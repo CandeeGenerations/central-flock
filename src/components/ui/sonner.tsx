@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import {
   CircleCheckIcon,
@@ -6,10 +6,10 @@ import {
   Loader2Icon,
   OctagonXIcon,
   TriangleAlertIcon,
-} from "lucide-react"
-import { Toaster as Sonner, type ToasterProps } from "sonner"
+} from 'lucide-react'
+import {Toaster as Sonner, type ToasterProps} from 'sonner'
 
-const Toaster = ({ ...props }: ToasterProps) => {
+const Toaster = ({...props}: ToasterProps) => {
   return (
     <Sonner
       className="toaster group"
@@ -22,10 +22,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
+          '--normal-bg': 'var(--color-popover)',
+          '--normal-text': 'var(--color-popover-foreground)',
+          '--normal-border': 'var(--color-border)',
+          '--success-bg': 'var(--color-popover)',
+          '--success-text': 'var(--color-popover-foreground)',
+          '--success-border': 'var(--color-border)',
+          '--error-bg': 'var(--color-popover)',
+          '--error-text': 'var(--color-popover-foreground)',
+          '--error-border': 'var(--color-border)',
+          '--border-radius': 'var(--radius)',
         } as React.CSSProperties
       }
       {...props}
@@ -33,4 +39,4 @@ const Toaster = ({ ...props }: ToasterProps) => {
   )
 }
 
-export { Toaster }
+export {Toaster}

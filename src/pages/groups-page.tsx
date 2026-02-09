@@ -1,44 +1,131 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { fetchGroups, createGroup, deleteGroup } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Users, Trash2, MessageSquare } from 'lucide-react';
-import { toast } from 'sonner';
+import {useState, useMemo} from 'react'
+import {usePersistedState} from '@/hooks/use-persisted-state'
+import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
+import {Link} from 'react-router-dom'
+import {fetchGroups, createGroup, deleteGroup} from '@/lib/api'
+import {Button} from '@/components/ui/button'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  Plus,
+  Search,
+  Trash2,
+  MessageSquare,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react'
+import {toast} from 'sonner'
+import {ConfirmDialog} from '@/components/confirm-dialog'
+
+type SortKey = 'name' | 'memberCount' | 'createdAt'
+type SortDir = 'asc' | 'desc'
 
 export function GroupsPage() {
-  const queryClient = useQueryClient();
-  const [addOpen, setAddOpen] = useState(false);
-  const [newGroup, setNewGroup] = useState({ name: '', description: '' });
+  const queryClient = useQueryClient()
+  const [addOpen, setAddOpen] = useState(false)
+  const [newGroup, setNewGroup] = useState({name: '', description: ''})
+  const [search, setSearch] = usePersistedState('groups.search', '')
+  const [sortKey, setSortKey] = usePersistedState<SortKey>(
+    'groups.sortKey',
+    'name',
+  )
+  const [sortDir, setSortDir] = usePersistedState<SortDir>(
+    'groups.sortDir',
+    'asc',
+  )
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number
+    name: string
+  } | null>(null)
 
-  const { data: groups, isLoading } = useQuery({
+  const {data: groups, isLoading} = useQuery({
     queryKey: ['groups'],
     queryFn: fetchGroups,
-  });
+  })
+
+  const filteredGroups = useMemo(() => {
+    if (!groups) return []
+    let result = groups
+    if (search) {
+      const q = search.toLowerCase()
+      result = result.filter(
+        (g) =>
+          g.name.toLowerCase().includes(q) ||
+          (g.description || '').toLowerCase().includes(q),
+      )
+    }
+    result = [...result].sort((a, b) => {
+      let cmp = 0
+      if (sortKey === 'name') cmp = a.name.localeCompare(b.name)
+      else if (sortKey === 'memberCount')
+        cmp = (a.memberCount || 0) - (b.memberCount || 0)
+      else if (sortKey === 'createdAt')
+        cmp = a.createdAt.localeCompare(b.createdAt)
+      return sortDir === 'desc' ? -cmp : cmp
+    })
+    return result
+  }, [groups, search, sortKey, sortDir])
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
+
+  const SortIcon = ({column}: {column: SortKey}) => {
+    if (sortKey !== column)
+      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />
+    return sortDir === 'asc' ? (
+      <ArrowUp className="h-3 w-3 ml-1" />
+    ) : (
+      <ArrowDown className="h-3 w-3 ml-1" />
+    )
+  }
 
   const createMutation = useMutation({
-    mutationFn: () => createGroup({ name: newGroup.name, description: newGroup.description || undefined }),
+    mutationFn: () =>
+      createGroup({
+        name: newGroup.name,
+        description: newGroup.description || undefined,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['groups'] });
-      setAddOpen(false);
-      setNewGroup({ name: '', description: '' });
-      toast.success('Group created');
+      queryClient.invalidateQueries({queryKey: ['groups']})
+      setAddOpen(false)
+      setNewGroup({name: '', description: ''})
+      toast.success('Group created')
     },
     onError: (err: Error) => toast.error(err.message),
-  });
+  })
 
   const deleteMutation = useMutation({
     mutationFn: deleteGroup,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['groups'] });
-      toast.success('Group deleted');
+      queryClient.invalidateQueries({queryKey: ['groups']})
+      toast.success('Group deleted')
+      setDeleteTarget(null)
     },
     onError: (err: Error) => toast.error(err.message),
-  });
+  })
 
   return (
     <div className="p-6 space-y-4">
@@ -46,7 +133,10 @@ export function GroupsPage() {
         <h2 className="text-2xl font-bold">Groups</h2>
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Create Group</Button>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Group
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -55,16 +145,31 @@ export function GroupsPage() {
             <div className="space-y-3">
               <div>
                 <Label>Name</Label>
-                <Input value={newGroup.name} onChange={e => setNewGroup(g => ({ ...g, name: e.target.value }))} />
+                <Input
+                  value={newGroup.name}
+                  onChange={(e) =>
+                    setNewGroup((g) => ({...g, name: e.target.value}))
+                  }
+                />
               </div>
               <div>
                 <Label>Description (optional)</Label>
-                <Input value={newGroup.description} onChange={e => setNewGroup(g => ({ ...g, description: e.target.value }))} />
+                <Input
+                  value={newGroup.description}
+                  onChange={(e) =>
+                    setNewGroup((g) => ({...g, description: e.target.value}))
+                  }
+                />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-              <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !newGroup.name.trim()}>
+              <Button variant="outline" onClick={() => setAddOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => createMutation.mutate()}
+                disabled={createMutation.isPending || !newGroup.name.trim()}
+              >
                 {createMutation.isPending ? 'Creating...' : 'Create'}
               </Button>
             </DialogFooter>
@@ -72,53 +177,120 @@ export function GroupsPage() {
         </Dialog>
       </div>
 
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search groups..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {groups?.map(group => (
-            <Card key={group.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <Link to={`/groups/${group.id}`}>
-                    <CardTitle className="text-lg hover:underline cursor-pointer">{group.name}</CardTitle>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0"
-                    onClick={() => {
-                      if (confirm(`Delete group "${group.name}"? Members will not be deleted.`))
-                        deleteMutation.mutate(group.id);
-                    }}
+        <div className="border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  <button
+                    className="flex items-center font-bold cursor-pointer"
+                    onClick={() => toggleSort('name')}
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {group.description && <p className="text-sm text-muted-foreground mb-3">{group.description}</p>}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Users className="h-4 w-4" />
-                    {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
-                  </div>
-                  <Link to={`/messages/compose?groupId=${group.id}`}>
-                    <Button variant="outline" size="sm">
-                      <MessageSquare className="h-3 w-3 mr-1" />Message
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {groups?.length === 0 && (
-            <div className="col-span-full text-center py-8 text-muted-foreground">
-              No groups yet. Create one or import from CSV.
-            </div>
-          )}
+                    Name <SortIcon column="name" />
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    className="flex items-center font-bold cursor-pointer"
+                    onClick={() => toggleSort('memberCount')}
+                  >
+                    Members <SortIcon column="memberCount" />
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    className="flex items-center font-bold cursor-pointer"
+                    onClick={() => toggleSort('createdAt')}
+                  >
+                    Created <SortIcon column="createdAt" />
+                  </button>
+                </TableHead>
+                <TableHead className="w-24">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredGroups.map((group) => (
+                <TableRow key={group.id}>
+                  <TableCell>
+                    <Link
+                      to={`/groups/${group.id}`}
+                      className="font-medium hover:underline"
+                    >
+                      {group.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{group.memberCount}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                    {new Date(group.createdAt).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Link to={`/messages/compose?groupId=${group.id}`}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Send message to group"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          setDeleteTarget({id: group.id, name: group.name})
+                        }
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filteredGroups.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={4}
+                    className="text-center text-muted-foreground py-8"
+                  >
+                    {groups?.length === 0
+                      ? 'No groups yet. Create one or import from CSV.'
+                      : 'No groups match your search.'}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open: boolean) => {
+          if (!open) setDeleteTarget(null)
+        }}
+        title={`Delete group "${deleteTarget?.name}"?`}
+        description="Members will not be deleted."
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget.id)
+        }}
+      />
     </div>
-  );
+  )
 }

@@ -1,13 +1,21 @@
 import {Router} from 'express'
 import {db, schema} from '../db/index.js'
-import {eq, like, or, and, sql, inArray} from 'drizzle-orm'
+import {eq, like, or, and, sql, inArray, desc, asc} from 'drizzle-orm'
 
 export const peopleRouter = Router()
 
 // GET /api/people - List all with optional search/filter
 peopleRouter.get('/', async (req, res) => {
   try {
-    const {search, status, groupId, page = '1', limit = '50'} = req.query
+    const {
+      search,
+      status,
+      groupId,
+      page = '1',
+      limit = '50',
+      sort = 'createdAt',
+      sortDir = 'desc',
+    } = req.query
     const offset = (Number(page) - 1) * Number(limit)
 
     const conditions = []
@@ -44,7 +52,21 @@ peopleRouter.get('/', async (req, res) => {
         .where(where)
         .limit(Number(limit))
         .offset(offset)
-        .orderBy(schema.people.lastName, schema.people.firstName),
+        .orderBy(
+          ...((): ReturnType<typeof desc>[] => {
+            const dir = sortDir === 'asc' ? asc : desc
+            switch (sort) {
+              case 'firstName':
+                return [dir(schema.people.firstName)]
+              case 'lastName':
+                return [dir(schema.people.lastName)]
+              case 'createdAt':
+                return [dir(schema.people.createdAt)]
+              default:
+                return [dir(schema.people.createdAt)]
+            }
+          })(),
+        ),
       db
         .select({count: sql<number>`count(*)`})
         .from(schema.people)
@@ -191,9 +213,19 @@ peopleRouter.put('/:id', async (req, res) => {
 // DELETE /api/people/:id - Delete person
 peopleRouter.delete('/:id', async (req, res) => {
   try {
+    const personId = Number(req.params.id)
+
+    // Remove related records first
+    db.delete(schema.peopleGroups)
+      .where(eq(schema.peopleGroups.personId, personId))
+      .run()
+    db.delete(schema.messageRecipients)
+      .where(eq(schema.messageRecipients.personId, personId))
+      .run()
+
     const result = db
       .delete(schema.people)
-      .where(eq(schema.people.id, Number(req.params.id)))
+      .where(eq(schema.people.id, personId))
       .returning()
       .get()
 

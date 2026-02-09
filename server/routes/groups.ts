@@ -214,7 +214,8 @@ groupsRouter.delete('/:id/members', async (req, res) => {
 groupsRouter.get('/:id/non-members', async (req, res) => {
   try {
     const groupId = Number(req.params.id)
-    const {search} = req.query
+    const {search, page = '1', limit = '30'} = req.query
+    const offset = (Number(page) - 1) * Number(limit)
 
     const memberIds = db
       .select({personId: schema.peopleGroups.personId})
@@ -229,15 +230,28 @@ groupsRouter.get('/:id/non-members', async (req, res) => {
       )
     }
 
-    const nonMembers = db
-      .select()
-      .from(schema.people)
-      .where(and(...conditions))
-      .orderBy(schema.people.lastName, schema.people.firstName)
-      .limit(50)
-      .all()
+    const where = and(...conditions)
 
-    res.json(nonMembers)
+    const [nonMembers, countResult] = await Promise.all([
+      db
+        .select()
+        .from(schema.people)
+        .where(where)
+        .orderBy(schema.people.lastName, schema.people.firstName)
+        .limit(Number(limit))
+        .offset(offset),
+      db
+        .select({count: sql<number>`count(*)`})
+        .from(schema.people)
+        .where(where),
+    ])
+
+    res.json({
+      data: nonMembers,
+      total: countResult[0]?.count || 0,
+      page: Number(page),
+      limit: Number(limit),
+    })
   } catch (error) {
     console.error('Error fetching non-members:', error)
     res.status(500).json({error: 'Failed to fetch non-members'})

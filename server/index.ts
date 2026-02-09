@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { peopleRouter } from './routes/people.js';
 import { groupsRouter } from './routes/groups.js';
 import { messagesRouter } from './routes/messages.js';
+import { draftsRouter } from './routes/drafts.js';
 import { importRouter } from './routes/import.js';
 import { contactsRouter } from './routes/contacts.js';
 
@@ -19,6 +20,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/people', peopleRouter);
 app.use('/api/groups', groupsRouter);
 app.use('/api/messages', messagesRouter);
+app.use('/api/drafts', draftsRouter);
 app.use('/api/import', importRouter);
 app.use('/api/contacts', contactsRouter);
 

@@ -18,6 +18,6 @@ if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
   "$PROJECT_DIR/scripts/flock-pulse.sh" stop
   echo "Flock Pulse stopped"
 else
-  "$PROJECT_DIR/scripts/flock-pulse.sh" start
-  echo "Flock Pulse started"
+  "$PROJECT_DIR/scripts/flock-pulse.sh" start &
+  echo "Starting Flock Pulse..."
 fi

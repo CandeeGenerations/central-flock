@@ -12,4 +12,5 @@
 PROJECT_DIR="/Users/cgen01/repos/cgen/flock-pulse"
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-"$PROJECT_DIR/scripts/flock-pulse.sh" start
+"$PROJECT_DIR/scripts/flock-pulse.sh" start &
+echo "Starting Flock Pulse..."

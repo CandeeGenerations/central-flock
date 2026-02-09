@@ -106,10 +106,7 @@ export function createGroup(data: {name: string; description?: string}) {
   return request<Group>('/groups', {method: 'POST', body: JSON.stringify(data)})
 }
 
-export function updateGroup(
-  id: number,
-  data: {name?: string; description?: string},
-) {
+export function updateGroup(id: number, data: {name?: string; description?: string}) {
   return request<Group>(`/groups/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -141,18 +138,13 @@ export interface NonMembersResponse {
   limit: number
 }
 
-export function fetchNonMembers(
-  groupId: number,
-  params?: {search?: string; page?: number; limit?: number},
-) {
+export function fetchNonMembers(groupId: number, params?: {search?: string; page?: number; limit?: number}) {
   const searchParams = new URLSearchParams()
   if (params?.search) searchParams.set('search', params.search)
   if (params?.page) searchParams.set('page', String(params.page))
   if (params?.limit) searchParams.set('limit', String(params.limit))
   const qs = searchParams.toString()
-  return request<NonMembersResponse>(
-    `/groups/${groupId}/non-members${qs ? `?${qs}` : ''}`,
-  )
+  return request<NonMembersResponse>(`/groups/${groupId}/non-members${qs ? `?${qs}` : ''}`)
 }
 
 // Messages
@@ -258,19 +250,14 @@ export function fetchDraft(id: number) {
   return request<Draft>(`/drafts/${id}`)
 }
 
-export function createDraft(
-  data: Partial<Omit<Draft, 'id' | 'createdAt' | 'updatedAt'>>,
-) {
+export function createDraft(data: Partial<Omit<Draft, 'id' | 'createdAt' | 'updatedAt'>>) {
   return request<Draft>('/drafts', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export function updateDraft(
-  id: number,
-  data: Partial<Omit<Draft, 'id' | 'createdAt' | 'updatedAt'>>,
-) {
+export function updateDraft(id: number, data: Partial<Omit<Draft, 'id' | 'createdAt' | 'updatedAt'>>) {
   return request<Draft>(`/drafts/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -312,10 +299,7 @@ export function previewImport(csvData: string) {
   })
 }
 
-export function executeImport(
-  people: ImportPreview['people'],
-  skipDuplicates = true,
-) {
+export function executeImport(people: ImportPreview['people'], skipDuplicates = true) {
   return request<{
     peopleCreated: number
     peopleUpdated: number

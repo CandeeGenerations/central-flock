@@ -1,42 +1,21 @@
-import {useState} from 'react'
-import {usePersistedState} from '@/hooks/use-persisted-state'
-import {useParams, useNavigate} from 'react-router-dom'
-import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
-import {fetchMessage, cancelMessage} from '@/lib/api'
-import {Button} from '@/components/ui/button'
 import {Badge} from '@/components/ui/badge'
+import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Progress} from '@/components/ui/progress'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  ArrowLeft,
-  XCircle,
-  Copy,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {usePersistedState} from '@/hooks/use-persisted-state'
+import {cancelMessage, fetchMessage} from '@/lib/api'
+import {formatDateTime} from '@/lib/date'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, XCircle} from 'lucide-react'
+import {useState} from 'react'
+import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 type ErrorInfo = {name: string; error: string}
 
-const recipientStatusColors: Record<
-  string,
-  'default' | 'secondary' | 'destructive' | 'outline'
-> = {
+const recipientStatusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   sent: 'default',
   pending: 'outline',
   failed: 'destructive',
@@ -69,35 +48,24 @@ export function MessageDetailPage() {
     },
   })
 
-  if (isLoading)
-    return <div className="p-6 text-muted-foreground">Loading...</div>
+  if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>
   if (!message) return <div className="p-6">Message not found</div>
 
   const progressPercent =
     message.totalRecipients > 0
-      ? ((message.sentCount + message.failedCount + message.skippedCount) /
-          message.totalRecipients) *
-        100
+      ? ((message.sentCount + message.failedCount + message.skippedCount) / message.totalRecipients) * 100
       : 0
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/messages')}
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate('/messages')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h2 className="text-2xl font-bold">Message Detail</h2>
         <Badge
           variant={
-            message.status === 'completed'
-              ? 'default'
-              : message.status === 'cancelled'
-                ? 'destructive'
-                : 'secondary'
+            message.status === 'completed' ? 'default' : message.status === 'cancelled' ? 'destructive' : 'secondary'
           }
         >
           {message.status}
@@ -111,9 +79,7 @@ export function MessageDetailPage() {
               state: {
                 content: message.content,
                 groupId: message.groupId,
-                excludeIds: message.recipients
-                  .filter((r) => r.status === 'skipped')
-                  .map((r) => r.personId),
+                excludeIds: message.recipients.filter((r) => r.status === 'skipped').map((r) => r.personId),
               },
             })
           }
@@ -128,9 +94,7 @@ export function MessageDetailPage() {
           <CardTitle>Message Content</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="whitespace-pre-wrap bg-muted p-4 rounded-md">
-            {message.content}
-          </p>
+          <p className="whitespace-pre-wrap bg-muted p-4 rounded-md">{message.content}</p>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Group</span>
@@ -138,7 +102,7 @@ export function MessageDetailPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Date</span>
-              <p>{new Date(message.createdAt).toLocaleString()}</p>
+              <p>{formatDateTime(message.createdAt)}</p>
             </div>
           </div>
         </CardContent>
@@ -149,11 +113,7 @@ export function MessageDetailPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Progress</CardTitle>
           {message.status === 'sending' && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => cancelMutation.mutate()}
-            >
+            <Button variant="destructive" size="sm" onClick={() => cancelMutation.mutate()}>
               <XCircle className="h-4 w-4 mr-1" />
               Cancel
             </Button>
@@ -164,9 +124,7 @@ export function MessageDetailPage() {
           <div className="flex gap-6 text-sm">
             <span className="text-green-600">Sent: {message.sentCount}</span>
             <span className="text-red-500">Failed: {message.failedCount}</span>
-            <span className="text-muted-foreground">
-              Skipped: {message.skippedCount}
-            </span>
+            <span className="text-muted-foreground">Skipped: {message.skippedCount}</span>
             <span>Total: {message.totalRecipients}</span>
           </div>
         </CardContent>
@@ -189,66 +147,44 @@ export function MessageDetailPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {message.recipients
-                .slice((page - 1) * pageSize, page * pageSize)
-                .map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>
-                      {[r.firstName, r.lastName].filter(Boolean).join(' ') ||
-                        'Unnamed'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {r.phoneDisplay}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={recipientStatusColors[r.status] || 'outline'}
+              {message.recipients.slice((page - 1) * pageSize, page * pageSize).map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell>{[r.firstName, r.lastName].filter(Boolean).join(' ') || 'Unnamed'}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.phoneDisplay}</TableCell>
+                  <TableCell>
+                    <Badge variant={recipientStatusColors[r.status] || 'outline'}>{r.status}</Badge>
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate text-sm">{r.renderedContent}</TableCell>
+                  <TableCell>
+                    {r.errorMessage && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 h-7 px-2"
+                        onClick={() =>
+                          setErrorInfo({
+                            name: [r.firstName, r.lastName].filter(Boolean).join(' ') || 'Unnamed',
+                            error: r.errorMessage!,
+                          })
+                        }
                       >
-                        {r.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-sm">
-                      {r.renderedContent}
-                    </TableCell>
-                    <TableCell>
-                      {r.errorMessage && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500 h-7 px-2"
-                          onClick={() =>
-                            setErrorInfo({
-                              name:
-                                [r.firstName, r.lastName]
-                                  .filter(Boolean)
-                                  .join(' ') || 'Unnamed',
-                              error: r.errorMessage!,
-                            })
-                          }
-                        >
-                          <AlertCircle className="h-4 w-4 mr-1" />
-                          Error
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        <AlertCircle className="h-4 w-4 mr-1" />
+                        Error
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
           {message.recipients.length > pageSize && (
             <div className="flex items-center justify-between pt-4">
               <span className="text-sm text-muted-foreground">
-                Showing {(page - 1) * pageSize + 1}–
-                {Math.min(page * pageSize, message.recipients.length)} of{' '}
+                Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, message.recipients.length)} of{' '}
                 {message.recipients.length}
               </span>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <Button

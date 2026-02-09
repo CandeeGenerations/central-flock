@@ -1,53 +1,26 @@
-import {useState, useRef, useCallback} from 'react'
-import {useParams, useNavigate, Link} from 'react-router-dom'
-import {
-  useQuery,
-  useInfiniteQuery,
-  useMutation,
-  useQueryClient,
-} from '@tanstack/react-query'
-import {
-  fetchGroup,
-  updateGroup,
-  deleteGroup,
-  addGroupMembers,
-  removeGroupMembers,
-  fetchNonMembers,
-  type Person,
-} from '@/lib/api'
+import {ConfirmDialog} from '@/components/confirm-dialog'
+import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Checkbox} from '@/components/ui/checkbox'
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import {Badge} from '@/components/ui/badge'
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import {Checkbox} from '@/components/ui/checkbox'
-import {
-  ArrowLeft,
-  Save,
-  Trash2,
-  UserPlus,
-  UserMinus,
-  UserX,
-  MessageSquare,
-  Search,
-} from 'lucide-react'
+  type Person,
+  addGroupMembers,
+  deleteGroup,
+  fetchGroup,
+  fetchNonMembers,
+  removeGroupMembers,
+  updateGroup,
+} from '@/lib/api'
+import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {ArrowLeft, MessageSquare, Save, Search, Trash2, UserMinus, UserPlus, UserX} from 'lucide-react'
+import {useCallback, useRef, useState} from 'react'
+import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
-import {ConfirmDialog} from '@/components/confirm-dialog'
 
 export function GroupDetailPage() {
   const {id} = useParams<{id: string}>()
@@ -132,6 +105,7 @@ export function GroupDetailPage() {
       queryClient.invalidateQueries({queryKey: ['group', id]})
       queryClient.invalidateQueries({queryKey: ['nonMembers']})
       queryClient.invalidateQueries({queryKey: ['groups']})
+      queryClient.invalidateQueries({queryKey: ['drafts']})
       setSelectedIds(new Set())
       setAddMembersOpen(false)
       toast.success('Members added')
@@ -143,12 +117,12 @@ export function GroupDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['group', id]})
       queryClient.invalidateQueries({queryKey: ['groups']})
+      queryClient.invalidateQueries({queryKey: ['drafts']})
       toast.success('Member removed')
     },
   })
 
-  const inactiveMembers =
-    group?.members.filter((m: Person) => m.status !== 'active') || []
+  const inactiveMembers = group?.members.filter((m: Person) => m.status !== 'active') || []
 
   const removeInactiveMutation = useMutation({
     mutationFn: () =>
@@ -159,10 +133,9 @@ export function GroupDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['group', id]})
       queryClient.invalidateQueries({queryKey: ['groups']})
+      queryClient.invalidateQueries({queryKey: ['drafts']})
       setRemoveInactiveOpen(false)
-      toast.success(
-        `Removed ${inactiveMembers.length} inactive member${inactiveMembers.length !== 1 ? 's' : ''}`,
-      )
+      toast.success(`Removed ${inactiveMembers.length} inactive member${inactiveMembers.length !== 1 ? 's' : ''}`)
     },
   })
 
@@ -182,8 +155,7 @@ export function GroupDetailPage() {
     })
   }
 
-  if (isLoading)
-    return <div className="p-6 text-muted-foreground">Loading...</div>
+  if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>
   if (!group) return <div className="p-6">Group not found</div>
 
   return (
@@ -219,27 +191,17 @@ export function GroupDetailPage() {
             <div className="space-y-3">
               <div>
                 <Label>Name</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) =>
-                    setForm((f) => ({...f, name: e.target.value}))
-                  }
-                />
+                <Input value={form.name} onChange={(e) => setForm((f) => ({...f, name: e.target.value}))} />
               </div>
               <div>
                 <Label>Description</Label>
                 <Input
                   value={form.description}
-                  onChange={(e) =>
-                    setForm((f) => ({...f, description: e.target.value}))
-                  }
+                  onChange={(e) => setForm((f) => ({...f, description: e.target.value}))}
                 />
               </div>
               <div className="flex gap-2">
-                <Button
-                  onClick={() => updateMutation.mutate()}
-                  disabled={updateMutation.isPending}
-                >
+                <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
                   <Save className="h-4 w-4 mr-1" />
                   Save
                 </Button>
@@ -249,9 +211,7 @@ export function GroupDetailPage() {
               </div>
             </div>
           ) : (
-            <p className="text-muted-foreground">
-              {group.description || 'No description'}
-            </p>
+            <p className="text-muted-foreground">{group.description || 'No description'}</p>
           )}
         </CardContent>
       </Card>
@@ -262,11 +222,7 @@ export function GroupDetailPage() {
           <CardTitle>Members</CardTitle>
           <div className="flex gap-2">
             {inactiveMembers.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setRemoveInactiveOpen(true)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setRemoveInactiveOpen(true)}>
                 <UserX className="h-4 w-4 mr-1" />
                 Remove Inactive ({inactiveMembers.length})
               </Button>
@@ -291,23 +247,13 @@ export function GroupDetailPage() {
               {group.members.map((m: Person) => (
                 <TableRow key={m.id}>
                   <TableCell>
-                    <Link
-                      to={`/people/${m.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {[m.firstName, m.lastName].filter(Boolean).join(' ') ||
-                        'Unnamed'}
+                    <Link to={`/people/${m.id}`} className="font-medium hover:underline">
+                      {[m.firstName, m.lastName].filter(Boolean).join(' ') || 'Unnamed'}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {m.phoneDisplay || m.phoneNumber}
-                  </TableCell>
+                  <TableCell className="text-muted-foreground">{m.phoneDisplay || m.phoneNumber}</TableCell>
                   <TableCell>
-                    <Badge
-                      variant={m.status === 'active' ? 'default' : 'secondary'}
-                    >
-                      {m.status}
-                    </Badge>
+                    <Badge variant={m.status === 'active' ? 'default' : 'secondary'}>{m.status}</Badge>
                   </TableCell>
                   <TableCell>
                     <Button
@@ -323,10 +269,7 @@ export function GroupDetailPage() {
               ))}
               {group.members.length === 0 && (
                 <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="text-center text-muted-foreground py-6"
-                  >
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
                     No members
                   </TableCell>
                 </TableRow>
@@ -363,30 +306,14 @@ export function GroupDetailPage() {
                 key={p.id}
                 className="group flex items-center gap-3 px-3 py-2 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer"
               >
-                <Checkbox
-                  checked={selectedIds.has(p.id)}
-                  onCheckedChange={() => toggleSelected(p.id)}
-                />
-                <span className="flex-1">
-                  {[p.firstName, p.lastName].filter(Boolean).join(' ') ||
-                    'Unnamed'}
-                </span>
-                <span className="text-sm group-hover:text-inherit">
-                  {p.phoneDisplay}
-                </span>
+                <Checkbox checked={selectedIds.has(p.id)} onCheckedChange={() => toggleSelected(p.id)} />
+                <span className="flex-1">{[p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unnamed'}</span>
+                <span className="text-sm group-hover:text-inherit">{p.phoneDisplay}</span>
               </label>
             ))}
-            {nonMembers.length === 0 && (
-              <p className="text-center text-muted-foreground py-4">
-                No people to add
-              </p>
-            )}
+            {nonMembers.length === 0 && <p className="text-center text-muted-foreground py-4">No people to add</p>}
             <div ref={sentinelRef} className="h-1" />
-            {isFetchingNextPage && (
-              <p className="text-center text-muted-foreground text-sm py-2">
-                Loading more...
-              </p>
-            )}
+            {isFetchingNextPage && <p className="text-center text-muted-foreground text-sm py-2">Loading more...</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddMembersOpen(false)}>

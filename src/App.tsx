@@ -1,17 +1,17 @@
-import {BrowserRouter, Routes, Route, NavLink, Navigate} from 'react-router-dom'
-import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {Toaster} from '@/components/ui/sonner'
-import {Users, FolderOpen, MessageSquare, Upload, Moon, Sun} from 'lucide-react'
-import {useState, useEffect} from 'react'
 import {cn} from '@/lib/utils'
+import {GroupDetailPage} from '@/pages/group-detail-page'
+import {GroupsPage} from '@/pages/groups-page'
+import {ImportPage} from '@/pages/import-page'
+import {MessageComposePage} from '@/pages/message-compose-page'
+import {MessageDetailPage} from '@/pages/message-detail-page'
+import {MessageHistoryPage} from '@/pages/message-history-page'
 import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
-import {GroupsPage} from '@/pages/groups-page'
-import {GroupDetailPage} from '@/pages/group-detail-page'
-import {MessageComposePage} from '@/pages/message-compose-page'
-import {MessageHistoryPage} from '@/pages/message-history-page'
-import {MessageDetailPage} from '@/pages/message-detail-page'
-import {ImportPage} from '@/pages/import-page'
+import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
+import {FolderOpen, MessageSquare, Moon, Sun, Upload, Users} from 'lucide-react'
+import {useEffect, useState} from 'react'
+import {BrowserRouter, NavLink, Navigate, Route, Routes} from 'react-router-dom'
 
 const queryClient = new QueryClient({
   defaultOptions: {queries: {staleTime: 30_000}},
@@ -52,9 +52,7 @@ function AppLayout() {
               className={({isActive}) =>
                 cn(
                   'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'hover:bg-sidebar-accent/50',
+                  isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/50',
                 )
               }
             >

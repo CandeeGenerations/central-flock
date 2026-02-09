@@ -1,38 +1,17 @@
-import {useState, useMemo} from 'react'
-import {usePersistedState} from '@/hooks/use-persisted-state'
-import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
-import {Link} from 'react-router-dom'
-import {fetchGroups, createGroup, deleteGroup} from '@/lib/api'
+import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Button} from '@/components/ui/button'
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import {
-  Plus,
-  Search,
-  Trash2,
-  MessageSquare,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-} from 'lucide-react'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {usePersistedState} from '@/hooks/use-persisted-state'
+import {createGroup, deleteGroup, fetchGroups} from '@/lib/api'
+import {formatDate} from '@/lib/date'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {ArrowDown, ArrowUp, ArrowUpDown, MessageSquare, Plus, Search, Trash2} from 'lucide-react'
+import {useMemo, useState} from 'react'
+import {Link} from 'react-router-dom'
 import {toast} from 'sonner'
-import {ConfirmDialog} from '@/components/confirm-dialog'
 
 type SortKey = 'name' | 'memberCount' | 'createdAt'
 type SortDir = 'asc' | 'desc'
@@ -42,14 +21,8 @@ export function GroupsPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [newGroup, setNewGroup] = useState({name: '', description: ''})
   const [search, setSearch] = usePersistedState('groups.search', '')
-  const [sortKey, setSortKey] = usePersistedState<SortKey>(
-    'groups.sortKey',
-    'name',
-  )
-  const [sortDir, setSortDir] = usePersistedState<SortDir>(
-    'groups.sortDir',
-    'asc',
-  )
+  const [sortKey, setSortKey] = usePersistedState<SortKey>('groups.sortKey', 'name')
+  const [sortDir, setSortDir] = usePersistedState<SortDir>('groups.sortDir', 'asc')
   const [deleteTarget, setDeleteTarget] = useState<{
     id: number
     name: string
@@ -65,19 +38,13 @@ export function GroupsPage() {
     let result = groups
     if (search) {
       const q = search.toLowerCase()
-      result = result.filter(
-        (g) =>
-          g.name.toLowerCase().includes(q) ||
-          (g.description || '').toLowerCase().includes(q),
-      )
+      result = result.filter((g) => g.name.toLowerCase().includes(q) || (g.description || '').toLowerCase().includes(q))
     }
     result = [...result].sort((a, b) => {
       let cmp = 0
       if (sortKey === 'name') cmp = a.name.localeCompare(b.name)
-      else if (sortKey === 'memberCount')
-        cmp = (a.memberCount || 0) - (b.memberCount || 0)
-      else if (sortKey === 'createdAt')
-        cmp = a.createdAt.localeCompare(b.createdAt)
+      else if (sortKey === 'memberCount') cmp = (a.memberCount || 0) - (b.memberCount || 0)
+      else if (sortKey === 'createdAt') cmp = a.createdAt.localeCompare(b.createdAt)
       return sortDir === 'desc' ? -cmp : cmp
     })
     return result
@@ -93,13 +60,8 @@ export function GroupsPage() {
   }
 
   const SortIcon = ({column}: {column: SortKey}) => {
-    if (sortKey !== column)
-      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />
-    return sortDir === 'asc' ? (
-      <ArrowUp className="h-3 w-3 ml-1" />
-    ) : (
-      <ArrowDown className="h-3 w-3 ml-1" />
-    )
+    if (sortKey !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />
+    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />
   }
 
   const createMutation = useMutation({
@@ -145,20 +107,13 @@ export function GroupsPage() {
             <div className="space-y-3">
               <div>
                 <Label>Name</Label>
-                <Input
-                  value={newGroup.name}
-                  onChange={(e) =>
-                    setNewGroup((g) => ({...g, name: e.target.value}))
-                  }
-                />
+                <Input value={newGroup.name} onChange={(e) => setNewGroup((g) => ({...g, name: e.target.value}))} />
               </div>
               <div>
                 <Label>Description (optional)</Label>
                 <Input
                   value={newGroup.description}
-                  onChange={(e) =>
-                    setNewGroup((g) => ({...g, description: e.target.value}))
-                  }
+                  onChange={(e) => setNewGroup((g) => ({...g, description: e.target.value}))}
                 />
               </div>
             </div>
@@ -196,10 +151,7 @@ export function GroupsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>
-                  <button
-                    className="flex items-center font-bold cursor-pointer"
-                    onClick={() => toggleSort('name')}
-                  >
+                  <button className="flex items-center font-bold cursor-pointer" onClick={() => toggleSort('name')}>
                     Name <SortIcon column="name" />
                   </button>
                 </TableHead>
@@ -226,34 +178,25 @@ export function GroupsPage() {
               {filteredGroups.map((group) => (
                 <TableRow key={group.id}>
                   <TableCell>
-                    <Link
-                      to={`/groups/${group.id}`}
-                      className="font-medium hover:underline"
-                    >
+                    <Link to={`/groups/${group.id}`} className="font-medium hover:underline">
                       {group.name}
                     </Link>
                   </TableCell>
                   <TableCell>{group.memberCount}</TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                    {new Date(group.createdAt).toLocaleDateString()}
+                    {formatDate(group.createdAt)}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Link to={`/messages/compose?groupId=${group.id}`}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Send message to group"
-                        >
+                        <Button variant="ghost" size="icon" title="Send message to group">
                           <MessageSquare className="h-4 w-4" />
                         </Button>
                       </Link>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() =>
-                          setDeleteTarget({id: group.id, name: group.name})
-                        }
+                        onClick={() => setDeleteTarget({id: group.id, name: group.name})}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -263,10 +206,7 @@ export function GroupsPage() {
               ))}
               {filteredGroups.length === 0 && (
                 <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="text-center text-muted-foreground py-8"
-                  >
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                     {groups?.length === 0
                       ? 'No groups yet. Create one or import from CSV.'
                       : 'No groups match your search.'}

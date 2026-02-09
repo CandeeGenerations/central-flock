@@ -10,11 +10,7 @@ export interface SendJob {
 const activeJobs = new Map<number, SendJob>()
 let jobCounter = 0
 
-export function createJob(
-  messageId: number,
-  batchSize: number,
-  batchDelayMs: number,
-): SendJob {
+export function createJob(messageId: number, batchSize: number, batchDelayMs: number): SendJob {
   const job: SendJob = {
     id: `job_${++jobCounter}`,
     messageId,

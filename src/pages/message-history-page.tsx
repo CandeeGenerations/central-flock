@@ -1,33 +1,18 @@
-import {useState} from 'react'
-import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
-import {Link, useNavigate} from 'react-router-dom'
-import {
-  fetchMessages,
-  deleteMessages,
-  fetchDrafts,
-  deleteDrafts,
-  duplicateDraft,
-} from '@/lib/api'
-import type {Draft} from '@/lib/api'
-import {Button} from '@/components/ui/button'
-import {Badge} from '@/components/ui/badge'
-import {Checkbox} from '@/components/ui/checkbox'
 import {ConfirmDialog} from '@/components/confirm-dialog'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {Plus, Trash2, Copy} from 'lucide-react'
+import {Badge} from '@/components/ui/badge'
+import {Button} from '@/components/ui/button'
+import {Checkbox} from '@/components/ui/checkbox'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {deleteDrafts, deleteMessages, duplicateDraft, fetchDrafts, fetchMessages} from '@/lib/api'
+import type {Draft} from '@/lib/api'
+import {formatDateTime} from '@/lib/date'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {Copy, Plus, Trash2} from 'lucide-react'
+import {useState} from 'react'
+import {Link, useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
 
-const statusColors: Record<
-  string,
-  'default' | 'secondary' | 'destructive' | 'outline'
-> = {
+const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   completed: 'default',
   sending: 'secondary',
   pending: 'outline',
@@ -52,25 +37,19 @@ export function MessageHistoryPage() {
     queryKey: ['drafts'],
     queryFn: fetchDrafts,
   })
-  const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(
-    new Set(),
-  )
+  const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set())
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false)
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteMessages([...selectedIds]),
     onSuccess: (data) => {
       queryClient.invalidateQueries({queryKey: ['messages']})
-      toast.success(
-        `Deleted ${data.deleted} message${data.deleted !== 1 ? 's' : ''}`,
-      )
+      toast.success(`Deleted ${data.deleted} message${data.deleted !== 1 ? 's' : ''}`)
       setSelectedIds(new Set())
       setConfirmOpen(false)
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to delete messages',
-      )
+      toast.error(error instanceof Error ? error.message : 'Failed to delete messages')
     },
   })
 
@@ -78,16 +57,12 @@ export function MessageHistoryPage() {
     mutationFn: () => deleteDrafts([...selectedDraftIds]),
     onSuccess: (data) => {
       queryClient.invalidateQueries({queryKey: ['drafts']})
-      toast.success(
-        `Deleted ${data.deleted} draft${data.deleted !== 1 ? 's' : ''}`,
-      )
+      toast.success(`Deleted ${data.deleted} draft${data.deleted !== 1 ? 's' : ''}`)
       setSelectedDraftIds(new Set())
       setDraftConfirmOpen(false)
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to delete drafts',
-      )
+      toast.error(error instanceof Error ? error.message : 'Failed to delete drafts')
     },
   })
 
@@ -99,9 +74,7 @@ export function MessageHistoryPage() {
       navigate(`/messages/compose?draftId=${draft.id}`)
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to duplicate draft',
-      )
+      toast.error(error instanceof Error ? error.message : 'Failed to duplicate draft')
     },
   })
 
@@ -164,8 +137,7 @@ export function MessageHistoryPage() {
       (draft.recipientMode === 'group' && !!draft.groupId) ||
       (draft.recipientMode === 'individual' && !!draft.selectedIndividualIds)
     if (hasContent && hasRecipients) return {label: 'Ready', variant: 'default'}
-    if (!hasContent && !hasRecipients)
-      return {label: 'Empty', variant: 'destructive'}
+    if (!hasContent && !hasRecipients) return {label: 'Empty', variant: 'destructive'}
     return {label: 'Incomplete', variant: 'outline'}
   }
 
@@ -181,10 +153,7 @@ export function MessageHistoryPage() {
             </Button>
           )}
           {activeTab === 'drafts' && selectedDraftIds.size > 0 && (
-            <Button
-              variant="destructive"
-              onClick={() => setDraftConfirmOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDraftConfirmOpen(true)}>
               <Trash2 className="h-4 w-4 mr-2" />
               Delete ({selectedDraftIds.size})
             </Button>
@@ -236,9 +205,7 @@ export function MessageHistoryPage() {
       {activeTab === 'sent' && (
         <>
           {messagesLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading...
-            </div>
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
           ) : (
             <div className="border rounded-md">
               <Table>
@@ -246,11 +213,7 @@ export function MessageHistoryPage() {
                   <TableRow>
                     <TableHead className="w-10">
                       <Checkbox
-                        checked={
-                          messages &&
-                          messages.length > 0 &&
-                          selectedIds.size === messages.length
-                        }
+                        checked={messages && messages.length > 0 && selectedIds.size === messages.length}
                         onCheckedChange={toggleAll}
                       />
                     </TableHead>
@@ -266,47 +229,26 @@ export function MessageHistoryPage() {
                   {messages?.map((msg) => (
                     <TableRow key={msg.id}>
                       <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(msg.id)}
-                          onCheckedChange={() => toggleSelect(msg.id)}
-                        />
+                        <Checkbox checked={selectedIds.has(msg.id)} onCheckedChange={() => toggleSelect(msg.id)} />
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {new Date(msg.createdAt).toLocaleDateString()}{' '}
-                        {new Date(msg.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatDateTime(msg.createdAt)}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
-                        <Link
-                          to={`/messages/${msg.id}`}
-                          className="hover:underline"
-                        >
+                        <Link to={`/messages/${msg.id}`} className="hover:underline">
                           {msg.content.substring(0, 80)}
                           {msg.content.length > 80 ? '...' : ''}
                         </Link>
                       </TableCell>
                       <TableCell>
                         <span className="text-green-600">{msg.sentCount}</span>
-                        {msg.failedCount > 0 && (
-                          <span className="text-red-500 ml-1">
-                            / {msg.failedCount} failed
-                          </span>
-                        )}
-                        <span className="text-muted-foreground">
-                          {' '}
-                          of {msg.totalRecipients}
-                        </span>
+                        {msg.failedCount > 0 && <span className="text-red-500 ml-1">/ {msg.failedCount} failed</span>}
+                        <span className="text-muted-foreground"> of {msg.totalRecipients}</span>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusColors[msg.status] || 'outline'}>
-                          {msg.status}
-                        </Badge>
+                        <Badge variant={statusColors[msg.status] || 'outline'}>{msg.status}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {msg.groupName || '—'}
-                      </TableCell>
+                      <TableCell className="text-muted-foreground">{msg.groupName || '—'}</TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"
@@ -328,10 +270,7 @@ export function MessageHistoryPage() {
                   ))}
                   {messages?.length === 0 && (
                     <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="text-center text-muted-foreground py-8"
-                      >
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No messages sent yet.{' '}
                         <Link to="/messages/compose" className="underline">
                           Compose one
@@ -350,9 +289,7 @@ export function MessageHistoryPage() {
       {activeTab === 'drafts' && (
         <>
           {draftsLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading...
-            </div>
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
           ) : (
             <div className="border rounded-md">
               <Table>
@@ -360,11 +297,7 @@ export function MessageHistoryPage() {
                   <TableRow>
                     <TableHead className="w-10">
                       <Checkbox
-                        checked={
-                          drafts &&
-                          drafts.length > 0 &&
-                          selectedDraftIds.size === drafts.length
-                        }
+                        checked={drafts && drafts.length > 0 && selectedDraftIds.size === drafts.length}
                         onCheckedChange={toggleAllDrafts}
                       />
                     </TableHead>
@@ -393,11 +326,7 @@ export function MessageHistoryPage() {
                         />
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {new Date(draft.updatedAt).toLocaleDateString()}{' '}
-                        {new Date(draft.updatedAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatDateTime(draft.updatedAt)}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
                         {draft.name ||
@@ -407,18 +336,12 @@ export function MessageHistoryPage() {
                               {draft.content.length > 80 ? '...' : ''}
                             </>
                           ) : (
-                            <span className="text-muted-foreground italic">
-                              Empty draft
-                            </span>
+                            <span className="text-muted-foreground italic">Empty draft</span>
                           ))}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {getDraftRecipientInfo(draft)}
-                      </TableCell>
+                      <TableCell className="text-muted-foreground">{getDraftRecipientInfo(draft)}</TableCell>
                       <TableCell>
-                        <Badge variant={getDraftStatus(draft).variant}>
-                          {getDraftStatus(draft).label}
-                        </Badge>
+                        <Badge variant={getDraftStatus(draft).variant}>{getDraftStatus(draft).label}</Badge>
                       </TableCell>
                       <TableCell>
                         <Button
@@ -437,10 +360,7 @@ export function MessageHistoryPage() {
                   ))}
                   {drafts?.length === 0 && (
                     <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="text-center text-muted-foreground py-8"
-                      >
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                         No drafts saved yet.
                       </TableCell>
                     </TableRow>

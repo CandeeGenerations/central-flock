@@ -1,61 +1,61 @@
-import { useState, useRef } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { previewImport, executeImport, type ImportPreview } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Upload, FileText, CheckCircle } from 'lucide-react';
-import { toast } from 'sonner';
+import {Badge} from '@/components/ui/badge'
+import {Button} from '@/components/ui/button'
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Checkbox} from '@/components/ui/checkbox'
+import {Label} from '@/components/ui/label'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {type ImportPreview, executeImport, previewImport} from '@/lib/api'
+import {useMutation, useQueryClient} from '@tanstack/react-query'
+import {CheckCircle, FileText, Upload} from 'lucide-react'
+import {useRef, useState} from 'react'
+import {toast} from 'sonner'
 
 export function ImportPage() {
-  const queryClient = useQueryClient();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [skipDuplicates, setSkipDuplicates] = useState(true);
+  const queryClient = useQueryClient()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const [skipDuplicates, setSkipDuplicates] = useState(true)
   const [importResult, setImportResult] = useState<{
-    peopleCreated: number;
-    peopleUpdated: number;
-    peopleSkipped: number;
-    groupsCreated: number;
-    membershipsCreated: number;
-  } | null>(null);
+    peopleCreated: number
+    peopleUpdated: number
+    peopleSkipped: number
+    groupsCreated: number
+    membershipsCreated: number
+  } | null>(null)
 
   const previewMutation = useMutation({
     mutationFn: previewImport,
     onSuccess: (data) => {
-      setPreview(data);
-      setImportResult(null);
+      setPreview(data)
+      setImportResult(null)
     },
     onError: (err: Error) => toast.error(err.message),
-  });
+  })
 
   const executeMutation = useMutation({
     mutationFn: () => {
-      if (!preview) throw new Error('No preview data');
-      return executeImport(preview.people, skipDuplicates);
+      if (!preview) throw new Error('No preview data')
+      return executeImport(preview.people, skipDuplicates)
     },
     onSuccess: (data) => {
-      setImportResult(data);
-      queryClient.invalidateQueries({ queryKey: ['people'] });
-      queryClient.invalidateQueries({ queryKey: ['groups'] });
-      toast.success(`Imported ${data.peopleCreated} people, ${data.groupsCreated} groups`);
+      setImportResult(data)
+      queryClient.invalidateQueries({queryKey: ['people']})
+      queryClient.invalidateQueries({queryKey: ['groups']})
+      toast.success(`Imported ${data.peopleCreated} people, ${data.groupsCreated} groups`)
     },
     onError: (err: Error) => toast.error(err.message),
-  });
+  })
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
     reader.onload = (ev) => {
-      const csvData = ev.target?.result as string;
-      previewMutation.mutate(csvData);
-    };
-    reader.readAsText(file);
-  };
+      const csvData = ev.target?.result as string
+      previewMutation.mutate(csvData)
+    }
+    reader.readAsText(file)
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -70,37 +70,47 @@ export function ImportPage() {
           >
             <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">Click to upload a CSV file</p>
-            <p className="text-xs text-muted-foreground mt-1">Expected columns: Phone Number, First Name, Last Name, Groups, Status</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Expected columns: Phone Number, First Name, Last Name, Groups, Status
+            </p>
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={handleFileChange}
-          />
+          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
         </CardContent>
       </Card>
 
-      {previewMutation.isPending && (
-        <div className="text-center py-8 text-muted-foreground">Parsing CSV...</div>
-      )}
+      {previewMutation.isPending && <div className="text-center py-8 text-muted-foreground">Parsing CSV...</div>}
 
       {/* Import result */}
       {importResult && (
         <Card className="border-green-500">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="h-5 w-5" />Import Complete
+              <CheckCircle className="h-5 w-5" />
+              Import Complete
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div><p className="text-2xl font-bold">{importResult.peopleCreated}</p><p className="text-sm text-muted-foreground">People Created</p></div>
-              <div><p className="text-2xl font-bold">{importResult.peopleUpdated}</p><p className="text-sm text-muted-foreground">People Updated</p></div>
-              <div><p className="text-2xl font-bold">{importResult.peopleSkipped}</p><p className="text-sm text-muted-foreground">Duplicates Skipped</p></div>
-              <div><p className="text-2xl font-bold">{importResult.groupsCreated}</p><p className="text-sm text-muted-foreground">Groups Created</p></div>
-              <div><p className="text-2xl font-bold">{importResult.membershipsCreated}</p><p className="text-sm text-muted-foreground">Memberships</p></div>
+              <div>
+                <p className="text-2xl font-bold">{importResult.peopleCreated}</p>
+                <p className="text-sm text-muted-foreground">People Created</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{importResult.peopleUpdated}</p>
+                <p className="text-sm text-muted-foreground">People Updated</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{importResult.peopleSkipped}</p>
+                <p className="text-sm text-muted-foreground">Duplicates Skipped</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{importResult.groupsCreated}</p>
+                <p className="text-sm text-muted-foreground">Groups Created</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{importResult.membershipsCreated}</p>
+                <p className="text-sm text-muted-foreground">Memberships</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -112,7 +122,8 @@ export function ImportPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />Preview
+                <FileText className="h-5 w-5" />
+                Preview
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -135,8 +146,10 @@ export function ImportPage() {
                 <div>
                   <Label className="text-sm">Groups to create:</Label>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {preview.uniqueGroups.map(g => (
-                      <Badge key={g} variant="outline">{g}</Badge>
+                    {preview.uniqueGroups.map((g) => (
+                      <Badge key={g} variant="outline">
+                        {g}
+                      </Badge>
                     ))}
                   </div>
                 </div>
@@ -174,13 +187,15 @@ export function ImportPage() {
               </TableBody>
             </Table>
             {preview.people.length > 100 && (
-              <p className="text-center text-sm text-muted-foreground py-2">Showing first 100 of {preview.people.length}</p>
+              <p className="text-center text-sm text-muted-foreground py-2">
+                Showing first 100 of {preview.people.length}
+              </p>
             )}
           </div>
 
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2">
-              <Checkbox checked={skipDuplicates} onCheckedChange={v => setSkipDuplicates(v === true)} />
+              <Checkbox checked={skipDuplicates} onCheckedChange={(v) => setSkipDuplicates(v === true)} />
               <span className="text-sm">Skip duplicates (same phone number)</span>
             </label>
             <Button size="lg" onClick={() => executeMutation.mutate()} disabled={executeMutation.isPending}>
@@ -190,5 +205,5 @@ export function ImportPage() {
         </>
       )}
     </div>
-  );
+  )
 }

@@ -1,4 +1,4 @@
-import {useState, useCallback} from 'react'
+import {useCallback, useState} from 'react'
 
 export function usePersistedState<T>(key: string, defaultValue: T): [T, (value: T | ((prev: T) => T)) => void] {
   const [state, setState] = useState<T>(() => {

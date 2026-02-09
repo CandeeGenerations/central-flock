@@ -1,17 +1,14 @@
+import {and, eq, inArray, notInArray, sql} from 'drizzle-orm'
 import {Router} from 'express'
+
 import {db, schema} from '../db/index.js'
-import {eq, sql, and, inArray, notInArray} from 'drizzle-orm'
 
 export const groupsRouter = Router()
 
 // GET /api/groups - List all with member counts
 groupsRouter.get('/', async (_req, res) => {
   try {
-    const groupsList = db
-      .select()
-      .from(schema.groups)
-      .orderBy(schema.groups.name)
-      .all()
+    const groupsList = db.select().from(schema.groups).orderBy(schema.groups.name).all()
 
     const counts = db
       .select({
@@ -59,10 +56,7 @@ groupsRouter.get('/:id', async (req, res) => {
         status: schema.people.status,
       })
       .from(schema.peopleGroups)
-      .innerJoin(
-        schema.people,
-        eq(schema.peopleGroups.personId, schema.people.id),
-      )
+      .innerJoin(schema.people, eq(schema.peopleGroups.personId, schema.people.id))
       .where(eq(schema.peopleGroups.groupId, group.id))
       .orderBy(schema.people.lastName, schema.people.firstName)
       .all()
@@ -150,11 +144,7 @@ groupsRouter.post('/:id/members', async (req, res) => {
     const groupId = Number(req.params.id)
     const {personIds} = req.body as {personIds: number[]}
 
-    const group = db
-      .select()
-      .from(schema.groups)
-      .where(eq(schema.groups.id, groupId))
-      .get()
+    const group = db.select().from(schema.groups).where(eq(schema.groups.id, groupId)).get()
     if (!group) {
       res.status(404).json({error: 'Group not found'})
       return
@@ -164,12 +154,7 @@ groupsRouter.post('/:id/members', async (req, res) => {
     const existing = db
       .select({personId: schema.peopleGroups.personId})
       .from(schema.peopleGroups)
-      .where(
-        and(
-          eq(schema.peopleGroups.groupId, groupId),
-          inArray(schema.peopleGroups.personId, personIds),
-        ),
-      )
+      .where(and(eq(schema.peopleGroups.groupId, groupId), inArray(schema.peopleGroups.personId, personIds)))
       .all()
 
     const existingIds = new Set(existing.map((e) => e.personId))
@@ -195,12 +180,7 @@ groupsRouter.delete('/:id/members', async (req, res) => {
     const {personIds} = req.body as {personIds: number[]}
 
     db.delete(schema.peopleGroups)
-      .where(
-        and(
-          eq(schema.peopleGroups.groupId, groupId),
-          inArray(schema.peopleGroups.personId, personIds),
-        ),
-      )
+      .where(and(eq(schema.peopleGroups.groupId, groupId), inArray(schema.peopleGroups.personId, personIds)))
       .run()
 
     res.json({success: true})

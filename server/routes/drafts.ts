@@ -1,17 +1,14 @@
+import {desc, eq, sql} from 'drizzle-orm'
 import {Router} from 'express'
+
 import {db, schema} from '../db/index.js'
-import {eq, sql, desc} from 'drizzle-orm'
 
 export const draftsRouter = Router()
 
 // GET /api/drafts - List all drafts
 draftsRouter.get('/', async (_req, res) => {
   try {
-    const draftsList = db
-      .select()
-      .from(schema.drafts)
-      .orderBy(desc(schema.drafts.updatedAt))
-      .all()
+    const draftsList = db.select().from(schema.drafts).orderBy(desc(schema.drafts.updatedAt)).all()
 
     const result = draftsList.map((draft) => {
       let groupName = null
@@ -39,10 +36,7 @@ draftsRouter.get('/', async (_req, res) => {
         recipientCount = Math.max(0, (count?.count || 0) - excludeCount)
       } else if (draft.selectedIndividualIds) {
         try {
-          recipientCount = Math.max(
-            0,
-            JSON.parse(draft.selectedIndividualIds).length - excludeCount,
-          )
+          recipientCount = Math.max(0, JSON.parse(draft.selectedIndividualIds).length - excludeCount)
         } catch {
           /* ignore */
         }
@@ -91,16 +85,7 @@ draftsRouter.get('/:id', async (req, res) => {
 // POST /api/drafts - Create draft
 draftsRouter.post('/', async (req, res) => {
   try {
-    const {
-      name,
-      content,
-      recipientMode,
-      groupId,
-      selectedIndividualIds,
-      excludeIds,
-      batchSize,
-      batchDelayMs,
-    } = req.body
+    const {name, content, recipientMode, groupId, selectedIndividualIds, excludeIds, batchSize, batchDelayMs} = req.body
 
     const draft = db
       .insert(schema.drafts)
@@ -128,16 +113,7 @@ draftsRouter.post('/', async (req, res) => {
 draftsRouter.put('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const {
-      name,
-      content,
-      recipientMode,
-      groupId,
-      selectedIndividualIds,
-      excludeIds,
-      batchSize,
-      batchDelayMs,
-    } = req.body
+    const {name, content, recipientMode, groupId, selectedIndividualIds, excludeIds, batchSize, batchDelayMs} = req.body
 
     const draft = db
       .update(schema.drafts)

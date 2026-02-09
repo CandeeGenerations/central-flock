@@ -1,21 +1,14 @@
+import {and, asc, desc, eq, inArray, like, or, sql} from 'drizzle-orm'
 import {Router} from 'express'
+
 import {db, schema} from '../db/index.js'
-import {eq, like, or, and, sql, inArray, desc, asc} from 'drizzle-orm'
 
 export const peopleRouter = Router()
 
 // GET /api/people - List all with optional search/filter
 peopleRouter.get('/', async (req, res) => {
   try {
-    const {
-      search,
-      status,
-      groupId,
-      page = '1',
-      limit = '50',
-      sort = 'createdAt',
-      sortDir = 'desc',
-    } = req.query
+    const {search, status, groupId, page = '1', limit = '50', sort = 'createdAt', sortDir = 'desc'} = req.query
     const offset = (Number(page) - 1) * Number(limit)
 
     const conditions = []
@@ -84,10 +77,7 @@ peopleRouter.get('/', async (req, res) => {
               groupName: schema.groups.name,
             })
             .from(schema.peopleGroups)
-            .innerJoin(
-              schema.groups,
-              eq(schema.peopleGroups.groupId, schema.groups.id),
-            )
+            .innerJoin(schema.groups, eq(schema.peopleGroups.groupId, schema.groups.id))
             .where(inArray(schema.peopleGroups.personId, peopleIds))
             .all()
         : []
@@ -134,10 +124,7 @@ peopleRouter.get('/:id', async (req, res) => {
         name: schema.groups.name,
       })
       .from(schema.peopleGroups)
-      .innerJoin(
-        schema.groups,
-        eq(schema.peopleGroups.groupId, schema.groups.id),
-      )
+      .innerJoin(schema.groups, eq(schema.peopleGroups.groupId, schema.groups.id))
       .where(eq(schema.peopleGroups.personId, person.id))
       .all()
 
@@ -151,8 +138,7 @@ peopleRouter.get('/:id', async (req, res) => {
 // POST /api/people - Create person
 peopleRouter.post('/', async (req, res) => {
   try {
-    const {firstName, lastName, phoneNumber, phoneDisplay, status, notes} =
-      req.body
+    const {firstName, lastName, phoneNumber, phoneDisplay, status, notes} = req.body
     const result = db
       .insert(schema.people)
       .values({
@@ -169,9 +155,7 @@ peopleRouter.post('/', async (req, res) => {
     res.status(201).json(result)
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
-      res
-        .status(409)
-        .json({error: 'A person with this phone number already exists'})
+      res.status(409).json({error: 'A person with this phone number already exists'})
       return
     }
     console.error('Error creating person:', error)
@@ -182,8 +166,7 @@ peopleRouter.post('/', async (req, res) => {
 // PUT /api/people/:id - Update person
 peopleRouter.put('/:id', async (req, res) => {
   try {
-    const {firstName, lastName, phoneNumber, phoneDisplay, status, notes} =
-      req.body
+    const {firstName, lastName, phoneNumber, phoneDisplay, status, notes} = req.body
     const result = db
       .update(schema.people)
       .set({
@@ -216,18 +199,10 @@ peopleRouter.delete('/:id', async (req, res) => {
     const personId = Number(req.params.id)
 
     // Remove related records first
-    db.delete(schema.peopleGroups)
-      .where(eq(schema.peopleGroups.personId, personId))
-      .run()
-    db.delete(schema.messageRecipients)
-      .where(eq(schema.messageRecipients.personId, personId))
-      .run()
+    db.delete(schema.peopleGroups).where(eq(schema.peopleGroups.personId, personId)).run()
+    db.delete(schema.messageRecipients).where(eq(schema.messageRecipients.personId, personId)).run()
 
-    const result = db
-      .delete(schema.people)
-      .where(eq(schema.people.id, personId))
-      .returning()
-      .get()
+    const result = db.delete(schema.people).where(eq(schema.people.id, personId)).returning().get()
 
     if (!result) {
       res.status(404).json({error: 'Person not found'})

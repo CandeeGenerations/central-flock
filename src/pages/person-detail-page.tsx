@@ -1,49 +1,29 @@
-import {useState} from 'react'
-import {useParams, useNavigate, Link} from 'react-router-dom'
-import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
-import {
-  fetchPerson,
-  updatePerson,
-  deletePerson,
-  createMacContact,
-  fetchGroups,
-  addGroupMembers,
-  removeGroupMembers,
-  type Person,
-} from '@/lib/api'
+import {ConfirmDialog} from '@/components/confirm-dialog'
+import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Checkbox} from '@/components/ui/checkbox'
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Textarea} from '@/components/ui/textarea'
-import {Badge} from '@/components/ui/badge'
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import {Checkbox} from '@/components/ui/checkbox'
-import {
-  ArrowLeft,
-  Save,
-  Trash2,
-  Contact,
-  MessageSquare,
-  UserPlus,
-} from 'lucide-react'
-import {toast} from 'sonner'
+  type Person,
+  addGroupMembers,
+  createMacContact,
+  deletePerson,
+  fetchGroups,
+  fetchPerson,
+  removeGroupMembers,
+  updatePerson,
+} from '@/lib/api'
 import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
-import {ConfirmDialog} from '@/components/confirm-dialog'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {ArrowLeft, Contact, MessageSquare, Save, Trash2, UserPlus} from 'lucide-react'
+import {useState} from 'react'
+import {Link, useNavigate, useParams} from 'react-router-dom'
+import {toast} from 'sonner'
 
 export function PersonDetailPage() {
   const {id} = useParams<{id: string}>()
@@ -53,9 +33,7 @@ export function PersonDetailPage() {
   const [form, setForm] = useState<Partial<Person>>({})
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [addGroupOpen, setAddGroupOpen] = useState(false)
-  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(
-    new Set(),
-  )
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(new Set())
 
   const {data: person, isLoading} = useQuery({
     queryKey: ['person', id],
@@ -96,15 +74,14 @@ export function PersonDetailPage() {
   })
 
   const currentGroupIds = new Set(person?.groups?.map((g) => g.id) || [])
-  const availableGroups =
-    allGroups?.filter((g) => !currentGroupIds.has(g.id)) || []
+  const availableGroups = allGroups?.filter((g) => !currentGroupIds.has(g.id)) || []
 
   const addGroupMutation = useMutation({
-    mutationFn: (groupIds: number[]) =>
-      Promise.all(groupIds.map((gid) => addGroupMembers(gid, [Number(id)]))),
+    mutationFn: (groupIds: number[]) => Promise.all(groupIds.map((gid) => addGroupMembers(gid, [Number(id)]))),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['person', id]})
       queryClient.invalidateQueries({queryKey: ['groups']})
+      queryClient.invalidateQueries({queryKey: ['drafts']})
       setAddGroupOpen(false)
       setSelectedGroupIds(new Set())
       toast.success('Added to groups')
@@ -116,6 +93,7 @@ export function PersonDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['person', id]})
       queryClient.invalidateQueries({queryKey: ['groups']})
+      queryClient.invalidateQueries({queryKey: ['drafts']})
       toast.success('Removed from group')
     },
   })
@@ -133,8 +111,7 @@ export function PersonDetailPage() {
     }
   }
 
-  if (isLoading)
-    return <div className="p-6 text-muted-foreground">Loading...</div>
+  if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>
   if (!person) return <div className="p-6">Person not found</div>
 
   return (
@@ -144,12 +121,9 @@ export function PersonDetailPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h2 className="text-2xl font-bold">
-          {[person.firstName, person.lastName].filter(Boolean).join(' ') ||
-            'Unnamed'}
+          {[person.firstName, person.lastName].filter(Boolean).join(' ') || 'Unnamed'}
         </h2>
-        <Badge variant={person.status === 'active' ? 'default' : 'secondary'}>
-          {person.status}
-        </Badge>
+        <Badge variant={person.status === 'active' ? 'default' : 'secondary'}>{person.status}</Badge>
       </div>
 
       <Card>
@@ -186,18 +160,14 @@ export function PersonDetailPage() {
                   <Label>First Name</Label>
                   <Input
                     value={form.firstName || ''}
-                    onChange={(e) =>
-                      setForm((f) => ({...f, firstName: e.target.value}))
-                    }
+                    onChange={(e) => setForm((f) => ({...f, firstName: e.target.value}))}
                   />
                 </div>
                 <div>
                   <Label>Last Name</Label>
                   <Input
                     value={form.lastName || ''}
-                    onChange={(e) =>
-                      setForm((f) => ({...f, lastName: e.target.value}))
-                    }
+                    onChange={(e) => setForm((f) => ({...f, lastName: e.target.value}))}
                   />
                 </div>
               </div>
@@ -219,38 +189,27 @@ export function PersonDetailPage() {
                   {(() => {
                     const digits = (form.phoneDisplay || '').replace(/\D/g, '')
                     return digits.length > 0 && digits.length !== 10 ? (
-                      <p className="text-xs text-destructive mt-1">
-                        Must be 10 digits ({digits.length}/10)
-                      </p>
+                      <p className="text-xs text-destructive mt-1">Must be 10 digits ({digits.length}/10)</p>
                     ) : null
                   })()}
                 </div>
                 <div>
                   <Label>E.164 Format</Label>
-                  <Input
-                    value={form.phoneNumber || ''}
-                    readOnly
-                    className="bg-muted"
-                  />
+                  <Input value={form.phoneNumber || ''} readOnly className="bg-muted" />
                 </div>
               </div>
               <div>
                 <Label>Notes</Label>
                 <Textarea
                   value={form.notes || ''}
-                  onChange={(e) =>
-                    setForm((f) => ({...f, notes: e.target.value}))
-                  }
+                  onChange={(e) => setForm((f) => ({...f, notes: e.target.value}))}
                   rows={3}
                 />
               </div>
               <div className="flex gap-2">
                 <Button
                   onClick={() => updateMutation.mutate(form)}
-                  disabled={
-                    updateMutation.isPending ||
-                    (form.phoneDisplay || '').replace(/\D/g, '').length !== 10
-                  }
+                  disabled={updateMutation.isPending || (form.phoneDisplay || '').replace(/\D/g, '').length !== 10}
                 >
                   <Save className="h-4 w-4 mr-1" />
                   {updateMutation.isPending ? 'Saving...' : 'Save'}
@@ -264,15 +223,11 @@ export function PersonDetailPage() {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <span className="text-sm text-muted-foreground">
-                    First Name
-                  </span>
+                  <span className="text-sm text-muted-foreground">First Name</span>
                   <p>{person.firstName || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-sm text-muted-foreground">
-                    Last Name
-                  </span>
+                  <span className="text-sm text-muted-foreground">Last Name</span>
                   <p>{person.lastName || '—'}</p>
                 </div>
               </div>
@@ -301,11 +256,7 @@ export function PersonDetailPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Groups</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setAddGroupOpen(true)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setAddGroupOpen(true)}>
             <UserPlus className="h-4 w-4 mr-1" />
             Add to Group
           </Button>
@@ -323,10 +274,7 @@ export function PersonDetailPage() {
                 {person.groups.map((g) => (
                   <TableRow key={g.id}>
                     <TableCell>
-                      <Link
-                        to={`/groups/${g.id}`}
-                        className="font-medium hover:underline"
-                      >
+                      <Link to={`/groups/${g.id}`} className="font-medium hover:underline">
                         {g.name}
                       </Link>
                     </TableCell>
@@ -345,9 +293,7 @@ export function PersonDetailPage() {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-sm">
-              Not a member of any groups
-            </p>
+            <p className="text-muted-foreground text-sm">Not a member of any groups</p>
           )}
         </CardContent>
       </Card>
@@ -381,18 +327,14 @@ export function PersonDetailPage() {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Already a member of all groups.
-            </p>
+            <p className="text-sm text-muted-foreground">Already a member of all groups.</p>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddGroupOpen(false)}>
               Cancel
             </Button>
             <Button
-              disabled={
-                selectedGroupIds.size === 0 || addGroupMutation.isPending
-              }
+              disabled={selectedGroupIds.size === 0 || addGroupMutation.isPending}
               onClick={() => addGroupMutation.mutate([...selectedGroupIds])}
             >
               Add to {selectedGroupIds.size} Group
@@ -404,10 +346,7 @@ export function PersonDetailPage() {
 
       {/* Delete */}
       <div className="pt-4">
-        <Button
-          variant="destructive"
-          onClick={() => setDeleteConfirmOpen(true)}
-        >
+        <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)}>
           <Trash2 className="h-4 w-4 mr-1" />
           Delete Person
         </Button>

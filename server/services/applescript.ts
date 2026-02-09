@@ -3,10 +3,7 @@ import {promisify} from 'util'
 
 const execFileAsync = promisify(execFile)
 
-export async function sendMessage(
-  phoneNumber: string,
-  message: string,
-): Promise<void> {
+export async function sendMessage(phoneNumber: string, message: string): Promise<void> {
   const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
   const escapedPhone = phoneNumber.replace(/"/g, '')
 
@@ -26,11 +23,7 @@ end tell`
   }
 }
 
-export async function createContact(
-  firstName: string,
-  lastName: string,
-  phoneNumber: string,
-): Promise<void> {
+export async function createContact(firstName: string, lastName: string, phoneNumber: string): Promise<void> {
   const escapedFirst = firstName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
   const escapedLast = lastName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
   const escapedPhone = phoneNumber.replace(/"/g, '')

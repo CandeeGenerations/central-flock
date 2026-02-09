@@ -49,8 +49,7 @@ export function parseCSV(csvData: string): ParsedPerson[] {
           .filter(Boolean)
       : []
 
-    const status: 'active' | 'inactive' =
-      statusRaw === 'inactive' || statusRaw === '-' ? 'inactive' : 'active'
+    const status: 'active' | 'inactive' = statusRaw === 'inactive' || statusRaw === '-' ? 'inactive' : 'active'
 
     return {
       firstName,

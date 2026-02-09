@@ -39,6 +39,7 @@ We have an existing CSV file (`gloo-people.csv`) with ~440 contacts to import as
 ### Why These Choices?
 
 **SQLite + Drizzle ORM** (over JSON files or Docker DB):
+
 - Relational data (people, groups, memberships) maps perfectly to SQL
 - Single file database, no server/Docker needed
 - Drizzle provides full TypeScript type safety with zero runtime overhead
@@ -47,6 +48,7 @@ We have an existing CSV file (`gloo-people.csv`) with ~440 contacts to import as
 - Can handle thousands of records with no issues
 
 **Express.js backend** (over Electron/Tauri):
+
 - AppleScript requires shell access via `child_process.exec` calling `osascript`
 - Simplest approach: local Express server handles API + AppleScript execution
 - No heavy framework overhead
@@ -111,6 +113,7 @@ message_recipients
 ```
 
 ### Phone Number Strategy
+
 - **Store in E.164**: `+15714668202` (for uniqueness and AppleScript compatibility)
 - **Keep display format**: `(571) 466-8202` (for UI display)
 - **Normalization on import**: Strip all non-digits, prepend `+1` if 10 digits
@@ -172,57 +175,64 @@ gloo-clone/
 ## Backend API Endpoints
 
 ### People
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/people` | List all (with search, filter by group/status, pagination) |
-| GET | `/api/people/:id` | Get person with their groups |
-| POST | `/api/people` | Create person |
-| PUT | `/api/people/:id` | Update person |
-| DELETE | `/api/people/:id` | Delete person |
-| PATCH | `/api/people/:id/status` | Toggle active/inactive |
+
+| Method | Endpoint                 | Description                                                |
+| ------ | ------------------------ | ---------------------------------------------------------- |
+| GET    | `/api/people`            | List all (with search, filter by group/status, pagination) |
+| GET    | `/api/people/:id`        | Get person with their groups                               |
+| POST   | `/api/people`            | Create person                                              |
+| PUT    | `/api/people/:id`        | Update person                                              |
+| DELETE | `/api/people/:id`        | Delete person                                              |
+| PATCH  | `/api/people/:id/status` | Toggle active/inactive                                     |
 
 ### Groups
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/groups` | List all groups with member counts |
-| GET | `/api/groups/:id` | Get group with members |
-| POST | `/api/groups` | Create group |
-| PUT | `/api/groups/:id` | Update group (name, description) |
-| DELETE | `/api/groups/:id` | Delete group (keeps people) |
-| POST | `/api/groups/:id/members` | Add people to group (body: { personIds: [] }) |
-| DELETE | `/api/groups/:id/members` | Remove people from group |
+
+| Method | Endpoint                  | Description                                   |
+| ------ | ------------------------- | --------------------------------------------- |
+| GET    | `/api/groups`             | List all groups with member counts            |
+| GET    | `/api/groups/:id`         | Get group with members                        |
+| POST   | `/api/groups`             | Create group                                  |
+| PUT    | `/api/groups/:id`         | Update group (name, description)              |
+| DELETE | `/api/groups/:id`         | Delete group (keeps people)                   |
+| POST   | `/api/groups/:id/members` | Add people to group (body: { personIds: [] }) |
+| DELETE | `/api/groups/:id/members` | Remove people from group                      |
 
 ### Messages
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/messages/send` | Send message (group or individuals) |
-| GET | `/api/messages` | Message history |
-| GET | `/api/messages/:id` | Message detail with recipient statuses |
-| GET | `/api/messages/:id/status` | Poll send progress |
-| POST | `/api/messages/:id/cancel` | Cancel in-progress batch |
+
+| Method | Endpoint                   | Description                            |
+| ------ | -------------------------- | -------------------------------------- |
+| POST   | `/api/messages/send`       | Send message (group or individuals)    |
+| GET    | `/api/messages`            | Message history                        |
+| GET    | `/api/messages/:id`        | Message detail with recipient statuses |
+| GET    | `/api/messages/:id/status` | Poll send progress                     |
+| POST   | `/api/messages/:id/cancel` | Cancel in-progress batch               |
 
 ### Import
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/import/preview` | Upload CSV, return parsed preview + duplicates |
-| POST | `/api/import/execute` | Execute import with user-confirmed mappings |
+
+| Method | Endpoint              | Description                                    |
+| ------ | --------------------- | ---------------------------------------------- |
+| POST   | `/api/import/preview` | Upload CSV, return parsed preview + duplicates |
+| POST   | `/api/import/execute` | Execute import with user-confirmed mappings    |
 
 ### macOS Contacts
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/contacts/create` | Create contact in macOS Contacts app |
-| POST | `/api/contacts/create-bulk` | Create multiple contacts |
+
+| Method | Endpoint                    | Description                          |
+| ------ | --------------------------- | ------------------------------------ |
+| POST   | `/api/contacts/create`      | Create contact in macOS Contacts app |
+| POST   | `/api/contacts/create-bulk` | Create multiple contacts             |
 
 ---
 
 ## Frontend Pages & Components
 
 ### Layout
+
 - **Sidebar navigation**: People, Groups, Messages, Import
 - **Top bar**: App name, dark/light mode toggle
 - **Content area**: Page-specific content
 
 ### People Page
+
 - **Data table** (shadcn) with columns: Name, Phone, Status, Groups, Actions
 - **Search bar**: Filter by name or phone number
 - **Filters**: By group, by status (active/inactive)
@@ -230,6 +240,7 @@ gloo-clone/
 - **Bulk actions**: Select multiple people, add to group, change status
 
 ### Person Detail Page
+
 - View/edit all fields
 - List of groups with ability to add/remove
 - Message history for this person
@@ -237,18 +248,21 @@ gloo-clone/
 - "Send Message" quick action
 
 ### Groups Page
+
 - **Card grid or table** showing each group with member count
 - Create new group (dialog)
 - Edit/delete group
 - Click to view members
 
 ### Group Detail Page
+
 - Group name/description (editable)
 - Member list with ability to remove
 - "Add Members" dialog (search people not in group)
 - "Send Message to Group" button
 
 ### Message Compose Page (most complex)
+
 1. **Delivery Method**: Toggle between iMessage and SMS (default: iMessage)
 2. **Recipient Selection**: Choose a group OR select individuals
 3. **Exclusion List**: If group selected, checkboxes to skip specific people
@@ -261,10 +275,12 @@ gloo-clone/
 10. **Progress View**: Real-time progress bar, per-recipient status
 
 ### Message History Page
+
 - List of past messages with date, recipient count, status
 - Click to see details: message content, all recipients, individual statuses
 
 ### Import Page
+
 - File upload area
 - Preview table showing parsed data
 - Duplicate detection warnings
@@ -282,6 +298,7 @@ The macOS Messages app handles both iMessage and SMS (via iPhone Text Message Fo
 **Strategy**: Use the phone number directly. macOS Messages will determine the best delivery method. Optionally, the user can force a specific service type per-send.
 
 #### Approach 1: Auto-route (Recommended Default)
+
 ```applescript
 tell application "Messages"
     set targetService to 1st account whose service type = iMessage
@@ -289,9 +306,11 @@ tell application "Messages"
     send "Hello John!" to targetBuddy
 end tell
 ```
+
 This sends via iMessage if available, and through SMS Text Message Forwarding if the recipient doesn't have iMessage (requires an iPhone paired via Continuity).
 
 #### Approach 2: Force SMS
+
 ```applescript
 tell application "Messages"
     set targetService to 1st account whose service type = SMS
@@ -299,35 +318,38 @@ tell application "Messages"
     send "Hello John!" to targetBuddy
 end tell
 ```
+
 This forces SMS delivery via iPhone Text Message Forwarding.
 
 **Node.js wrapper:**
+
 ```typescript
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import {exec} from 'child_process'
+import {promisify} from 'util'
 
-const execAsync = promisify(exec);
+const execAsync = promisify(exec)
 
-type ServiceType = 'iMessage' | 'SMS';
+type ServiceType = 'iMessage' | 'SMS'
 
 async function sendMessage(
   phoneNumber: string,
   message: string,
-  serviceType: ServiceType = 'iMessage'  // auto-routes to SMS if iMessage unavailable
+  serviceType: ServiceType = 'iMessage', // auto-routes to SMS if iMessage unavailable
 ): Promise<void> {
-  const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
   const script = `
     tell application "Messages"
       set targetService to 1st account whose service type = ${serviceType}
       set targetBuddy to participant "${phoneNumber}" of targetService
       send "${escapedMessage}" to targetBuddy
     end tell
-  `;
-  await execAsync(`osascript -e '${script}'`);
+  `
+  await execAsync(`osascript -e '${script}'`)
 }
 ```
 
 ### Create macOS Contact
+
 ```applescript
 tell application "Contacts"
     set newPerson to make new person with properties {first name:"John", last name:"Doe"}
@@ -337,6 +359,7 @@ end tell
 ```
 
 ### Important Considerations
+
 - **First run**: macOS will prompt for permissions (Messages, Contacts, Accessibility). User must grant these.
 - **iPhone pairing required for SMS**: To send SMS (green bubble), your iPhone must be connected to your Mac via Text Message Forwarding (Settings > Messages > Text Message Forwarding on iPhone).
 - **Error handling**: AppleScript can fail silently or throw. Wrap in try-catch, log errors.
@@ -349,6 +372,7 @@ end tell
 ## CSV Import Strategy
 
 ### Phase 1: Parse & Preview
+
 1. Read CSV with `papaparse` (handles BOM, quoted fields with commas)
 2. Normalize phone numbers: strip `()`, `-`, spaces → digits only → prepend `+1` if 10 digits
 3. Parse groups: split on `,`, trim whitespace
@@ -361,6 +385,7 @@ end tell
 6. Return preview to user with flagged issues
 
 ### Phase 2: Execute Import
+
 1. Create all unique groups first
 2. Create/update people (upsert by phone number)
 3. Create group memberships
@@ -407,6 +432,7 @@ end tell
 ## Implementation Phases
 
 ### Phase 0: Project Foundation
+
 **Goal**: Set up the full dev stack
 
 - [ ] Install additional dependencies:
@@ -424,6 +450,7 @@ end tell
 - [ ] Add dev scripts to package.json
 
 ### Phase 1: Database & CSV Import
+
 **Goal**: Get data into the system
 
 - [ ] Implement CSV parser service with phone normalization
@@ -433,6 +460,7 @@ end tell
 - [ ] Verify data integrity after import
 
 ### Phase 2: People Management
+
 **Goal**: Full CRUD for people
 
 - [ ] Backend: People API routes (list, get, create, update, delete, toggle status)
@@ -442,6 +470,7 @@ end tell
 - [ ] Delete confirmation
 
 ### Phase 3: Group Management
+
 **Goal**: Full CRUD for groups + membership management
 
 - [ ] Backend: Groups API routes
@@ -451,6 +480,7 @@ end tell
 - [ ] Create/edit/delete groups
 
 ### Phase 4: Messaging Core
+
 **Goal**: Send messages via AppleScript
 
 - [ ] AppleScript service: send single iMessage
@@ -462,6 +492,7 @@ end tell
 - [ ] Send progress UI with per-recipient status
 
 ### Phase 5: Message History
+
 **Goal**: Track and review sent messages
 
 - [ ] Message history page (list view)
@@ -469,6 +500,7 @@ end tell
 - [ ] Filter by date, group, status
 
 ### Phase 6: macOS Contacts Integration
+
 **Goal**: Create contacts in macOS Contacts.app
 
 - [ ] AppleScript service: create single contact
@@ -476,6 +508,7 @@ end tell
 - [ ] Bulk contact creation
 
 ### Phase 7: Polish & Enhancements
+
 **Goal**: Improve UX and handle edge cases
 
 - [ ] Dark/light mode toggle
@@ -491,26 +524,27 @@ end tell
 
 ## Tech Stack Summary
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18 + TypeScript |
-| Build Tool | Vite 6 |
-| UI Components | shadcn/ui + Tailwind CSS |
-| Routing | React Router DOM |
-| Data Fetching | TanStack React Query |
-| Backend | Express.js |
-| Database | SQLite via better-sqlite3 |
-| ORM | Drizzle ORM |
-| CSV Parsing | PapaParse |
-| macOS Integration | osascript (child_process) |
-| Dev Runner | concurrently (Vite + Express) |
-| Package Manager | pnpm |
+| Layer             | Technology                    |
+| ----------------- | ----------------------------- |
+| Frontend          | React 18 + TypeScript         |
+| Build Tool        | Vite 6                        |
+| UI Components     | shadcn/ui + Tailwind CSS      |
+| Routing           | React Router DOM              |
+| Data Fetching     | TanStack React Query          |
+| Backend           | Express.js                    |
+| Database          | SQLite via better-sqlite3     |
+| ORM               | Drizzle ORM                   |
+| CSV Parsing       | PapaParse                     |
+| macOS Integration | osascript (child_process)     |
+| Dev Runner        | concurrently (Vite + Express) |
+| Package Manager   | pnpm                          |
 
 ---
 
 ## Verification & Testing
 
 ### Per-Phase Verification
+
 - **Phase 0**: `pnpm dev` starts both Vite and Express, shadcn components render
 - **Phase 1**: CSV imports successfully, all ~440 people and ~17 groups created, verify in SQLite
 - **Phase 2**: Can add/edit/delete people, search works, status toggle works
@@ -521,6 +555,7 @@ end tell
 - **Phase 7**: Dark mode works, toasts fire, export produces valid CSV
 
 ### Manual Testing Checklist
+
 - [ ] Import CSV → verify all people and groups created
 - [ ] Create a new person → verify appears in list
 - [ ] Edit a person → verify changes saved

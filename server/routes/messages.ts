@@ -1,13 +1,9 @@
+import {desc, eq, sql} from 'drizzle-orm'
 import {Router} from 'express'
+
 import {db, schema} from '../db/index.js'
-import {eq, sql, desc} from 'drizzle-orm'
 import {sendMessage} from '../services/applescript.js'
-import {
-  getJob,
-  cancelJob,
-  createJob,
-  type SendJob,
-} from '../services/message-queue.js'
+import {type SendJob, cancelJob, createJob, getJob} from '../services/message-queue.js'
 
 export const messagesRouter = Router()
 
@@ -43,22 +39,15 @@ messagesRouter.post('/send', async (req, res) => {
       .all()
 
     const excludeSet = new Set(excludeIds)
-    const activeRecipients = recipients.filter(
-      (r) => !excludeSet.has(r.id) && r.status === 'active',
-    )
-    const skippedRecipients = recipients.filter(
-      (r) => excludeSet.has(r.id) || r.status !== 'active',
-    )
+    const activeRecipients = recipients.filter((r) => !excludeSet.has(r.id) && r.status === 'active')
+    const skippedRecipients = recipients.filter((r) => excludeSet.has(r.id) || r.status !== 'active')
 
     // Create message record
     const message = db
       .insert(schema.messages)
       .values({
         content,
-        renderedPreview: renderTemplate(
-          content,
-          activeRecipients[0] || recipients[0],
-        ),
+        renderedPreview: renderTemplate(content, activeRecipients[0] || recipients[0]),
         groupId: groupId || null,
         totalRecipients: recipients.length,
         skippedCount: skippedRecipients.length,
@@ -126,11 +115,7 @@ messagesRouter.post('/delete', async (req, res) => {
 // GET /api/messages - Message history
 messagesRouter.get('/', async (_req, res) => {
   try {
-    const messagesList = db
-      .select()
-      .from(schema.messages)
-      .orderBy(desc(schema.messages.createdAt))
-      .all()
+    const messagesList = db.select().from(schema.messages).orderBy(desc(schema.messages.createdAt)).all()
 
     // Attach group names
     const result = messagesList.map((msg) => {
@@ -179,10 +164,7 @@ messagesRouter.get('/:id', async (req, res) => {
         sentAt: schema.messageRecipients.sentAt,
       })
       .from(schema.messageRecipients)
-      .innerJoin(
-        schema.people,
-        eq(schema.messageRecipients.personId, schema.people.id),
-      )
+      .innerJoin(schema.people, eq(schema.messageRecipients.personId, schema.people.id))
       .where(eq(schema.messageRecipients.messageId, message.id))
       .all()
 
@@ -258,10 +240,7 @@ messagesRouter.post('/:id/cancel', async (req, res) => {
   }
 })
 
-function renderTemplate(
-  template: string,
-  person: {firstName?: string | null; lastName?: string | null},
-): string {
+function renderTemplate(template: string, person: {firstName?: string | null; lastName?: string | null}): string {
   const firstName = person.firstName || ''
   const lastName = person.lastName || ''
   const fullName = [firstName, lastName].filter(Boolean).join(' ')
@@ -280,20 +259,14 @@ async function processSendJob(job: SendJob) {
       renderedContent: schema.messageRecipients.renderedContent,
     })
     .from(schema.messageRecipients)
-    .innerJoin(
-      schema.people,
-      eq(schema.messageRecipients.personId, schema.people.id),
-    )
+    .innerJoin(schema.people, eq(schema.messageRecipients.personId, schema.people.id))
     .where(
       sql`${schema.messageRecipients.messageId} = ${job.messageId} AND ${schema.messageRecipients.status} = 'pending'`,
     )
     .all()
 
   // Update message status to sending
-  db.update(schema.messages)
-    .set({status: 'sending'})
-    .where(eq(schema.messages.id, job.messageId))
-    .run()
+  db.update(schema.messages).set({status: 'sending'}).where(eq(schema.messages.id, job.messageId)).run()
 
   job.status = 'processing'
 

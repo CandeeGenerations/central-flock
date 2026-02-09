@@ -1,27 +1,30 @@
-import {useState, useMemo, useEffect} from 'react'
-import {useSearchParams, useNavigate, useLocation} from 'react-router-dom'
-import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
-import {fetchGroups, fetchGroup, fetchPeople, sendMessage, fetchDraft, createDraft, updateDraft, deleteDrafts} from '@/lib/api'
-import {Button} from '@/components/ui/button'
-import {Textarea} from '@/components/ui/textarea'
-import {Label} from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {Checkbox} from '@/components/ui/checkbox'
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Badge} from '@/components/ui/badge'
-import {Input} from '@/components/ui/input'
-import {Separator} from '@/components/ui/separator'
-import {Progress} from '@/components/ui/progress'
-import {Send, Eye, Search, Save} from 'lucide-react'
-import {toast} from 'sonner'
-import {fetchMessageStatus} from '@/lib/api'
 import {ConfirmDialog} from '@/components/confirm-dialog'
+import {Badge} from '@/components/ui/badge'
+import {Button} from '@/components/ui/button'
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Checkbox} from '@/components/ui/checkbox'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
+import {Progress} from '@/components/ui/progress'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {Separator} from '@/components/ui/separator'
+import {Textarea} from '@/components/ui/textarea'
+import {
+  createDraft,
+  deleteDrafts,
+  fetchDraft,
+  fetchGroup,
+  fetchGroups,
+  fetchPeople,
+  sendMessage,
+  updateDraft,
+} from '@/lib/api'
+import {fetchMessageStatus} from '@/lib/api'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {Eye, Save, Search, Send} from 'lucide-react'
+import {useEffect, useMemo, useState} from 'react'
+import {useLocation, useNavigate, useSearchParams} from 'react-router-dom'
+import {toast} from 'sonner'
 
 export function MessageComposePage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -35,19 +38,13 @@ export function MessageComposePage() {
   } | null
 
   const draftIdParam = searchParams.get('draftId')
-  const presetGroupId =
-    searchParams.get('groupId') ||
-    (dupState?.groupId ? String(dupState.groupId) : '')
+  const presetGroupId = searchParams.get('groupId') || (dupState?.groupId ? String(dupState.groupId) : '')
   const presetRecipientId = searchParams.get('recipientId')
 
-  const [recipientMode, setRecipientMode] = useState<'group' | 'individual'>(
-    presetRecipientId ? 'individual' : 'group',
-  )
+  const [recipientMode, setRecipientMode] = useState<'group' | 'individual'>(presetRecipientId ? 'individual' : 'group')
   const [selectedGroupId, setSelectedGroupId] = useState(presetGroupId || '')
   const [content, setContent] = useState(dupState?.content || '')
-  const [excludeIds, setExcludeIds] = useState<Set<number>>(
-    () => new Set(dupState?.excludeIds || []),
-  )
+  const [excludeIds, setExcludeIds] = useState<Set<number>>(() => new Set(dupState?.excludeIds || []))
   const [excludeSearch, setExcludeSearch] = useState('')
   const [batchSize, setBatchSize] = useState(1)
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
@@ -62,9 +59,7 @@ export function MessageComposePage() {
     status: string
   } | null>(null)
 
-  const [currentDraftId, setCurrentDraftId] = useState<number | null>(
-    draftIdParam ? Number(draftIdParam) : null,
-  )
+  const [currentDraftId, setCurrentDraftId] = useState<number | null>(draftIdParam ? Number(draftIdParam) : null)
 
   const {data: draftData} = useQuery({
     queryKey: ['draft', currentDraftId],
@@ -83,12 +78,16 @@ export function MessageComposePage() {
     if (draftData.excludeIds) {
       try {
         setExcludeIds(new Set(JSON.parse(draftData.excludeIds)))
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     if (draftData.selectedIndividualIds) {
       try {
         setSelectedIndividualIds(new Set(JSON.parse(draftData.selectedIndividualIds)))
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   }, [draftData])
 
@@ -105,9 +104,7 @@ export function MessageComposePage() {
   })
 
   const [individualSearch, setIndividualSearch] = useState('')
-  const [selectedIndividualIds, setSelectedIndividualIds] = useState<
-    Set<number>
-  >(() => {
+  const [selectedIndividualIds, setSelectedIndividualIds] = useState<Set<number>>(() => {
     return presetRecipientId ? new Set([Number(presetRecipientId)]) : new Set()
   })
 
@@ -133,12 +130,7 @@ export function MessageComposePage() {
     ? content
         .replace(/\{\{firstName\}\}/g, previewPerson.firstName || '')
         .replace(/\{\{lastName\}\}/g, previewPerson.lastName || '')
-        .replace(
-          /\{\{fullName\}\}/g,
-          [previewPerson.firstName, previewPerson.lastName]
-            .filter(Boolean)
-            .join(' '),
-        )
+        .replace(/\{\{fullName\}\}/g, [previewPerson.firstName, previewPerson.lastName].filter(Boolean).join(' '))
     : content
 
   const charCount = content.length
@@ -149,8 +141,7 @@ export function MessageComposePage() {
         content,
         recipientIds: allRecipientIds,
         excludeIds: [...excludeIds],
-        groupId:
-          recipientMode === 'group' ? Number(selectedGroupId) : undefined,
+        groupId: recipientMode === 'group' ? Number(selectedGroupId) : undefined,
         batchSize,
         batchDelayMs,
       }),
@@ -160,7 +151,9 @@ export function MessageComposePage() {
         try {
           await deleteDrafts([currentDraftId])
           queryClient.invalidateQueries({queryKey: ['drafts']})
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
       setSending(true)
       const messageId = data.messageId
@@ -172,9 +165,7 @@ export function MessageComposePage() {
           if (status.status === 'completed' || status.status === 'cancelled') {
             clearInterval(poll)
             setSending(false)
-            toast.success(
-              `Message sending complete: ${status.sentCount} sent, ${status.failedCount} failed`,
-            )
+            toast.success(`Message sending complete: ${status.sentCount} sent, ${status.failedCount} failed`)
           }
         } catch {
           clearInterval(poll)
@@ -245,10 +236,7 @@ export function MessageComposePage() {
   }
 
   const progressPercent = sendProgress
-    ? ((sendProgress.sentCount +
-        sendProgress.failedCount +
-        sendProgress.skippedCount) /
-        sendProgress.totalRecipients) *
+    ? ((sendProgress.sentCount + sendProgress.failedCount + sendProgress.skippedCount) / sendProgress.totalRecipients) *
       100
     : 0
 
@@ -269,10 +257,7 @@ export function MessageComposePage() {
               <span>Failed: {sendProgress.failedCount}</span>
               <span>Total: {sendProgress.totalRecipients}</span>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => navigate(`/messages/${sendProgress.messageId}`)}
-            >
+            <Button variant="outline" onClick={() => navigate(`/messages/${sendProgress.messageId}`)}>
               View Details
             </Button>
           </CardContent>
@@ -284,12 +269,7 @@ export function MessageComposePage() {
           {/* Recipient selection */}
           <div className="space-y-2">
             <Label>Recipients</Label>
-            <Select
-              value={recipientMode}
-              onValueChange={(v) =>
-                setRecipientMode(v as 'group' | 'individual')
-              }
-            >
+            <Select value={recipientMode} onValueChange={(v) => setRecipientMode(v as 'group' | 'individual')}>
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
@@ -300,10 +280,7 @@ export function MessageComposePage() {
             </Select>
 
             {recipientMode === 'group' && (
-              <Select
-                value={selectedGroupId}
-                onValueChange={setSelectedGroupId}
-              >
+              <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
                 <SelectTrigger className="w-72">
                   <SelectValue placeholder="Choose a group..." />
                 </SelectTrigger>
@@ -329,24 +306,15 @@ export function MessageComposePage() {
                   />
                 </div>
                 {selectedIndividualIds.size > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {selectedIndividualIds.size} selected
-                  </p>
+                  <p className="text-xs text-muted-foreground">{selectedIndividualIds.size} selected</p>
                 )}
                 <div className="border rounded-md max-h-48 overflow-auto p-2 space-y-1">
                   {allPeople.data
                     .filter((p) => {
                       if (!individualSearch) return true
                       const q = individualSearch.toLowerCase()
-                      const name = [p.firstName, p.lastName]
-                        .filter(Boolean)
-                        .join(' ')
-                        .toLowerCase()
-                      const phone = (
-                        p.phoneDisplay ||
-                        p.phoneNumber ||
-                        ''
-                      ).toLowerCase()
+                      const name = [p.firstName, p.lastName].filter(Boolean).join(' ').toLowerCase()
+                      const phone = (p.phoneDisplay || p.phoneNumber || '').toLowerCase()
                       return name.includes(q) || phone.includes(q)
                     })
                     .map((p) => (
@@ -358,16 +326,10 @@ export function MessageComposePage() {
                           checked={selectedIndividualIds.has(p.id)}
                           onCheckedChange={() => toggleIndividual(p.id)}
                         />
-                        {[p.firstName, p.lastName]
-                          .filter(Boolean)
-                          .join(' ') || (
-                          <em className="text-muted-foreground group-hover:text-inherit">
-                            Unnamed
-                          </em>
+                        {[p.firstName, p.lastName].filter(Boolean).join(' ') || (
+                          <em className="text-muted-foreground group-hover:text-inherit">Unnamed</em>
                         )}
-                        <span className="text-muted-foreground ml-auto group-hover:text-inherit">
-                          {p.phoneDisplay}
-                        </span>
+                        <span className="text-muted-foreground ml-auto group-hover:text-inherit">{p.phoneDisplay}</span>
                       </label>
                     ))}
                 </div>
@@ -376,68 +338,44 @@ export function MessageComposePage() {
           </div>
 
           {/* Exclusion list for group mode */}
-          {recipientMode === 'group' &&
-            groupDetail &&
-            groupDetail.members.length > 0 && (
-              <div className="space-y-2">
-                <Label>Exclude from send (optional)</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search members..."
-                    value={excludeSearch}
-                    onChange={(e) => setExcludeSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-                <div className="border rounded-md max-h-48 overflow-auto p-2 space-y-1">
-                  {groupDetail.members
-                    .filter((m) => {
-                      if (!excludeSearch) return true
-                      const q = excludeSearch.toLowerCase()
-                      const name = [m.firstName, m.lastName]
-                        .filter(Boolean)
-                        .join(' ')
-                        .toLowerCase()
-                      const phone = (
-                        m.phoneDisplay ||
-                        m.phoneNumber ||
-                        ''
-                      ).toLowerCase()
-                      return name.includes(q) || phone.includes(q)
-                    })
-                    .map((m) => (
-                      <label
-                        key={m.id}
-                        className="group flex items-center gap-2 px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
-                      >
-                        <Checkbox
-                          checked={excludeIds.has(m.id)}
-                          onCheckedChange={() => toggleExclude(m.id)}
-                        />
-                        <span
-                          className={
-                            excludeIds.has(m.id)
-                              ? 'line-through text-muted-foreground'
-                              : ''
-                          }
-                        >
-                          {[m.firstName, m.lastName]
-                            .filter(Boolean)
-                            .join(' ') || (
-                            <em className="text-muted-foreground group-hover:text-inherit">
-                              Unnamed
-                            </em>
-                          )}
-                        </span>
-                        <span className="text-muted-foreground ml-auto group-hover:text-inherit">
-                          {m.phoneDisplay}
-                        </span>
-                      </label>
-                    ))}
-                </div>
+          {recipientMode === 'group' && groupDetail && groupDetail.members.length > 0 && (
+            <div className="space-y-2">
+              <Label>Exclude from send (optional)</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search members..."
+                  value={excludeSearch}
+                  onChange={(e) => setExcludeSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
-            )}
+              <div className="border rounded-md max-h-48 overflow-auto p-2 space-y-1">
+                {groupDetail.members
+                  .filter((m) => {
+                    if (!excludeSearch) return true
+                    const q = excludeSearch.toLowerCase()
+                    const name = [m.firstName, m.lastName].filter(Boolean).join(' ').toLowerCase()
+                    const phone = (m.phoneDisplay || m.phoneNumber || '').toLowerCase()
+                    return name.includes(q) || phone.includes(q)
+                  })
+                  .map((m) => (
+                    <label
+                      key={m.id}
+                      className="group flex items-center gap-2 px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
+                    >
+                      <Checkbox checked={excludeIds.has(m.id)} onCheckedChange={() => toggleExclude(m.id)} />
+                      <span className={excludeIds.has(m.id) ? 'line-through text-muted-foreground' : ''}>
+                        {[m.firstName, m.lastName].filter(Boolean).join(' ') || (
+                          <em className="text-muted-foreground group-hover:text-inherit">Unnamed</em>
+                        )}
+                      </span>
+                      <span className="text-muted-foreground ml-auto group-hover:text-inherit">{m.phoneDisplay}</span>
+                    </label>
+                  ))}
+              </div>
+            </div>
+          )}
 
           <Separator />
 
@@ -445,25 +383,13 @@ export function MessageComposePage() {
           <div className="space-y-2">
             <Label>Message</Label>
             <div className="flex gap-2 mb-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setContent((c) => c + '{{firstName}}')}
-              >
+              <Button variant="outline" size="sm" onClick={() => setContent((c) => c + '{{firstName}}')}>
                 {'{{firstName}}'}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setContent((c) => c + '{{lastName}}')}
-              >
+              <Button variant="outline" size="sm" onClick={() => setContent((c) => c + '{{lastName}}')}>
                 {'{{lastName}}'}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setContent((c) => c + '{{fullName}}')}
-              >
+              <Button variant="outline" size="sm" onClick={() => setContent((c) => c + '{{fullName}}')}>
                 {'{{fullName}}'}
               </Button>
             </div>
@@ -475,11 +401,7 @@ export function MessageComposePage() {
             />
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>{charCount} characters</span>
-              {charCount > 160 && (
-                <span className="text-orange-500">
-                  {Math.ceil(charCount / 160)} segments
-                </span>
-              )}
+              {charCount > 160 && <span className="text-orange-500">{Math.ceil(charCount / 160)} segments</span>}
             </div>
           </div>
 
@@ -502,12 +424,7 @@ export function MessageComposePage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Batch Size</Label>
-              <Input
-                type="number"
-                min={1}
-                value={batchSize}
-                onChange={(e) => setBatchSize(Number(e.target.value))}
-              />
+              <Input type="number" min={1} value={batchSize} onChange={(e) => setBatchSize(Number(e.target.value))} />
             </div>
             <div>
               <Label>Delay Between Batches (ms)</Label>
@@ -525,15 +442,10 @@ export function MessageComposePage() {
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium">
-                Sending to{' '}
-                <Badge variant="secondary">{recipients.length}</Badge> of{' '}
+                Sending to <Badge variant="secondary">{recipients.length}</Badge> of{' '}
                 <Badge variant="outline">{allRecipientIds.length}</Badge> people
               </p>
-              {excludeIds.size > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  {excludeIds.size} excluded
-                </p>
-              )}
+              {excludeIds.size > 0 && <p className="text-sm text-muted-foreground">{excludeIds.size} excluded</p>}
             </div>
             <div className="flex gap-2">
               <Button
@@ -548,11 +460,7 @@ export function MessageComposePage() {
               <Button
                 size="lg"
                 onClick={handleSend}
-                disabled={
-                  sendMutation.isPending ||
-                  recipients.length === 0 ||
-                  !content.trim()
-                }
+                disabled={sendMutation.isPending || recipients.length === 0 || !content.trim()}
               >
                 <Send className="h-4 w-4 mr-2" />
                 {sendMutation.isPending ? 'Starting...' : 'Send Message'}
@@ -594,17 +502,13 @@ export function MessageComposePage() {
           {charCount > 160 && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Segments</span>
-              <span className="font-medium text-orange-500">
-                {Math.ceil(charCount / 160)}
-              </span>
+              <span className="font-medium text-orange-500">{Math.ceil(charCount / 160)}</span>
             </div>
           )}
           <Separator />
           <div>
             <span className="text-muted-foreground">Preview</span>
-            <p className="mt-1 bg-muted rounded-md p-3 whitespace-pre-wrap text-sm">
-              {renderedPreview || content}
-            </p>
+            <p className="mt-1 bg-muted rounded-md p-3 whitespace-pre-wrap text-sm">{renderedPreview || content}</p>
           </div>
         </div>
       </ConfirmDialog>

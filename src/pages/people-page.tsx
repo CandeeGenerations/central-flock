@@ -1,72 +1,30 @@
-import {useState} from 'react'
-import {usePersistedState} from '@/hooks/use-persisted-state'
-import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
-import {Link} from 'react-router-dom'
-import {
-  fetchPeople,
-  createPerson,
-  deletePerson,
-  togglePersonStatus,
-  type Person,
-} from '@/lib/api'
-import {Button} from '@/components/ui/button'
-import {Input} from '@/components/ui/input'
-import {Badge} from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import {Label} from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Plus,
-  Search,
-  Trash2,
-  ToggleLeft,
-  ToggleRight,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-} from 'lucide-react'
-import {toast} from 'sonner'
-import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
 import {ConfirmDialog} from '@/components/confirm-dialog'
+import {Badge} from '@/components/ui/badge'
+import {Button} from '@/components/ui/button'
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {usePersistedState} from '@/hooks/use-persisted-state'
+import {type Person, createPerson, deletePerson, fetchPeople, togglePersonStatus} from '@/lib/api'
+import {formatDate} from '@/lib/date'
+import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {ArrowDown, ArrowUp, ArrowUpDown, Plus, Search, ToggleLeft, ToggleRight, Trash2} from 'lucide-react'
+import {useState} from 'react'
+import {Link} from 'react-router-dom'
+import {toast} from 'sonner'
 
 export function PeoplePage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = usePersistedState('people.search', '')
-  const [statusFilter, setStatusFilter] = usePersistedState(
-    'people.statusFilter',
-    'all',
-  )
+  const [statusFilter, setStatusFilter] = usePersistedState('people.statusFilter', 'all')
   const [page, setPage] = usePersistedState('people.page', 1)
   const [addOpen, setAddOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
-  const [sort, setSort] = usePersistedState<
-    'createdAt' | 'firstName' | 'lastName'
-  >('people.sort', 'createdAt')
-  const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>(
-    'people.sortDir',
-    'desc',
-  )
+  const [sort, setSort] = usePersistedState<'createdAt' | 'firstName' | 'lastName'>('people.sort', 'createdAt')
+  const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('people.sortDir', 'desc')
   const [newPerson, setNewPerson] = useState({
     firstName: '',
     lastName: '',
@@ -171,18 +129,14 @@ export function PeoplePage() {
                 <Label>First Name</Label>
                 <Input
                   value={newPerson.firstName}
-                  onChange={(e) =>
-                    setNewPerson((p) => ({...p, firstName: e.target.value}))
-                  }
+                  onChange={(e) => setNewPerson((p) => ({...p, firstName: e.target.value}))}
                 />
               </div>
               <div>
                 <Label>Last Name</Label>
                 <Input
                   value={newPerson.lastName}
-                  onChange={(e) =>
-                    setNewPerson((p) => ({...p, lastName: e.target.value}))
-                  }
+                  onChange={(e) => setNewPerson((p) => ({...p, lastName: e.target.value}))}
                 />
               </div>
               <div>
@@ -193,28 +147,19 @@ export function PeoplePage() {
                   placeholder="(555) 123-4567"
                 />
                 {phoneDigits.length > 0 && !phoneValid && (
-                  <p className="text-xs text-destructive mt-1">
-                    Must be 10 digits ({phoneDigits.length}/10)
-                  </p>
+                  <p className="text-xs text-destructive mt-1">Must be 10 digits ({phoneDigits.length}/10)</p>
                 )}
               </div>
               <div>
                 <Label>E.164 Format</Label>
-                <Input
-                  value={newPerson.phoneNumber}
-                  readOnly
-                  className="bg-muted"
-                />
+                <Input value={newPerson.phoneNumber} readOnly className="bg-muted" />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setAddOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                onClick={handleAddPerson}
-                disabled={createMutation.isPending}
-              >
+              <Button onClick={handleAddPerson} disabled={createMutation.isPending}>
                 {createMutation.isPending ? 'Creating...' : 'Create'}
               </Button>
             </DialogFooter>
@@ -267,8 +212,7 @@ export function PeoplePage() {
                     <button
                       className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
                       onClick={() => {
-                        if (sort === 'firstName')
-                          setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                        if (sort === 'firstName') setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
                         else {
                           setSort('firstName')
                           setSortDir('asc')
@@ -291,8 +235,7 @@ export function PeoplePage() {
                     <button
                       className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
                       onClick={() => {
-                        if (sort === 'lastName')
-                          setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                        if (sort === 'lastName') setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
                         else {
                           setSort('lastName')
                           setSortDir('asc')
@@ -318,8 +261,7 @@ export function PeoplePage() {
                     <button
                       className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
                       onClick={() => {
-                        if (sort === 'createdAt')
-                          setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                        if (sort === 'createdAt') setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
                         else {
                           setSort('createdAt')
                           setSortDir('desc')
@@ -345,45 +287,23 @@ export function PeoplePage() {
                 {data?.data.map((person) => (
                   <TableRow key={person.id}>
                     <TableCell>
-                      <Link
-                        to={`/people/${person.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {person.firstName || (
-                          <em className="text-muted-foreground">—</em>
-                        )}
+                      <Link to={`/people/${person.id}`} className="font-medium hover:underline">
+                        {person.firstName || <em className="text-muted-foreground">—</em>}
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link
-                        to={`/people/${person.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {person.lastName || (
-                          <em className="text-muted-foreground">—</em>
-                        )}
+                      <Link to={`/people/${person.id}`} className="font-medium hover:underline">
+                        {person.lastName || <em className="text-muted-foreground">—</em>}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {person.phoneDisplay || person.phoneNumber}
-                    </TableCell>
+                    <TableCell className="text-muted-foreground">{person.phoneDisplay || person.phoneNumber}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          person.status === 'active' ? 'default' : 'secondary'
-                        }
-                      >
-                        {person.status}
-                      </Badge>
+                      <Badge variant={person.status === 'active' ? 'default' : 'secondary'}>{person.status}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {person.groups?.slice(0, 3).map((g) => (
-                          <Badge
-                            key={g.id}
-                            variant="outline"
-                            className="text-xs"
-                          >
+                          <Badge key={g.id} variant="outline" className="text-xs">
                             {g.name}
                           </Badge>
                         ))}
@@ -395,7 +315,7 @@ export function PeoplePage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                      {new Date(person.createdAt).toLocaleDateString()}
+                      {formatDate(person.createdAt)}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -403,11 +323,7 @@ export function PeoplePage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => toggleMutation.mutate(person.id)}
-                          title={
-                            person.status === 'active'
-                              ? 'Deactivate'
-                              : 'Activate'
-                          }
+                          title={person.status === 'active' ? 'Deactivate' : 'Activate'}
                         >
                           {person.status === 'active' ? (
                             <ToggleRight className="h-4 w-4" />
@@ -415,11 +331,7 @@ export function PeoplePage() {
                             <ToggleLeft className="h-4 w-4" />
                           )}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteTarget(person.id)}
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(person.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -428,12 +340,8 @@ export function PeoplePage() {
                 ))}
                 {data?.data.length === 0 && (
                   <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="text-center text-muted-foreground py-8"
-                    >
-                      No people found. Try importing from CSV or adding one
-                      manually.
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      No people found. Try importing from CSV or adding one manually.
                     </TableCell>
                   </TableRow>
                 )}
@@ -445,24 +353,13 @@ export function PeoplePage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Showing {(page - 1) * 50 + 1}–
-                {Math.min(page * 50, data?.total || 0)} of {data?.total} people
+                Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, data?.total || 0)} of {data?.total} people
               </p>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
                   Previous
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
+                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
                   Next
                 </Button>
               </div>

@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm run type-check:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(pnpm run format:*)",
+      "Bash(pnpm run check-formatting)",
+      "Bash(pnpm run biome:*)",
+      "Bash(pnpm run prettier:*)",
+      "Bash(pnpm run eslint:*)",
+      "Bash(fnm use)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git cat-file:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git describe:*)",
+      "WebSearch"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

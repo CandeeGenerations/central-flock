@@ -1,0 +1,245 @@
+import {Router} from 'express'
+import {db, schema} from '../db/index.js'
+import {eq, sql, and, inArray, notInArray} from 'drizzle-orm'
+
+export const groupsRouter = Router()
+
+// GET /api/groups - List all with member counts
+groupsRouter.get('/', async (_req, res) => {
+  try {
+    const groupsList = db
+      .select()
+      .from(schema.groups)
+      .orderBy(schema.groups.name)
+      .all()
+
+    const counts = db
+      .select({
+        groupId: schema.peopleGroups.groupId,
+        count: sql<number>`count(*)`,
+      })
+      .from(schema.peopleGroups)
+      .groupBy(schema.peopleGroups.groupId)
+      .all()
+
+    const countMap = new Map(counts.map((c) => [c.groupId, c.count]))
+
+    const result = groupsList.map((g) => ({
+      ...g,
+      memberCount: countMap.get(g.id) || 0,
+    }))
+
+    res.json(result)
+  } catch (error) {
+    console.error('Error fetching groups:', error)
+    res.status(500).json({error: 'Failed to fetch groups'})
+  }
+})
+
+// GET /api/groups/:id - Get group with members
+groupsRouter.get('/:id', async (req, res) => {
+  try {
+    const group = db
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, Number(req.params.id)))
+      .get()
+    if (!group) {
+      res.status(404).json({error: 'Group not found'})
+      return
+    }
+
+    const members = db
+      .select({
+        id: schema.people.id,
+        firstName: schema.people.firstName,
+        lastName: schema.people.lastName,
+        phoneNumber: schema.people.phoneNumber,
+        phoneDisplay: schema.people.phoneDisplay,
+        status: schema.people.status,
+      })
+      .from(schema.peopleGroups)
+      .innerJoin(
+        schema.people,
+        eq(schema.peopleGroups.personId, schema.people.id),
+      )
+      .where(eq(schema.peopleGroups.groupId, group.id))
+      .orderBy(schema.people.lastName, schema.people.firstName)
+      .all()
+
+    res.json({...group, members})
+  } catch (error) {
+    console.error('Error fetching group:', error)
+    res.status(500).json({error: 'Failed to fetch group'})
+  }
+})
+
+// POST /api/groups - Create group
+groupsRouter.post('/', async (req, res) => {
+  try {
+    const {name, description} = req.body
+    const result = db
+      .insert(schema.groups)
+      .values({
+        name,
+        description: description || null,
+      })
+      .returning()
+      .get()
+
+    res.status(201).json(result)
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
+      res.status(409).json({error: 'A group with this name already exists'})
+      return
+    }
+    console.error('Error creating group:', error)
+    res.status(500).json({error: 'Failed to create group'})
+  }
+})
+
+// PUT /api/groups/:id - Update group
+groupsRouter.put('/:id', async (req, res) => {
+  try {
+    const {name, description} = req.body
+    const result = db
+      .update(schema.groups)
+      .set({
+        name: name ?? undefined,
+        description: description ?? undefined,
+        updatedAt: sql`datetime('now')`,
+      })
+      .where(eq(schema.groups.id, Number(req.params.id)))
+      .returning()
+      .get()
+
+    if (!result) {
+      res.status(404).json({error: 'Group not found'})
+      return
+    }
+    res.json(result)
+  } catch (error) {
+    console.error('Error updating group:', error)
+    res.status(500).json({error: 'Failed to update group'})
+  }
+})
+
+// DELETE /api/groups/:id - Delete group
+groupsRouter.delete('/:id', async (req, res) => {
+  try {
+    const result = db
+      .delete(schema.groups)
+      .where(eq(schema.groups.id, Number(req.params.id)))
+      .returning()
+      .get()
+
+    if (!result) {
+      res.status(404).json({error: 'Group not found'})
+      return
+    }
+    res.json({success: true})
+  } catch (error) {
+    console.error('Error deleting group:', error)
+    res.status(500).json({error: 'Failed to delete group'})
+  }
+})
+
+// POST /api/groups/:id/members - Add people to group
+groupsRouter.post('/:id/members', async (req, res) => {
+  try {
+    const groupId = Number(req.params.id)
+    const {personIds} = req.body as {personIds: number[]}
+
+    const group = db
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, groupId))
+      .get()
+    if (!group) {
+      res.status(404).json({error: 'Group not found'})
+      return
+    }
+
+    // Get existing memberships to avoid duplicates
+    const existing = db
+      .select({personId: schema.peopleGroups.personId})
+      .from(schema.peopleGroups)
+      .where(
+        and(
+          eq(schema.peopleGroups.groupId, groupId),
+          inArray(schema.peopleGroups.personId, personIds),
+        ),
+      )
+      .all()
+
+    const existingIds = new Set(existing.map((e) => e.personId))
+    const newIds = personIds.filter((id) => !existingIds.has(id))
+
+    if (newIds.length > 0) {
+      db.insert(schema.peopleGroups)
+        .values(newIds.map((personId) => ({personId, groupId})))
+        .run()
+    }
+
+    res.json({added: newIds.length, alreadyMembers: existingIds.size})
+  } catch (error) {
+    console.error('Error adding members:', error)
+    res.status(500).json({error: 'Failed to add members'})
+  }
+})
+
+// DELETE /api/groups/:id/members - Remove people from group
+groupsRouter.delete('/:id/members', async (req, res) => {
+  try {
+    const groupId = Number(req.params.id)
+    const {personIds} = req.body as {personIds: number[]}
+
+    db.delete(schema.peopleGroups)
+      .where(
+        and(
+          eq(schema.peopleGroups.groupId, groupId),
+          inArray(schema.peopleGroups.personId, personIds),
+        ),
+      )
+      .run()
+
+    res.json({success: true})
+  } catch (error) {
+    console.error('Error removing members:', error)
+    res.status(500).json({error: 'Failed to remove members'})
+  }
+})
+
+// GET /api/groups/:id/non-members - Get people not in this group
+groupsRouter.get('/:id/non-members', async (req, res) => {
+  try {
+    const groupId = Number(req.params.id)
+    const {search} = req.query
+
+    const memberIds = db
+      .select({personId: schema.peopleGroups.personId})
+      .from(schema.peopleGroups)
+      .where(eq(schema.peopleGroups.groupId, groupId))
+
+    const conditions = [notInArray(schema.people.id, memberIds)]
+
+    if (search && typeof search === 'string') {
+      conditions.push(
+        sql`(${schema.people.firstName} LIKE ${'%' + search + '%'} OR ${schema.people.lastName} LIKE ${'%' + search + '%'} OR ${schema.people.phoneDisplay} LIKE ${'%' + search + '%'})`,
+      )
+    }
+
+    const nonMembers = db
+      .select()
+      .from(schema.people)
+      .where(and(...conditions))
+      .orderBy(schema.people.lastName, schema.people.firstName)
+      .limit(50)
+      .all()
+
+    res.json(nonMembers)
+  } catch (error) {
+    console.error('Error fetching non-members:', error)
+    res.status(500).json({error: 'Failed to fetch non-members'})
+  }
+})

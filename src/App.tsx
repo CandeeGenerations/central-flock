@@ -42,7 +42,7 @@ function AppLayout() {
       {/* Sidebar */}
       <aside className="w-56 border-r bg-sidebar text-sidebar-foreground flex flex-col shrink-0">
         <div className="p-4 border-b">
-          <h1 className="text-lg font-bold tracking-tight">Mass Texter</h1>
+          <h1 className="text-lg font-bold tracking-tight">Flock Pulse</h1>
         </div>
         <nav className="flex-1 p-2 space-y-1">
           {navItems.map(({to, label, icon: Icon}) => (

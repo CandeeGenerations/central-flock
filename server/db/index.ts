@@ -5,7 +5,7 @@ import path from 'path'
 import {fileURLToPath} from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const dbPath = path.join(__dirname, '..', '..', 'gloo.db')
+const dbPath = path.join(__dirname, '..', '..', 'flock-pulse.db')
 
 const sqlite = new Database(dbPath)
 sqlite.pragma('journal_mode = WAL')

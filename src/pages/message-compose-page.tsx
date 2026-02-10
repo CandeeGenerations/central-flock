@@ -2,7 +2,6 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Progress} from '@/components/ui/progress'
@@ -21,7 +20,7 @@ import {
 } from '@/lib/api'
 import {fetchMessageStatus} from '@/lib/api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Eye, Save, Search, Send} from 'lucide-react'
+import {ArrowLeft, Eye, Save, Search, Send} from 'lucide-react'
 import {useEffect, useMemo, useState} from 'react'
 import {useLocation, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -60,6 +59,10 @@ export function MessageComposePage() {
   } | null>(null)
 
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(draftIdParam ? Number(draftIdParam) : null)
+  const [individualSearch, setIndividualSearch] = useState('')
+  const [selectedIndividualIds, setSelectedIndividualIds] = useState<Set<number>>(() => {
+    return presetRecipientId ? new Set([Number(presetRecipientId)]) : new Set()
+  })
 
   const {data: draftData} = useQuery({
     queryKey: ['draft', currentDraftId],
@@ -101,11 +104,6 @@ export function MessageComposePage() {
     queryKey: ['people', 'all'],
     queryFn: () => fetchPeople({limit: 1000}),
     enabled: recipientMode === 'individual',
-  })
-
-  const [individualSearch, setIndividualSearch] = useState('')
-  const [selectedIndividualIds, setSelectedIndividualIds] = useState<Set<number>>(() => {
-    return presetRecipientId ? new Set([Number(presetRecipientId)]) : new Set()
   })
 
   const recipients = useMemo(() => {
@@ -242,7 +240,16 @@ export function MessageComposePage() {
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
-      <h2 className="text-2xl font-bold">Compose Message</h2>
+      <div className="flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate(currentDraftId ? '/messages?tab=drafts' : '/messages')}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h2 className="text-2xl font-bold">Compose Message</h2>
+      </div>
 
       {/* Sending progress overlay */}
       {sending && sendProgress && (
@@ -299,40 +306,65 @@ export function MessageComposePage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search people..."
+                    placeholder="Search people to add..."
                     value={individualSearch}
                     onChange={(e) => setIndividualSearch(e.target.value)}
                     className="pl-9"
                   />
                 </div>
-                {selectedIndividualIds.size > 0 && (
-                  <p className="text-xs text-muted-foreground">{selectedIndividualIds.size} selected</p>
-                )}
-                <div className="border rounded-md max-h-48 overflow-auto p-2 space-y-1">
-                  {allPeople.data
-                    .filter((p) => {
-                      if (!individualSearch) return true
+                {individualSearch && (
+                  <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
+                    {(() => {
                       const q = individualSearch.toLowerCase()
-                      const name = [p.firstName, p.lastName].filter(Boolean).join(' ').toLowerCase()
-                      const phone = (p.phoneDisplay || p.phoneNumber || '').toLowerCase()
-                      return name.includes(q) || phone.includes(q)
-                    })
-                    .map((p) => (
-                      <label
-                        key={p.id}
-                        className="group flex items-center gap-2 px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
-                      >
-                        <Checkbox
-                          checked={selectedIndividualIds.has(p.id)}
-                          onCheckedChange={() => toggleIndividual(p.id)}
-                        />
-                        {[p.firstName, p.lastName].filter(Boolean).join(' ') || (
-                          <em className="text-muted-foreground group-hover:text-inherit">Unnamed</em>
-                        )}
-                        <span className="text-muted-foreground ml-auto group-hover:text-inherit">{p.phoneDisplay}</span>
-                      </label>
-                    ))}
-                </div>
+                      const results = allPeople.data.filter((p) => {
+                        if (selectedIndividualIds.has(p.id)) return false
+                        const name = [p.firstName, p.lastName].filter(Boolean).join(' ').toLowerCase()
+                        const phone = (p.phoneDisplay || p.phoneNumber || '').toLowerCase()
+                        return name.includes(q) || phone.includes(q)
+                      })
+                      if (results.length === 0) {
+                        return (
+                          <p className="text-sm text-muted-foreground text-center py-3">No matching people found</p>
+                        )
+                      }
+                      return results.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className="flex items-center gap-2 w-full px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm text-left"
+                          onClick={() => {
+                            toggleIndividual(p.id)
+                            setIndividualSearch('')
+                          }}
+                        >
+                          <span>
+                            {[p.firstName, p.lastName].filter(Boolean).join(' ') || (
+                              <em className="text-muted-foreground">Unnamed</em>
+                            )}
+                          </span>
+                          <span className="text-muted-foreground ml-auto">{p.phoneDisplay}</span>
+                        </button>
+                      ))
+                    })()}
+                  </div>
+                )}
+                {selectedIndividualIds.size > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {allPeople.data
+                      .filter((p) => selectedIndividualIds.has(p.id))
+                      .map((p) => (
+                        <Badge
+                          key={p.id}
+                          variant="secondary"
+                          className="gap-1 cursor-pointer hover:bg-destructive/20"
+                          onClick={() => toggleIndividual(p.id)}
+                        >
+                          {[p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unnamed'}
+                          <span className="text-muted-foreground">&times;</span>
+                        </Badge>
+                      ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -344,36 +376,63 @@ export function MessageComposePage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search members..."
+                  placeholder="Search members to exclude..."
                   value={excludeSearch}
                   onChange={(e) => setExcludeSearch(e.target.value)}
                   className="pl-9"
                 />
               </div>
-              <div className="border rounded-md max-h-48 overflow-auto p-2 space-y-1">
-                {groupDetail.members
-                  .filter((m) => {
-                    if (!excludeSearch) return true
+              {excludeSearch && (
+                <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
+                  {(() => {
                     const q = excludeSearch.toLowerCase()
-                    const name = [m.firstName, m.lastName].filter(Boolean).join(' ').toLowerCase()
-                    const phone = (m.phoneDisplay || m.phoneNumber || '').toLowerCase()
-                    return name.includes(q) || phone.includes(q)
-                  })
-                  .map((m) => (
-                    <label
-                      key={m.id}
-                      className="group flex items-center gap-2 px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
-                    >
-                      <Checkbox checked={excludeIds.has(m.id)} onCheckedChange={() => toggleExclude(m.id)} />
-                      <span className={excludeIds.has(m.id) ? 'line-through text-muted-foreground' : ''}>
-                        {[m.firstName, m.lastName].filter(Boolean).join(' ') || (
-                          <em className="text-muted-foreground group-hover:text-inherit">Unnamed</em>
-                        )}
-                      </span>
-                      <span className="text-muted-foreground ml-auto group-hover:text-inherit">{m.phoneDisplay}</span>
-                    </label>
-                  ))}
-              </div>
+                    const results = groupDetail.members.filter((m) => {
+                      if (excludeIds.has(m.id)) return false
+                      const name = [m.firstName, m.lastName].filter(Boolean).join(' ').toLowerCase()
+                      const phone = (m.phoneDisplay || m.phoneNumber || '').toLowerCase()
+                      return name.includes(q) || phone.includes(q)
+                    })
+                    if (results.length === 0) {
+                      return <p className="text-sm text-muted-foreground text-center py-3">No matching members found</p>
+                    }
+                    return results.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className="flex items-center gap-2 w-full px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm text-left"
+                        onClick={() => {
+                          toggleExclude(m.id)
+                          setExcludeSearch('')
+                        }}
+                      >
+                        <span>
+                          {[m.firstName, m.lastName].filter(Boolean).join(' ') || (
+                            <em className="text-muted-foreground">Unnamed</em>
+                          )}
+                        </span>
+                        <span className="text-muted-foreground ml-auto">{m.phoneDisplay}</span>
+                      </button>
+                    ))
+                  })()}
+                </div>
+              )}
+              {excludeIds.size > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {groupDetail.members
+                    .filter((m) => excludeIds.has(m.id))
+                    .map((m) => (
+                      <Badge
+                        key={m.id}
+                        variant="secondary"
+                        className="gap-1 cursor-pointer hover:bg-destructive/20"
+                        onClick={() => toggleExclude(m.id)}
+                      >
+                        {[m.firstName, m.lastName].filter(Boolean).join(' ') || 'Unnamed'}
+                        <span className="text-muted-foreground">&times;</span>
+                      </Badge>
+                    ))}
+                </div>
+              )}
             </div>
           )}
 

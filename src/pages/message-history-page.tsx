@@ -2,14 +2,15 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Checkbox} from '@/components/ui/checkbox'
+import {Input} from '@/components/ui/input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {deleteDrafts, deleteMessages, duplicateDraft, fetchDrafts, fetchMessages} from '@/lib/api'
 import type {Draft} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Copy, Plus, Trash2} from 'lucide-react'
+import {Copy, Plus, Search, Trash2} from 'lucide-react'
 import {useState} from 'react'
-import {Link, useNavigate} from 'react-router-dom'
+import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -22,20 +23,23 @@ const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'ou
 export function MessageHistoryPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<'sent' | 'drafts'>('sent')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = (searchParams.get('tab') === 'drafts' ? 'drafts' : 'sent') as 'sent' | 'drafts'
+  const setActiveTab = (tab: 'sent' | 'drafts') => setSearchParams(tab === 'sent' ? {} : {tab}, {replace: true})
+  const [search, setSearch] = useState('')
 
   // Sent messages state
   const {data: messages, isLoading: messagesLoading} = useQuery({
-    queryKey: ['messages'],
-    queryFn: fetchMessages,
+    queryKey: ['messages', search],
+    queryFn: () => fetchMessages({search: search || undefined}),
   })
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   // Drafts state
   const {data: drafts, isLoading: draftsLoading} = useQuery({
-    queryKey: ['drafts'],
-    queryFn: fetchDrafts,
+    queryKey: ['drafts', search],
+    queryFn: () => fetchDrafts({search: search || undefined}),
   })
   const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set())
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false)
@@ -165,6 +169,17 @@ export function MessageHistoryPage() {
             </Button>
           </Link>
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder={activeTab === 'sent' ? 'Search messages...' : 'Search drafts...'}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       {/* Tab toggle */}

@@ -202,8 +202,11 @@ export function deleteMessages(ids: number[]) {
   })
 }
 
-export function fetchMessages() {
-  return request<Message[]>('/messages')
+export function fetchMessages(params?: {search?: string}) {
+  const searchParams = new URLSearchParams()
+  if (params?.search) searchParams.set('search', params.search)
+  const qs = searchParams.toString()
+  return request<Message[]>(`/messages${qs ? `?${qs}` : ''}`)
 }
 
 export function fetchMessage(id: number) {
@@ -242,8 +245,11 @@ export interface Draft {
   updatedAt: string
 }
 
-export function fetchDrafts() {
-  return request<Draft[]>('/drafts')
+export function fetchDrafts(params?: {search?: string}) {
+  const searchParams = new URLSearchParams()
+  if (params?.search) searchParams.set('search', params.search)
+  const qs = searchParams.toString()
+  return request<Draft[]>(`/drafts${qs ? `?${qs}` : ''}`)
 }
 
 export function fetchDraft(id: number) {

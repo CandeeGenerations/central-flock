@@ -6,11 +6,13 @@ import {db, schema} from '../db/index.js'
 export const draftsRouter = Router()
 
 // GET /api/drafts - List all drafts
-draftsRouter.get('/', async (_req, res) => {
+draftsRouter.get('/', async (req, res) => {
   try {
+    const {search} = req.query
+
     const draftsList = db.select().from(schema.drafts).orderBy(desc(schema.drafts.updatedAt)).all()
 
-    const result = draftsList.map((draft) => {
+    let result = draftsList.map((draft) => {
       let groupName = null
       let recipientCount = 0
       let excludeCount = 0
@@ -43,6 +45,16 @@ draftsRouter.get('/', async (_req, res) => {
       }
       return {...draft, groupName, recipientCount}
     })
+
+    if (search && typeof search === 'string') {
+      const term = search.toLowerCase()
+      result = result.filter(
+        (draft) =>
+          draft.content?.toLowerCase().includes(term) ||
+          draft.name?.toLowerCase().includes(term) ||
+          draft.groupName?.toLowerCase().includes(term),
+      )
+    }
 
     res.json(result)
   } catch (error) {

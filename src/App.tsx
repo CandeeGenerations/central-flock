@@ -42,7 +42,8 @@ function AppLayout() {
       {/* Sidebar */}
       <aside className="w-56 border-r bg-sidebar text-sidebar-foreground flex flex-col shrink-0">
         <div className="p-4 border-b">
-          <h1 className="text-lg font-bold tracking-tight">Flock Pulse</h1>
+          <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-6 dark:hidden" />
+          <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6 hidden dark:block" />
         </div>
         <nav className="flex-1 p-2 space-y-1">
           {navItems.map(({to, label, icon: Icon}) => (

@@ -113,12 +113,14 @@ messagesRouter.post('/delete', async (req, res) => {
 })
 
 // GET /api/messages - Message history
-messagesRouter.get('/', async (_req, res) => {
+messagesRouter.get('/', async (req, res) => {
   try {
+    const {search} = req.query
+
     const messagesList = db.select().from(schema.messages).orderBy(desc(schema.messages.createdAt)).all()
 
     // Attach group names
-    const result = messagesList.map((msg) => {
+    let result = messagesList.map((msg) => {
       let groupName = null
       if (msg.groupId) {
         const group = db
@@ -130,6 +132,16 @@ messagesRouter.get('/', async (_req, res) => {
       }
       return {...msg, groupName}
     })
+
+    if (search && typeof search === 'string') {
+      const term = search.toLowerCase()
+      result = result.filter(
+        (msg) =>
+          msg.content.toLowerCase().includes(term) ||
+          msg.groupName?.toLowerCase().includes(term) ||
+          msg.status.toLowerCase().includes(term),
+      )
+    }
 
     res.json(result)
   } catch (error) {

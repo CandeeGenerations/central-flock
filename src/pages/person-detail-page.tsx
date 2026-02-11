@@ -19,6 +19,8 @@ import {
   removeGroupMembers,
   updatePerson,
 } from '@/lib/api'
+import {formatFullName} from '@/lib/format'
+import {queryKeys} from '@/lib/query-keys'
 import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowLeft, Contact, MessageSquare, Save, Trash2, UserMinus, UserPlus} from 'lucide-react'
@@ -38,7 +40,7 @@ export function PersonDetailPage() {
   const [removeAllConfirmOpen, setRemoveAllConfirmOpen] = useState(false)
 
   const {data: person, isLoading} = useQuery({
-    queryKey: ['person', id],
+    queryKey: queryKeys.person(id!),
     queryFn: () => fetchPerson(Number(id)),
     enabled: !!id,
   })
@@ -46,8 +48,8 @@ export function PersonDetailPage() {
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Person>) => updatePerson(Number(id), data),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['person', id]})
-      queryClient.invalidateQueries({queryKey: ['people']})
+      queryClient.invalidateQueries({queryKey: queryKeys.person(id!)})
+      queryClient.invalidateQueries({queryKey: queryKeys.people})
       setEditing(false)
       toast.success('Person updated')
     },
@@ -57,7 +59,7 @@ export function PersonDetailPage() {
   const deleteMutation = useMutation({
     mutationFn: () => deletePerson(Number(id)),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['people']})
+      queryClient.invalidateQueries({queryKey: queryKeys.people})
       navigate('/people')
       toast.success('Person deleted')
     },
@@ -70,7 +72,7 @@ export function PersonDetailPage() {
   })
 
   const {data: allGroups} = useQuery({
-    queryKey: ['groups'],
+    queryKey: queryKeys.groups,
     queryFn: fetchGroups,
     enabled: addGroupOpen,
   })
@@ -78,12 +80,16 @@ export function PersonDetailPage() {
   const currentGroupIds = new Set(person?.groups?.map((g) => g.id) || [])
   const availableGroups = allGroups?.filter((g) => !currentGroupIds.has(g.id)) || []
 
+  const invalidatePersonMembership = () => {
+    queryClient.invalidateQueries({queryKey: queryKeys.person(id!)})
+    queryClient.invalidateQueries({queryKey: queryKeys.groups})
+    queryClient.invalidateQueries({queryKey: queryKeys.drafts()})
+  }
+
   const addGroupMutation = useMutation({
     mutationFn: (groupIds: number[]) => Promise.all(groupIds.map((gid) => addGroupMembers(gid, [Number(id)]))),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['person', id]})
-      queryClient.invalidateQueries({queryKey: ['groups']})
-      queryClient.invalidateQueries({queryKey: ['drafts']})
+      invalidatePersonMembership()
       setAddGroupOpen(false)
       setSelectedGroupIds(new Set())
       toast.success('Added to groups')
@@ -93,9 +99,7 @@ export function PersonDetailPage() {
   const removeGroupMutation = useMutation({
     mutationFn: (groupId: number) => removeGroupMembers(groupId, [Number(id)]),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['person', id]})
-      queryClient.invalidateQueries({queryKey: ['groups']})
-      queryClient.invalidateQueries({queryKey: ['drafts']})
+      invalidatePersonMembership()
       toast.success('Removed from group')
     },
   })
@@ -123,9 +127,7 @@ export function PersonDetailPage() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/people')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-2xl font-bold">
-          {[person.firstName, person.lastName].filter(Boolean).join(' ') || 'Unnamed'}
-        </h2>
+        <h2 className="text-2xl font-bold">{formatFullName(person)}</h2>
         <Badge variant={person.status === 'active' ? 'default' : 'secondary'}>{person.status}</Badge>
       </div>
 
@@ -389,9 +391,7 @@ export function PersonDetailPage() {
         onConfirm={() => {
           if (!person.groups) return
           Promise.all(person.groups.map((g) => removeGroupMembers(g.id, [Number(id)]))).then(() => {
-            queryClient.invalidateQueries({queryKey: ['person', id]})
-            queryClient.invalidateQueries({queryKey: ['groups']})
-            queryClient.invalidateQueries({queryKey: ['drafts']})
+            invalidatePersonMembership()
             setRemoveAllConfirmOpen(false)
             toast.success('Removed from all groups')
           })

@@ -8,6 +8,7 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {useSetToggle} from '@/hooks/use-set-toggle'
 import {
   type Person,
   addGroupMembers,
@@ -17,6 +18,8 @@ import {
   removeGroupMembers,
   updateGroup,
 } from '@/lib/api'
+import {formatFullName} from '@/lib/format'
+import {queryKeys} from '@/lib/query-keys'
 import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowLeft, MessageSquare, Save, Trash2, UserMinus, UserPlus, UserX} from 'lucide-react'
 import {useCallback, useRef, useState} from 'react'
@@ -38,7 +41,7 @@ export function GroupDetailPage() {
   const [removeInactiveOpen, setRemoveInactiveOpen] = useState(false)
 
   const {data: group, isLoading} = useQuery({
-    queryKey: ['group', id],
+    queryKey: queryKeys.group(id!),
     queryFn: () => fetchGroup(groupId),
     enabled: !!id,
   })
@@ -49,7 +52,7 @@ export function GroupDetailPage() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['nonMembers', id, memberSearch],
+    queryKey: queryKeys.nonMembers(id!, memberSearch || undefined),
     queryFn: ({pageParam}) =>
       fetchNonMembers(groupId, {
         search: memberSearch || undefined,
@@ -81,11 +84,17 @@ export function GroupDetailPage() {
     [hasNextPage, isFetchingNextPage, fetchNextPage],
   )
 
+  const invalidateGroupMembership = () => {
+    queryClient.invalidateQueries({queryKey: queryKeys.group(id!)})
+    queryClient.invalidateQueries({queryKey: queryKeys.groups})
+    queryClient.invalidateQueries({queryKey: queryKeys.drafts()})
+  }
+
   const updateMutation = useMutation({
     mutationFn: () => updateGroup(groupId, form),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['group', id]})
-      queryClient.invalidateQueries({queryKey: ['groups']})
+      queryClient.invalidateQueries({queryKey: queryKeys.group(id!)})
+      queryClient.invalidateQueries({queryKey: queryKeys.groups})
       setEditing(false)
       toast.success('Group updated')
     },
@@ -94,7 +103,7 @@ export function GroupDetailPage() {
   const deleteMutation = useMutation({
     mutationFn: () => deleteGroup(groupId),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['groups']})
+      queryClient.invalidateQueries({queryKey: queryKeys.groups})
       navigate('/groups')
       toast.success('Group deleted')
     },
@@ -103,10 +112,8 @@ export function GroupDetailPage() {
   const addMembersMutation = useMutation({
     mutationFn: (personIds: number[]) => addGroupMembers(groupId, personIds),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['group', id]})
+      invalidateGroupMembership()
       queryClient.invalidateQueries({queryKey: ['nonMembers']})
-      queryClient.invalidateQueries({queryKey: ['groups']})
-      queryClient.invalidateQueries({queryKey: ['drafts']})
       setSelectedIds(new Set())
       setAddMembersOpen(false)
       toast.success('Members added')
@@ -116,9 +123,7 @@ export function GroupDetailPage() {
   const removeMemberMutation = useMutation({
     mutationFn: (personId: number) => removeGroupMembers(groupId, [personId]),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['group', id]})
-      queryClient.invalidateQueries({queryKey: ['groups']})
-      queryClient.invalidateQueries({queryKey: ['drafts']})
+      invalidateGroupMembership()
       toast.success('Member removed')
     },
   })
@@ -132,9 +137,7 @@ export function GroupDetailPage() {
         inactiveMembers.map((m: Person) => m.id),
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['group', id]})
-      queryClient.invalidateQueries({queryKey: ['groups']})
-      queryClient.invalidateQueries({queryKey: ['drafts']})
+      invalidateGroupMembership()
       setRemoveInactiveOpen(false)
       toast.success(`Removed ${inactiveMembers.length} inactive member${inactiveMembers.length !== 1 ? 's' : ''}`)
     },
@@ -147,14 +150,7 @@ export function GroupDetailPage() {
     }
   }
 
-  const toggleSelected = (personId: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(personId)) next.delete(personId)
-      else next.add(personId)
-      return next
-    })
-  }
+  const toggleSelected = useSetToggle(setSelectedIds)
 
   if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>
   if (!group) return <div className="p-6">Group not found</div>
@@ -249,7 +245,7 @@ export function GroupDetailPage() {
                 <TableRow key={m.id}>
                   <TableCell>
                     <Link to={`/people/${m.id}`} className="font-medium hover:underline">
-                      {[m.firstName, m.lastName].filter(Boolean).join(' ') || 'Unnamed'}
+                      {formatFullName(m)}
                     </Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{m.phoneDisplay || m.phoneNumber}</TableCell>
@@ -300,7 +296,7 @@ export function GroupDetailPage() {
                 className="group flex items-center gap-3 px-3 py-2 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer"
               >
                 <Checkbox checked={selectedIds.has(p.id)} onCheckedChange={() => toggleSelected(p.id)} />
-                <span className="flex-1">{[p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unnamed'}</span>
+                <span className="flex-1">{formatFullName(p)}</span>
                 <span className="text-sm group-hover:text-inherit">{p.phoneDisplay}</span>
               </label>
             ))}

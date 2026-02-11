@@ -2,21 +2,25 @@ import {desc, eq, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
+import {BATCH_DEFAULTS} from '../lib/constants.js'
+import {renderTemplate} from '../lib/format.js'
+import {asyncHandler, getGroupName} from '../lib/route-helpers.js'
 import {sendMessage} from '../services/applescript.js'
 import {type SendJob, cancelJob, createJob, getJob} from '../services/message-queue.js'
 
 export const messagesRouter = Router()
 
 // POST /api/messages/send - Send message
-messagesRouter.post('/send', async (req, res) => {
-  try {
+messagesRouter.post(
+  '/send',
+  asyncHandler(async (req, res) => {
     const {
       content,
       recipientIds,
       excludeIds = [],
       groupId,
-      batchSize = 1,
-      batchDelayMs = 5000,
+      batchSize = BATCH_DEFAULTS.batchSize,
+      batchDelayMs = BATCH_DEFAULTS.batchDelayMs,
     } = req.body as {
       content: string
       recipientIds: number[]
@@ -86,15 +90,13 @@ messagesRouter.post('/send', async (req, res) => {
     processSendJob(job)
 
     res.status(201).json({messageId: message.id, jobId: job.id})
-  } catch (error) {
-    console.error('Error sending message:', error)
-    res.status(500).json({error: 'Failed to send message'})
-  }
-})
+  }),
+)
 
 // POST /api/messages/delete - Delete messages by IDs
-messagesRouter.post('/delete', async (req, res) => {
-  try {
+messagesRouter.post(
+  '/delete',
+  asyncHandler(async (req, res) => {
     const {ids} = req.body as {ids: number[]}
     if (!ids || ids.length === 0) {
       res.status(400).json({error: 'No message IDs provided'})
@@ -106,30 +108,20 @@ messagesRouter.post('/delete', async (req, res) => {
     }
 
     res.json({success: true, deleted: ids.length})
-  } catch (error) {
-    console.error('Error deleting messages:', error)
-    res.status(500).json({error: 'Failed to delete messages'})
-  }
-})
+  }),
+)
 
 // GET /api/messages - Message history
-messagesRouter.get('/', async (req, res) => {
-  try {
+messagesRouter.get(
+  '/',
+  asyncHandler(async (req, res) => {
     const {search} = req.query
 
     const messagesList = db.select().from(schema.messages).orderBy(desc(schema.messages.createdAt)).all()
 
     // Attach group names
     let result = messagesList.map((msg) => {
-      let groupName = null
-      if (msg.groupId) {
-        const group = db
-          .select({name: schema.groups.name})
-          .from(schema.groups)
-          .where(eq(schema.groups.id, msg.groupId))
-          .get()
-        groupName = group?.name || null
-      }
+      const groupName = msg.groupId ? getGroupName(msg.groupId) : null
       return {...msg, groupName}
     })
 
@@ -144,15 +136,13 @@ messagesRouter.get('/', async (req, res) => {
     }
 
     res.json(result)
-  } catch (error) {
-    console.error('Error fetching messages:', error)
-    res.status(500).json({error: 'Failed to fetch messages'})
-  }
-})
+  }),
+)
 
 // GET /api/messages/:id - Message detail
-messagesRouter.get('/:id', async (req, res) => {
-  try {
+messagesRouter.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
     const message = db
       .select()
       .from(schema.messages)
@@ -180,26 +170,16 @@ messagesRouter.get('/:id', async (req, res) => {
       .where(eq(schema.messageRecipients.messageId, message.id))
       .all()
 
-    let groupName = null
-    if (message.groupId) {
-      const group = db
-        .select({name: schema.groups.name})
-        .from(schema.groups)
-        .where(eq(schema.groups.id, message.groupId))
-        .get()
-      groupName = group?.name || null
-    }
+    const groupName = message.groupId ? getGroupName(message.groupId) : null
 
     res.json({...message, groupName, recipients})
-  } catch (error) {
-    console.error('Error fetching message:', error)
-    res.status(500).json({error: 'Failed to fetch message'})
-  }
-})
+  }),
+)
 
 // GET /api/messages/:id/status - Poll send progress
-messagesRouter.get('/:id/status', async (req, res) => {
-  try {
+messagesRouter.get(
+  '/:id/status',
+  asyncHandler(async (req, res) => {
     const message = db
       .select()
       .from(schema.messages)
@@ -220,15 +200,13 @@ messagesRouter.get('/:id/status', async (req, res) => {
       totalRecipients: message.totalRecipients,
       isProcessing: job?.status === 'processing',
     })
-  } catch (error) {
-    console.error('Error fetching message status:', error)
-    res.status(500).json({error: 'Failed to fetch message status'})
-  }
-})
+  }),
+)
 
 // POST /api/messages/:id/cancel - Cancel in-progress batch
-messagesRouter.post('/:id/cancel', async (req, res) => {
-  try {
+messagesRouter.post(
+  '/:id/cancel',
+  asyncHandler(async (req, res) => {
     const messageId = Number(req.params.id)
     cancelJob(messageId)
 
@@ -246,21 +224,8 @@ messagesRouter.post('/:id/cancel', async (req, res) => {
       .run()
 
     res.json({success: true})
-  } catch (error) {
-    console.error('Error cancelling message:', error)
-    res.status(500).json({error: 'Failed to cancel message'})
-  }
-})
-
-function renderTemplate(template: string, person: {firstName?: string | null; lastName?: string | null}): string {
-  const firstName = person.firstName || ''
-  const lastName = person.lastName || ''
-  const fullName = [firstName, lastName].filter(Boolean).join(' ')
-  return template
-    .replace(/\{\{firstName\}\}/g, firstName)
-    .replace(/\{\{lastName\}\}/g, lastName)
-    .replace(/\{\{fullName\}\}/g, fullName)
-}
+  }),
+)
 
 async function processSendJob(job: SendJob) {
   const pendingRecipients = db

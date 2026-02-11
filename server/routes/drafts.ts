@@ -2,12 +2,15 @@ import {asc, desc, eq, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
+import {BATCH_DEFAULTS} from '../lib/constants.js'
+import {asyncHandler, getGroupName} from '../lib/route-helpers.js'
 
 export const draftsRouter = Router()
 
 // GET /api/drafts - List all drafts
-draftsRouter.get('/', async (req, res) => {
-  try {
+draftsRouter.get(
+  '/',
+  asyncHandler(async (req, res) => {
     const {search} = req.query
 
     const draftsList = db
@@ -21,7 +24,6 @@ draftsRouter.get('/', async (req, res) => {
       .all()
 
     let result = draftsList.map((draft) => {
-      let groupName = null
       let recipientCount = 0
       let excludeCount = 0
       if (draft.excludeIds) {
@@ -31,13 +33,8 @@ draftsRouter.get('/', async (req, res) => {
           /* ignore */
         }
       }
+      const groupName = draft.groupId ? getGroupName(draft.groupId) : null
       if (draft.groupId) {
-        const group = db
-          .select({name: schema.groups.name})
-          .from(schema.groups)
-          .where(eq(schema.groups.id, draft.groupId))
-          .get()
-        groupName = group?.name || null
         const count = db
           .select({count: sql<number>`count(*)`})
           .from(schema.peopleGroups)
@@ -65,15 +62,13 @@ draftsRouter.get('/', async (req, res) => {
     }
 
     res.json(result)
-  } catch (error) {
-    console.error('Error fetching drafts:', error)
-    res.status(500).json({error: 'Failed to fetch drafts'})
-  }
-})
+  }),
+)
 
 // GET /api/drafts/:id - Get single draft
-draftsRouter.get('/:id', async (req, res) => {
-  try {
+draftsRouter.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
     const draft = db
       .select()
       .from(schema.drafts)
@@ -85,26 +80,16 @@ draftsRouter.get('/:id', async (req, res) => {
       return
     }
 
-    let groupName = null
-    if (draft.groupId) {
-      const group = db
-        .select({name: schema.groups.name})
-        .from(schema.groups)
-        .where(eq(schema.groups.id, draft.groupId))
-        .get()
-      groupName = group?.name || null
-    }
+    const groupName = draft.groupId ? getGroupName(draft.groupId) : null
 
     res.json({...draft, groupName})
-  } catch (error) {
-    console.error('Error fetching draft:', error)
-    res.status(500).json({error: 'Failed to fetch draft'})
-  }
-})
+  }),
+)
 
 // POST /api/drafts - Create draft
-draftsRouter.post('/', async (req, res) => {
-  try {
+draftsRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
     const {
       name,
       content,
@@ -126,23 +111,21 @@ draftsRouter.post('/', async (req, res) => {
         groupId: groupId || null,
         selectedIndividualIds: selectedIndividualIds || null,
         excludeIds: excludeIds || null,
-        batchSize: batchSize ?? 1,
-        batchDelayMs: batchDelayMs ?? 5000,
+        batchSize: batchSize ?? BATCH_DEFAULTS.batchSize,
+        batchDelayMs: batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs,
         scheduledAt: scheduledAt || null,
       })
       .returning()
       .get()
 
     res.status(201).json(draft)
-  } catch (error) {
-    console.error('Error creating draft:', error)
-    res.status(500).json({error: 'Failed to create draft'})
-  }
-})
+  }),
+)
 
 // PUT /api/drafts/:id - Update draft
-draftsRouter.put('/:id', async (req, res) => {
-  try {
+draftsRouter.put(
+  '/:id',
+  asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
     const {
       name,
@@ -165,8 +148,8 @@ draftsRouter.put('/:id', async (req, res) => {
         groupId: groupId ?? null,
         selectedIndividualIds: selectedIndividualIds ?? null,
         excludeIds: excludeIds ?? null,
-        batchSize: batchSize ?? 1,
-        batchDelayMs: batchDelayMs ?? 5000,
+        batchSize: batchSize ?? BATCH_DEFAULTS.batchSize,
+        batchDelayMs: batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs,
         scheduledAt: scheduledAt ?? null,
         updatedAt: sql`datetime('now')`,
       })
@@ -180,15 +163,13 @@ draftsRouter.put('/:id', async (req, res) => {
     }
 
     res.json(draft)
-  } catch (error) {
-    console.error('Error updating draft:', error)
-    res.status(500).json({error: 'Failed to update draft'})
-  }
-})
+  }),
+)
 
 // POST /api/drafts/:id/duplicate - Duplicate a draft
-draftsRouter.post('/:id/duplicate', async (req, res) => {
-  try {
+draftsRouter.post(
+  '/:id/duplicate',
+  asyncHandler(async (req, res) => {
     const original = db
       .select()
       .from(schema.drafts)
@@ -216,15 +197,13 @@ draftsRouter.post('/:id/duplicate', async (req, res) => {
       .get()
 
     res.status(201).json(copy)
-  } catch (error) {
-    console.error('Error duplicating draft:', error)
-    res.status(500).json({error: 'Failed to duplicate draft'})
-  }
-})
+  }),
+)
 
 // POST /api/drafts/delete - Bulk delete drafts
-draftsRouter.post('/delete', async (req, res) => {
-  try {
+draftsRouter.post(
+  '/delete',
+  asyncHandler(async (req, res) => {
     const {ids} = req.body as {ids: number[]}
     if (!ids || ids.length === 0) {
       res.status(400).json({error: 'No draft IDs provided'})
@@ -236,8 +215,5 @@ draftsRouter.post('/delete', async (req, res) => {
     }
 
     res.json({success: true, deleted: ids.length})
-  } catch (error) {
-    console.error('Error deleting drafts:', error)
-    res.status(500).json({error: 'Failed to delete drafts'})
-  }
-})
+  }),
+)

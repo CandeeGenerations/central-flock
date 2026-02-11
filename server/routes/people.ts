@@ -2,12 +2,14 @@ import {and, asc, desc, eq, inArray, like, or, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
+import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 
 export const peopleRouter = Router()
 
 // GET /api/people - List all with optional search/filter
-peopleRouter.get('/', async (req, res) => {
-  try {
+peopleRouter.get(
+  '/',
+  asyncHandler(async (req, res) => {
     const {search, status, groupId, page = '1', limit = '50', sort = 'createdAt', sortDir = 'desc'} = req.query
     const offset = (Number(page) - 1) * Number(limit)
 
@@ -99,15 +101,13 @@ peopleRouter.get('/', async (req, res) => {
       page: Number(page),
       limit: Number(limit),
     })
-  } catch (error) {
-    console.error('Error fetching people:', error)
-    res.status(500).json({error: 'Failed to fetch people'})
-  }
-})
+  }),
+)
 
 // GET /api/people/:id - Get person with groups
-peopleRouter.get('/:id', async (req, res) => {
-  try {
+peopleRouter.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
     const person = db
       .select()
       .from(schema.people)
@@ -129,43 +129,43 @@ peopleRouter.get('/:id', async (req, res) => {
       .all()
 
     res.json({...person, groups})
-  } catch (error) {
-    console.error('Error fetching person:', error)
-    res.status(500).json({error: 'Failed to fetch person'})
-  }
-})
+  }),
+)
 
 // POST /api/people - Create person
-peopleRouter.post('/', async (req, res) => {
-  try {
+peopleRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
     const {firstName, lastName, phoneNumber, phoneDisplay, status, notes} = req.body
-    const result = db
-      .insert(schema.people)
-      .values({
-        firstName: firstName || null,
-        lastName: lastName || null,
-        phoneNumber,
-        phoneDisplay: phoneDisplay || null,
-        status: status || 'active',
-        notes: notes || null,
-      })
-      .returning()
-      .get()
+    try {
+      const result = db
+        .insert(schema.people)
+        .values({
+          firstName: firstName || null,
+          lastName: lastName || null,
+          phoneNumber,
+          phoneDisplay: phoneDisplay || null,
+          status: status || 'active',
+          notes: notes || null,
+        })
+        .returning()
+        .get()
 
-    res.status(201).json(result)
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
-      res.status(409).json({error: 'A person with this phone number already exists'})
-      return
+      res.status(201).json(result)
+    } catch (error: unknown) {
+      if (isUniqueConstraintError(error)) {
+        res.status(409).json({error: 'A person with this phone number already exists'})
+        return
+      }
+      throw error
     }
-    console.error('Error creating person:', error)
-    res.status(500).json({error: 'Failed to create person'})
-  }
-})
+  }),
+)
 
 // PUT /api/people/:id - Update person
-peopleRouter.put('/:id', async (req, res) => {
-  try {
+peopleRouter.put(
+  '/:id',
+  asyncHandler(async (req, res) => {
     const {firstName, lastName, phoneNumber, phoneDisplay, status, notes} = req.body
     const result = db
       .update(schema.people)
@@ -187,15 +187,13 @@ peopleRouter.put('/:id', async (req, res) => {
       return
     }
     res.json(result)
-  } catch (error) {
-    console.error('Error updating person:', error)
-    res.status(500).json({error: 'Failed to update person'})
-  }
-})
+  }),
+)
 
 // DELETE /api/people/:id - Delete person
-peopleRouter.delete('/:id', async (req, res) => {
-  try {
+peopleRouter.delete(
+  '/:id',
+  asyncHandler(async (req, res) => {
     const personId = Number(req.params.id)
 
     // Remove related records first
@@ -209,15 +207,13 @@ peopleRouter.delete('/:id', async (req, res) => {
       return
     }
     res.json({success: true})
-  } catch (error) {
-    console.error('Error deleting person:', error)
-    res.status(500).json({error: 'Failed to delete person'})
-  }
-})
+  }),
+)
 
 // PATCH /api/people/:id/status - Toggle status
-peopleRouter.patch('/:id/status', async (req, res) => {
-  try {
+peopleRouter.patch(
+  '/:id/status',
+  asyncHandler(async (req, res) => {
     const person = db
       .select()
       .from(schema.people)
@@ -236,8 +232,5 @@ peopleRouter.patch('/:id/status', async (req, res) => {
       .get()
 
     res.json(result)
-  } catch (error) {
-    console.error('Error toggling status:', error)
-    res.status(500).json({error: 'Failed to toggle status'})
-  }
-})
+  }),
+)

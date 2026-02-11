@@ -10,17 +10,21 @@ import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Separator} from '@/components/ui/separator'
 import {Textarea} from '@/components/ui/textarea'
+import {useSetToggle} from '@/hooks/use-set-toggle'
 import {
   createDraft,
   deleteDrafts,
   fetchDraft,
   fetchGroup,
   fetchGroups,
+  fetchMessageStatus,
   fetchPeople,
   sendMessage,
   updateDraft,
 } from '@/lib/api'
-import {fetchMessageStatus} from '@/lib/api'
+import {BATCH_DEFAULTS} from '@/lib/constants'
+import {formatFullName, renderTemplate} from '@/lib/format'
+import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowLeft, Eye, Save, Send, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
@@ -47,10 +51,10 @@ export function MessageComposePage() {
   const [content, setContent] = useState(dupState?.content || '')
   const [excludeIds, setExcludeIds] = useState<Set<number>>(() => new Set(dupState?.excludeIds || []))
   const [excludeSearch, setExcludeSearch] = useState('')
-  const [batchSize, setBatchSize] = useState(1)
+  const [batchSize, setBatchSize] = useState<number>(BATCH_DEFAULTS.batchSize)
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [batchDelayMs, setBatchDelayMs] = useState(5000)
+  const [batchDelayMs, setBatchDelayMs] = useState<number>(BATCH_DEFAULTS.batchDelayMs)
   const [scheduledAt, setScheduledAt] = useState('')
   const [sending, setSending] = useState(false)
   const [sendProgress, setSendProgress] = useState<{
@@ -68,8 +72,11 @@ export function MessageComposePage() {
     return presetRecipientId ? new Set([Number(presetRecipientId)]) : new Set()
   })
 
+  const toggleExclude = useSetToggle(setExcludeIds)
+  const toggleIndividual = useSetToggle(setSelectedIndividualIds)
+
   const {data: draftData} = useQuery({
-    queryKey: ['draft', currentDraftId],
+    queryKey: queryKeys.draft(currentDraftId!),
     queryFn: () => fetchDraft(currentDraftId!),
     enabled: !!currentDraftId,
   })
@@ -81,8 +88,8 @@ export function MessageComposePage() {
     setContent(draftData.content || '')
     setRecipientMode(draftData.recipientMode || 'group')
     setSelectedGroupId(draftData.groupId ? String(draftData.groupId) : '')
-    setBatchSize(draftData.batchSize ?? 1)
-    setBatchDelayMs(draftData.batchDelayMs ?? 5000)
+    setBatchSize(draftData.batchSize ?? BATCH_DEFAULTS.batchSize)
+    setBatchDelayMs(draftData.batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs)
     setScheduledAt(draftData.scheduledAt || '')
     if (draftData.excludeIds) {
       try {
@@ -100,14 +107,14 @@ export function MessageComposePage() {
     }
   }
 
-  const {data: groups} = useQuery({queryKey: ['groups'], queryFn: fetchGroups})
+  const {data: groups} = useQuery({queryKey: queryKeys.groups, queryFn: fetchGroups})
   const {data: groupDetail} = useQuery({
-    queryKey: ['group', selectedGroupId],
+    queryKey: queryKeys.group(selectedGroupId),
     queryFn: () => fetchGroup(Number(selectedGroupId)),
     enabled: recipientMode === 'group' && !!selectedGroupId,
   })
   const {data: allPeople} = useQuery({
-    queryKey: ['people', 'all'],
+    queryKey: [...queryKeys.people, 'all'],
     queryFn: () => fetchPeople({limit: 1000}),
     enabled: recipientMode === 'individual',
   })
@@ -130,12 +137,7 @@ export function MessageComposePage() {
   }, [recipientMode, groupDetail, selectedIndividualIds])
 
   const previewPerson = recipients[0]
-  const renderedPreview = previewPerson
-    ? content
-        .replace(/\{\{firstName\}\}/g, previewPerson.firstName || '')
-        .replace(/\{\{lastName\}\}/g, previewPerson.lastName || '')
-        .replace(/\{\{fullName\}\}/g, [previewPerson.firstName, previewPerson.lastName].filter(Boolean).join(' '))
-    : content
+  const renderedPreview = previewPerson ? renderTemplate(content, previewPerson) : content
 
   const charCount = content.length
 
@@ -154,7 +156,7 @@ export function MessageComposePage() {
       if (currentDraftId) {
         try {
           await deleteDrafts([currentDraftId])
-          queryClient.invalidateQueries({queryKey: ['drafts']})
+          queryClient.invalidateQueries({queryKey: queryKeys.drafts()})
         } catch {
           /* ignore */
         }
@@ -220,24 +222,6 @@ export function MessageComposePage() {
       return
     }
     setSendConfirmOpen(true)
-  }
-
-  const toggleExclude = (id: number) => {
-    setExcludeIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const toggleIndividual = (id: number) => {
-    setSelectedIndividualIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
   }
 
   const progressPercent = sendProgress
@@ -321,7 +305,7 @@ export function MessageComposePage() {
                       const q = individualSearch.toLowerCase()
                       const results = allPeople.data.filter((p) => {
                         if (selectedIndividualIds.has(p.id)) return false
-                        const name = [p.firstName, p.lastName].filter(Boolean).join(' ').toLowerCase()
+                        const name = formatFullName(p, '').toLowerCase()
                         const phone = (p.phoneDisplay || p.phoneNumber || '').toLowerCase()
                         return name.includes(q) || phone.includes(q)
                       })
@@ -340,11 +324,7 @@ export function MessageComposePage() {
                             setIndividualSearch('')
                           }}
                         >
-                          <span>
-                            {[p.firstName, p.lastName].filter(Boolean).join(' ') || (
-                              <em className="text-muted-foreground">Unnamed</em>
-                            )}
-                          </span>
+                          <span>{formatFullName(p, '') || <em className="text-muted-foreground">Unnamed</em>}</span>
                           <span className="text-muted-foreground ml-auto">{p.phoneDisplay}</span>
                         </button>
                       ))
@@ -362,7 +342,7 @@ export function MessageComposePage() {
                           className="gap-1 cursor-pointer hover:bg-destructive/20"
                           onClick={() => toggleIndividual(p.id)}
                         >
-                          {[p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unnamed'}
+                          {formatFullName(p)}
                           <span className="text-muted-foreground">&times;</span>
                         </Badge>
                       ))}
@@ -387,7 +367,7 @@ export function MessageComposePage() {
                     const q = excludeSearch.toLowerCase()
                     const results = groupDetail.members.filter((m) => {
                       if (excludeIds.has(m.id)) return false
-                      const name = [m.firstName, m.lastName].filter(Boolean).join(' ').toLowerCase()
+                      const name = formatFullName(m, '').toLowerCase()
                       const phone = (m.phoneDisplay || m.phoneNumber || '').toLowerCase()
                       return name.includes(q) || phone.includes(q)
                     })
@@ -404,11 +384,7 @@ export function MessageComposePage() {
                           setExcludeSearch('')
                         }}
                       >
-                        <span>
-                          {[m.firstName, m.lastName].filter(Boolean).join(' ') || (
-                            <em className="text-muted-foreground">Unnamed</em>
-                          )}
-                        </span>
+                        <span>{formatFullName(m, '') || <em className="text-muted-foreground">Unnamed</em>}</span>
                         <span className="text-muted-foreground ml-auto">{m.phoneDisplay}</span>
                       </button>
                     ))
@@ -426,7 +402,7 @@ export function MessageComposePage() {
                         className="gap-1 cursor-pointer hover:bg-destructive/20"
                         onClick={() => toggleExclude(m.id)}
                       >
-                        {[m.firstName, m.lastName].filter(Boolean).join(' ') || 'Unnamed'}
+                        {formatFullName(m)}
                         <span className="text-muted-foreground">&times;</span>
                       </Badge>
                     ))}
@@ -592,7 +568,7 @@ export function MessageComposePage() {
         onConfirm={() => {
           if (!currentDraftId) return
           deleteDrafts([currentDraftId]).then(() => {
-            queryClient.invalidateQueries({queryKey: ['drafts']})
+            queryClient.invalidateQueries({queryKey: queryKeys.drafts()})
             toast.success('Draft deleted')
             navigate('/messages?tab=drafts')
           })

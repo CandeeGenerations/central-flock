@@ -8,6 +8,7 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {createGroup, deleteGroup, fetchGroups} from '@/lib/api'
 import {formatDate} from '@/lib/date'
+import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowDown, ArrowUp, ArrowUpDown, MessageSquare, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
@@ -30,7 +31,7 @@ export function GroupsPage() {
   } | null>(null)
 
   const {data: groups, isLoading} = useQuery({
-    queryKey: ['groups'],
+    queryKey: queryKeys.groups,
     queryFn: fetchGroups,
   })
 
@@ -72,7 +73,7 @@ export function GroupsPage() {
         description: newGroup.description || undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['groups']})
+      queryClient.invalidateQueries({queryKey: queryKeys.groups})
       setAddOpen(false)
       setNewGroup({name: '', description: ''})
       toast.success('Group created')
@@ -83,7 +84,7 @@ export function GroupsPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteGroup,
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['groups']})
+      queryClient.invalidateQueries({queryKey: queryKeys.groups})
       toast.success('Group deleted')
       setDeleteTarget(null)
     },

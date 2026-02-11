@@ -2,12 +2,14 @@ import {and, eq, inArray, notInArray, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
+import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 
 export const groupsRouter = Router()
 
 // GET /api/groups - List all with member counts
-groupsRouter.get('/', async (_req, res) => {
-  try {
+groupsRouter.get(
+  '/',
+  asyncHandler(async (_req, res) => {
     const groupsList = db.select().from(schema.groups).orderBy(schema.groups.name).all()
 
     const counts = db
@@ -27,15 +29,13 @@ groupsRouter.get('/', async (_req, res) => {
     }))
 
     res.json(result)
-  } catch (error) {
-    console.error('Error fetching groups:', error)
-    res.status(500).json({error: 'Failed to fetch groups'})
-  }
-})
+  }),
+)
 
 // GET /api/groups/:id - Get group with members
-groupsRouter.get('/:id', async (req, res) => {
-  try {
+groupsRouter.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
     const group = db
       .select()
       .from(schema.groups)
@@ -62,39 +62,39 @@ groupsRouter.get('/:id', async (req, res) => {
       .all()
 
     res.json({...group, members})
-  } catch (error) {
-    console.error('Error fetching group:', error)
-    res.status(500).json({error: 'Failed to fetch group'})
-  }
-})
+  }),
+)
 
 // POST /api/groups - Create group
-groupsRouter.post('/', async (req, res) => {
-  try {
+groupsRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
     const {name, description} = req.body
-    const result = db
-      .insert(schema.groups)
-      .values({
-        name,
-        description: description || null,
-      })
-      .returning()
-      .get()
+    try {
+      const result = db
+        .insert(schema.groups)
+        .values({
+          name,
+          description: description || null,
+        })
+        .returning()
+        .get()
 
-    res.status(201).json(result)
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
-      res.status(409).json({error: 'A group with this name already exists'})
-      return
+      res.status(201).json(result)
+    } catch (error: unknown) {
+      if (isUniqueConstraintError(error)) {
+        res.status(409).json({error: 'A group with this name already exists'})
+        return
+      }
+      throw error
     }
-    console.error('Error creating group:', error)
-    res.status(500).json({error: 'Failed to create group'})
-  }
-})
+  }),
+)
 
 // PUT /api/groups/:id - Update group
-groupsRouter.put('/:id', async (req, res) => {
-  try {
+groupsRouter.put(
+  '/:id',
+  asyncHandler(async (req, res) => {
     const {name, description} = req.body
     const result = db
       .update(schema.groups)
@@ -112,15 +112,13 @@ groupsRouter.put('/:id', async (req, res) => {
       return
     }
     res.json(result)
-  } catch (error) {
-    console.error('Error updating group:', error)
-    res.status(500).json({error: 'Failed to update group'})
-  }
-})
+  }),
+)
 
 // DELETE /api/groups/:id - Delete group
-groupsRouter.delete('/:id', async (req, res) => {
-  try {
+groupsRouter.delete(
+  '/:id',
+  asyncHandler(async (req, res) => {
     const result = db
       .delete(schema.groups)
       .where(eq(schema.groups.id, Number(req.params.id)))
@@ -132,15 +130,13 @@ groupsRouter.delete('/:id', async (req, res) => {
       return
     }
     res.json({success: true})
-  } catch (error) {
-    console.error('Error deleting group:', error)
-    res.status(500).json({error: 'Failed to delete group'})
-  }
-})
+  }),
+)
 
 // POST /api/groups/:id/members - Add people to group
-groupsRouter.post('/:id/members', async (req, res) => {
-  try {
+groupsRouter.post(
+  '/:id/members',
+  asyncHandler(async (req, res) => {
     const groupId = Number(req.params.id)
     const {personIds} = req.body as {personIds: number[]}
 
@@ -167,15 +163,13 @@ groupsRouter.post('/:id/members', async (req, res) => {
     }
 
     res.json({added: newIds.length, alreadyMembers: existingIds.size})
-  } catch (error) {
-    console.error('Error adding members:', error)
-    res.status(500).json({error: 'Failed to add members'})
-  }
-})
+  }),
+)
 
 // DELETE /api/groups/:id/members - Remove people from group
-groupsRouter.delete('/:id/members', async (req, res) => {
-  try {
+groupsRouter.delete(
+  '/:id/members',
+  asyncHandler(async (req, res) => {
     const groupId = Number(req.params.id)
     const {personIds} = req.body as {personIds: number[]}
 
@@ -184,15 +178,13 @@ groupsRouter.delete('/:id/members', async (req, res) => {
       .run()
 
     res.json({success: true})
-  } catch (error) {
-    console.error('Error removing members:', error)
-    res.status(500).json({error: 'Failed to remove members'})
-  }
-})
+  }),
+)
 
 // GET /api/groups/:id/non-members - Get people not in this group
-groupsRouter.get('/:id/non-members', async (req, res) => {
-  try {
+groupsRouter.get(
+  '/:id/non-members',
+  asyncHandler(async (req, res) => {
     const groupId = Number(req.params.id)
     const {search, page = '1', limit = '30'} = req.query
     const offset = (Number(page) - 1) * Number(limit)
@@ -232,8 +224,5 @@ groupsRouter.get('/:id/non-members', async (req, res) => {
       page: Number(page),
       limit: Number(limit),
     })
-  } catch (error) {
-    console.error('Error fetching non-members:', error)
-    res.status(500).json({error: 'Failed to fetch non-members'})
-  }
-})
+  }),
+)

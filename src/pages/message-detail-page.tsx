@@ -7,6 +7,8 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {cancelMessage, fetchMessage} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
+import {formatFullName} from '@/lib/format'
+import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, XCircle} from 'lucide-react'
 import {useState} from 'react'
@@ -31,7 +33,7 @@ export function MessageDetailPage() {
   const pageSize = 25
 
   const {data: message, isLoading} = useQuery({
-    queryKey: ['message', id],
+    queryKey: queryKeys.message(id!),
     queryFn: () => fetchMessage(Number(id)),
     enabled: !!id,
     refetchInterval: (query) => {
@@ -43,7 +45,7 @@ export function MessageDetailPage() {
   const cancelMutation = useMutation({
     mutationFn: () => cancelMessage(Number(id)),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['message', id]})
+      queryClient.invalidateQueries({queryKey: queryKeys.message(id!)})
       toast.success('Message cancelled')
     },
   })
@@ -149,7 +151,7 @@ export function MessageDetailPage() {
             <TableBody>
               {message.recipients.slice((page - 1) * pageSize, page * pageSize).map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell>{[r.firstName, r.lastName].filter(Boolean).join(' ') || 'Unnamed'}</TableCell>
+                  <TableCell>{formatFullName(r)}</TableCell>
                   <TableCell className="text-muted-foreground">{r.phoneDisplay}</TableCell>
                   <TableCell>
                     <Badge variant={recipientStatusColors[r.status] || 'outline'}>{r.status}</Badge>
@@ -163,7 +165,7 @@ export function MessageDetailPage() {
                         className="text-red-500 h-7 px-2"
                         onClick={() =>
                           setErrorInfo({
-                            name: [r.firstName, r.lastName].filter(Boolean).join(' ') || 'Unnamed',
+                            name: formatFullName(r),
                             error: r.errorMessage!,
                           })
                         }

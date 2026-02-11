@@ -12,6 +12,16 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+function buildQueryString(params?: Record<string, string | number | undefined>): string {
+  if (!params) return ''
+  const searchParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') searchParams.set(key, String(value))
+  }
+  const qs = searchParams.toString()
+  return qs ? `?${qs}` : ''
+}
+
 // People
 export interface Person {
   id: number
@@ -42,16 +52,7 @@ export function fetchPeople(params?: {
   sort?: string
   sortDir?: string
 }) {
-  const searchParams = new URLSearchParams()
-  if (params?.search) searchParams.set('search', params.search)
-  if (params?.status) searchParams.set('status', params.status)
-  if (params?.groupId) searchParams.set('groupId', params.groupId)
-  if (params?.page) searchParams.set('page', String(params.page))
-  if (params?.limit) searchParams.set('limit', String(params.limit))
-  if (params?.sort) searchParams.set('sort', params.sort)
-  if (params?.sortDir) searchParams.set('sortDir', params.sortDir)
-  const qs = searchParams.toString()
-  return request<PeopleResponse>(`/people${qs ? `?${qs}` : ''}`)
+  return request<PeopleResponse>(`/people${buildQueryString(params)}`)
 }
 
 export function fetchPerson(id: number) {
@@ -139,12 +140,7 @@ export interface NonMembersResponse {
 }
 
 export function fetchNonMembers(groupId: number, params?: {search?: string; page?: number; limit?: number}) {
-  const searchParams = new URLSearchParams()
-  if (params?.search) searchParams.set('search', params.search)
-  if (params?.page) searchParams.set('page', String(params.page))
-  if (params?.limit) searchParams.set('limit', String(params.limit))
-  const qs = searchParams.toString()
-  return request<NonMembersResponse>(`/groups/${groupId}/non-members${qs ? `?${qs}` : ''}`)
+  return request<NonMembersResponse>(`/groups/${groupId}/non-members${buildQueryString(params)}`)
 }
 
 // Messages
@@ -203,10 +199,7 @@ export function deleteMessages(ids: number[]) {
 }
 
 export function fetchMessages(params?: {search?: string}) {
-  const searchParams = new URLSearchParams()
-  if (params?.search) searchParams.set('search', params.search)
-  const qs = searchParams.toString()
-  return request<Message[]>(`/messages${qs ? `?${qs}` : ''}`)
+  return request<Message[]>(`/messages${buildQueryString(params)}`)
 }
 
 export function fetchMessage(id: number) {
@@ -247,10 +240,7 @@ export interface Draft {
 }
 
 export function fetchDrafts(params?: {search?: string}) {
-  const searchParams = new URLSearchParams()
-  if (params?.search) searchParams.set('search', params.search)
-  const qs = searchParams.toString()
-  return request<Draft[]>(`/drafts${qs ? `?${qs}` : ''}`)
+  return request<Draft[]>(`/drafts${buildQueryString(params)}`)
 }
 
 export function fetchDraft(id: number) {

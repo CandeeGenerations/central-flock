@@ -4,9 +4,11 @@ import {Button} from '@/components/ui/button'
 import {Checkbox} from '@/components/ui/checkbox'
 import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {useSetToggle} from '@/hooks/use-set-toggle'
 import {deleteDrafts, deleteMessages, duplicateDraft, fetchDrafts, fetchMessages} from '@/lib/api'
 import type {Draft} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
+import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Copy, Plus, Trash2} from 'lucide-react'
 import {useState} from 'react'
@@ -30,7 +32,7 @@ export function MessageHistoryPage() {
 
   // Sent messages state
   const {data: messages, isLoading: messagesLoading} = useQuery({
-    queryKey: ['messages', search],
+    queryKey: queryKeys.messages(search || undefined),
     queryFn: () => fetchMessages({search: search || undefined}),
   })
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -38,7 +40,7 @@ export function MessageHistoryPage() {
 
   // Drafts state
   const {data: drafts, isLoading: draftsLoading} = useQuery({
-    queryKey: ['drafts', search],
+    queryKey: queryKeys.drafts(search || undefined),
     queryFn: () => fetchDrafts({search: search || undefined}),
   })
   const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set())
@@ -47,7 +49,7 @@ export function MessageHistoryPage() {
   const deleteMutation = useMutation({
     mutationFn: () => deleteMessages([...selectedIds]),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({queryKey: ['messages']})
+      queryClient.invalidateQueries({queryKey: queryKeys.messages()})
       toast.success(`Deleted ${data.deleted} message${data.deleted !== 1 ? 's' : ''}`)
       setSelectedIds(new Set())
       setConfirmOpen(false)
@@ -60,7 +62,7 @@ export function MessageHistoryPage() {
   const deleteDraftsMutation = useMutation({
     mutationFn: () => deleteDrafts([...selectedDraftIds]),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({queryKey: ['drafts']})
+      queryClient.invalidateQueries({queryKey: queryKeys.drafts()})
       toast.success(`Deleted ${data.deleted} draft${data.deleted !== 1 ? 's' : ''}`)
       setSelectedDraftIds(new Set())
       setDraftConfirmOpen(false)
@@ -73,7 +75,7 @@ export function MessageHistoryPage() {
   const duplicateDraftMutation = useMutation({
     mutationFn: (id: number) => duplicateDraft(id),
     onSuccess: (draft) => {
-      queryClient.invalidateQueries({queryKey: ['drafts']})
+      queryClient.invalidateQueries({queryKey: queryKeys.drafts()})
       toast.success('Draft duplicated')
       navigate(`/messages/compose?draftId=${draft.id}`)
     },
@@ -82,14 +84,7 @@ export function MessageHistoryPage() {
     },
   })
 
-  const toggleSelect = (id: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+  const toggleSelect = useSetToggle(setSelectedIds)
 
   const toggleAll = () => {
     if (!messages) return
@@ -100,14 +95,7 @@ export function MessageHistoryPage() {
     }
   }
 
-  const toggleDraftSelect = (id: number) => {
-    setSelectedDraftIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+  const toggleDraftSelect = useSetToggle(setSelectedDraftIds)
 
   const toggleAllDrafts = () => {
     if (!drafts) return

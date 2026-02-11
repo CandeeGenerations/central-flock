@@ -9,19 +9,13 @@ export interface ParsedPerson {
   groups: string[]
 }
 
+// Mirrors src/lib/utils.ts:phoneToE164 — keep both in sync
 export function normalizePhoneNumber(phone: string): string {
-  // Strip all non-digit characters
   const digits = phone.replace(/\D/g, '')
-
-  // Handle different lengths
-  if (digits.length === 10) {
-    return `+1${digits}`
-  } else if (digits.length === 11 && digits.startsWith('1')) {
-    return `+${digits}`
-  } else if (digits.length > 0) {
-    return `+${digits}`
-  }
-  return phone // Return as-is if we can't parse
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+  if (digits.length > 0) return `+${digits}`
+  return ''
 }
 
 export function parseCSV(csvData: string): ParsedPerson[] {

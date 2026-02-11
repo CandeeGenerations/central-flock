@@ -19,6 +19,7 @@ end tell`
   } catch (error) {
     throw new Error(
       `Failed to send message to ${phoneNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      {cause: error},
     )
   }
 }
@@ -40,6 +41,7 @@ end tell`
   } catch (error) {
     throw new Error(
       `Failed to create contact for ${firstName} ${lastName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      {cause: error},
     )
   }
 }

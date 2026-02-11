@@ -10,6 +10,7 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {type Person, createPerson, deletePerson, fetchPeople, togglePersonStatus} from '@/lib/api'
 import {formatDate} from '@/lib/date'
+import {queryKeys} from '@/lib/query-keys'
 import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowDown, ArrowUp, ArrowUpDown, Plus, ToggleLeft, ToggleRight, Trash2} from 'lucide-react'
@@ -34,7 +35,7 @@ export function PeoplePage() {
   })
 
   const {data, isLoading} = useQuery({
-    queryKey: ['people', search, statusFilter, page, sort, sortDir],
+    queryKey: [...queryKeys.people, search, statusFilter, page, sort, sortDir],
     queryFn: () =>
       fetchPeople({
         search: search || undefined,
@@ -49,7 +50,7 @@ export function PeoplePage() {
   const createMutation = useMutation({
     mutationFn: (data: Partial<Person>) => createPerson(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['people']})
+      queryClient.invalidateQueries({queryKey: queryKeys.people})
       setAddOpen(false)
       setNewPerson({
         firstName: '',
@@ -65,7 +66,7 @@ export function PeoplePage() {
   const deleteMutation = useMutation({
     mutationFn: deletePerson,
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['people']})
+      queryClient.invalidateQueries({queryKey: queryKeys.people})
       toast.success('Person deleted')
       setDeleteTarget(null)
     },
@@ -75,7 +76,7 @@ export function PeoplePage() {
   const toggleMutation = useMutation({
     mutationFn: togglePersonStatus,
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ['people']})
+      queryClient.invalidateQueries({queryKey: queryKeys.people})
     },
   })
 

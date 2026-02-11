@@ -240,6 +240,7 @@ export interface Draft {
   excludeIds: string | null
   batchSize: number
   batchDelayMs: number
+  scheduledAt: string | null
   recipientCount?: number
   createdAt: string
   updatedAt: string

@@ -6,6 +6,7 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {
   type Person,
@@ -17,7 +18,7 @@ import {
   updateGroup,
 } from '@/lib/api'
 import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, MessageSquare, Save, Search, Trash2, UserMinus, UserPlus, UserX} from 'lucide-react'
+import {ArrowLeft, MessageSquare, Save, Trash2, UserMinus, UserPlus, UserX} from 'lucide-react'
 import {useCallback, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -291,15 +292,7 @@ export function GroupDetailPage() {
           <DialogHeader>
             <DialogTitle>Add Members to {group.name}</DialogTitle>
           </DialogHeader>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search people..."
-              value={memberSearch}
-              onChange={(e) => setMemberSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+          <SearchInput placeholder="Search people..." value={memberSearch} onChange={setMemberSearch} />
           <div className="flex-1 overflow-auto space-y-1 min-h-0 max-h-64">
             {nonMembers.map((p) => (
               <label

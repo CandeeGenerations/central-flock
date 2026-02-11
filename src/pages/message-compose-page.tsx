@@ -2,9 +2,11 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {DateTimePicker} from '@/components/ui/date-time-picker'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Progress} from '@/components/ui/progress'
+import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Separator} from '@/components/ui/separator'
 import {Textarea} from '@/components/ui/textarea'
@@ -20,8 +22,8 @@ import {
 } from '@/lib/api'
 import {fetchMessageStatus} from '@/lib/api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Eye, Save, Search, Send} from 'lucide-react'
-import {useEffect, useMemo, useState} from 'react'
+import {ArrowLeft, Eye, Save, Send, Trash2} from 'lucide-react'
+import {useMemo, useState} from 'react'
 import {useLocation, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -47,7 +49,9 @@ export function MessageComposePage() {
   const [excludeSearch, setExcludeSearch] = useState('')
   const [batchSize, setBatchSize] = useState(1)
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [batchDelayMs, setBatchDelayMs] = useState(5000)
+  const [scheduledAt, setScheduledAt] = useState('')
   const [sending, setSending] = useState(false)
   const [sendProgress, setSendProgress] = useState<{
     messageId: number
@@ -70,14 +74,16 @@ export function MessageComposePage() {
     enabled: !!currentDraftId,
   })
 
-  // Populate form from loaded draft
-  useEffect(() => {
-    if (!draftData) return
+  // Populate form from loaded draft (render-time state adjustment — React-recommended pattern)
+  const [loadedDraftId, setLoadedDraftId] = useState<number | null>(null)
+  if (draftData && loadedDraftId !== draftData.id) {
+    setLoadedDraftId(draftData.id)
     setContent(draftData.content || '')
     setRecipientMode(draftData.recipientMode || 'group')
     setSelectedGroupId(draftData.groupId ? String(draftData.groupId) : '')
     setBatchSize(draftData.batchSize ?? 1)
     setBatchDelayMs(draftData.batchDelayMs ?? 5000)
+    setScheduledAt(draftData.scheduledAt || '')
     if (draftData.excludeIds) {
       try {
         setExcludeIds(new Set(JSON.parse(draftData.excludeIds)))
@@ -92,7 +98,7 @@ export function MessageComposePage() {
         /* ignore */
       }
     }
-  }, [draftData])
+  }
 
   const {data: groups} = useQuery({queryKey: ['groups'], queryFn: fetchGroups})
   const {data: groupDetail} = useQuery({
@@ -182,6 +188,7 @@ export function MessageComposePage() {
     excludeIds: excludeIds.size > 0 ? JSON.stringify([...excludeIds]) : null,
     batchSize,
     batchDelayMs,
+    scheduledAt: scheduledAt || null,
   })
 
   const saveDraftMutation = useMutation({
@@ -303,15 +310,11 @@ export function MessageComposePage() {
 
             {recipientMode === 'individual' && allPeople && (
               <div className="space-y-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search people to add..."
-                    value={individualSearch}
-                    onChange={(e) => setIndividualSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
+                <SearchInput
+                  placeholder="Search people to add..."
+                  value={individualSearch}
+                  onChange={setIndividualSearch}
+                />
                 {individualSearch && (
                   <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
                     {(() => {
@@ -373,15 +376,11 @@ export function MessageComposePage() {
           {recipientMode === 'group' && groupDetail && groupDetail.members.length > 0 && (
             <div className="space-y-2">
               <Label>Exclude from send (optional)</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search members to exclude..."
-                  value={excludeSearch}
-                  onChange={(e) => setExcludeSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+              <SearchInput
+                placeholder="Search members to exclude..."
+                value={excludeSearch}
+                onChange={setExcludeSearch}
+              />
               {excludeSearch && (
                 <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
                   {(() => {
@@ -479,6 +478,12 @@ export function MessageComposePage() {
             </Card>
           )}
 
+          {/* Schedule date */}
+          <div className="space-y-2">
+            <Label>Schedule Date (optional)</Label>
+            <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
+          </div>
+
           {/* Batch settings */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -507,6 +512,12 @@ export function MessageComposePage() {
               {excludeIds.size > 0 && <p className="text-sm text-muted-foreground">{excludeIds.size} excluded</p>}
             </div>
             <div className="flex gap-2">
+              {currentDraftId && (
+                <Button variant="outline" size="lg" onClick={() => setDeleteConfirmOpen(true)}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="lg"
@@ -571,6 +582,22 @@ export function MessageComposePage() {
           </div>
         </div>
       </ConfirmDialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete this draft?"
+        description="This will permanently delete this draft. This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (!currentDraftId) return
+          deleteDrafts([currentDraftId]).then(() => {
+            queryClient.invalidateQueries({queryKey: ['drafts']})
+            toast.success('Draft deleted')
+            navigate('/messages?tab=drafts')
+          })
+        }}
+      />
     </div>
   )
 }

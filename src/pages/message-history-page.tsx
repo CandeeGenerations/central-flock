@@ -2,13 +2,13 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Checkbox} from '@/components/ui/checkbox'
-import {Input} from '@/components/ui/input'
+import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {deleteDrafts, deleteMessages, duplicateDraft, fetchDrafts, fetchMessages} from '@/lib/api'
 import type {Draft} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Copy, Plus, Search, Trash2} from 'lucide-react'
+import {Copy, Plus, Trash2} from 'lucide-react'
 import {useState} from 'react'
 import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -140,6 +140,7 @@ export function MessageHistoryPage() {
     const hasRecipients =
       (draft.recipientMode === 'group' && !!draft.groupId) ||
       (draft.recipientMode === 'individual' && !!draft.selectedIndividualIds)
+    if (hasContent && hasRecipients && draft.scheduledAt) return {label: 'Scheduled', variant: 'secondary'}
     if (hasContent && hasRecipients) return {label: 'Ready', variant: 'default'}
     if (!hasContent && !hasRecipients) return {label: 'Empty', variant: 'destructive'}
     return {label: 'Incomplete', variant: 'outline'}
@@ -172,15 +173,12 @@ export function MessageHistoryPage() {
       </div>
 
       {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder={activeTab === 'sent' ? 'Search messages...' : 'Search drafts...'}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
-      </div>
+      <SearchInput
+        placeholder={activeTab === 'sent' ? 'Search messages...' : 'Search drafts...'}
+        value={search}
+        onChange={setSearch}
+        containerClassName="max-w-sm"
+      />
 
       {/* Tab toggle */}
       <div className="flex gap-1 border-b">
@@ -232,7 +230,7 @@ export function MessageHistoryPage() {
                         onCheckedChange={toggleAll}
                       />
                     </TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>Date Sent</TableHead>
                     <TableHead>Message</TableHead>
                     <TableHead>Recipients</TableHead>
                     <TableHead>Status</TableHead>
@@ -316,7 +314,7 @@ export function MessageHistoryPage() {
                         onCheckedChange={toggleAllDrafts}
                       />
                     </TableHead>
-                    <TableHead>Last Updated</TableHead>
+                    <TableHead>Scheduled</TableHead>
                     <TableHead>Message</TableHead>
                     <TableHead>Recipients</TableHead>
                     <TableHead>Status</TableHead>
@@ -341,7 +339,7 @@ export function MessageHistoryPage() {
                         />
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {formatDateTime(draft.updatedAt)}
+                        {draft.scheduledAt ? formatDateTime(draft.scheduledAt) : '—'}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
                         {draft.name ||
@@ -375,7 +373,7 @@ export function MessageHistoryPage() {
                   ))}
                   {drafts?.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No drafts saved yet.
                       </TableCell>
                     </TableRow>

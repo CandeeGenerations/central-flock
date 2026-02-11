@@ -3,12 +3,13 @@ import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {createGroup, deleteGroup, fetchGroups} from '@/lib/api'
 import {formatDate} from '@/lib/date'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ArrowUpDown, MessageSquare, Plus, Search, Trash2} from 'lucide-react'
+import {ArrowDown, ArrowUp, ArrowUpDown, MessageSquare, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -59,7 +60,7 @@ export function GroupsPage() {
     }
   }
 
-  const SortIcon = ({column}: {column: SortKey}) => {
+  const sortIcon = (column: SortKey) => {
     if (sortKey !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />
     return sortDir === 'asc' ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />
   }
@@ -133,15 +134,7 @@ export function GroupsPage() {
       </div>
 
       {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search groups..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
-      </div>
+      <SearchInput placeholder="Search groups..." value={search} onChange={setSearch} containerClassName="max-w-sm" />
 
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading...</div>
@@ -152,7 +145,7 @@ export function GroupsPage() {
               <TableRow>
                 <TableHead>
                   <button className="flex items-center font-bold cursor-pointer" onClick={() => toggleSort('name')}>
-                    Name <SortIcon column="name" />
+                    Name {sortIcon('name')}
                   </button>
                 </TableHead>
                 <TableHead>
@@ -160,7 +153,7 @@ export function GroupsPage() {
                     className="flex items-center font-bold cursor-pointer"
                     onClick={() => toggleSort('memberCount')}
                   >
-                    Members <SortIcon column="memberCount" />
+                    Members {sortIcon('memberCount')}
                   </button>
                 </TableHead>
                 <TableHead>
@@ -168,7 +161,7 @@ export function GroupsPage() {
                     className="flex items-center font-bold cursor-pointer"
                     onClick={() => toggleSort('createdAt')}
                   >
-                    Created <SortIcon column="createdAt" />
+                    Created {sortIcon('createdAt')}
                   </button>
                 </TableHead>
                 <TableHead className="w-24">Actions</TableHead>

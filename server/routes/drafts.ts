@@ -1,4 +1,4 @@
-import {desc, eq, sql} from 'drizzle-orm'
+import {asc, desc, eq, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
@@ -10,7 +10,15 @@ draftsRouter.get('/', async (req, res) => {
   try {
     const {search} = req.query
 
-    const draftsList = db.select().from(schema.drafts).orderBy(desc(schema.drafts.updatedAt)).all()
+    const draftsList = db
+      .select()
+      .from(schema.drafts)
+      .orderBy(
+        sql`CASE WHEN ${schema.drafts.scheduledAt} IS NULL THEN 1 ELSE 0 END`,
+        asc(schema.drafts.scheduledAt),
+        desc(schema.drafts.updatedAt),
+      )
+      .all()
 
     let result = draftsList.map((draft) => {
       let groupName = null
@@ -97,7 +105,17 @@ draftsRouter.get('/:id', async (req, res) => {
 // POST /api/drafts - Create draft
 draftsRouter.post('/', async (req, res) => {
   try {
-    const {name, content, recipientMode, groupId, selectedIndividualIds, excludeIds, batchSize, batchDelayMs} = req.body
+    const {
+      name,
+      content,
+      recipientMode,
+      groupId,
+      selectedIndividualIds,
+      excludeIds,
+      batchSize,
+      batchDelayMs,
+      scheduledAt,
+    } = req.body
 
     const draft = db
       .insert(schema.drafts)
@@ -110,6 +128,7 @@ draftsRouter.post('/', async (req, res) => {
         excludeIds: excludeIds || null,
         batchSize: batchSize ?? 1,
         batchDelayMs: batchDelayMs ?? 5000,
+        scheduledAt: scheduledAt || null,
       })
       .returning()
       .get()
@@ -125,7 +144,17 @@ draftsRouter.post('/', async (req, res) => {
 draftsRouter.put('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const {name, content, recipientMode, groupId, selectedIndividualIds, excludeIds, batchSize, batchDelayMs} = req.body
+    const {
+      name,
+      content,
+      recipientMode,
+      groupId,
+      selectedIndividualIds,
+      excludeIds,
+      batchSize,
+      batchDelayMs,
+      scheduledAt,
+    } = req.body
 
     const draft = db
       .update(schema.drafts)
@@ -138,6 +167,7 @@ draftsRouter.put('/:id', async (req, res) => {
         excludeIds: excludeIds ?? null,
         batchSize: batchSize ?? 1,
         batchDelayMs: batchDelayMs ?? 5000,
+        scheduledAt: scheduledAt ?? null,
         updatedAt: sql`datetime('now')`,
       })
       .where(eq(schema.drafts.id, id))

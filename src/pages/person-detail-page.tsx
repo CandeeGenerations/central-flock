@@ -6,6 +6,7 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Textarea} from '@/components/ui/textarea'
 import {
@@ -20,7 +21,7 @@ import {
 } from '@/lib/api'
 import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Contact, MessageSquare, Save, Trash2, UserPlus} from 'lucide-react'
+import {ArrowLeft, Contact, MessageSquare, Save, Trash2, UserMinus, UserPlus} from 'lucide-react'
 import {useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -34,6 +35,7 @@ export function PersonDetailPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [addGroupOpen, setAddGroupOpen] = useState(false)
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(new Set())
+  const [removeAllConfirmOpen, setRemoveAllConfirmOpen] = useState(false)
 
   const {data: person, isLoading} = useQuery({
     queryKey: ['person', id],
@@ -105,6 +107,7 @@ export function PersonDetailPage() {
         lastName: person.lastName,
         phoneNumber: person.phoneNumber,
         phoneDisplay: person.phoneDisplay,
+        status: person.status,
         notes: person.notes,
       })
       setEditing(true)
@@ -198,6 +201,23 @@ export function PersonDetailPage() {
                   <Input value={form.phoneNumber || ''} readOnly className="bg-muted" />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Status</Label>
+                  <Select
+                    value={form.status || 'active'}
+                    onValueChange={(v) => setForm((f) => ({...f, status: v as 'active' | 'inactive'}))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div>
                 <Label>Notes</Label>
                 <Textarea
@@ -256,10 +276,18 @@ export function PersonDetailPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Groups</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => setAddGroupOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-1" />
-            Add to Group
-          </Button>
+          <div className="flex gap-2">
+            {person.groups && person.groups.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setRemoveAllConfirmOpen(true)}>
+                <UserMinus className="h-4 w-4 mr-1" />
+                Remove All
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setAddGroupOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-1" />
+              Add to Group
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {person.groups && person.groups.length > 0 ? (
@@ -351,6 +379,24 @@ export function PersonDetailPage() {
           Delete Person
         </Button>
       </div>
+      <ConfirmDialog
+        open={removeAllConfirmOpen}
+        onOpenChange={setRemoveAllConfirmOpen}
+        title={`Remove from all ${person.groups?.length || 0} groups?`}
+        description="This will remove this person from every group they belong to."
+        confirmLabel="Remove All"
+        variant="destructive"
+        onConfirm={() => {
+          if (!person.groups) return
+          Promise.all(person.groups.map((g) => removeGroupMembers(g.id, [Number(id)]))).then(() => {
+            queryClient.invalidateQueries({queryKey: ['person', id]})
+            queryClient.invalidateQueries({queryKey: ['groups']})
+            queryClient.invalidateQueries({queryKey: ['drafts']})
+            setRemoveAllConfirmOpen(false)
+            toast.success('Removed from all groups')
+          })
+        }}
+      />
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}

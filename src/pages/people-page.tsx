@@ -4,6 +4,7 @@ import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {usePersistedState} from '@/hooks/use-persisted-state'
@@ -11,7 +12,7 @@ import {type Person, createPerson, deletePerson, fetchPeople, togglePersonStatus
 import {formatDate} from '@/lib/date'
 import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ArrowUpDown, Plus, Search, ToggleLeft, ToggleRight, Trash2} from 'lucide-react'
+import {ArrowDown, ArrowUp, ArrowUpDown, Plus, ToggleLeft, ToggleRight, Trash2} from 'lucide-react'
 import {useState} from 'react'
 import {Link} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -169,18 +170,16 @@ export function PeoplePage() {
 
       {/* Filters */}
       <div className="flex gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search name or phone..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
-            className="pl-9"
-          />
-        </div>
+        <SearchInput
+          placeholder="Search name or phone..."
+          value={search}
+          onChange={(v) => {
+            setSearch(v)
+            setPage(1)
+          }}
+          onClear={() => setPage(1)}
+          containerClassName="flex-1 max-w-sm"
+        />
         <Select
           value={statusFilter}
           onValueChange={(v) => {

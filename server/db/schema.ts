@@ -76,6 +76,7 @@ export const drafts = sqliteTable('drafts', {
   excludeIds: text('exclude_ids'),
   batchSize: integer('batch_size').default(1).notNull(),
   batchDelayMs: integer('batch_delay_ms').default(5000).notNull(),
+  scheduledAt: text('scheduled_at'),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

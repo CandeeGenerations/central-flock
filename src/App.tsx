@@ -8,8 +8,10 @@ import {MessageDetailPage} from '@/pages/message-detail-page'
 import {MessageHistoryPage} from '@/pages/message-history-page'
 import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
+import {TemplateEditPage} from '@/pages/template-edit-page'
+import {TemplatesPage} from '@/pages/templates-page'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
-import {FolderOpen, MessageSquare, Moon, Sun, Upload, Users} from 'lucide-react'
+import {FileText, FolderOpen, MessageSquare, Moon, Sun, Upload, Users} from 'lucide-react'
 import {useEffect, useState} from 'react'
 import {BrowserRouter, NavLink, Navigate, Route, Routes} from 'react-router-dom'
 
@@ -21,6 +23,7 @@ const navItems = [
   {to: '/people', label: 'People', icon: Users},
   {to: '/groups', label: 'Groups', icon: FolderOpen},
   {to: '/messages', label: 'Messages', icon: MessageSquare},
+  {to: '/templates', label: 'Templates', icon: FileText},
   {to: '/import', label: 'Import', icon: Upload},
 ]
 
@@ -84,6 +87,9 @@ function AppLayout() {
           <Route path="/messages" element={<MessageHistoryPage />} />
           <Route path="/messages/compose" element={<MessageComposePage />} />
           <Route path="/messages/:id" element={<MessageDetailPage />} />
+          <Route path="/templates" element={<TemplatesPage />} />
+          <Route path="/templates/new" element={<TemplateEditPage />} />
+          <Route path="/templates/:id/edit" element={<TemplateEditPage />} />
           <Route path="/import" element={<ImportPage />} />
         </Routes>
       </main>

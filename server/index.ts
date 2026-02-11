@@ -9,6 +9,7 @@ import {groupsRouter} from './routes/groups.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter} from './routes/messages.js'
 import {peopleRouter} from './routes/people.js'
+import {templatesRouter} from './routes/templates.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -22,6 +23,7 @@ app.use('/api/people', peopleRouter)
 app.use('/api/groups', groupsRouter)
 app.use('/api/messages', messagesRouter)
 app.use('/api/drafts', draftsRouter)
+app.use('/api/templates', templatesRouter)
 app.use('/api/import', importRouter)
 app.use('/api/contacts', contactsRouter)
 

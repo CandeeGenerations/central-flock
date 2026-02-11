@@ -7,5 +7,7 @@ export const queryKeys = {
   message: (id: string | number) => ['message', String(id)] as const,
   drafts: (search?: string) => ['drafts', search] as const,
   draft: (id: number) => ['draft', id] as const,
+  templates: (search?: string) => ['templates', search] as const,
+  template: (id: number) => ['template', id] as const,
   nonMembers: (groupId: string | number, search?: string) => ['nonMembers', String(groupId), search] as const,
 }

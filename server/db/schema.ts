@@ -85,6 +85,19 @@ export const drafts = sqliteTable('drafts', {
     .notNull(),
 })
 
+export const templates = sqliteTable('templates', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  name: text('name').notNull(),
+  content: text('content').default('').notNull(),
+  customVariables: text('custom_variables'),
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+  updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})
+
 export const messageRecipients = sqliteTable('message_recipients', {
   id: integer('id').primaryKey({autoIncrement: true}),
   messageId: integer('message_id')

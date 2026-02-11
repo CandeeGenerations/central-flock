@@ -54,47 +54,58 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
     : null
 
   return (
-    <div className="flex items-center gap-2">
-      <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen}>
+      <div className="relative">
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            className={cn('w-64 justify-start text-left font-normal', !value && 'text-muted-foreground')}
+            className={cn(
+              'w-full justify-start text-left font-normal',
+              !value && 'text-muted-foreground',
+              value && 'pr-8',
+            )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {displayValue || placeholder}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar mode="single" selected={date} onSelect={handleDateSelect} initialFocus />
-          <div className="border-t px-4 py-3 flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Time:</span>
-            <Input
-              type="number"
-              min={0}
-              max={23}
-              value={hours}
-              onChange={(e) => handleTimeChange(e.target.value, minutes)}
-              className="w-16 text-center"
-            />
-            <span className="text-sm font-medium">:</span>
-            <Input
-              type="number"
-              min={0}
-              max={59}
-              step={5}
-              value={minutes}
-              onChange={(e) => handleTimeChange(hours, e.target.value)}
-              className="w-16 text-center"
-            />
-          </div>
-        </PopoverContent>
-      </Popover>
-      {value && (
-        <Button variant="ghost" size="icon" onClick={() => onChange('')} className="h-8 w-8">
-          <X className="h-4 w-4" />
-        </Button>
-      )}
-    </div>
+        {value && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onChange('')
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm opacity-70 hover:opacity-100 cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar mode="single" selected={date} onSelect={handleDateSelect} initialFocus />
+        <div className="border-t px-4 py-3 flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Time:</span>
+          <Input
+            type="number"
+            min={0}
+            max={23}
+            value={hours}
+            onChange={(e) => handleTimeChange(e.target.value, minutes)}
+            className="w-16 text-center"
+          />
+          <span className="text-sm font-medium">:</span>
+          <Input
+            type="number"
+            min={0}
+            max={59}
+            step={5}
+            value={minutes}
+            onChange={(e) => handleTimeChange(hours, e.target.value)}
+            className="w-16 text-center"
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }

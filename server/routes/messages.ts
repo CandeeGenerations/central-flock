@@ -21,6 +21,7 @@ messagesRouter.post(
       groupId,
       batchSize = BATCH_DEFAULTS.batchSize,
       batchDelayMs = BATCH_DEFAULTS.batchDelayMs,
+      customVarValues,
     } = req.body as {
       content: string
       recipientIds: number[]
@@ -28,6 +29,7 @@ messagesRouter.post(
       groupId?: number
       batchSize?: number
       batchDelayMs?: number
+      customVarValues?: Record<string, string>
     }
 
     // Get all recipients
@@ -51,7 +53,7 @@ messagesRouter.post(
       .insert(schema.messages)
       .values({
         content,
-        renderedPreview: renderTemplate(content, activeRecipients[0] || recipients[0]),
+        renderedPreview: renderTemplate(content, activeRecipients[0] || recipients[0], customVarValues),
         groupId: groupId || null,
         totalRecipients: recipients.length,
         skippedCount: skippedRecipients.length,
@@ -68,7 +70,7 @@ messagesRouter.post(
         .values({
           messageId: message.id,
           personId: person.id,
-          renderedContent: renderTemplate(content, person),
+          renderedContent: renderTemplate(content, person, customVarValues),
           status: 'pending',
         })
         .run()
@@ -79,7 +81,7 @@ messagesRouter.post(
         .values({
           messageId: message.id,
           personId: person.id,
-          renderedContent: renderTemplate(content, person),
+          renderedContent: renderTemplate(content, person, customVarValues),
           status: 'skipped',
         })
         .run()

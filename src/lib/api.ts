@@ -184,6 +184,7 @@ export function sendMessage(data: {
   groupId?: number
   batchSize?: number
   batchDelayMs?: number
+  customVarValues?: Record<string, string>
 }) {
   return request<{messageId: number; jobId: string}>('/messages/send', {
     method: 'POST',
@@ -267,6 +268,50 @@ export function duplicateDraft(id: number) {
 
 export function deleteDrafts(ids: number[]) {
   return request<{success: boolean; deleted: number}>('/drafts/delete', {
+    method: 'POST',
+    body: JSON.stringify({ids}),
+  })
+}
+
+// Templates
+export interface TemplateVariable {
+  name: string
+  type: 'text' | 'date'
+}
+
+export interface Template {
+  id: number
+  name: string
+  content: string
+  customVariables: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export function fetchTemplates(params?: {search?: string}) {
+  return request<Template[]>(`/templates${buildQueryString(params)}`)
+}
+
+export function fetchTemplate(id: number) {
+  return request<Template>(`/templates/${id}`)
+}
+
+export function createTemplate(data: {name: string; content?: string; customVariables?: string}) {
+  return request<Template>('/templates', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateTemplate(id: number, data: {name?: string; content?: string; customVariables?: string}) {
+  return request<Template>(`/templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteTemplates(ids: number[]) {
+  return request<{success: boolean; deleted: number}>('/templates/delete', {
     method: 'POST',
     body: JSON.stringify({ids}),
   })

@@ -680,7 +680,7 @@ export function MessageComposePage() {
                 </div>
               </VariableDropdown>
               {activeTemplateVars.length > 0 && (
-                <VariableDropdown label="Template Variables" count={activeTemplateVars.length}>
+                <VariableDropdown label="Template Variables" count={activeTemplateVars.length} defaultOpen>
                   <div className="space-y-3 mt-2">
                     <div className="flex flex-wrap gap-2">
                       <span className="text-xs text-muted-foreground self-center mr-1">Insert:</span>
@@ -764,7 +764,7 @@ export function MessageComposePage() {
                 </VariableDropdown>
               )}
               {globalVariables && globalVariables.length > 0 && (
-                <VariableDropdown label="Global Variables" count={globalVariables.length}>
+                <VariableDropdown label="Global Variables" count={globalVariables.length} defaultOpen>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {globalVariables.map((v) => (
                       <Button key={v.name} variant="outline" size="sm" onClick={() => insertAtCursor(`{{${v.name}}}`)}>
@@ -830,7 +830,7 @@ export function MessageComposePage() {
           </div>
 
           {/* Summary & send */}
-          <div className="flex items-center justify-between mb-48">
+          <div className="flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium">
                 Sending to <Badge variant="secondary">{recipients.length}</Badge> of{' '}

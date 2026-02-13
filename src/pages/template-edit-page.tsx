@@ -1,3 +1,4 @@
+import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -5,12 +6,12 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Textarea} from '@/components/ui/textarea'
-import {createTemplate, fetchGlobalVariables, fetchTemplate, updateTemplate} from '@/lib/api'
+import {createTemplate, deleteTemplates, fetchGlobalVariables, fetchTemplate, updateTemplate} from '@/lib/api'
 import type {TemplateVariable} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {format} from 'date-fns'
-import {ArrowLeft, Calendar, ChevronDown, ChevronRight, Eye, Globe, Save, Type, X} from 'lucide-react'
+import {ArrowLeft, Calendar, ChevronDown, ChevronRight, Eye, Globe, Save, Trash2, Type, X} from 'lucide-react'
 import {type ReactNode, useCallback, useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -63,7 +64,7 @@ export function TemplateEditPage() {
       const payload = {
         name,
         content,
-        customVariables: customVariables.length > 0 ? JSON.stringify(customVariables) : undefined,
+        customVariables: customVariables.length > 0 ? JSON.stringify(customVariables) : null,
       }
       if (isEdit) {
         return updateTemplate(Number(id), payload)
@@ -79,6 +80,18 @@ export function TemplateEditPage() {
       if (!isEdit) {
         navigate(`/templates/${template.id}/edit`, {replace: true})
       }
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteTemplates([Number(id)]),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: queryKeys.templates()})
+      toast.success('Template deleted')
+      navigate('/templates')
     },
     onError: (err: Error) => toast.error(err.message),
   })
@@ -194,7 +207,7 @@ export function TemplateEditPage() {
           </div>
         </VariableDropdown>
 
-        <VariableDropdown label="Custom Variables" count={customVariables.length}>
+        <VariableDropdown label="Custom Variables" count={customVariables.length} defaultOpen>
           <div className="space-y-3 mt-2">
             <div className="flex gap-2 items-end">
               <div className="flex-1">
@@ -251,7 +264,7 @@ export function TemplateEditPage() {
         </VariableDropdown>
 
         {globalVariables && globalVariables.length > 0 && (
-          <VariableDropdown label="Global Variables" count={globalVariables.length}>
+          <VariableDropdown label="Global Variables" count={globalVariables.length} defaultOpen>
             <div className="flex flex-wrap gap-2 mt-2">
               {globalVariables.map((v) => (
                 <Button key={v.name} variant="outline" size="sm" onClick={() => insertVariable(v.name)}>
@@ -291,13 +304,32 @@ export function TemplateEditPage() {
         </Card>
       )}
 
-      {/* Save */}
-      <div className="flex justify-end">
+      {/* Actions */}
+      <div className="flex justify-between">
+        {isEdit ? (
+          <Button variant="destructive" size="lg" onClick={() => setConfirmDeleteOpen(true)}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </Button>
+        ) : (
+          <div />
+        )}
         <Button size="lg" onClick={handleSave} disabled={saveMutation.isPending || !name.trim()}>
           <Save className="h-4 w-4 mr-2" />
           {saveMutation.isPending ? 'Saving...' : isEdit ? 'Update Template' : 'Create Template'}
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete Template"
+        description="Are you sure you want to delete this template? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+      />
     </div>
   )
 }

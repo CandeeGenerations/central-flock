@@ -297,14 +297,14 @@ export function fetchTemplate(id: number) {
   return request<Template>(`/templates/${id}`)
 }
 
-export function createTemplate(data: {name: string; content?: string; customVariables?: string}) {
+export function createTemplate(data: {name: string; content?: string; customVariables?: string | null}) {
   return request<Template>('/templates', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export function updateTemplate(id: number, data: {name?: string; content?: string; customVariables?: string}) {
+export function updateTemplate(id: number, data: {name?: string; content?: string; customVariables?: string | null}) {
   return request<Template>(`/templates/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),

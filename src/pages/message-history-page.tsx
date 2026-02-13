@@ -4,6 +4,7 @@ import {Button} from '@/components/ui/button'
 import {Checkbox} from '@/components/ui/checkbox'
 import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {deleteDrafts, deleteMessages, duplicateDraft, fetchDrafts, fetchMessages} from '@/lib/api'
 import type {Draft} from '@/lib/api'
@@ -236,10 +237,19 @@ export function MessageHistoryPage() {
                         {formatDateTime(msg.createdAt)}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
-                        <Link to={`/messages/${msg.id}`} className="hover:underline">
-                          {msg.content.substring(0, 80)}
-                          {msg.content.length > 80 ? '...' : ''}
-                        </Link>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Link to={`/messages/${msg.id}`} className="hover:underline truncate block">
+                                {msg.content.substring(0, 80)}
+                                {msg.content.length > 80 ? '...' : ''}
+                              </Link>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
+                              {msg.content}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableCell>
                       <TableCell>
                         <span className="text-green-600">{msg.sentCount}</span>
@@ -330,15 +340,27 @@ export function MessageHistoryPage() {
                         {draft.scheduledAt ? formatDateTime(draft.scheduledAt) : '—'}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
-                        {draft.name ||
-                          (draft.content ? (
-                            <>
-                              {draft.content.substring(0, 80)}
-                              {draft.content.length > 80 ? '...' : ''}
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground italic">Empty draft</span>
-                          ))}
+                        {draft.content ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="truncate block">
+                                  {draft.name || (
+                                    <>
+                                      {draft.content.substring(0, 80)}
+                                      {draft.content.length > 80 ? '...' : ''}
+                                    </>
+                                  )}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
+                                {draft.content}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          draft.name || <span className="text-muted-foreground italic">Empty draft</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{getDraftRecipientInfo(draft)}</TableCell>
                       <TableCell>

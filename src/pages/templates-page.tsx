@@ -5,6 +5,7 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
 import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {
   createGlobalVariable,
@@ -19,7 +20,21 @@ import type {GlobalVariable, TemplateVariable} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ArrowUpDown, Calendar, Check, Copy, Pencil, Plus, Trash2, Type, X} from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Pencil,
+  Plus,
+  Trash2,
+  Type,
+  X,
+} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link, useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -33,6 +48,8 @@ export function TemplatesPage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [sort, setSort] = useState<'name' | 'updatedAt'>('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [page, setPage] = useState(1)
+  const pageSize = 25
 
   const {data: templates, isLoading} = useQuery({
     queryKey: queryKeys.templates(search || undefined),
@@ -47,6 +64,13 @@ export function TemplatesPage() {
       return dir * a.updatedAt.localeCompare(b.updatedAt)
     })
   }, [templates, sort, sortDir])
+
+  const paginatedTemplates = useMemo(() => {
+    if (!sortedTemplates) return undefined
+    return sortedTemplates.slice((page - 1) * pageSize, page * pageSize)
+  }, [sortedTemplates, page])
+
+  const totalTemplates = sortedTemplates?.length ?? 0
 
   const {data: globalVariables} = useQuery({
     queryKey: queryKeys.globalVariables(),
@@ -144,7 +168,10 @@ export function TemplatesPage() {
             <SearchInput
               placeholder="Search templates..."
               value={search}
-              onChange={setSearch}
+              onChange={(v) => {
+                setSearch(v)
+                setPage(1)
+              }}
               containerClassName="max-w-sm"
             />
             <div className="flex gap-2">
@@ -228,7 +255,7 @@ export function TemplatesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedTemplates?.map((template) => {
+                  {paginatedTemplates?.map((template) => {
                     const vars = parseVariables(template.customVariables)
                     return (
                       <TableRow
@@ -247,8 +274,19 @@ export function TemplatesPage() {
                         </TableCell>
                         <TableCell className="font-medium">{template.name}</TableCell>
                         <TableCell className="max-w-xs truncate text-muted-foreground">
-                          {template.content.substring(0, 80)}
-                          {template.content.length > 80 ? '...' : ''}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="truncate block">
+                                  {template.content.substring(0, 80)}
+                                  {template.content.length > 80 ? '...' : ''}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
+                                {template.content}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
@@ -292,6 +330,26 @@ export function TemplatesPage() {
                   )}
                 </TableBody>
               </Table>
+              {totalTemplates > pageSize && (
+                <div className="flex items-center justify-between px-4 py-3 border-t">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalTemplates)} of {totalTemplates}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page * pageSize >= totalTemplates}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -323,11 +381,24 @@ function VariablesTab() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
   const [editValue, setEditValue] = useState('')
+  const [page, setPage] = useState(1)
+  const pageSize = 25
 
   const {data: variables, isLoading} = useQuery({
     queryKey: queryKeys.globalVariables(search || undefined),
     queryFn: () => fetchGlobalVariables({search: search || undefined}),
   })
+
+  const sortedVariables = useMemo(() => {
+    if (!variables) return undefined
+    return [...variables].sort((a, b) => a.name.localeCompare(b.name))
+  }, [variables])
+
+  const totalVariables = sortedVariables?.length ?? 0
+  const paginatedVariables = useMemo(() => {
+    if (!sortedVariables) return undefined
+    return sortedVariables.slice((page - 1) * pageSize, page * pageSize)
+  }, [sortedVariables, page])
 
   const toggleSelect = useSetToggle(setSelectedIds)
 
@@ -408,7 +479,10 @@ function VariablesTab() {
         <SearchInput
           placeholder="Search variables..."
           value={search}
-          onChange={setSearch}
+          onChange={(v) => {
+            setSearch(v)
+            setPage(1)
+          }}
           containerClassName="max-w-sm"
         />
         {selectedIds.size > 0 && (
@@ -467,7 +541,7 @@ function VariablesTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {variables?.map((variable) =>
+              {paginatedVariables?.map((variable) =>
                 editingId === variable.id ? (
                   <TableRow key={variable.id}>
                     <TableCell>
@@ -553,6 +627,26 @@ function VariablesTab() {
               )}
             </TableBody>
           </Table>
+          {totalVariables > pageSize && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <span className="text-sm text-muted-foreground">
+                Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalVariables)} of {totalVariables}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page * pageSize >= totalVariables}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

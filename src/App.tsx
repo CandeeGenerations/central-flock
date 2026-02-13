@@ -77,7 +77,7 @@ function AppLayout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto pb-48">
         <Routes>
           <Route path="/" element={<Navigate to="/people" replace />} />
           <Route path="/people" element={<PeoplePage />} />

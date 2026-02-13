@@ -5,6 +5,7 @@ import {fileURLToPath} from 'url'
 
 import {contactsRouter} from './routes/contacts.js'
 import {draftsRouter} from './routes/drafts.js'
+import {globalVariablesRouter} from './routes/global-variables.js'
 import {groupsRouter} from './routes/groups.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter} from './routes/messages.js'
@@ -13,7 +14,7 @@ import {templatesRouter} from './routes/templates.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 5172
 
 app.use(cors())
 app.use(express.json({limit: '10mb'}))
@@ -24,6 +25,7 @@ app.use('/api/groups', groupsRouter)
 app.use('/api/messages', messagesRouter)
 app.use('/api/drafts', draftsRouter)
 app.use('/api/templates', templatesRouter)
+app.use('/api/global-variables', globalVariablesRouter)
 app.use('/api/import', importRouter)
 app.use('/api/contacts', contactsRouter)
 

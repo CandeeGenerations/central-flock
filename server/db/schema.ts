@@ -77,6 +77,7 @@ export const drafts = sqliteTable('drafts', {
   batchSize: integer('batch_size').default(1).notNull(),
   batchDelayMs: integer('batch_delay_ms').default(5000).notNull(),
   scheduledAt: text('scheduled_at'),
+  templateState: text('template_state'),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),
@@ -90,6 +91,18 @@ export const templates = sqliteTable('templates', {
   name: text('name').notNull(),
   content: text('content').default('').notNull(),
   customVariables: text('custom_variables'),
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+  updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})
+
+export const globalVariables = sqliteTable('global_variables', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  name: text('name').notNull().unique(),
+  value: text('value').notNull(),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

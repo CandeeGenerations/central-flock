@@ -100,6 +100,7 @@ draftsRouter.post(
       batchSize,
       batchDelayMs,
       scheduledAt,
+      templateState,
     } = req.body
 
     const draft = db
@@ -114,6 +115,7 @@ draftsRouter.post(
         batchSize: batchSize ?? BATCH_DEFAULTS.batchSize,
         batchDelayMs: batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs,
         scheduledAt: scheduledAt || null,
+        templateState: templateState || null,
       })
       .returning()
       .get()
@@ -137,6 +139,7 @@ draftsRouter.put(
       batchSize,
       batchDelayMs,
       scheduledAt,
+      templateState,
     } = req.body
 
     const draft = db
@@ -151,6 +154,7 @@ draftsRouter.put(
         batchSize: batchSize ?? BATCH_DEFAULTS.batchSize,
         batchDelayMs: batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs,
         scheduledAt: scheduledAt ?? null,
+        templateState: templateState ?? null,
         updatedAt: sql`datetime('now')`,
       })
       .where(eq(schema.drafts.id, id))
@@ -192,6 +196,7 @@ draftsRouter.post(
         excludeIds: original.excludeIds,
         batchSize: original.batchSize,
         batchDelayMs: original.batchDelayMs,
+        templateState: original.templateState,
       })
       .returning()
       .get()

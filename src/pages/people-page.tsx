@@ -5,7 +5,7 @@ import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTr
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {type Person, createPerson, deletePerson, fetchPeople, togglePersonStatus} from '@/lib/api'
@@ -181,22 +181,20 @@ export function PeoplePage() {
           onClear={() => setPage(1)}
           containerClassName="flex-1 max-w-sm"
         />
-        <Select
+        <SearchableSelect
           value={statusFilter}
           onValueChange={(v) => {
             setStatusFilter(v)
             setPage(1)
           }}
-        >
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
+          options={[
+            {value: 'all', label: 'All Status'},
+            {value: 'active', label: 'Active'},
+            {value: 'inactive', label: 'Inactive'},
+          ]}
+          className="w-36"
+          searchable={false}
+        />
       </div>
 
       {/* Table */}

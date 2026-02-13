@@ -6,7 +6,7 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Textarea} from '@/components/ui/textarea'
 import {
@@ -206,18 +206,15 @@ export function PersonDetailPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Status</Label>
-                  <Select
+                  <SearchableSelect
                     value={form.status || 'active'}
                     onValueChange={(v) => setForm((f) => ({...f, status: v as 'active' | 'inactive'}))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    options={[
+                      {value: 'active', label: 'Active'},
+                      {value: 'inactive', label: 'Inactive'},
+                    ]}
+                    searchable={false}
+                  />
                 </div>
               </div>
               <div>

@@ -43,7 +43,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The app will be available at [http://localhost:5173](http://localhost:5173). The API server runs on port 3001 and Vite proxies `/api` requests to it automatically.
+The app will be available at [http://localhost:5173](http://localhost:5173). The API server runs on port 5172 and Vite proxies `/api` requests to it automatically.
 
 ## Scripts
 

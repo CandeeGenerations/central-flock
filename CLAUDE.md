@@ -6,7 +6,7 @@ Central Flock is a macOS desktop app for managing contacts and sending personali
 
 ## Commands
 
-- `pnpm dev` — Start frontend (Vite, port 5173) and backend (Express, port 3001) concurrently
+- `pnpm dev` — Start frontend (Vite, port 5173) and backend (Express, port 5172) concurrently
 - `pnpm build` — TypeScript compile + Vite production build
 - `pnpm lint` — Run ESLint + TypeScript type checking (both `tsconfig.app.json` and `tsconfig.server.json`)
 - `pnpm db:generate` — Generate Drizzle migration files
@@ -18,7 +18,7 @@ Central Flock is a macOS desktop app for managing contacts and sending personali
 - **Frontend:** `src/` — React 19, React Router, TailwindCSS 4, Radix UI, TanStack React Query
 - **Backend:** `server/` — Express 5, Drizzle ORM, better-sqlite3
 - **Database:** SQLite file at `./central-flock.db`, schema in `server/db/schema.ts`
-- **API proxy:** Vite proxies `/api` requests to `http://localhost:3001` in dev
+- **API proxy:** Vite proxies `/api` requests to `http://localhost:5172` in dev
 - **Path alias:** `@` maps to `./src` (configured in `vite.config.ts` and `tsconfig.app.json`)
 - **macOS integration:** AppleScript in `server/services/applescript.ts` for Messages and Contacts
 

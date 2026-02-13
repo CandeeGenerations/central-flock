@@ -235,6 +235,7 @@ export interface Draft {
   batchSize: number
   batchDelayMs: number
   scheduledAt: string | null
+  templateState: string | null
   recipientCount?: number
   createdAt: string
   updatedAt: string
@@ -312,6 +313,44 @@ export function updateTemplate(id: number, data: {name?: string; content?: strin
 
 export function deleteTemplates(ids: number[]) {
   return request<{success: boolean; deleted: number}>('/templates/delete', {
+    method: 'POST',
+    body: JSON.stringify({ids}),
+  })
+}
+
+// Global Variables
+export interface GlobalVariable {
+  id: number
+  name: string
+  value: string
+  createdAt: string
+  updatedAt: string
+}
+
+export function fetchGlobalVariables(params?: {search?: string}) {
+  return request<GlobalVariable[]>(`/global-variables${buildQueryString(params)}`)
+}
+
+export function fetchGlobalVariable(id: number) {
+  return request<GlobalVariable>(`/global-variables/${id}`)
+}
+
+export function createGlobalVariable(data: {name: string; value: string}) {
+  return request<GlobalVariable>('/global-variables', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateGlobalVariable(id: number, data: {name?: string; value?: string}) {
+  return request<GlobalVariable>(`/global-variables/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteGlobalVariables(ids: number[]) {
+  return request<{success: boolean; deleted: number}>('/global-variables/delete', {
     method: 'POST',
     body: JSON.stringify({ids}),
   })

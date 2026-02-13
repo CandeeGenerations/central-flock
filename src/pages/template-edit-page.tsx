@@ -3,15 +3,15 @@ import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Textarea} from '@/components/ui/textarea'
-import {createTemplate, fetchTemplate, updateTemplate} from '@/lib/api'
+import {createTemplate, fetchGlobalVariables, fetchTemplate, updateTemplate} from '@/lib/api'
 import type {TemplateVariable} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {format} from 'date-fns'
-import {ArrowLeft, Calendar, Eye, Save, Type, X} from 'lucide-react'
-import {useCallback, useRef, useState} from 'react'
+import {ArrowLeft, Calendar, ChevronDown, ChevronRight, Eye, Globe, Save, Type, X} from 'lucide-react'
+import {type ReactNode, useCallback, useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -106,6 +106,11 @@ export function TemplateEditPage() {
     setCustomVariables(customVariables.filter((v) => v.name !== varName))
   }
 
+  const {data: globalVariables} = useQuery({
+    queryKey: queryKeys.globalVariables(),
+    queryFn: () => fetchGlobalVariables(),
+  })
+
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const insertVariable = useCallback((varName: string) => {
@@ -132,9 +137,15 @@ export function TemplateEditPage() {
       .replace(/\{\{lastName\}\}/g, 'Doe')
       .replace(/\{\{fullName\}\}/g, 'John Doe')
 
+    // Resolve global variables
+    if (globalVariables) {
+      for (const g of globalVariables) {
+        preview = preview.replace(new RegExp(`\\{\\{${g.name}\\}\\}`, 'g'), g.value)
+      }
+    }
+
     for (const v of customVariables) {
-      const placeholder =
-        v.type === 'date' ? format(new Date(), 'MMMM d, yyyy') : `[${v.name}]`
+      const placeholder = v.type === 'date' ? format(new Date(), 'MMMM d, yyyy') : `[${v.name}]`
       preview = preview.replace(new RegExp(`\\{\\{${v.name}\\}\\}`, 'g'), placeholder)
     }
     return preview
@@ -167,32 +178,90 @@ export function TemplateEditPage() {
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Event Invitation" />
       </div>
 
-      {/* Variable insert buttons */}
+      {/* Variable sections as dropdowns */}
       <div className="space-y-2">
-        <Label>Insert Variables</Label>
-        <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-muted-foreground self-center mr-1">Person:</span>
-          <Button variant="outline" size="sm" onClick={() => insertVariable('firstName')}>
-            {'{{firstName}}'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => insertVariable('lastName')}>
-            {'{{lastName}}'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => insertVariable('fullName')}>
-            {'{{fullName}}'}
-          </Button>
-          {customVariables.length > 0 && (
-            <>
-              <span className="text-xs text-muted-foreground self-center ml-2 mr-1">Custom:</span>
-              {customVariables.map((v) => (
+        <VariableDropdown label="Person Variables">
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Button variant="outline" size="sm" onClick={() => insertVariable('firstName')}>
+              {'{{firstName}}'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => insertVariable('lastName')}>
+              {'{{lastName}}'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => insertVariable('fullName')}>
+              {'{{fullName}}'}
+            </Button>
+          </div>
+        </VariableDropdown>
+
+        <VariableDropdown label="Custom Variables" count={customVariables.length}>
+          <div className="space-y-3 mt-2">
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <Input
+                  value={newVarName}
+                  onChange={(e) => setNewVarName(e.target.value)}
+                  placeholder="variableName"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddVariable()
+                  }}
+                />
+              </div>
+              <SearchableSelect
+                value={newVarType}
+                onValueChange={(v) => setNewVarType(v as 'text' | 'date')}
+                options={[
+                  {value: 'text', label: 'Text'},
+                  {value: 'date', label: 'Date'},
+                ]}
+                className="w-28"
+                searchable={false}
+              />
+              <Button onClick={handleAddVariable}>Add</Button>
+            </div>
+            {customVariables.length > 0 && (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {customVariables.map((v) => (
+                    <Badge key={v.name} variant="secondary" className="gap-1 pr-1">
+                      {v.type === 'date' ? <Calendar className="h-3 w-3" /> : <Type className="h-3 w-3" />}
+                      {v.name}
+                      <button
+                        type="button"
+                        className="ml-1 rounded-full hover:bg-destructive/20 p-0.5 cursor-pointer"
+                        onClick={() => removeVariable(v.name)}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-xs text-muted-foreground self-center mr-1">Insert:</span>
+                  {customVariables.map((v) => (
+                    <Button key={v.name} variant="outline" size="sm" onClick={() => insertVariable(v.name)}>
+                      {v.type === 'date' ? <Calendar className="h-3 w-3 mr-1" /> : <Type className="h-3 w-3 mr-1" />}
+                      {`{{${v.name}}}`}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </VariableDropdown>
+
+        {globalVariables && globalVariables.length > 0 && (
+          <VariableDropdown label="Global Variables" count={globalVariables.length}>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {globalVariables.map((v) => (
                 <Button key={v.name} variant="outline" size="sm" onClick={() => insertVariable(v.name)}>
-                  {v.type === 'date' ? <Calendar className="h-3 w-3 mr-1" /> : <Type className="h-3 w-3 mr-1" />}
+                  <Globe className="h-3 w-3 mr-1" />
                   {`{{${v.name}}}`}
                 </Button>
               ))}
-            </>
-          )}
-        </div>
+            </div>
+          </VariableDropdown>
+        )}
       </div>
 
       {/* Message body */}
@@ -202,53 +271,9 @@ export function TemplateEditPage() {
           ref={textareaRef}
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          rows={6}
+          rows={10}
           placeholder="Type your template message here..."
         />
-      </div>
-
-      {/* Custom variables */}
-      <div className="space-y-3">
-        <Label>Custom Variables</Label>
-        <div className="flex gap-2 items-end">
-          <div className="flex-1">
-            <Input
-              value={newVarName}
-              onChange={(e) => setNewVarName(e.target.value)}
-              placeholder="variableName"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleAddVariable()
-              }}
-            />
-          </div>
-          <Select value={newVarType} onValueChange={(v) => setNewVarType(v as 'text' | 'date')}>
-            <SelectTrigger className="w-28">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="text">Text</SelectItem>
-              <SelectItem value="date">Date</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={handleAddVariable}>Add</Button>
-        </div>
-        {customVariables.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {customVariables.map((v) => (
-              <Badge key={v.name} variant="secondary" className="gap-1 pr-1">
-                {v.type === 'date' ? <Calendar className="h-3 w-3" /> : <Type className="h-3 w-3" />}
-                {v.name}
-                <button
-                  type="button"
-                  className="ml-1 rounded-full hover:bg-destructive/20 p-0.5 cursor-pointer"
-                  onClick={() => removeVariable(v.name)}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Preview */}
@@ -273,6 +298,39 @@ export function TemplateEditPage() {
           {saveMutation.isPending ? 'Saving...' : isEdit ? 'Update Template' : 'Create Template'}
         </Button>
       </div>
+    </div>
+  )
+}
+
+function VariableDropdown({
+  label,
+  count,
+  defaultOpen = false,
+  children,
+}: {
+  label: string
+  count?: number
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <div className="border rounded-md">
+      <button
+        type="button"
+        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer"
+        onClick={() => setOpen(!open)}
+      >
+        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        {label}
+        {count !== undefined && count > 0 && (
+          <Badge variant="secondary" className="text-xs">
+            {count}
+          </Badge>
+        )}
+      </button>
+      {open && <div className="px-3 pb-3">{children}</div>}
     </div>
   )
 }

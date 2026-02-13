@@ -32,6 +32,11 @@ messagesRouter.post(
       customVarValues?: Record<string, string>
     }
 
+    // Fetch global variables and merge with custom var values (custom takes precedence)
+    const globals = db.select().from(schema.globalVariables).all()
+    const globalVarValues = Object.fromEntries(globals.map((g) => [g.name, g.value]))
+    const mergedVarValues = {...globalVarValues, ...customVarValues}
+
     // Get all recipients
     const recipients = db
       .select()
@@ -53,7 +58,7 @@ messagesRouter.post(
       .insert(schema.messages)
       .values({
         content,
-        renderedPreview: renderTemplate(content, activeRecipients[0] || recipients[0], customVarValues),
+        renderedPreview: renderTemplate(content, activeRecipients[0] || recipients[0], mergedVarValues),
         groupId: groupId || null,
         totalRecipients: recipients.length,
         skippedCount: skippedRecipients.length,
@@ -70,7 +75,7 @@ messagesRouter.post(
         .values({
           messageId: message.id,
           personId: person.id,
-          renderedContent: renderTemplate(content, person, customVarValues),
+          renderedContent: renderTemplate(content, person, mergedVarValues),
           status: 'pending',
         })
         .run()
@@ -81,7 +86,7 @@ messagesRouter.post(
         .values({
           messageId: message.id,
           personId: person.id,
-          renderedContent: renderTemplate(content, person, customVarValues),
+          renderedContent: renderTemplate(content, person, mergedVarValues),
           status: 'skipped',
         })
         .run()

@@ -9,5 +9,7 @@ export const queryKeys = {
   draft: (id: number) => ['draft', id] as const,
   templates: (search?: string) => ['templates', search] as const,
   template: (id: number) => ['template', id] as const,
+  globalVariables: (search?: string) => ['globalVariables', search] as const,
+  globalVariable: (id: number) => ['globalVariable', id] as const,
   nonMembers: (groupId: string | number, search?: string) => ['nonMembers', String(groupId), search] as const,
 }

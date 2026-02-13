@@ -52,7 +52,7 @@ We have an existing CSV file (`gloo-people.csv`) with ~440 contacts to import as
 - AppleScript requires shell access via `child_process.exec` calling `osascript`
 - Simplest approach: local Express server handles API + AppleScript execution
 - No heavy framework overhead
-- In dev: Vite dev server proxies `/api` to Express on port 3001
+- In dev: Vite dev server proxies `/api` to Express on port 5172
 - In prod: Express serves the built Vite static files
 
 ---
@@ -442,7 +442,7 @@ end tell
 - [ ] Set up Tailwind CSS (required for shadcn)
 - [ ] Initialize shadcn (`pnpm dlx shadcn@latest init`)
 - [ ] Add core shadcn components: button, input, dialog, table, card, badge, toast, dropdown-menu, select, checkbox, tabs, separator, sheet (sidebar)
-- [ ] Configure Vite proxy for `/api` → `localhost:3001`
+- [ ] Configure Vite proxy for `/api` → `localhost:5172`
 - [ ] Set up `concurrently` to run Vite + Express in dev
 - [ ] Create Express server entry point
 - [ ] Set up Drizzle + SQLite connection

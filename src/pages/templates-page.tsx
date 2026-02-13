@@ -10,6 +10,7 @@ import {
   createGlobalVariable,
   deleteGlobalVariables,
   deleteTemplates,
+  duplicateTemplate,
   fetchGlobalVariables,
   fetchTemplates,
   updateGlobalVariable,
@@ -18,7 +19,7 @@ import type {GlobalVariable, TemplateVariable} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ArrowUpDown, Calendar, Check, Pencil, Plus, Trash2, Type, X} from 'lucide-react'
+import {ArrowDown, ArrowUp, ArrowUpDown, Calendar, Check, Copy, Pencil, Plus, Trash2, Type, X} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link, useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -62,6 +63,18 @@ export function TemplatesPage() {
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : 'Failed to delete templates')
+    },
+  })
+
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => duplicateTemplate(id),
+    onSuccess: (template) => {
+      queryClient.invalidateQueries({queryKey: queryKeys.templates()})
+      toast.success('Template duplicated')
+      navigate(`/templates/${template.id}/edit`)
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Failed to duplicate template')
     },
   })
 
@@ -211,6 +224,7 @@ export function TemplatesPage() {
                         )}
                       </button>
                     </TableHead>
+                    <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -253,12 +267,22 @@ export function TemplatesPage() {
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {formatDateTime(template.updatedAt)}
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Duplicate template"
+                            onClick={() => duplicateMutation.mutate(template.id)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     )
                   })}
                   {templates?.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                         No templates yet.{' '}
                         <Link to="/templates/new" className="underline">
                           Create one

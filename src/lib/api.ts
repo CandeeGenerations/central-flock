@@ -311,6 +311,10 @@ export function updateTemplate(id: number, data: {name?: string; content?: strin
   })
 }
 
+export function duplicateTemplate(id: number) {
+  return request<Template>(`/templates/${id}/duplicate`, {method: 'POST'})
+}
+
 export function deleteTemplates(ids: number[]) {
   return request<{success: boolean; deleted: number}>('/templates/delete', {
     method: 'POST',

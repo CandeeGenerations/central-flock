@@ -105,6 +105,35 @@ templatesRouter.put(
   }),
 )
 
+// POST /api/templates/:id/duplicate - Duplicate a template
+templatesRouter.post(
+  '/:id/duplicate',
+  asyncHandler(async (req, res) => {
+    const original = db
+      .select()
+      .from(schema.templates)
+      .where(eq(schema.templates.id, Number(req.params.id)))
+      .get()
+
+    if (!original) {
+      res.status(404).json({error: 'Template not found'})
+      return
+    }
+
+    const copy = db
+      .insert(schema.templates)
+      .values({
+        name: `${original.name} (copy)`,
+        content: original.content,
+        customVariables: original.customVariables,
+      })
+      .returning()
+      .get()
+
+    res.status(201).json(copy)
+  }),
+)
+
 // POST /api/templates/delete - Bulk delete templates
 templatesRouter.post(
   '/delete',

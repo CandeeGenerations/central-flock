@@ -5,6 +5,7 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {createGroup, deleteGroup, fetchGroups} from '@/lib/api'
 import {formatDate} from '@/lib/date'
@@ -23,6 +24,7 @@ export function GroupsPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [newGroup, setNewGroup] = useState({name: '', description: ''})
   const [search, setSearch] = usePersistedState('groups.search', '')
+  const debouncedSearch = useDebouncedValue(search, 250)
   const [sortKey, setSortKey] = usePersistedState<SortKey>('groups.sortKey', 'name')
   const [sortDir, setSortDir] = usePersistedState<SortDir>('groups.sortDir', 'asc')
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -38,8 +40,8 @@ export function GroupsPage() {
   const filteredGroups = useMemo(() => {
     if (!groups) return []
     let result = groups
-    if (search) {
-      const q = search.toLowerCase()
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase()
       result = result.filter((g) => g.name.toLowerCase().includes(q) || (g.description || '').toLowerCase().includes(q))
     }
     result = [...result].sort((a, b) => {
@@ -50,7 +52,7 @@ export function GroupsPage() {
       return sortDir === 'desc' ? -cmp : cmp
     })
     return result
-  }, [groups, search, sortKey, sortDir])
+  }, [groups, debouncedSearch, sortKey, sortDir])
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {

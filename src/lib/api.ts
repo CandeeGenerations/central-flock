@@ -154,9 +154,11 @@ export interface Message {
   sentCount: number
   failedCount: number
   skippedCount: number
-  status: 'pending' | 'sending' | 'completed' | 'cancelled'
+  status: 'pending' | 'scheduled' | 'past_due' | 'sending' | 'completed' | 'cancelled'
   batchSize: number
   batchDelayMs: number
+  scheduledAt: string | null
+  templateState: string | null
   createdAt: string
   completedAt: string | null
 }
@@ -185,8 +187,10 @@ export function sendMessage(data: {
   batchSize?: number
   batchDelayMs?: number
   customVarValues?: Record<string, string>
+  scheduledAt?: string
+  templateState?: string
 }) {
-  return request<{messageId: number; jobId: string}>('/messages/send', {
+  return request<{messageId: number; jobId?: string; scheduled?: boolean}>('/messages/send', {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -222,6 +226,30 @@ export function cancelMessage(id: number) {
   return request(`/messages/${id}/cancel`, {method: 'POST'})
 }
 
+export function sendNowMessage(id: number) {
+  return request<{success: boolean; jobId: string}>(`/messages/${id}/send-now`, {method: 'POST'})
+}
+
+export function updateMessage(
+  id: number,
+  data: {
+    content: string
+    recipientIds: number[]
+    excludeIds?: number[]
+    groupId?: number
+    batchSize?: number
+    batchDelayMs?: number
+    customVarValues?: Record<string, string>
+    scheduledAt?: string
+    templateState?: string
+  },
+) {
+  return request<{messageId: number; scheduled?: boolean}>(`/messages/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
 // Drafts
 export interface Draft {
   id: number
@@ -237,6 +265,7 @@ export interface Draft {
   scheduledAt: string | null
   templateState: string | null
   recipientCount?: number
+  renderedPreview?: string | null
   createdAt: string
   updatedAt: string
 }

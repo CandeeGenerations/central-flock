@@ -22,6 +22,7 @@ peopleRouter.get(
           like(schema.people.lastName, `%${search}%`),
           like(schema.people.phoneNumber, `%${search}%`),
           like(schema.people.phoneDisplay, `%${search}%`),
+          sql`(COALESCE(${schema.people.firstName}, '') || ' ' || COALESCE(${schema.people.lastName}, '')) LIKE ${'%' + search + '%'}`,
         ),
       )
     }

@@ -5,14 +5,15 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {deleteDrafts, deleteMessages, duplicateDraft, fetchDrafts, fetchMessages} from '@/lib/api'
 import type {Draft} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Copy, Plus, Trash2} from 'lucide-react'
-import {useState} from 'react'
+import {Copy, Pencil, Plus, Trash2} from 'lucide-react'
+import {useMemo, useState} from 'react'
 import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -21,28 +22,48 @@ const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'ou
   sending: 'secondary',
   pending: 'outline',
   cancelled: 'destructive',
+  scheduled: 'secondary',
+  past_due: 'destructive',
 }
 
 export function MessageHistoryPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeTab = (searchParams.get('tab') === 'drafts' ? 'drafts' : 'sent') as 'sent' | 'drafts'
-  const setActiveTab = (tab: 'sent' | 'drafts') => setSearchParams(tab === 'sent' ? {} : {tab}, {replace: true})
+  const tabParam = searchParams.get('tab')
+  const activeTab = (tabParam === 'drafts' ? 'drafts' : tabParam === 'scheduled' ? 'scheduled' : 'sent') as
+    | 'sent'
+    | 'scheduled'
+    | 'drafts'
+  const setActiveTab = (tab: 'sent' | 'scheduled' | 'drafts') =>
+    setSearchParams(tab === 'sent' ? {} : {tab}, {replace: true})
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search, 250)
 
   // Sent messages state
   const {data: messages, isLoading: messagesLoading} = useQuery({
-    queryKey: queryKeys.messages(search || undefined),
-    queryFn: () => fetchMessages({search: search || undefined}),
+    queryKey: queryKeys.messages(debouncedSearch || undefined),
+    queryFn: () => fetchMessages({search: debouncedSearch || undefined}),
   })
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
 
+  const sentMessages = useMemo(
+    () =>
+      messages?.filter(
+        (m) => m.status === 'pending' || m.status === 'sending' || m.status === 'completed' || m.status === 'cancelled',
+      ),
+    [messages],
+  )
+  const scheduledMessages = useMemo(
+    () => messages?.filter((m) => m.status === 'scheduled' || m.status === 'past_due'),
+    [messages],
+  )
+
   // Drafts state
   const {data: drafts, isLoading: draftsLoading} = useQuery({
-    queryKey: queryKeys.drafts(search || undefined),
-    queryFn: () => fetchDrafts({search: search || undefined}),
+    queryKey: queryKeys.drafts(debouncedSearch || undefined),
+    queryFn: () => fetchDrafts({search: debouncedSearch || undefined}),
   })
   const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set())
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false)
@@ -140,7 +161,7 @@ export function MessageHistoryPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Messages</h2>
         <div className="flex gap-2">
-          {activeTab === 'sent' && selectedIds.size > 0 && (
+          {(activeTab === 'sent' || activeTab === 'scheduled') && selectedIds.size > 0 && (
             <Button variant="destructive" onClick={() => setConfirmOpen(true)}>
               <Trash2 className="h-4 w-4 mr-2" />
               Delete ({selectedIds.size})
@@ -163,7 +184,7 @@ export function MessageHistoryPage() {
 
       {/* Search */}
       <SearchInput
-        placeholder={activeTab === 'sent' ? 'Search messages...' : 'Search drafts...'}
+        placeholder={activeTab === 'drafts' ? 'Search drafts...' : 'Search messages...'}
         value={search}
         onChange={setSearch}
         containerClassName="max-w-sm"
@@ -180,9 +201,24 @@ export function MessageHistoryPage() {
           onClick={() => setActiveTab('sent')}
         >
           Sent Messages
-          {messages && messages.length > 0 && (
+          {sentMessages && sentMessages.length > 0 && (
             <Badge variant="secondary" className="text-xs">
-              {messages.length}
+              {sentMessages.length}
+            </Badge>
+          )}
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+            activeTab === 'scheduled'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+          onClick={() => setActiveTab('scheduled')}
+        >
+          Scheduled
+          {scheduledMessages && scheduledMessages.length > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {scheduledMessages.length}
             </Badge>
           )}
         </button>
@@ -215,7 +251,7 @@ export function MessageHistoryPage() {
                   <TableRow>
                     <TableHead className="w-10">
                       <Checkbox
-                        checked={messages && messages.length > 0 && selectedIds.size === messages.length}
+                        checked={sentMessages && sentMessages.length > 0 && selectedIds.size === sentMessages.length}
                         onCheckedChange={toggleAll}
                       />
                     </TableHead>
@@ -228,7 +264,7 @@ export function MessageHistoryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {messages?.map((msg) => (
+                  {sentMessages?.map((msg) => (
                     <TableRow key={msg.id}>
                       <TableCell>
                         <Checkbox checked={selectedIds.has(msg.id)} onCheckedChange={() => toggleSelect(msg.id)} />
@@ -241,12 +277,12 @@ export function MessageHistoryPage() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Link to={`/messages/${msg.id}`} className="hover:underline truncate block">
-                                {msg.content.substring(0, 80)}
-                                {msg.content.length > 80 ? '...' : ''}
+                                {(msg.renderedPreview || msg.content).substring(0, 80)}
+                                {(msg.renderedPreview || msg.content).length > 80 ? '...' : ''}
                               </Link>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
-                              {msg.content}
+                              {msg.renderedPreview || msg.content}
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -259,7 +295,7 @@ export function MessageHistoryPage() {
                       <TableCell>
                         <Badge variant={statusColors[msg.status] || 'outline'}>{msg.status}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{msg.groupName || '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{msg.groupName || '\u2014'}</TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"
@@ -279,13 +315,121 @@ export function MessageHistoryPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {messages?.length === 0 && (
+                  {sentMessages?.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No messages sent yet.{' '}
                         <Link to="/messages/compose" className="underline">
                           Compose one
                         </Link>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Scheduled Tab */}
+      {activeTab === 'scheduled' && (
+        <>
+          {messagesLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          ) : (
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          scheduledMessages &&
+                          scheduledMessages.length > 0 &&
+                          selectedIds.size === scheduledMessages.length
+                        }
+                        onCheckedChange={toggleAll}
+                      />
+                    </TableHead>
+                    <TableHead>Scheduled For</TableHead>
+                    <TableHead>Message</TableHead>
+                    <TableHead>Recipients</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Group</TableHead>
+                    <TableHead className="w-16">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {scheduledMessages?.map((msg) => (
+                    <TableRow key={msg.id}>
+                      <TableCell>
+                        <Checkbox checked={selectedIds.has(msg.id)} onCheckedChange={() => toggleSelect(msg.id)} />
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {msg.status === 'past_due' ? (
+                          <span className="text-destructive">Past Due: {formatDateTime(msg.scheduledAt!)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">{formatDateTime(msg.scheduledAt!)}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Link to={`/messages/${msg.id}`} className="hover:underline truncate block">
+                                {(msg.renderedPreview || msg.content).substring(0, 80)}
+                                {(msg.renderedPreview || msg.content).length > 80 ? '...' : ''}
+                              </Link>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
+                              {msg.renderedPreview || msg.content}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">{msg.totalRecipients}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={statusColors[msg.status] || 'outline'}>
+                          {msg.status === 'past_due' ? 'past due' : msg.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{msg.groupName || '\u2014'}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Edit scheduled message"
+                            onClick={() => navigate(`/messages/compose?editMessageId=${msg.id}`)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Duplicate as draft"
+                            onClick={() =>
+                              navigate('/messages/compose', {
+                                state: {
+                                  content: msg.content,
+                                  groupId: msg.groupId,
+                                },
+                              })
+                            }
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {scheduledMessages?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        No scheduled messages.
                       </TableCell>
                     </TableRow>
                   )}
@@ -347,14 +491,14 @@ export function MessageHistoryPage() {
                                 <span className="truncate block">
                                   {draft.name || (
                                     <>
-                                      {draft.content.substring(0, 80)}
-                                      {draft.content.length > 80 ? '...' : ''}
+                                      {(draft.renderedPreview || draft.content).substring(0, 80)}
+                                      {(draft.renderedPreview || draft.content).length > 80 ? '...' : ''}
                                     </>
                                   )}
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
-                                {draft.content}
+                                {draft.renderedPreview || draft.content}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>

@@ -12,6 +12,7 @@ import {SearchInput} from '@/components/ui/search-input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Separator} from '@/components/ui/separator'
 import {Textarea} from '@/components/ui/textarea'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {
   createDraft,
@@ -20,11 +21,13 @@ import {
   fetchGlobalVariables,
   fetchGroup,
   fetchGroups,
+  fetchMessage,
   fetchMessageStatus,
   fetchPeople,
   fetchTemplates,
   sendMessage,
   updateDraft,
+  updateMessage,
 } from '@/lib/api'
 import type {Draft, TemplateVariable} from '@/lib/api'
 import {BATCH_DEFAULTS} from '@/lib/constants'
@@ -72,6 +75,7 @@ export function MessageComposePage() {
   } | null
 
   const draftIdParam = searchParams.get('draftId')
+  const editMessageId = searchParams.get('editMessageId')
   const presetGroupId = searchParams.get('groupId') || (dupState?.groupId ? String(dupState.groupId) : '')
   const presetRecipientId = searchParams.get('recipientId')
 
@@ -80,6 +84,7 @@ export function MessageComposePage() {
   const [content, setContent] = useState(dupState?.content || '')
   const [excludeIds, setExcludeIds] = useState<Set<number>>(() => new Set(dupState?.excludeIds || []))
   const [excludeSearch, setExcludeSearch] = useState('')
+  const debouncedExcludeSearch = useDebouncedValue(excludeSearch, 250)
   const [excludeHighlight, setExcludeHighlight] = useState(-1)
   const excludeSearchRef = useRef<HTMLInputElement>(null)
   const [batchSize, setBatchSize] = useState<number>(BATCH_DEFAULTS.batchSize)
@@ -99,6 +104,7 @@ export function MessageComposePage() {
 
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(draftIdParam ? Number(draftIdParam) : null)
   const [individualSearch, setIndividualSearch] = useState('')
+  const debouncedIndividualSearch = useDebouncedValue(individualSearch, 250)
   const [selectedIndividualIds, setSelectedIndividualIds] = useState<Set<number>>(() => {
     return presetRecipientId ? new Set([Number(presetRecipientId)]) : new Set()
   })
@@ -203,6 +209,75 @@ export function MessageComposePage() {
     }
   }
 
+  // Edit mode: fetch existing message and populate form
+  const {data: editMessageData} = useQuery({
+    queryKey: queryKeys.message(editMessageId!),
+    queryFn: () => fetchMessage(Number(editMessageId)),
+    enabled: !!editMessageId,
+  })
+
+  const [loadedEditMessageId, setLoadedEditMessageId] = useState<number | null>(null)
+  if (editMessageData && loadedEditMessageId !== editMessageData.id) {
+    setLoadedEditMessageId(editMessageData.id)
+    setContent(editMessageData.content || '')
+    setSelectedGroupId(editMessageData.groupId ? String(editMessageData.groupId) : '')
+    setRecipientMode(editMessageData.groupId ? 'group' : 'individual')
+    setBatchSize(editMessageData.batchSize ?? BATCH_DEFAULTS.batchSize)
+    setBatchDelayMs(editMessageData.batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs)
+    // Convert scheduledAt UTC back to local datetime-local format
+    if (editMessageData.scheduledAt) {
+      const d = new Date(editMessageData.scheduledAt + (editMessageData.scheduledAt.endsWith('Z') ? '' : 'Z'))
+      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+      setScheduledAt(local)
+    }
+    // Derive exclude/include from recipients
+    const pendingIds = editMessageData.recipients.filter((r) => r.status === 'pending').map((r) => r.personId)
+    const skippedIds = editMessageData.recipients.filter((r) => r.status === 'skipped').map((r) => r.personId)
+    if (editMessageData.groupId) {
+      setExcludeIds(new Set(skippedIds))
+    } else {
+      setSelectedIndividualIds(new Set(pendingIds))
+    }
+    // Restore template state
+    if (editMessageData.templateState) {
+      try {
+        const ts = JSON.parse(editMessageData.templateState) as {
+          templateId: number
+          customVarValues: Record<string, string>
+          dateValues: Record<string, string>
+          dateFormats: Record<string, string>
+        }
+        setSelectedTemplateId(String(ts.templateId))
+        setCustomVarValues(ts.customVarValues || {})
+        setDateFormats(ts.dateFormats || {})
+        const parsedDates: Record<string, Date | undefined> = {}
+        for (const [key, iso] of Object.entries(ts.dateValues || {})) {
+          if (iso) parsedDates[key] = new Date(iso)
+        }
+        setDateValues(parsedDates)
+        // Derive activeTemplateVars from the template
+        const template = templatesList?.find((t) => t.id === ts.templateId)
+        if (template?.customVariables) {
+          try {
+            setActiveTemplateVars(JSON.parse(template.customVariables))
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    } else {
+      setSelectedTemplateId('')
+      setActiveTemplateVars([])
+      setCustomVarValues({})
+      setDateValues({})
+      setDateFormats({})
+    }
+  }
+
+  const isEditMode = !!editMessageId
+
   const {data: groups} = useQuery({queryKey: queryKeys.groups, queryFn: fetchGroups})
   const {data: groupDetail} = useQuery({
     queryKey: queryKeys.group(selectedGroupId),
@@ -269,15 +344,15 @@ export function MessageComposePage() {
   }, [recipientMode, groupDetail, selectedIndividualIds])
 
   const excludeResults = useMemo(() => {
-    if (!excludeSearch || !groupDetail) return []
-    const q = excludeSearch.toLowerCase()
+    if (!debouncedExcludeSearch || !groupDetail) return []
+    const q = debouncedExcludeSearch.toLowerCase()
     return groupDetail.members.filter((m) => {
       if (excludeIds.has(m.id)) return false
       const name = formatFullName(m, '').toLowerCase()
       const phone = (m.phoneDisplay || m.phoneNumber || '').toLowerCase()
       return name.includes(q) || phone.includes(q)
     })
-  }, [excludeSearch, groupDetail, excludeIds])
+  }, [debouncedExcludeSearch, groupDetail, excludeIds])
 
   const handleExcludeKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -343,10 +418,24 @@ export function MessageComposePage() {
 
   const charCount = content.length
 
+  const buildTemplateState = (): string | undefined => {
+    if (!selectedTemplateId || selectedTemplateId === 'none') return undefined
+    const dateIsoValues: Record<string, string> = {}
+    for (const [key, date] of Object.entries(dateValues)) {
+      if (date) dateIsoValues[key] = date.toISOString()
+    }
+    return JSON.stringify({
+      templateId: Number(selectedTemplateId),
+      customVarValues,
+      dateValues: dateIsoValues,
+      dateFormats,
+    })
+  }
+
   const sendMutation = useMutation({
     mutationFn: () => {
       const cvv = Object.keys(resolvedCustomVarValues).length > 0 ? resolvedCustomVarValues : undefined
-      return sendMessage({
+      const payload = {
         content,
         recipientIds: allRecipientIds,
         excludeIds: [...excludeIds],
@@ -354,9 +443,42 @@ export function MessageComposePage() {
         batchSize,
         batchDelayMs,
         customVarValues: cvv,
-      })
+        scheduledAt: scheduledAt || undefined,
+        templateState: buildTemplateState(),
+      }
+      if (isEditMode) {
+        return updateMessage(Number(editMessageId), payload)
+      }
+      return sendMessage(payload)
     },
     onSuccess: async (data) => {
+      if (isEditMode) {
+        queryClient.invalidateQueries({queryKey: queryKeys.messages()})
+        queryClient.invalidateQueries({queryKey: queryKeys.message(editMessageId!)})
+        if (data.scheduled) {
+          toast.success('Message updated')
+          navigate('/messages?tab=scheduled')
+        } else {
+          toast.success('Message updated and sending')
+          setSending(true)
+          const messageId = data.messageId
+          const poll = setInterval(async () => {
+            try {
+              const status = await fetchMessageStatus(messageId)
+              setSendProgress({messageId, ...status})
+              if (status.status === 'completed' || status.status === 'cancelled') {
+                clearInterval(poll)
+                setSending(false)
+                toast.success(`Message sending complete: ${status.sentCount} sent, ${status.failedCount} failed`)
+              }
+            } catch {
+              clearInterval(poll)
+              setSending(false)
+            }
+          }, 1000)
+        }
+        return
+      }
       // Auto-delete draft after successful send
       if (currentDraftId) {
         try {
@@ -365,6 +487,12 @@ export function MessageComposePage() {
         } catch {
           /* ignore */
         }
+      }
+      queryClient.invalidateQueries({queryKey: queryKeys.messages()})
+      if (data.scheduled) {
+        toast.success('Message scheduled')
+        navigate('/messages?tab=scheduled')
+        return
       }
       setSending(true)
       const messageId = data.messageId
@@ -428,7 +556,9 @@ export function MessageComposePage() {
         setSearchParams({draftId: String(draft.id)}, {replace: true})
       }
       queryClient.invalidateQueries({queryKey: ['drafts']})
-      queryClient.setQueryData(queryKeys.draft(draft.id), (old: Draft | undefined) => (old ? {...old, ...draft} : draft))
+      queryClient.setQueryData(queryKeys.draft(draft.id), (old: Draft | undefined) =>
+        old ? {...old, ...draft} : draft,
+      )
       toast.success('Draft saved')
     },
     onError: (err: Error) => toast.error(err.message),
@@ -457,11 +587,13 @@ export function MessageComposePage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate(currentDraftId ? '/messages?tab=drafts' : '/messages')}
+          onClick={() =>
+            navigate(isEditMode ? '/messages?tab=scheduled' : currentDraftId ? '/messages?tab=drafts' : '/messages')
+          }
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-2xl font-bold">Compose Message</h2>
+        <h2 className="text-2xl font-bold">{isEditMode ? 'Edit Scheduled Message' : 'Compose Message'}</h2>
       </div>
 
       {/* Sending progress overlay */}
@@ -526,10 +658,10 @@ export function MessageComposePage() {
                 value={individualSearch}
                 onChange={setIndividualSearch}
               />
-              {individualSearch && (
+              {debouncedIndividualSearch && (
                 <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
                   {(() => {
-                    const q = individualSearch.toLowerCase()
+                    const q = debouncedIndividualSearch.toLowerCase()
                     const results = allPeople.data.filter((p) => {
                       if (selectedIndividualIds.has(p.id)) return false
                       const name = formatFullName(p, '').toLowerCase()
@@ -590,7 +722,7 @@ export function MessageComposePage() {
                 }}
                 onKeyDown={handleExcludeKeyDown}
               />
-              {excludeSearch && (
+              {debouncedExcludeSearch && (
                 <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
                   {excludeResults.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-3">No matching members found</p>
@@ -651,10 +783,12 @@ export function MessageComposePage() {
                 onValueChange={handleTemplateSelect}
                 options={[
                   {value: 'none', label: 'No template'},
-                  ...[...templatesList].sort((a, b) => a.name.localeCompare(b.name)).map((t) => ({
-                    value: String(t.id),
-                    label: t.name,
-                  })),
+                  ...[...templatesList]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((t) => ({
+                      value: String(t.id),
+                      label: t.name,
+                    })),
                 ]}
                 placeholder="Choose a template..."
                 className="w-full"
@@ -839,28 +973,38 @@ export function MessageComposePage() {
               {excludeIds.size > 0 && <p className="text-sm text-muted-foreground">{excludeIds.size} excluded</p>}
             </div>
             <div className="flex gap-2">
-              {currentDraftId && (
+              {!isEditMode && currentDraftId && (
                 <Button variant="outline" size="lg" onClick={() => setDeleteConfirmOpen(true)}>
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => saveDraftMutation.mutate()}
-                disabled={saveDraftMutation.isPending}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {saveDraftMutation.isPending ? 'Saving...' : 'Save Draft'}
-              </Button>
+              {!isEditMode && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => saveDraftMutation.mutate()}
+                  disabled={saveDraftMutation.isPending}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saveDraftMutation.isPending ? 'Saving...' : 'Save Draft'}
+                </Button>
+              )}
               <Button
                 size="lg"
                 onClick={handleSend}
                 disabled={sendMutation.isPending || recipients.length === 0 || !content.trim()}
               >
                 <Send className="h-4 w-4 mr-2" />
-                {sendMutation.isPending ? 'Starting...' : 'Send Message'}
+                {sendMutation.isPending
+                  ? 'Updating...'
+                  : isEditMode
+                    ? scheduledAt
+                      ? 'Update Schedule'
+                      : 'Update & Send'
+                    : scheduledAt
+                      ? 'Schedule Message'
+                      : 'Send Message'}
               </Button>
             </div>
           </div>
@@ -869,8 +1013,12 @@ export function MessageComposePage() {
       <ConfirmDialog
         open={sendConfirmOpen}
         onOpenChange={setSendConfirmOpen}
-        title={`Send to ${recipients.length} recipient${recipients.length !== 1 ? 's' : ''}?`}
-        confirmLabel="Send"
+        title={
+          scheduledAt
+            ? `Schedule for ${recipients.length} recipient${recipients.length !== 1 ? 's' : ''}?`
+            : `Send to ${recipients.length} recipient${recipients.length !== 1 ? 's' : ''}?`
+        }
+        confirmLabel={scheduledAt ? 'Schedule' : 'Send'}
         loading={sendMutation.isPending}
         onConfirm={() => {
           setSendConfirmOpen(false)
@@ -894,6 +1042,12 @@ export function MessageComposePage() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Excluded</span>
               <span className="font-medium">{excludeIds.size}</span>
+            </div>
+          )}
+          {scheduledAt && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Scheduled For</span>
+              <span className="font-medium">{format(new Date(scheduledAt), 'PPP p')}</span>
             </div>
           )}
           {charCount > 160 && (

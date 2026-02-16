@@ -8,9 +8,10 @@ import {draftsRouter} from './routes/drafts.js'
 import {globalVariablesRouter} from './routes/global-variables.js'
 import {groupsRouter} from './routes/groups.js'
 import {importRouter} from './routes/import.js'
-import {messagesRouter} from './routes/messages.js'
+import {messagesRouter, processSendJob} from './routes/messages.js'
 import {peopleRouter} from './routes/people.js'
 import {templatesRouter} from './routes/templates.js'
+import {startScheduler} from './services/scheduler.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -38,4 +39,5 @@ app.get('{*path}', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
+  startScheduler(processSendJob)
 })

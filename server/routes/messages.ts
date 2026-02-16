@@ -22,6 +22,8 @@ messagesRouter.post(
       batchSize = BATCH_DEFAULTS.batchSize,
       batchDelayMs = BATCH_DEFAULTS.batchDelayMs,
       customVarValues,
+      scheduledAt,
+      templateState,
     } = req.body as {
       content: string
       recipientIds: number[]
@@ -30,6 +32,8 @@ messagesRouter.post(
       batchSize?: number
       batchDelayMs?: number
       customVarValues?: Record<string, string>
+      scheduledAt?: string
+      templateState?: string
     }
 
     // Fetch global variables and merge with custom var values (custom takes precedence)
@@ -53,6 +57,17 @@ messagesRouter.post(
     const activeRecipients = recipients.filter((r) => !excludeSet.has(r.id) && r.status === 'active')
     const skippedRecipients = recipients.filter((r) => excludeSet.has(r.id) || r.status !== 'active')
 
+    // Determine if this is a scheduled send
+    let scheduledAtUtc: string | null = null
+    let isScheduled = false
+    if (scheduledAt) {
+      const scheduledDate = new Date(scheduledAt)
+      if (scheduledDate.getTime() > Date.now()) {
+        isScheduled = true
+        scheduledAtUtc = scheduledDate.toISOString().replace('T', ' ').slice(0, 19)
+      }
+    }
+
     // Create message record
     const message = db
       .insert(schema.messages)
@@ -62,9 +77,11 @@ messagesRouter.post(
         groupId: groupId || null,
         totalRecipients: recipients.length,
         skippedCount: skippedRecipients.length,
-        status: 'pending',
+        status: isScheduled ? 'scheduled' : 'pending',
         batchSize,
         batchDelayMs,
+        scheduledAt: scheduledAtUtc,
+        templateState: templateState || null,
       })
       .returning()
       .get()
@@ -92,11 +109,15 @@ messagesRouter.post(
         .run()
     }
 
-    // Start async sending
-    const job = createJob(message.id, batchSize, batchDelayMs)
-    processSendJob(job)
-
-    res.status(201).json({messageId: message.id, jobId: job.id})
+    if (isScheduled) {
+      // Scheduled — don't send now, just return
+      res.status(201).json({messageId: message.id, scheduled: true})
+    } else {
+      // Immediate send
+      const job = createJob(message.id, batchSize, batchDelayMs)
+      processSendJob(job)
+      res.status(201).json({messageId: message.id, jobId: job.id})
+    }
   }),
 )
 
@@ -210,6 +231,132 @@ messagesRouter.get(
   }),
 )
 
+// PUT /api/messages/:id - Edit a scheduled/past_due message
+messagesRouter.put(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const messageId = Number(req.params.id)
+    const message = db.select().from(schema.messages).where(eq(schema.messages.id, messageId)).get()
+
+    if (!message) {
+      res.status(404).json({error: 'Message not found'})
+      return
+    }
+    if (message.status !== 'scheduled' && message.status !== 'past_due') {
+      res.status(400).json({error: 'Only scheduled or past due messages can be edited'})
+      return
+    }
+
+    const {
+      content,
+      recipientIds,
+      excludeIds = [],
+      groupId,
+      batchSize = BATCH_DEFAULTS.batchSize,
+      batchDelayMs = BATCH_DEFAULTS.batchDelayMs,
+      customVarValues,
+      scheduledAt,
+      templateState,
+    } = req.body as {
+      content: string
+      recipientIds: number[]
+      excludeIds?: number[]
+      groupId?: number
+      batchSize?: number
+      batchDelayMs?: number
+      customVarValues?: Record<string, string>
+      scheduledAt?: string
+      templateState?: string
+    }
+
+    // Fetch global variables and merge with custom var values
+    const globals = db.select().from(schema.globalVariables).all()
+    const globalVarValues = Object.fromEntries(globals.map((g) => [g.name, g.value]))
+    const mergedVarValues = {...globalVarValues, ...customVarValues}
+
+    // Get all recipients
+    const recipients = db
+      .select()
+      .from(schema.people)
+      .where(
+        sql`${schema.people.id} IN (${sql.join(
+          recipientIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})`,
+      )
+      .all()
+
+    const excludeSet = new Set(excludeIds)
+    const activeRecipients = recipients.filter((r) => !excludeSet.has(r.id) && r.status === 'active')
+    const skippedRecipients = recipients.filter((r) => excludeSet.has(r.id) || r.status !== 'active')
+
+    // Determine if this is a scheduled send
+    let scheduledAtUtc: string | null = null
+    let isScheduled = false
+    if (scheduledAt) {
+      const scheduledDate = new Date(scheduledAt)
+      if (scheduledDate.getTime() > Date.now()) {
+        isScheduled = true
+        scheduledAtUtc = scheduledDate.toISOString().replace('T', ' ').slice(0, 19)
+      }
+    }
+
+    // Update message record
+    db.update(schema.messages)
+      .set({
+        content,
+        renderedPreview: renderTemplate(content, activeRecipients[0] || recipients[0], mergedVarValues),
+        groupId: groupId || null,
+        totalRecipients: recipients.length,
+        skippedCount: skippedRecipients.length,
+        sentCount: 0,
+        failedCount: 0,
+        status: isScheduled ? 'scheduled' : 'pending',
+        batchSize,
+        batchDelayMs,
+        scheduledAt: scheduledAtUtc,
+        templateState: templateState || null,
+        completedAt: null,
+      })
+      .where(eq(schema.messages.id, messageId))
+      .run()
+
+    // Delete existing recipients and recreate
+    db.delete(schema.messageRecipients).where(eq(schema.messageRecipients.messageId, messageId)).run()
+
+    for (const person of activeRecipients) {
+      db.insert(schema.messageRecipients)
+        .values({
+          messageId,
+          personId: person.id,
+          renderedContent: renderTemplate(content, person, mergedVarValues),
+          status: 'pending',
+        })
+        .run()
+    }
+
+    for (const person of skippedRecipients) {
+      db.insert(schema.messageRecipients)
+        .values({
+          messageId,
+          personId: person.id,
+          renderedContent: renderTemplate(content, person, mergedVarValues),
+          status: 'skipped',
+        })
+        .run()
+    }
+
+    if (!isScheduled) {
+      // Immediate send
+      const job = createJob(messageId, batchSize, batchDelayMs)
+      processSendJob(job)
+      res.json({messageId, jobId: job.id})
+    } else {
+      res.json({messageId, scheduled: true})
+    }
+  }),
+)
+
 // POST /api/messages/:id/cancel - Cancel in-progress batch
 messagesRouter.post(
   '/:id/cancel',
@@ -234,7 +381,32 @@ messagesRouter.post(
   }),
 )
 
-async function processSendJob(job: SendJob) {
+// POST /api/messages/:id/send-now - Immediately send a scheduled or past_due message
+messagesRouter.post(
+  '/:id/send-now',
+  asyncHandler(async (req, res) => {
+    const messageId = Number(req.params.id)
+    const message = db.select().from(schema.messages).where(eq(schema.messages.id, messageId)).get()
+
+    if (!message) {
+      res.status(404).json({error: 'Message not found'})
+      return
+    }
+    if (message.status !== 'scheduled' && message.status !== 'past_due') {
+      res.status(400).json({error: 'Message is not scheduled or past due'})
+      return
+    }
+
+    db.update(schema.messages).set({status: 'pending'}).where(eq(schema.messages.id, messageId)).run()
+
+    const job = createJob(messageId, message.batchSize, message.batchDelayMs)
+    processSendJob(job)
+
+    res.json({success: true, jobId: job.id})
+  }),
+)
+
+export async function processSendJob(job: SendJob) {
   const pendingRecipients = db
     .select({
       id: schema.messageRecipients.id,

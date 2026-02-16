@@ -1,8 +1,10 @@
 import {asc, desc, eq, sql} from 'drizzle-orm'
+import {format} from 'date-fns'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
 import {BATCH_DEFAULTS} from '../lib/constants.js'
+import {renderTemplate} from '../lib/format.js'
 import {asyncHandler, getGroupName} from '../lib/route-helpers.js'
 
 export const draftsRouter = Router()
@@ -48,7 +50,62 @@ draftsRouter.get(
           /* ignore */
         }
       }
-      return {...draft, groupName, recipientCount}
+      // Compute rendered preview
+      let renderedPreview: string | null = null
+      if (draft.content) {
+        // Resolve template variables
+        const globals = db.select().from(schema.globalVariables).all()
+        const varValues: Record<string, string> = Object.fromEntries(globals.map((g) => [g.name, g.value]))
+        if (draft.templateState) {
+          try {
+            const ts = JSON.parse(draft.templateState) as {
+              customVarValues?: Record<string, string>
+              dateValues?: Record<string, string>
+              dateFormats?: Record<string, string>
+            }
+            if (ts.customVarValues) Object.assign(varValues, ts.customVarValues)
+            if (ts.dateValues && ts.dateFormats) {
+              for (const [key, iso] of Object.entries(ts.dateValues)) {
+                if (iso) {
+                  const fmt = ts.dateFormats[key] || 'MMMM d, yyyy'
+                  varValues[key] = format(new Date(iso), fmt)
+                }
+              }
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        // Get a sample recipient
+        let samplePerson: {firstName: string | null; lastName: string | null} = {firstName: null, lastName: null}
+        if (draft.groupId) {
+          const member = db
+            .select({firstName: schema.people.firstName, lastName: schema.people.lastName})
+            .from(schema.peopleGroups)
+            .innerJoin(schema.people, eq(schema.peopleGroups.personId, schema.people.id))
+            .where(eq(schema.peopleGroups.groupId, draft.groupId))
+            .limit(1)
+            .get()
+          if (member) samplePerson = member
+        } else if (draft.selectedIndividualIds) {
+          try {
+            const ids: number[] = JSON.parse(draft.selectedIndividualIds)
+            if (ids.length > 0) {
+              const person = db
+                .select({firstName: schema.people.firstName, lastName: schema.people.lastName})
+                .from(schema.people)
+                .where(eq(schema.people.id, ids[0]))
+                .get()
+              if (person) samplePerson = person
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        renderedPreview = renderTemplate(draft.content, samplePerson, varValues)
+      }
+
+      return {...draft, groupName, recipientCount, renderedPreview}
     })
 
     if (search && typeof search === 'string') {

@@ -7,6 +7,7 @@ import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {type Person, createPerson, deletePerson, fetchPeople, togglePersonStatus} from '@/lib/api'
 import {formatDate} from '@/lib/date'
@@ -21,6 +22,7 @@ import {toast} from 'sonner'
 export function PeoplePage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = usePersistedState('people.search', '')
+  const debouncedSearch = useDebouncedValue(search, 250)
   const [statusFilter, setStatusFilter] = usePersistedState('people.statusFilter', 'all')
   const [page, setPage] = usePersistedState('people.page', 1)
   const [addOpen, setAddOpen] = useState(false)
@@ -35,10 +37,10 @@ export function PeoplePage() {
   })
 
   const {data, isLoading} = useQuery({
-    queryKey: [...queryKeys.people, search, statusFilter, page, sort, sortDir],
+    queryKey: [...queryKeys.people, debouncedSearch, statusFilter, page, sort, sortDir],
     queryFn: () =>
       fetchPeople({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
         page,
         limit: 50,

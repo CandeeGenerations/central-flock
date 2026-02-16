@@ -54,10 +54,12 @@ export const messages = sqliteTable('messages', {
   failedCount: integer('failed_count').default(0).notNull(),
   skippedCount: integer('skipped_count').default(0).notNull(),
   status: text('status', {
-    enum: ['pending', 'sending', 'completed', 'cancelled'],
+    enum: ['pending', 'scheduled', 'past_due', 'sending', 'completed', 'cancelled'],
   }).notNull(),
   batchSize: integer('batch_size').default(1).notNull(),
   batchDelayMs: integer('batch_delay_ms').default(5000).notNull(),
+  scheduledAt: text('scheduled_at'),
+  templateState: text('template_state'),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

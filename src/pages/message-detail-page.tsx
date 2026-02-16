@@ -5,12 +5,12 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/
 import {Progress} from '@/components/ui/progress'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {usePersistedState} from '@/hooks/use-persisted-state'
-import {cancelMessage, fetchMessage} from '@/lib/api'
+import {cancelMessage, fetchMessage, sendNowMessage} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, XCircle} from 'lucide-react'
+import {AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, Pencil, Play, XCircle} from 'lucide-react'
 import {useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -38,7 +38,7 @@ export function MessageDetailPage() {
     enabled: !!id,
     refetchInterval: (query) => {
       const msg = query.state.data
-      return msg?.status === 'sending' ? 2000 : false
+      return msg?.status === 'sending' || msg?.status === 'scheduled' ? 2000 : false
     },
   })
 
@@ -46,7 +46,17 @@ export function MessageDetailPage() {
     mutationFn: () => cancelMessage(Number(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.message(id!)})
+      queryClient.invalidateQueries({queryKey: queryKeys.messages()})
       toast.success('Message cancelled')
+    },
+  })
+
+  const sendNowMutation = useMutation({
+    mutationFn: () => sendNowMessage(Number(id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: queryKeys.message(id!)})
+      queryClient.invalidateQueries({queryKey: queryKeys.messages()})
+      toast.success('Message sending started')
     },
   })
 
@@ -72,10 +82,21 @@ export function MessageDetailPage() {
         >
           {message.status}
         </Badge>
+        {(message.status === 'scheduled' || message.status === 'past_due') && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto"
+            onClick={() => navigate(`/messages/compose?editMessageId=${message.id}`)}
+          >
+            <Pencil className="h-4 w-4 mr-1" />
+            Edit
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
-          className="ml-auto"
+          className={message.status !== 'scheduled' && message.status !== 'past_due' ? 'ml-auto' : ''}
           onClick={() =>
             navigate('/messages/compose', {
               state: {
@@ -96,7 +117,15 @@ export function MessageDetailPage() {
           <CardTitle>Message Content</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="whitespace-pre-wrap bg-muted p-4 rounded-md">{message.content}</p>
+          <p className="whitespace-pre-wrap bg-muted p-4 rounded-md">
+            {message.renderedPreview || message.content}
+          </p>
+          {message.renderedPreview && message.renderedPreview !== message.content && (
+            <details className="text-sm">
+              <summary className="text-muted-foreground cursor-pointer">Template</summary>
+              <p className="whitespace-pre-wrap bg-muted p-4 rounded-md mt-1">{message.content}</p>
+            </details>
+          )}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Group</span>
@@ -106,33 +135,70 @@ export function MessageDetailPage() {
               <span className="text-muted-foreground">Date</span>
               <p>{formatDateTime(message.createdAt)}</p>
             </div>
+            {message.scheduledAt && (
+              <div>
+                <span className="text-muted-foreground">Scheduled For</span>
+                <p>{formatDateTime(message.scheduledAt)}</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Progress */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Progress</CardTitle>
-          {message.status === 'sending' && (
-            <Button variant="destructive" size="sm" onClick={() => cancelMutation.mutate()}>
-              <XCircle className="h-4 w-4 mr-1" />
-              Cancel
+      {/* Actions for scheduled/past_due */}
+      {(message.status === 'scheduled' || message.status === 'past_due') && (
+        <div className="flex gap-2">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => cancelMutation.mutate()}
+            disabled={cancelMutation.isPending}
+          >
+            <XCircle className="h-4 w-4 mr-1" />
+            Cancel
+          </Button>
+          {message.status === 'past_due' && (
+            <Button size="sm" onClick={() => sendNowMutation.mutate()} disabled={sendNowMutation.isPending}>
+              <Play className="h-4 w-4 mr-1" />
+              Send Now
             </Button>
           )}
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Progress value={progressPercent} />
-          <div className="flex gap-6 text-sm">
-            <span className="text-green-600">Sent: {message.sentCount}</span>
-            <span className="text-red-500">Failed: {message.failedCount}</span>
-            <span className="text-muted-foreground">Skipped: {message.skippedCount}</span>
-            <span>Total: {message.totalRecipients}</span>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
-      {/* Recipients */}
+      {/* Progress — hidden for scheduled/past_due */}
+      {message.status !== 'scheduled' && message.status !== 'past_due' && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Progress</CardTitle>
+            <div className="flex gap-2">
+              {message.status === 'sending' && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => cancelMutation.mutate()}
+                  disabled={cancelMutation.isPending}
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Progress value={progressPercent} />
+            <div className="flex gap-6 text-sm">
+              <span className="text-green-600">Sent: {message.sentCount}</span>
+              <span className="text-red-500">Failed: {message.failedCount}</span>
+              <span className="text-muted-foreground">Skipped: {message.skippedCount}</span>
+              <span>Total: {message.totalRecipients}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recipients — hidden for scheduled/past_due */}
+      {message.status !== 'scheduled' && message.status !== 'past_due' && (
       <Card>
         <CardHeader>
           <CardTitle>Recipients</CardTitle>
@@ -202,6 +268,7 @@ export function MessageDetailPage() {
           )}
         </CardContent>
       </Card>
+      )}
       <Dialog
         open={!!errorInfo}
         onOpenChange={(open) => {

@@ -6,6 +6,7 @@ import {Input} from '@/components/ui/input'
 import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {
   createGlobalVariable,
@@ -44,6 +45,7 @@ export function TemplatesPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'templates' | 'variables'>('templates')
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search, 250)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [sort, setSort] = useState<'name' | 'updatedAt'>('name')
@@ -52,8 +54,8 @@ export function TemplatesPage() {
   const pageSize = 25
 
   const {data: templates, isLoading} = useQuery({
-    queryKey: queryKeys.templates(search || undefined),
-    queryFn: () => fetchTemplates({search: search || undefined}),
+    queryKey: queryKeys.templates(debouncedSearch || undefined),
+    queryFn: () => fetchTemplates({search: debouncedSearch || undefined}),
   })
 
   const sortedTemplates = useMemo(() => {
@@ -292,11 +294,7 @@ export function TemplatesPage() {
                           <div className="flex flex-wrap gap-1">
                             {vars.map((v) => (
                               <Badge key={v.name} variant="outline" className="gap-1 text-xs">
-                                {v.type === 'date' ? (
-                                  <Calendar className="h-3 w-3" />
-                                ) : (
-                                  <Type className="h-3 w-3" />
-                                )}
+                                {v.type === 'date' ? <Calendar className="h-3 w-3" /> : <Type className="h-3 w-3" />}
                                 {v.name}
                               </Badge>
                             ))}
@@ -374,6 +372,7 @@ export function TemplatesPage() {
 function VariablesTab() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search, 250)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [newName, setNewName] = useState('')
@@ -385,8 +384,8 @@ function VariablesTab() {
   const pageSize = 25
 
   const {data: variables, isLoading} = useQuery({
-    queryKey: queryKeys.globalVariables(search || undefined),
-    queryFn: () => fetchGlobalVariables({search: search || undefined}),
+    queryKey: queryKeys.globalVariables(debouncedSearch || undefined),
+    queryFn: () => fetchGlobalVariables({search: debouncedSearch || undefined}),
   })
 
   const sortedVariables = useMemo(() => {
@@ -606,12 +605,7 @@ function VariablesTab() {
                       {formatDateTime(variable.updatedAt)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => startEditing(variable)}
-                      >
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEditing(variable)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </TableCell>

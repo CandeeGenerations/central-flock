@@ -8,6 +8,7 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {
   type Person,
@@ -19,10 +20,11 @@ import {
   updateGroup,
 } from '@/lib/api'
 import {formatFullName} from '@/lib/format'
+import {cn} from '@/lib/utils'
 import {queryKeys} from '@/lib/query-keys'
 import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowLeft, MessageSquare, Save, Trash2, UserMinus, UserPlus, UserX} from 'lucide-react'
-import {useCallback, useRef, useState} from 'react'
+import {useCallback, useMemo, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -37,6 +39,7 @@ export function GroupDetailPage() {
   const [addMembersOpen, setAddMembersOpen] = useState(false)
   const [memberSearch, setMemberSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [highlightIndex, setHighlightIndex] = useState(-1)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [removeInactiveOpen, setRemoveInactiveOpen] = useState(false)
 
@@ -46,16 +49,18 @@ export function GroupDetailPage() {
     enabled: !!id,
   })
 
+  const debouncedMemberSearch = useDebouncedValue(memberSearch, 250)
+
   const {
     data: nonMembersData,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: queryKeys.nonMembers(id!, memberSearch || undefined),
+    queryKey: queryKeys.nonMembers(id!, debouncedMemberSearch || undefined),
     queryFn: ({pageParam}) =>
       fetchNonMembers(groupId, {
-        search: memberSearch || undefined,
+        search: debouncedMemberSearch || undefined,
         page: pageParam,
         limit: 30,
       }),
@@ -67,7 +72,25 @@ export function GroupDetailPage() {
     enabled: addMembersOpen,
   })
 
-  const nonMembers = nonMembersData?.pages.flatMap((p) => p.data) || []
+  const nonMembers = useMemo(() => nonMembersData?.pages.flatMap((p) => p.data) || [], [nonMembersData])
+  const toggleSelected = useSetToggle(setSelectedIds)
+
+  const handleMemberSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (nonMembers.length === 0) return
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setHighlightIndex((i) => (i < nonMembers.length - 1 ? i + 1 : 0))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setHighlightIndex((i) => (i > 0 ? i - 1 : nonMembers.length - 1))
+      } else if (e.key === 'Enter' && highlightIndex >= 0 && highlightIndex < nonMembers.length) {
+        e.preventDefault()
+        toggleSelected(nonMembers[highlightIndex].id)
+      }
+    },
+    [nonMembers, highlightIndex, toggleSelected],
+  )
 
   const observerRef = useRef<IntersectionObserver | null>(null)
   const sentinelRef = useCallback(
@@ -149,8 +172,6 @@ export function GroupDetailPage() {
       setEditing(true)
     }
   }
-
-  const toggleSelected = useSetToggle(setSelectedIds)
 
   if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>
   if (!group) return <div className="p-6">Group not found</div>
@@ -288,12 +309,26 @@ export function GroupDetailPage() {
           <DialogHeader>
             <DialogTitle>Add Members to {group.name}</DialogTitle>
           </DialogHeader>
-          <SearchInput placeholder="Search people..." value={memberSearch} onChange={setMemberSearch} />
+          <SearchInput
+            placeholder="Search people..."
+            value={memberSearch}
+            onChange={(v) => {
+              setMemberSearch(v)
+              setHighlightIndex(-1)
+            }}
+            onKeyDown={handleMemberSearchKeyDown}
+          />
           <div className="flex-1 overflow-auto space-y-1 min-h-0 max-h-64">
-            {nonMembers.map((p) => (
+            {nonMembers.map((p, i) => (
               <label
                 key={p.id}
-                className="group flex items-center gap-3 px-3 py-2 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                ref={i === highlightIndex ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
+                className={cn(
+                  'group flex items-center gap-3 px-3 py-2 rounded cursor-pointer',
+                  i === highlightIndex
+                    ? 'bg-accent text-accent-foreground'
+                    : 'hover:bg-accent hover:text-accent-foreground',
+                )}
               >
                 <Checkbox checked={selectedIds.has(p.id)} onCheckedChange={() => toggleSelected(p.id)} />
                 <span className="flex-1">{formatFullName(p)}</span>

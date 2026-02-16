@@ -24,7 +24,7 @@ start() {
 
   echo "Starting Central Flock..."
   cd "$PROJECT_DIR" || exit 1
-  NODE_BIN="$HOME/.local/share/fnm/node-versions/v25.6.0/installation/bin"
+  NODE_BIN="$HOME/.local/share/fnm/node-versions/v24.13.1/installation/bin"
   nohup env PATH="$NODE_BIN:/opt/homebrew/bin:/usr/local/bin:$PATH" pnpm run dev > "$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
 

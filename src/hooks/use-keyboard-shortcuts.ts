@@ -1,17 +1,16 @@
 import {useEffect} from 'react'
 import {useNavigate} from 'react-router-dom'
 
-const NAV_ROUTES = ['/people', '/groups', '/messages', '/templates', '/import']
+const NAV_ROUTES = ['/', '/people', '/groups', '/messages', '/templates']
 
-export function useKeyboardShortcuts(onShowHelp: () => void) {
+export function useKeyboardShortcuts(onShowHelp: () => void, onToggleDark: () => void) {
   const navigate = useNavigate()
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const target = e.target as HTMLElement
       const tag = target.tagName
-      const isEditing =
-        tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
+      const isEditing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
 
       // ⌘K / Ctrl+K — focus search input on current page
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -29,6 +28,20 @@ export function useKeyboardShortcuts(onShowHelp: () => void) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
         e.preventDefault()
         navigate('/messages/compose')
+        return
+      }
+
+      // ⌘P / Ctrl+P — add person
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault()
+        navigate('/people?add=1')
+        return
+      }
+
+      // ⌘D / Ctrl+D — toggle dark mode
+      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+        e.preventDefault()
+        onToggleDark()
         return
       }
 
@@ -55,5 +68,5 @@ export function useKeyboardShortcuts(onShowHelp: () => void) {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [navigate, onShowHelp])
+  }, [navigate, onShowHelp, onToggleDark])
 }

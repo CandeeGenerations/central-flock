@@ -33,12 +33,13 @@ Central Flock is a macOS desktop app for managing contacts and sending personali
 
 ## Database
 
-Schema is in `server/db/schema.ts` using Drizzle ORM. Tables: `people`, `groups`, `people_groups` (junction), `messages`, `message_recipients`, `drafts`. SQLite with WAL mode and foreign keys enabled (`server/db/index.ts`). After schema changes, run `pnpm db:migrate` to push.
+Schema is in `server/db/schema.ts` using Drizzle ORM. Tables: `people`, `groups`, `people_groups` (junction), `messages`, `message_recipients`, `drafts`, `templates`, `global_variables`. SQLite with WAL mode and foreign keys enabled (`server/db/index.ts`). After schema changes, run `pnpm db:migrate` to push.
 
 ## Key Patterns
 
 - API client with typed helpers in `src/lib/api.ts`
-- Express routes in `server/routes/` (people, groups, messages, drafts, import, contacts)
+- Express routes in `server/routes/` (people, groups, messages, drafts, templates, global-variables, import, contacts)
 - Message sending is async with batch processing via `server/services/message-queue.ts`
 - Template variables: `{{firstName}}`, `{{lastName}}`, `{{fullName}}`
 - Phone numbers stored in E.164 format, validated as 10-digit US numbers
+- CSV import via `/api/import` (preview + execute); CSV export via `/api/people/export` and `/api/groups/:id/export`

@@ -1,4 +1,5 @@
 export const queryKeys = {
+  stats: ['stats'] as const,
   people: ['people'] as const,
   duplicates: ['duplicates'] as const,
   person: (id: string | number) => ['person', String(id)] as const,

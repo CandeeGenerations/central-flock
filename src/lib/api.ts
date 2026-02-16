@@ -473,3 +473,49 @@ export function createBulkMacContacts(personIds: number[]) {
     body: JSON.stringify({personIds}),
   })
 }
+
+// Stats
+export interface StatsResponse {
+  people: {total: number; active: number; inactive: number; doNotContact: number}
+  groups: {
+    total: number
+  }
+  messages: {
+    total: number
+    totalRecipients: number
+    totalSent: number
+    totalFailed: number
+    totalSkipped: number
+    recentMessages: {
+      id: number
+      content: string
+      renderedPreview: string | null
+      status: string
+      totalRecipients: number
+      sentCount: number
+      failedCount: number
+      groupName: string | null
+      createdAt: string
+      completedAt: string | null
+    }[]
+    scheduledMessages: {
+      id: number
+      content: string
+      renderedPreview: string | null
+      status: string
+      totalRecipients: number
+      groupName: string | null
+      scheduledAt: string | null
+    }[]
+    overTime: {
+      period: 'week' | 'month' | 'year'
+      data: {label: string; sent: number; failed: number; skipped: number}[]
+    }
+  }
+  drafts: {total: number}
+  templates: {total: number}
+}
+
+export function fetchStats(period?: 'week' | 'month' | 'year') {
+  return request<StatsResponse>(`/stats${buildQueryString({period})}`)
+}

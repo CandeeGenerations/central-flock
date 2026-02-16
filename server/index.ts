@@ -10,6 +10,7 @@ import {groupsRouter} from './routes/groups.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter, processSendJob} from './routes/messages.js'
 import {peopleRouter} from './routes/people.js'
+import {statsRouter} from './routes/stats.js'
 import {templatesRouter} from './routes/templates.js'
 import {startScheduler} from './services/scheduler.js'
 
@@ -29,6 +30,7 @@ app.use('/api/templates', templatesRouter)
 app.use('/api/global-variables', globalVariablesRouter)
 app.use('/api/import', importRouter)
 app.use('/api/contacts', contactsRouter)
+app.use('/api/stats', statsRouter)
 
 // In production, serve the built Vite static files
 const distPath = path.join(__dirname, '..', 'dist')

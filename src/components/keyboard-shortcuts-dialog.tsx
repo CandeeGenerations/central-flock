@@ -4,18 +4,26 @@ const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase
 const mod = isMac ? '⌘' : 'Ctrl'
 
 const shortcuts = [
-  {category: 'Navigation', items: [
-    {keys: [`${mod} 1`], description: 'Go to People'},
-    {keys: [`${mod} 2`], description: 'Go to Groups'},
-    {keys: [`${mod} 3`], description: 'Go to Messages'},
-    {keys: [`${mod} 4`], description: 'Go to Templates'},
-    {keys: [`${mod} 5`], description: 'Go to Import'},
-  ]},
-  {category: 'Actions', items: [
-    {keys: [`${mod} K`], description: 'Focus search'},
-    {keys: [`${mod} J`], description: 'Quick compose'},
-    {keys: ['?'], description: 'Show keyboard shortcuts'},
-  ]},
+  {
+    category: 'Navigation',
+    items: [
+      {keys: [`${mod} 1`], description: 'Go to Dashboard'},
+      {keys: [`${mod} 2`], description: 'Go to People'},
+      {keys: [`${mod} 3`], description: 'Go to Groups'},
+      {keys: [`${mod} 4`], description: 'Go to Messages'},
+      {keys: [`${mod} 5`], description: 'Go to Templates'},
+    ],
+  },
+  {
+    category: 'Actions',
+    items: [
+      {keys: [`${mod} K`], description: 'Focus search'},
+      {keys: [`${mod} J`], description: 'Quick compose'},
+      {keys: [`${mod} P`], description: 'Add person'},
+      {keys: [`${mod} D`], description: 'Toggle dark mode'},
+      {keys: ['?'], description: 'Show keyboard shortcuts'},
+    ],
+  },
 ]
 
 interface KeyboardShortcutsDialogProps {

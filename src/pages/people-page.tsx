@@ -23,9 +23,21 @@ import {formatDate} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ArrowUpDown, Ban, Download, Plus, ToggleLeft, ToggleRight, Trash2, Users} from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Ban,
+  Download,
+  Plus,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+  Upload,
+  Users,
+} from 'lucide-react'
 import {useState} from 'react'
-import {Link} from 'react-router-dom'
+import {Link, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 export function PeoplePage() {
@@ -34,7 +46,8 @@ export function PeoplePage() {
   const debouncedSearch = useDebouncedValue(search, 250)
   const [statusFilter, setStatusFilter] = usePersistedState('people.statusFilter', 'all')
   const [page, setPage] = usePersistedState('people.page', 1)
-  const [addOpen, setAddOpen] = useState(false)
+  const [searchParams] = useSearchParams()
+  const [addOpen, setAddOpen] = useState(() => searchParams.get('add') === '1')
   const [duplicatesOpen, setDuplicatesOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [sort, setSort] = usePersistedState<'createdAt' | 'firstName' | 'lastName'>('people.sort', 'createdAt')
@@ -151,6 +164,12 @@ export function PeoplePage() {
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
+          <Link to="/import">
+            <Button variant="outline">
+              <Upload className="h-4 w-4 mr-2" />
+              Import CSV
+            </Button>
+          </Link>
           <Dialog open={duplicatesOpen} onOpenChange={setDuplicatesOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">

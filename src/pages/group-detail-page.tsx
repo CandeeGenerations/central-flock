@@ -7,6 +7,7 @@ import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
+import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
@@ -14,16 +15,28 @@ import {
   type Person,
   addGroupMembers,
   deleteGroup,
+  exportGroupCSV,
   fetchGroup,
   fetchNonMembers,
   removeGroupMembers,
   updateGroup,
 } from '@/lib/api'
 import {formatFullName} from '@/lib/format'
-import {cn} from '@/lib/utils'
 import {queryKeys} from '@/lib/query-keys'
+import {cn} from '@/lib/utils'
 import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, MessageSquare, Save, Trash2, UserMinus, UserPlus, UserX} from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  MessageSquare,
+  Save,
+  Trash2,
+  UserMinus,
+  UserPlus,
+  UserX,
+} from 'lucide-react'
 import {useCallback, useMemo, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -42,6 +55,8 @@ export function GroupDetailPage() {
   const [highlightIndex, setHighlightIndex] = useState(-1)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [removeInactiveOpen, setRemoveInactiveOpen] = useState(false)
+  const [membersPage, setMembersPage] = useState(1)
+  const membersPageSize = 25
 
   const {data: group, isLoading} = useQuery({
     queryKey: queryKeys.group(id!),
@@ -162,7 +177,7 @@ export function GroupDetailPage() {
     onSuccess: () => {
       invalidateGroupMembership()
       setRemoveInactiveOpen(false)
-      toast.success(`Removed ${inactiveMembers.length} inactive member${inactiveMembers.length !== 1 ? 's' : ''}`)
+      toast.success(`Removed ${inactiveMembers.length} inactive/DNC member${inactiveMembers.length !== 1 ? 's' : ''}`)
     },
   })
 
@@ -173,7 +188,7 @@ export function GroupDetailPage() {
     }
   }
 
-  if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>
+  if (isLoading) return <InlineSpinner />
   if (!group) return <div className="p-6">Group not found</div>
 
   return (
@@ -196,6 +211,21 @@ export function GroupDetailPage() {
                 Edit
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await exportGroupCSV(groupId)
+                  toast.success('CSV exported')
+                } catch {
+                  toast.error('Failed to export CSV')
+                }
+              }}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Export CSV
+            </Button>
             <Link to={`/messages/compose?groupId=${group.id}`}>
               <Button variant="outline" size="sm">
                 <MessageSquare className="h-4 w-4 mr-1" />
@@ -242,7 +272,7 @@ export function GroupDetailPage() {
             {inactiveMembers.length > 0 && (
               <Button variant="outline" size="sm" onClick={() => setRemoveInactiveOpen(true)}>
                 <UserX className="h-4 w-4 mr-1" />
-                Remove Inactive ({inactiveMembers.length})
+                Remove Inactive/DNC ({inactiveMembers.length})
               </Button>
             )}
             <Button size="sm" onClick={() => setAddMembersOpen(true)}>
@@ -262,29 +292,41 @@ export function GroupDetailPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {group.members.map((m: Person) => (
-                <TableRow key={m.id}>
-                  <TableCell>
-                    <Link to={`/people/${m.id}`} className="font-medium hover:underline">
-                      {formatFullName(m)}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{m.phoneDisplay || m.phoneNumber}</TableCell>
-                  <TableCell>
-                    <Badge variant={m.status === 'active' ? 'default' : 'secondary'}>{m.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeMemberMutation.mutate(m.id)}
-                      title="Remove from group"
-                    >
-                      <UserMinus className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {group.members
+                .slice((membersPage - 1) * membersPageSize, membersPage * membersPageSize)
+                .map((m: Person) => (
+                  <TableRow key={m.id}>
+                    <TableCell>
+                      <Link to={`/people/${m.id}`} className="font-medium hover:underline">
+                        {formatFullName(m)}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{m.phoneDisplay || m.phoneNumber}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          m.status === 'active'
+                            ? 'default'
+                            : m.status === 'do_not_contact'
+                              ? 'destructive'
+                              : 'secondary'
+                        }
+                      >
+                        {m.status === 'do_not_contact' ? 'do not contact' : m.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeMemberMutation.mutate(m.id)}
+                        title="Remove from group"
+                      >
+                        <UserMinus className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
               {group.members.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
@@ -294,6 +336,32 @@ export function GroupDetailPage() {
               )}
             </TableBody>
           </Table>
+          {group.members.length > membersPageSize && (
+            <div className="flex items-center justify-between pt-4">
+              <span className="text-sm text-muted-foreground">
+                Showing {(membersPage - 1) * membersPageSize + 1}–
+                {Math.min(membersPage * membersPageSize, group.members.length)} of {group.members.length}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={membersPage <= 1}
+                  onClick={() => setMembersPage((p) => p - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={membersPage * membersPageSize >= group.members.length}
+                  onClick={() => setMembersPage((p) => p + 1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -365,7 +433,7 @@ export function GroupDetailPage() {
       <ConfirmDialog
         open={removeInactiveOpen}
         onOpenChange={setRemoveInactiveOpen}
-        title={`Remove ${inactiveMembers.length} inactive member${inactiveMembers.length !== 1 ? 's' : ''}?`}
+        title={`Remove ${inactiveMembers.length} inactive/DNC member${inactiveMembers.length !== 1 ? 's' : ''}?`}
         description="They will be removed from this group but not deleted."
         confirmLabel="Remove"
         variant="destructive"

@@ -1,4 +1,6 @@
+import {KeyboardShortcutsDialog} from '@/components/keyboard-shortcuts-dialog'
 import {Toaster} from '@/components/ui/sonner'
+import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts'
 import {cn} from '@/lib/utils'
 import {GroupDetailPage} from '@/pages/group-detail-page'
 import {GroupsPage} from '@/pages/groups-page'
@@ -11,20 +13,23 @@ import {PersonDetailPage} from '@/pages/person-detail-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
-import {FileText, FolderOpen, MessageSquare, Moon, Sun, Upload, Users} from 'lucide-react'
-import {useEffect, useState} from 'react'
+import {FileText, FolderOpen, Keyboard, MessageSquare, Moon, Sun, Upload, Users} from 'lucide-react'
+import {useCallback, useEffect, useState} from 'react'
 import {BrowserRouter, NavLink, Navigate, Route, Routes} from 'react-router-dom'
 
 const queryClient = new QueryClient({
   defaultOptions: {queries: {staleTime: 30_000}},
 })
 
+const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC')
+const mod = isMac ? '⌘' : 'Ctrl+'
+
 const navItems = [
-  {to: '/people', label: 'People', icon: Users},
-  {to: '/groups', label: 'Groups', icon: FolderOpen},
-  {to: '/messages', label: 'Messages', icon: MessageSquare},
-  {to: '/templates', label: 'Templates', icon: FileText},
-  {to: '/import', label: 'Import', icon: Upload},
+  {to: '/people', label: 'People', icon: Users, shortcut: `${mod}1`},
+  {to: '/groups', label: 'Groups', icon: FolderOpen, shortcut: `${mod}2`},
+  {to: '/messages', label: 'Messages', icon: MessageSquare, shortcut: `${mod}3`},
+  {to: '/templates', label: 'Templates', icon: FileText, shortcut: `${mod}4`},
+  {to: '/import', label: 'Import', icon: Upload, shortcut: `${mod}5`},
 ]
 
 function AppLayout() {
@@ -34,6 +39,9 @@ function AppLayout() {
     }
     return false
   })
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const showShortcuts = useCallback(() => setShortcutsOpen(true), [])
+  useKeyboardShortcuts(showShortcuts)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -49,7 +57,7 @@ function AppLayout() {
           <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6 hidden dark:block" />
         </div>
         <nav className="flex-1 p-2 space-y-1">
-          {navItems.map(({to, label, icon: Icon}) => (
+          {navItems.map(({to, label, icon: Icon, shortcut}) => (
             <NavLink
               key={to}
               to={to}
@@ -61,11 +69,20 @@ function AppLayout() {
               }
             >
               <Icon className="h-4 w-4" />
-              {label}
+              <span className="flex-1">{label}</span>
+              <kbd className="text-[10px] font-mono text-muted-foreground opacity-60">{shortcut}</kbd>
             </NavLink>
           ))}
         </nav>
-        <div className="p-3 border-t">
+        <div className="p-3 border-t space-y-1">
+          <button
+            onClick={() => setShortcutsOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-sidebar-accent/50 w-full transition-colors"
+          >
+            <Keyboard className="h-4 w-4" />
+            <span className="flex-1 text-left">Shortcuts</span>
+            <kbd className="text-[10px] font-mono text-muted-foreground opacity-60">?</kbd>
+          </button>
           <button
             onClick={() => setDark((d) => !d)}
             className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-sidebar-accent/50 w-full transition-colors"
@@ -94,6 +111,7 @@ function AppLayout() {
         </Routes>
       </main>
       <Toaster />
+      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   )
 }

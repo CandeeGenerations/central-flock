@@ -1,5 +1,6 @@
 export const queryKeys = {
   people: ['people'] as const,
+  duplicates: ['duplicates'] as const,
   person: (id: string | number) => ['person', String(id)] as const,
   groups: ['groups'] as const,
   group: (id: string | number) => ['group', String(id)] as const,

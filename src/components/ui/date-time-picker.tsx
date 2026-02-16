@@ -83,7 +83,14 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
         )}
       </div>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar mode="single" defaultMonth={date} selected={date} onSelect={handleDateSelect} initialFocus />
+        <Calendar
+          mode="single"
+          defaultMonth={date}
+          selected={date}
+          onSelect={handleDateSelect}
+          disabled={{before: new Date()}}
+          initialFocus
+        />
         <div className="border-t px-4 py-3 flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Time:</span>
           <Input

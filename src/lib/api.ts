@@ -29,7 +29,7 @@ export interface Person {
   lastName: string | null
   phoneNumber: string
   phoneDisplay: string | null
-  status: 'active' | 'inactive'
+  status: 'active' | 'inactive' | 'do_not_contact'
   notes: string | null
   createdAt: string
   updatedAt: string
@@ -41,6 +41,15 @@ export interface PeopleResponse {
   total: number
   page: number
   limit: number
+}
+
+export interface DuplicateResults {
+  nameDuplicates: {name: string; people: Person[]}[]
+  phoneDuplicates: {people: Person[]}[]
+}
+
+export function fetchDuplicates() {
+  return request<DuplicateResults>('/people/duplicates')
 }
 
 export function fetchPeople(params?: {
@@ -79,6 +88,18 @@ export function deletePerson(id: number) {
 
 export function togglePersonStatus(id: number) {
   return request<Person>(`/people/${id}/status`, {method: 'PATCH'})
+}
+
+export async function exportPeopleCSV() {
+  const res = await fetch(`${BASE_URL}/people/export`)
+  if (!res.ok) throw new Error('Export failed')
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'people-export.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // Groups
@@ -123,6 +144,18 @@ export function addGroupMembers(groupId: number, personIds: number[]) {
     method: 'POST',
     body: JSON.stringify({personIds}),
   })
+}
+
+export async function exportGroupCSV(groupId: number) {
+  const res = await fetch(`${BASE_URL}/groups/${groupId}/export`)
+  if (!res.ok) throw new Error('Export failed')
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'group-export.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export function removeGroupMembers(groupId: number, personIds: number[]) {
@@ -223,7 +256,7 @@ export function fetchMessageStatus(id: number) {
 }
 
 export function cancelMessage(id: number) {
-  return request(`/messages/${id}/cancel`, {method: 'POST'})
+  return request<{success: boolean; draftId?: number}>(`/messages/${id}/cancel`, {method: 'POST'})
 }
 
 export function sendNowMessage(id: number) {
@@ -396,7 +429,7 @@ export interface ImportPreview {
     lastName: string | null
     phoneNumber: string
     phoneDisplay: string
-    status: 'active' | 'inactive'
+    status: 'active' | 'inactive' | 'do_not_contact'
     groups: string[]
     isDuplicate: boolean
   }>

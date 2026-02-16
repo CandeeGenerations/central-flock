@@ -5,7 +5,7 @@ export interface ParsedPerson {
   lastName: string | null
   phoneNumber: string // E.164 format
   phoneDisplay: string // original format
-  status: 'active' | 'inactive'
+  status: 'active' | 'inactive' | 'do_not_contact'
   groups: string[]
 }
 
@@ -43,7 +43,12 @@ export function parseCSV(csvData: string): ParsedPerson[] {
           .filter(Boolean)
       : []
 
-    const status: 'active' | 'inactive' = statusRaw === 'inactive' || statusRaw === '-' ? 'inactive' : 'active'
+    const status: 'active' | 'inactive' | 'do_not_contact' =
+      statusRaw === 'inactive' || statusRaw === '-'
+        ? 'inactive'
+        : statusRaw === 'do_not_contact' || statusRaw === 'dnc' || statusRaw === 'do not contact'
+          ? 'do_not_contact'
+          : 'active'
 
     return {
       firstName,

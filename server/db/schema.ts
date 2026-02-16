@@ -7,7 +7,7 @@ export const people = sqliteTable('people', {
   lastName: text('last_name'),
   phoneNumber: text('phone_number').notNull().unique(),
   phoneDisplay: text('phone_display'),
-  status: text('status', {enum: ['active', 'inactive']})
+  status: text('status', {enum: ['active', 'inactive', 'do_not_contact']})
     .default('active')
     .notNull(),
   notes: text('notes'),

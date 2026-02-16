@@ -3,6 +3,7 @@ import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Progress} from '@/components/ui/progress'
+import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {cancelMessage, fetchMessage, sendNowMessage} from '@/lib/api'
@@ -44,10 +45,16 @@ export function MessageDetailPage() {
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelMessage(Number(id)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.message(id!)})
+    onSuccess: (data) => {
       queryClient.invalidateQueries({queryKey: queryKeys.messages()})
-      toast.success('Message cancelled')
+      if (data.draftId) {
+        queryClient.invalidateQueries({queryKey: queryKeys.drafts()})
+        toast.success('Scheduled message moved to drafts')
+        navigate(`/messages/compose?draftId=${data.draftId}`)
+      } else {
+        queryClient.invalidateQueries({queryKey: queryKeys.message(id!)})
+        toast.success('Message cancelled')
+      }
     },
   })
 
@@ -60,12 +67,13 @@ export function MessageDetailPage() {
     },
   })
 
-  if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>
+  if (isLoading) return <InlineSpinner />
   if (!message) return <div className="p-6">Message not found</div>
 
+  const totalWithSkipped = message.totalRecipients + message.skippedCount
   const progressPercent =
-    message.totalRecipients > 0
-      ? ((message.sentCount + message.failedCount + message.skippedCount) / message.totalRecipients) * 100
+    totalWithSkipped > 0
+      ? ((message.sentCount + message.failedCount + message.skippedCount) / totalWithSkipped) * 100
       : 0
 
   return (
@@ -117,9 +125,7 @@ export function MessageDetailPage() {
           <CardTitle>Message Content</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="whitespace-pre-wrap bg-muted p-4 rounded-md">
-            {message.renderedPreview || message.content}
-          </p>
+          <p className="whitespace-pre-wrap bg-muted p-4 rounded-md">{message.renderedPreview || message.content}</p>
           {message.renderedPreview && message.renderedPreview !== message.content && (
             <details className="text-sm">
               <summary className="text-muted-foreground cursor-pointer">Template</summary>
@@ -199,75 +205,75 @@ export function MessageDetailPage() {
 
       {/* Recipients — hidden for scheduled/past_due */}
       {message.status !== 'scheduled' && message.status !== 'past_due' && (
-      <Card>
-        <CardHeader>
-          <CardTitle>Recipients</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Rendered Message</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {message.recipients.slice((page - 1) * pageSize, page * pageSize).map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell>{formatFullName(r)}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.phoneDisplay}</TableCell>
-                  <TableCell>
-                    <Badge variant={recipientStatusColors[r.status] || 'outline'}>{r.status}</Badge>
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate text-sm">{r.renderedContent}</TableCell>
-                  <TableCell>
-                    {r.errorMessage && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 h-7 px-2"
-                        onClick={() =>
-                          setErrorInfo({
-                            name: formatFullName(r),
-                            error: r.errorMessage!,
-                          })
-                        }
-                      >
-                        <AlertCircle className="h-4 w-4 mr-1" />
-                        Error
-                      </Button>
-                    )}
-                  </TableCell>
+        <Card>
+          <CardHeader>
+            <CardTitle>Recipients</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Rendered Message</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {message.recipients.length > pageSize && (
-            <div className="flex items-center justify-between pt-4">
-              <span className="text-sm text-muted-foreground">
-                Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, message.recipients.length)} of{' '}
-                {message.recipients.length}
-              </span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page * pageSize >= message.recipients.length}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+              </TableHeader>
+              <TableBody>
+                {message.recipients.slice((page - 1) * pageSize, page * pageSize).map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>{formatFullName(r)}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.phoneDisplay}</TableCell>
+                    <TableCell>
+                      <Badge variant={recipientStatusColors[r.status] || 'outline'}>{r.status}</Badge>
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate text-sm">{r.renderedContent}</TableCell>
+                    <TableCell>
+                      {r.errorMessage && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 h-7 px-2"
+                          onClick={() =>
+                            setErrorInfo({
+                              name: formatFullName(r),
+                              error: r.errorMessage!,
+                            })
+                          }
+                        >
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          Error
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {message.recipients.length > pageSize && (
+              <div className="flex items-center justify-between pt-4">
+                <span className="text-sm text-muted-foreground">
+                  Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, message.recipients.length)} of{' '}
+                  {message.recipients.length}
+                </span>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page * pageSize >= message.recipients.length}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
       )}
       <Dialog
         open={!!errorInfo}

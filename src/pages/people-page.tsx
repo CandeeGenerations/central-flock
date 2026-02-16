@@ -6,15 +6,24 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
+import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
-import {type Person, createPerson, deletePerson, fetchPeople, togglePersonStatus} from '@/lib/api'
+import {
+  type Person,
+  createPerson,
+  deletePerson,
+  exportPeopleCSV,
+  fetchDuplicates,
+  fetchPeople,
+  togglePersonStatus,
+} from '@/lib/api'
 import {formatDate} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ArrowUpDown, Plus, ToggleLeft, ToggleRight, Trash2} from 'lucide-react'
+import {ArrowDown, ArrowUp, ArrowUpDown, Ban, Download, Plus, ToggleLeft, ToggleRight, Trash2, Users} from 'lucide-react'
 import {useState} from 'react'
 import {Link} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -26,6 +35,7 @@ export function PeoplePage() {
   const [statusFilter, setStatusFilter] = usePersistedState('people.statusFilter', 'all')
   const [page, setPage] = usePersistedState('people.page', 1)
   const [addOpen, setAddOpen] = useState(false)
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [sort, setSort] = usePersistedState<'createdAt' | 'firstName' | 'lastName'>('people.sort', 'createdAt')
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('people.sortDir', 'desc')
@@ -48,6 +58,15 @@ export function PeoplePage() {
         sortDir,
       }),
   })
+
+  const {data: duplicatesData, isLoading: duplicatesLoading} = useQuery({
+    queryKey: queryKeys.duplicates,
+    queryFn: fetchDuplicates,
+    enabled: duplicatesOpen,
+  })
+
+  const totalDuplicateGroups =
+    (duplicatesData?.nameDuplicates.length || 0) + (duplicatesData?.phoneDuplicates.length || 0)
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<Person>) => createPerson(data),
@@ -117,58 +136,209 @@ export function PeoplePage() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">People</h2>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Person
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Person</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div>
-                <Label>First Name</Label>
-                <Input
-                  value={newPerson.firstName}
-                  onChange={(e) => setNewPerson((p) => ({...p, firstName: e.target.value}))}
-                />
-              </div>
-              <div>
-                <Label>Last Name</Label>
-                <Input
-                  value={newPerson.lastName}
-                  onChange={(e) => setNewPerson((p) => ({...p, lastName: e.target.value}))}
-                />
-              </div>
-              <div>
-                <Label>Phone Number</Label>
-                <Input
-                  value={newPerson.phoneDisplay}
-                  onChange={(e) => handlePhoneDisplayChange(e.target.value)}
-                  placeholder="(555) 123-4567"
-                />
-                {phoneDigits.length > 0 && !phoneValid && (
-                  <p className="text-xs text-destructive mt-1">Must be 10 digits ({phoneDigits.length}/10)</p>
-                )}
-              </div>
-              <div>
-                <Label>E.164 Format</Label>
-                <Input value={newPerson.phoneNumber} readOnly className="bg-muted" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAddOpen(false)}>
-                Cancel
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                await exportPeopleCSV()
+                toast.success('CSV exported')
+              } catch {
+                toast.error('Failed to export CSV')
+              }
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Dialog open={duplicatesOpen} onOpenChange={setDuplicatesOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Users className="h-4 w-4 mr-2" />
+                Find Duplicates
               </Button>
-              <Button onClick={handleAddPerson} disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Creating...' : 'Create'}
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  Find Duplicates
+                  {duplicatesData && (
+                    <Badge variant="secondary">
+                      {totalDuplicateGroups} group{totalDuplicateGroups !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </DialogTitle>
+              </DialogHeader>
+              {duplicatesLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Scanning for duplicates...</div>
+              ) : totalDuplicateGroups === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No duplicates found.</div>
+              ) : (
+                <div className="space-y-6">
+                  {duplicatesData && duplicatesData.nameDuplicates.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                        Name Duplicates ({duplicatesData.nameDuplicates.length})
+                      </h3>
+                      {duplicatesData.nameDuplicates.map((group, i) => (
+                        <div key={i} className="border rounded-md p-3 space-y-2">
+                          <p className="font-medium">{group.name}</p>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Phone</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-16" />
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {group.people.map((p) => (
+                                <TableRow key={p.id}>
+                                  <TableCell className="text-muted-foreground">
+                                    {p.phoneDisplay || p.phoneNumber}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={
+                                        p.status === 'active'
+                                          ? 'default'
+                                          : p.status === 'do_not_contact'
+                                            ? 'destructive'
+                                            : 'secondary'
+                                      }
+                                    >
+                                      {p.status === 'do_not_contact' ? 'DNC' : p.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Link
+                                      to={`/people/${p.id}`}
+                                      className="text-sm text-primary hover:underline"
+                                      onClick={() => setDuplicatesOpen(false)}
+                                    >
+                                      View
+                                    </Link>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {duplicatesData && duplicatesData.phoneDuplicates.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                        Similar Phone Numbers ({duplicatesData.phoneDuplicates.length})
+                      </h3>
+                      {duplicatesData.phoneDuplicates.map((group, i) => (
+                        <div key={i} className="border rounded-md p-3">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Phone</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-16" />
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {group.people.map((p) => (
+                                <TableRow key={p.id}>
+                                  <TableCell className="font-medium">
+                                    {[p.firstName, p.lastName].filter(Boolean).join(' ') || '—'}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    {p.phoneDisplay || p.phoneNumber}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={
+                                        p.status === 'active'
+                                          ? 'default'
+                                          : p.status === 'do_not_contact'
+                                            ? 'destructive'
+                                            : 'secondary'
+                                      }
+                                    >
+                                      {p.status === 'do_not_contact' ? 'DNC' : p.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Link
+                                      to={`/people/${p.id}`}
+                                      className="text-sm text-primary hover:underline"
+                                      onClick={() => setDuplicatesOpen(false)}
+                                    >
+                                      View
+                                    </Link>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Person
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Person</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <Label>First Name</Label>
+                  <Input
+                    value={newPerson.firstName}
+                    onChange={(e) => setNewPerson((p) => ({...p, firstName: e.target.value}))}
+                  />
+                </div>
+                <div>
+                  <Label>Last Name</Label>
+                  <Input
+                    value={newPerson.lastName}
+                    onChange={(e) => setNewPerson((p) => ({...p, lastName: e.target.value}))}
+                  />
+                </div>
+                <div>
+                  <Label>Phone Number</Label>
+                  <Input
+                    value={newPerson.phoneDisplay}
+                    onChange={(e) => handlePhoneDisplayChange(e.target.value)}
+                    placeholder="(555) 123-4567"
+                  />
+                  {phoneDigits.length > 0 && !phoneValid && (
+                    <p className="text-xs text-destructive mt-1">Must be 10 digits ({phoneDigits.length}/10)</p>
+                  )}
+                </div>
+                <div>
+                  <Label>E.164 Format</Label>
+                  <Input value={newPerson.phoneNumber} readOnly className="bg-muted" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAddOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddPerson} disabled={createMutation.isPending}>
+                  {createMutation.isPending ? 'Creating...' : 'Create'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Filters */}
@@ -193,15 +363,16 @@ export function PeoplePage() {
             {value: 'all', label: 'All Status'},
             {value: 'active', label: 'Active'},
             {value: 'inactive', label: 'Inactive'},
+            {value: 'do_not_contact', label: 'Do Not Contact'},
           ]}
-          className="w-36"
+          className="w-48"
           searchable={false}
         />
       </div>
 
       {/* Table */}
       {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        <PageSpinner />
       ) : (
         <>
           <div className="border rounded-md">
@@ -298,7 +469,17 @@ export function PeoplePage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{person.phoneDisplay || person.phoneNumber}</TableCell>
                     <TableCell>
-                      <Badge variant={person.status === 'active' ? 'default' : 'secondary'}>{person.status}</Badge>
+                      <Badge
+                        variant={
+                          person.status === 'active'
+                            ? 'default'
+                            : person.status === 'do_not_contact'
+                              ? 'destructive'
+                              : 'secondary'
+                        }
+                      >
+                        {person.status === 'do_not_contact' ? 'do not contact' : person.status}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -319,18 +500,24 @@ export function PeoplePage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => toggleMutation.mutate(person.id)}
-                          title={person.status === 'active' ? 'Deactivate' : 'Activate'}
-                        >
-                          {person.status === 'active' ? (
-                            <ToggleRight className="h-4 w-4" />
-                          ) : (
-                            <ToggleLeft className="h-4 w-4" />
-                          )}
-                        </Button>
+                        {person.status === 'do_not_contact' ? (
+                          <Button variant="ghost" size="icon" disabled title="Do Not Contact">
+                            <Ban className="h-4 w-4 text-destructive" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleMutation.mutate(person.id)}
+                            title={person.status === 'active' ? 'Deactivate' : 'Activate'}
+                          >
+                            {person.status === 'active' ? (
+                              <ToggleRight className="h-4 w-4" />
+                            ) : (
+                              <ToggleLeft className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
                         <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(person.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

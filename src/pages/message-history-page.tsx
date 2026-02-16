@@ -3,6 +3,7 @@ import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Checkbox} from '@/components/ui/checkbox'
 import {SearchInput} from '@/components/ui/search-input'
+import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
@@ -56,7 +57,10 @@ export function MessageHistoryPage() {
     [messages],
   )
   const scheduledMessages = useMemo(
-    () => messages?.filter((m) => m.status === 'scheduled' || m.status === 'past_due'),
+    () =>
+      messages
+        ?.filter((m) => m.status === 'scheduled' || m.status === 'past_due')
+        .sort((a, b) => (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? '')),
     [messages],
   )
 
@@ -177,6 +181,9 @@ export function MessageHistoryPage() {
             <Button>
               <Plus className="h-4 w-4 mr-2" />
               Compose
+              <kbd className="ml-2 text-[10px] font-mono opacity-60">
+                {typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl+'}J
+              </kbd>
             </Button>
           </Link>
         </div>
@@ -243,7 +250,7 @@ export function MessageHistoryPage() {
       {activeTab === 'sent' && (
         <>
           {messagesLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            <PageSpinner />
           ) : (
             <div className="border rounded-md">
               <Table>
@@ -336,7 +343,7 @@ export function MessageHistoryPage() {
       {activeTab === 'scheduled' && (
         <>
           {messagesLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            <PageSpinner />
           ) : (
             <div className="border rounded-md">
               <Table>
@@ -444,7 +451,7 @@ export function MessageHistoryPage() {
       {activeTab === 'drafts' && (
         <>
           {draftsLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            <PageSpinner />
           ) : (
             <div className="border rounded-md">
               <Table>

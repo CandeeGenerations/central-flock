@@ -62,10 +62,12 @@ messagesRouter.post(
     let isScheduled = false
     if (scheduledAt) {
       const scheduledDate = new Date(scheduledAt)
-      if (scheduledDate.getTime() > Date.now()) {
-        isScheduled = true
-        scheduledAtUtc = scheduledDate.toISOString().replace('T', ' ').slice(0, 19)
+      if (scheduledDate.getTime() <= Date.now()) {
+        res.status(400).json({error: 'Scheduled time must be in the future'})
+        return
       }
+      isScheduled = true
+      scheduledAtUtc = scheduledDate.toISOString().replace('T', ' ').slice(0, 19)
     }
 
     // Create message record
@@ -75,7 +77,7 @@ messagesRouter.post(
         content,
         renderedPreview: renderTemplate(content, activeRecipients[0] || recipients[0], mergedVarValues),
         groupId: groupId || null,
-        totalRecipients: recipients.length,
+        totalRecipients: activeRecipients.length,
         skippedCount: skippedRecipients.length,
         status: isScheduled ? 'scheduled' : 'pending',
         batchSize,
@@ -295,10 +297,12 @@ messagesRouter.put(
     let isScheduled = false
     if (scheduledAt) {
       const scheduledDate = new Date(scheduledAt)
-      if (scheduledDate.getTime() > Date.now()) {
-        isScheduled = true
-        scheduledAtUtc = scheduledDate.toISOString().replace('T', ' ').slice(0, 19)
+      if (scheduledDate.getTime() <= Date.now()) {
+        res.status(400).json({error: 'Scheduled time must be in the future'})
+        return
       }
+      isScheduled = true
+      scheduledAtUtc = scheduledDate.toISOString().replace('T', ' ').slice(0, 19)
     }
 
     // Update message record
@@ -307,7 +311,7 @@ messagesRouter.put(
         content,
         renderedPreview: renderTemplate(content, activeRecipients[0] || recipients[0], mergedVarValues),
         groupId: groupId || null,
-        totalRecipients: recipients.length,
+        totalRecipients: activeRecipients.length,
         skippedCount: skippedRecipients.length,
         sentCount: 0,
         failedCount: 0,
@@ -362,6 +366,50 @@ messagesRouter.post(
   '/:id/cancel',
   asyncHandler(async (req, res) => {
     const messageId = Number(req.params.id)
+    const message = db.select().from(schema.messages).where(eq(schema.messages.id, messageId)).get()
+
+    if (!message) {
+      res.status(404).json({error: 'Message not found'})
+      return
+    }
+
+    // For scheduled/past_due messages, convert back to a draft
+    if (message.status === 'scheduled' || message.status === 'past_due') {
+      // Gather recipient IDs to reconstruct the draft
+      const recipients = db
+        .select({personId: schema.messageRecipients.personId, status: schema.messageRecipients.status})
+        .from(schema.messageRecipients)
+        .where(eq(schema.messageRecipients.messageId, messageId))
+        .all()
+
+      const excludeIds = recipients.filter((r) => r.status === 'skipped').map((r) => r.personId)
+      const selectedIndividualIds = recipients.filter((r) => r.status !== 'skipped').map((r) => r.personId)
+
+      const draft = db
+        .insert(schema.drafts)
+        .values({
+          content: message.content,
+          recipientMode: message.groupId ? 'group' : 'individual',
+          groupId: message.groupId,
+          selectedIndividualIds: message.groupId ? null : JSON.stringify(selectedIndividualIds),
+          excludeIds: excludeIds.length > 0 ? JSON.stringify(excludeIds) : null,
+          batchSize: message.batchSize,
+          batchDelayMs: message.batchDelayMs,
+          scheduledAt: message.scheduledAt,
+          templateState: message.templateState,
+        })
+        .returning()
+        .get()
+
+      // Delete the message and its recipients
+      db.delete(schema.messageRecipients).where(eq(schema.messageRecipients.messageId, messageId)).run()
+      db.delete(schema.messages).where(eq(schema.messages.id, messageId)).run()
+
+      res.json({success: true, draftId: draft.id})
+      return
+    }
+
+    // For sending/in-progress messages, cancel normally
     cancelJob(messageId)
 
     db.update(schema.messages)

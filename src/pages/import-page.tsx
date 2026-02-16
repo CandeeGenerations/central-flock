@@ -178,7 +178,17 @@ export function ImportPage() {
                     <TableCell>{p.phoneDisplay}</TableCell>
                     <TableCell className="font-mono text-xs">{p.phoneNumber}</TableCell>
                     <TableCell>
-                      <Badge variant={p.status === 'active' ? 'default' : 'secondary'}>{p.status}</Badge>
+                      <Badge
+                        variant={
+                          p.status === 'active'
+                            ? 'default'
+                            : p.status === 'do_not_contact'
+                              ? 'destructive'
+                              : 'secondary'
+                        }
+                      >
+                        {p.status === 'do_not_contact' ? 'do not contact' : p.status}
+                      </Badge>
                     </TableCell>
                     <TableCell className="max-w-xs truncate text-sm">{p.groups.join(', ')}</TableCell>
                     <TableCell>{p.isDuplicate && <Badge variant="destructive">Duplicate</Badge>}</TableCell>

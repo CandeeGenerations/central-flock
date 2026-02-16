@@ -4,6 +4,7 @@ import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTr
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
+import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
@@ -140,7 +141,7 @@ export function GroupsPage() {
       <SearchInput placeholder="Search groups..." value={search} onChange={setSearch} containerClassName="max-w-sm" />
 
       {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        <PageSpinner />
       ) : (
         <div className="border rounded-md">
           <Table>
@@ -176,6 +177,9 @@ export function GroupsPage() {
                   <TableCell>
                     <Link to={`/groups/${group.id}`} className="font-medium hover:underline">
                       {group.name}
+                      {group.description && (
+                        <span className="text-muted-foreground font-normal"> ({group.description})</span>
+                      )}
                     </Link>
                   </TableCell>
                   <TableCell>{group.memberCount}</TableCell>

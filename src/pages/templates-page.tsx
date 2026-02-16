@@ -4,6 +4,7 @@ import {Button} from '@/components/ui/button'
 import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
 import {SearchInput} from '@/components/ui/search-input'
+import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
@@ -193,7 +194,7 @@ export function TemplatesPage() {
           </div>
 
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            <PageSpinner />
           ) : (
             <div className="border rounded-md">
               <Table>

@@ -32,6 +32,77 @@ groupsRouter.get(
   }),
 )
 
+// GET /api/groups/:id/export - Export group members as CSV
+groupsRouter.get(
+  '/:id/export',
+  asyncHandler(async (req, res) => {
+    const group = db
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, Number(req.params.id)))
+      .get()
+    if (!group) {
+      res.status(404).json({error: 'Group not found'})
+      return
+    }
+
+    const members = db
+      .select({
+        id: schema.people.id,
+        firstName: schema.people.firstName,
+        lastName: schema.people.lastName,
+        phoneNumber: schema.people.phoneNumber,
+        phoneDisplay: schema.people.phoneDisplay,
+        status: schema.people.status,
+      })
+      .from(schema.peopleGroups)
+      .innerJoin(schema.people, eq(schema.peopleGroups.personId, schema.people.id))
+      .where(eq(schema.peopleGroups.groupId, group.id))
+      .orderBy(schema.people.lastName, schema.people.firstName)
+      .all()
+
+    // Get all group memberships for these people
+    const memberIds = members.map((m) => m.id)
+    const memberships =
+      memberIds.length > 0
+        ? db
+            .select({
+              personId: schema.peopleGroups.personId,
+              groupName: schema.groups.name,
+            })
+            .from(schema.peopleGroups)
+            .innerJoin(schema.groups, eq(schema.peopleGroups.groupId, schema.groups.id))
+            .where(inArray(schema.peopleGroups.personId, memberIds))
+            .all()
+        : []
+
+    const membershipMap = new Map<number, string[]>()
+    for (const m of memberships) {
+      if (!membershipMap.has(m.personId)) membershipMap.set(m.personId, [])
+      membershipMap.get(m.personId)!.push(m.groupName)
+    }
+
+    const escapeCSV = (value: string) => {
+      if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+        return `"${value.replace(/"/g, '""')}"`
+      }
+      return value
+    }
+
+    const rows = ['First Name,Last Name,Phone Number,Status,Groups']
+    for (const p of members) {
+      const phone = p.phoneDisplay || p.phoneNumber
+      const groups = (membershipMap.get(p.id) || []).join(', ')
+      rows.push([p.firstName || '', p.lastName || '', phone, p.status, groups].map((v) => escapeCSV(v)).join(','))
+    }
+
+    const safeName = group.name.replace(/[^a-zA-Z0-9-_ ]/g, '').replace(/\s+/g, '-')
+    res.setHeader('Content-Type', 'text/csv')
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}-export.csv"`)
+    res.send(rows.join('\n'))
+  }),
+)
+
 // GET /api/groups/:id - Get group with members
 groupsRouter.get(
   '/:id',

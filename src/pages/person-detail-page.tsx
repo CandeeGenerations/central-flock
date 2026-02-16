@@ -7,6 +7,7 @@ import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchableSelect} from '@/components/ui/searchable-select'
+import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Textarea} from '@/components/ui/textarea'
 import {
@@ -118,7 +119,7 @@ export function PersonDetailPage() {
     }
   }
 
-  if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>
+  if (isLoading) return <InlineSpinner />
   if (!person) return <div className="p-6">Person not found</div>
 
   return (
@@ -128,7 +129,13 @@ export function PersonDetailPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h2 className="text-2xl font-bold">{formatFullName(person)}</h2>
-        <Badge variant={person.status === 'active' ? 'default' : 'secondary'}>{person.status}</Badge>
+        <Badge
+          variant={
+            person.status === 'active' ? 'default' : person.status === 'do_not_contact' ? 'destructive' : 'secondary'
+          }
+        >
+          {person.status === 'do_not_contact' ? 'do not contact' : person.status}
+        </Badge>
       </div>
 
       <Card>
@@ -208,12 +215,14 @@ export function PersonDetailPage() {
                   <Label>Status</Label>
                   <SearchableSelect
                     value={form.status || 'active'}
-                    onValueChange={(v) => setForm((f) => ({...f, status: v as 'active' | 'inactive'}))}
+                    onValueChange={(v) => setForm((f) => ({...f, status: v as Person['status']}))}
                     options={[
                       {value: 'active', label: 'Active'},
                       {value: 'inactive', label: 'Inactive'},
+                      {value: 'do_not_contact', label: 'Do Not Contact'},
                     ]}
                     searchable={false}
+                    className="w-48"
                   />
                 </div>
               </div>

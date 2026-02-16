@@ -5,6 +5,7 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchableSelect} from '@/components/ui/searchable-select'
+import {InlineSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
 import {createTemplate, deleteTemplates, fetchGlobalVariables, fetchTemplate, updateTemplate} from '@/lib/api'
 import type {TemplateVariable} from '@/lib/api'
@@ -173,7 +174,7 @@ export function TemplateEditPage() {
   }
 
   if (isEdit && isLoading) {
-    return <div className="p-6 text-center text-muted-foreground">Loading...</div>
+    return <InlineSpinner />
   }
 
   return (

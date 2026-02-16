@@ -6,6 +6,147 @@ import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 
 export const peopleRouter = Router()
 
+// GET /api/people/duplicates - Find duplicate people
+peopleRouter.get(
+  '/duplicates',
+  asyncHandler(async (_req, res) => {
+    // Name duplicates: group by lowercase (firstName, lastName) where both non-null
+    const namePairs = db
+      .select({
+        firstName: sql<string>`LOWER(${schema.people.firstName})`,
+        lastName: sql<string>`LOWER(${schema.people.lastName})`,
+        count: sql<number>`count(*)`,
+      })
+      .from(schema.people)
+      .where(and(sql`${schema.people.firstName} IS NOT NULL`, sql`${schema.people.lastName} IS NOT NULL`))
+      .groupBy(sql`LOWER(${schema.people.firstName})`, sql`LOWER(${schema.people.lastName})`)
+      .having(sql`count(*) > 1`)
+      .all()
+
+    const nameDuplicates = []
+    for (const pair of namePairs) {
+      const people = db
+        .select()
+        .from(schema.people)
+        .where(
+          and(
+            sql`LOWER(${schema.people.firstName}) = ${pair.firstName}`,
+            sql`LOWER(${schema.people.lastName}) = ${pair.lastName}`,
+          ),
+        )
+        .all()
+      const displayName = people[0].firstName && people[0].lastName
+        ? `${people[0].firstName} ${people[0].lastName}`
+        : pair.firstName + ' ' + pair.lastName
+      nameDuplicates.push({name: displayName, people})
+    }
+
+    // Similar phones: fetch all, pairwise compare
+    const allPeople = db.select().from(schema.people).all()
+    const phoneClusters: Map<number, Set<number>> = new Map()
+    const personById = new Map(allPeople.map((p) => [p.id, p]))
+
+    for (let i = 0; i < allPeople.length; i++) {
+      for (let j = i + 1; j < allPeople.length; j++) {
+        const a = allPeople[i].phoneNumber
+        const b = allPeople[j].phoneNumber
+        if (a.length === b.length) {
+          let diff = 0
+          for (let k = 0; k < a.length; k++) {
+            if (a[k] !== b[k]) diff++
+            if (diff > 2) break
+          }
+          if (diff > 0 && diff <= 2) {
+            // Merge into clusters using union-find style
+            const idA = allPeople[i].id
+            const idB = allPeople[j].id
+            const clusterA = phoneClusters.get(idA)
+            const clusterB = phoneClusters.get(idB)
+            if (clusterA && clusterB) {
+              // Merge B into A
+              for (const id of clusterB) {
+                clusterA.add(id)
+                phoneClusters.set(id, clusterA)
+              }
+            } else if (clusterA) {
+              clusterA.add(idB)
+              phoneClusters.set(idB, clusterA)
+            } else if (clusterB) {
+              clusterB.add(idA)
+              phoneClusters.set(idA, clusterB)
+            } else {
+              const cluster = new Set([idA, idB])
+              phoneClusters.set(idA, cluster)
+              phoneClusters.set(idB, cluster)
+            }
+          }
+        }
+      }
+    }
+
+    // Dedupe clusters
+    const seenClusters = new Set<Set<number>>()
+    const phoneDuplicates = []
+    for (const cluster of phoneClusters.values()) {
+      if (seenClusters.has(cluster)) continue
+      seenClusters.add(cluster)
+      phoneDuplicates.push({
+        people: [...cluster].map((id) => personById.get(id)!),
+      })
+    }
+
+    res.json({nameDuplicates, phoneDuplicates})
+  }),
+)
+
+// GET /api/people/export - Export all people as CSV
+peopleRouter.get(
+  '/export',
+  asyncHandler(async (_req, res) => {
+    const peopleList = db.select().from(schema.people).orderBy(asc(schema.people.firstName)).all()
+
+    const peopleIds = peopleList.map((p) => p.id)
+    const memberships =
+      peopleIds.length > 0
+        ? db
+            .select({
+              personId: schema.peopleGroups.personId,
+              groupName: schema.groups.name,
+            })
+            .from(schema.peopleGroups)
+            .innerJoin(schema.groups, eq(schema.peopleGroups.groupId, schema.groups.id))
+            .where(inArray(schema.peopleGroups.personId, peopleIds))
+            .all()
+        : []
+
+    const membershipMap = new Map<number, string[]>()
+    for (const m of memberships) {
+      if (!membershipMap.has(m.personId)) membershipMap.set(m.personId, [])
+      membershipMap.get(m.personId)!.push(m.groupName)
+    }
+
+    const escapeCSV = (value: string) => {
+      if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+        return `"${value.replace(/"/g, '""')}"`
+      }
+      return value
+    }
+
+    const rows = ['First Name,Last Name,Phone Number,Status,Groups']
+    for (const p of peopleList) {
+      const phone = p.phoneDisplay || p.phoneNumber
+      const groups = (membershipMap.get(p.id) || []).join(', ')
+      rows.push(
+        [p.firstName || '', p.lastName || '', phone, p.status, groups].map((v) => escapeCSV(v)).join(','),
+      )
+    }
+
+    res.setHeader('Content-Type', 'text/csv')
+    res.setHeader('Content-Disposition', 'attachment; filename="people-export.csv"')
+    res.send(rows.join('\n'))
+  }),
+)
+
 // GET /api/people - List all with optional search/filter
 peopleRouter.get(
   '/',
@@ -28,7 +169,7 @@ peopleRouter.get(
     }
 
     if (status && typeof status === 'string') {
-      conditions.push(eq(schema.people.status, status as 'active' | 'inactive'))
+      conditions.push(eq(schema.people.status, status as 'active' | 'inactive' | 'do_not_contact'))
     }
 
     if (groupId && typeof groupId === 'string') {
@@ -224,7 +365,7 @@ peopleRouter.patch(
       res.status(404).json({error: 'Person not found'})
       return
     }
-    const newStatus = person.status === 'active' ? 'inactive' : 'active'
+    const newStatus = person.status === 'active' ? 'inactive' : person.status === 'inactive' ? 'active' : person.status
     const result = db
       .update(schema.people)
       .set({status: newStatus, updatedAt: sql`datetime('now')`})

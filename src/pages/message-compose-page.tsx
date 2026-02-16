@@ -946,6 +946,9 @@ export function MessageComposePage() {
             <div className="space-y-2">
               <Label>Schedule Date (optional)</Label>
               <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
+              {scheduledAt && new Date(scheduledAt).getTime() <= Date.now() && (
+                <p className="text-xs text-destructive">Scheduled time must be in the future</p>
+              )}
             </div>
             <div>
               <Label>Batch Size</Label>
@@ -993,7 +996,12 @@ export function MessageComposePage() {
               <Button
                 size="lg"
                 onClick={handleSend}
-                disabled={sendMutation.isPending || recipients.length === 0 || !content.trim()}
+                disabled={
+                  sendMutation.isPending ||
+                  recipients.length === 0 ||
+                  !content.trim() ||
+                  (!!scheduledAt && new Date(scheduledAt).getTime() <= Date.now())
+                }
               >
                 <Send className="h-4 w-4 mr-2" />
                 {sendMutation.isPending

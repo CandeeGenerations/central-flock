@@ -21,6 +21,7 @@ const shortcuts = [
       {keys: [`${mod} J`], description: 'Quick compose'},
       {keys: [`${mod} P`], description: 'Add person'},
       {keys: [`${mod} D`], description: 'Toggle dark mode'},
+      {keys: [`${mod} ,`], description: 'Open settings'},
       {keys: ['?'], description: 'Show keyboard shortcuts'},
     ],
   },

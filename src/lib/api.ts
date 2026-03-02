@@ -474,6 +474,20 @@ export function createBulkMacContacts(personIds: number[]) {
   })
 }
 
+// Settings
+export type Settings = Record<string, string>
+
+export function fetchSettings() {
+  return request<Settings>('/settings')
+}
+
+export function updateSetting(key: string, value: string) {
+  return request<{key: string; value: string}>(`/settings/${key}`, {
+    method: 'PUT',
+    body: JSON.stringify({value}),
+  })
+}
+
 // Stats
 export interface StatsResponse {
   people: {total: number; active: number; inactive: number; doNotContact: number}

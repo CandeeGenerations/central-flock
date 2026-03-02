@@ -1,0 +1,6 @@
+CHANGELOG.md
+CLAUDE.md
+pnpm-lock.yaml
+schema.graphql
+
+.github/dependabot.yml

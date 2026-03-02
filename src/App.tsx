@@ -11,10 +11,11 @@ import {MessageDetailPage} from '@/pages/message-detail-page'
 import {MessageHistoryPage} from '@/pages/message-history-page'
 import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
+import {SettingsPage} from '@/pages/settings-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
-import {FileText, FolderOpen, Keyboard, LayoutDashboard, MessageSquare, Moon, Sun, Users} from 'lucide-react'
+import {FileText, FolderOpen, Keyboard, LayoutDashboard, MessageSquare, Moon, Settings, Sun, Users} from 'lucide-react'
 import {useCallback, useEffect, useState} from 'react'
 import {BrowserRouter, NavLink, Route, Routes} from 'react-router-dom'
 
@@ -78,6 +79,19 @@ function AppLayout() {
           ))}
         </nav>
         <div className="p-3 border-t space-y-1">
+          <NavLink
+            to="/settings"
+            className={({isActive}) =>
+              cn(
+                'flex items-center gap-2 px-3 py-2 rounded-md text-sm w-full transition-colors',
+                isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/50',
+              )
+            }
+          >
+            <Settings className="h-4 w-4" />
+            <span className="flex-1 text-left">Settings</span>
+            <kbd className="text-[10px] font-mono text-muted-foreground opacity-60">{mod},</kbd>
+          </NavLink>
           <button
             onClick={() => setShortcutsOpen(true)}
             className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-sidebar-accent/50 w-full transition-colors"
@@ -112,6 +126,7 @@ function AppLayout() {
           <Route path="/templates/new" element={<TemplateEditPage />} />
           <Route path="/templates/:id/edit" element={<TemplateEditPage />} />
           <Route path="/import" element={<ImportPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>
       <Toaster />

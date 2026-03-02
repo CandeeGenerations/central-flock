@@ -5,8 +5,9 @@ import {db, schema} from '../db/index.js'
 import {BATCH_DEFAULTS} from '../lib/constants.js'
 import {renderTemplate} from '../lib/format.js'
 import {asyncHandler, getGroupName} from '../lib/route-helpers.js'
-import {sendMessage} from '../services/applescript.js'
+import {sendMessage, sendMessageViaUI} from '../services/applescript.js'
 import {type SendJob, cancelJob, createJob, getJob} from '../services/message-queue.js'
+import {getSetting} from './settings.js'
 
 export const messagesRouter = Router()
 
@@ -469,6 +470,10 @@ export async function processSendJob(job: SendJob) {
     )
     .all()
 
+  // Read send method setting before starting
+  const sendMethod = getSetting('sendMethod')
+  const send = sendMethod === 'ui' ? sendMessageViaUI : sendMessage
+
   // Update message status to sending
   db.update(schema.messages).set({status: 'sending'}).where(eq(schema.messages.id, job.messageId)).run()
 
@@ -480,7 +485,7 @@ export async function processSendJob(job: SendJob) {
     const recipient = pendingRecipients[i]
 
     try {
-      await sendMessage(recipient.phoneNumber, recipient.renderedContent || '')
+      await send(recipient.phoneNumber, recipient.renderedContent || '')
 
       db.update(schema.messageRecipients)
         .set({

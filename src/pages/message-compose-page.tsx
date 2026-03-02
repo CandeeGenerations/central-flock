@@ -24,6 +24,7 @@ import {
   fetchMessage,
   fetchMessageStatus,
   fetchPeople,
+  fetchSettings,
   fetchTemplates,
   sendMessage,
   updateDraft,
@@ -36,7 +37,19 @@ import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {format} from 'date-fns'
-import {ArrowLeft, CalendarIcon, ChevronDown, ChevronRight, Eye, Globe, Save, Send, Trash2, Type} from 'lucide-react'
+import {
+  ArrowLeft,
+  CalendarIcon,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  Globe,
+  Info,
+  Save,
+  Send,
+  Trash2,
+  Type,
+} from 'lucide-react'
 import {type ReactNode, useCallback, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -293,6 +306,19 @@ export function MessageComposePage() {
     queryKey: queryKeys.globalVariables(),
     queryFn: () => fetchGlobalVariables(),
   })
+  const {data: settings} = useQuery({
+    queryKey: queryKeys.settings,
+    queryFn: fetchSettings,
+  })
+
+  // Set default batch delay based on send method (only for new composes, not loaded drafts/edits)
+  const [appliedSendMethodDefault, setAppliedSendMethodDefault] = useState(false)
+  if (settings && !appliedSendMethodDefault && !loadedDraftId && !loadedEditMessageId) {
+    setAppliedSendMethodDefault(true)
+    if (settings.sendMethod === 'ui') {
+      setBatchDelayMs(1000)
+    }
+  }
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplateId(templateId)
@@ -1064,6 +1090,27 @@ export function MessageComposePage() {
               <span className="font-medium text-orange-500">{Math.ceil(charCount / 160)}</span>
             </div>
           )}
+          <div
+            className={cn(
+              'flex items-start gap-2 rounded-md p-2.5 text-xs',
+              settings?.sendMethod === 'ui'
+                ? 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                : 'bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
+            )}
+          >
+            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            {settings?.sendMethod === 'ui' ? (
+              <span>
+                Sending via <strong>UI Scripting</strong> — Messages app will handle routing (iMessage/RCS/SMS). Do not
+                interact with the computer during sends.
+              </span>
+            ) : (
+              <span>
+                Sending via <strong>API (AppleScript)</strong> — SMS only. Change to UI Scripting in Settings for
+                iMessage/RCS support.
+              </span>
+            )}
+          </div>
           <Separator />
           <div>
             <span className="text-muted-foreground">Preview</span>

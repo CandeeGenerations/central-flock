@@ -113,6 +113,14 @@ export const globalVariables = sqliteTable('global_variables', {
     .notNull(),
 })
 
+export const settings = sqliteTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})
+
 export const messageRecipients = sqliteTable('message_recipients', {
   id: integer('id').primaryKey({autoIncrement: true}),
   messageId: integer('message_id')

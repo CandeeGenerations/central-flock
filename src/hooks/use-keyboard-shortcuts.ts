@@ -45,6 +45,13 @@ export function useKeyboardShortcuts(onShowHelp: () => void, onToggleDark: () =>
         return
       }
 
+      // ⌘, / Ctrl+, — open settings
+      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault()
+        navigate('/settings')
+        return
+      }
+
       // ⌘1-5 / Ctrl+1-5 — navigate between pages
       if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '5') {
         e.preventDefault()

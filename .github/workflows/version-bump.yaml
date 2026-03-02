@@ -1,0 +1,64 @@
+name: 'Version Bump'
+
+on: workflow_dispatch
+
+jobs:
+  bump_commit:
+    name: 'Bump Commit'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump_script.outputs.version }}
+      branch: ${{ steps.bump_script.outputs.branch }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install:ci
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+      - name: Bump version
+        id: bump_script
+        run: |
+          # Run the version bump
+          pnpm run release
+
+          # Get the new version from package.json
+          VERSION=$(node -p "require('./package.json').version")
+
+          # Create a branch name
+          BRANCH="version-bump/v${VERSION}"
+
+          # Create and push the branch
+          git checkout -b $BRANCH
+          git push origin $BRANCH
+
+          # Set outputs
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
+
+  pull_request:
+    name: 'Pull Request'
+    runs-on: ubuntu-latest
+    needs: [bump_commit]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ github.token }}
+          ref: ${{ needs.bump_commit.outputs.branch }}
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.bump_commit.outputs.version }}
+        run: |
+          gh pr create \
+            --base main \
+            --title "chore(release): bump version to v${VERSION}" \
+            --body "Automated version bump to v${VERSION}" \
+            --reviewer cgen01

@@ -16,9 +16,7 @@ templatesRouter.get(
 
     if (search && typeof search === 'string') {
       const term = search.toLowerCase()
-      result = result.filter(
-        (t) => t.name.toLowerCase().includes(term) || t.content.toLowerCase().includes(term),
-      )
+      result = result.filter((t) => t.name.toLowerCase().includes(term) || t.content.toLowerCase().includes(term))
     }
 
     res.json(result)

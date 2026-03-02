@@ -35,9 +35,10 @@ peopleRouter.get(
           ),
         )
         .all()
-      const displayName = people[0].firstName && people[0].lastName
-        ? `${people[0].firstName} ${people[0].lastName}`
-        : pair.firstName + ' ' + pair.lastName
+      const displayName =
+        people[0].firstName && people[0].lastName
+          ? `${people[0].firstName} ${people[0].lastName}`
+          : pair.firstName + ' ' + pair.lastName
       nameDuplicates.push({name: displayName, people})
     }
 
@@ -136,9 +137,7 @@ peopleRouter.get(
     for (const p of peopleList) {
       const phone = p.phoneDisplay || p.phoneNumber
       const groups = (membershipMap.get(p.id) || []).join(', ')
-      rows.push(
-        [p.firstName || '', p.lastName || '', phone, p.status, groups].map((v) => escapeCSV(v)).join(','),
-      )
+      rows.push([p.firstName || '', p.lastName || '', phone, p.status, groups].map((v) => escapeCSV(v)).join(','))
     }
 
     res.setHeader('Content-Type', 'text/csv')

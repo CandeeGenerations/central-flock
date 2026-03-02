@@ -19,9 +19,7 @@ globalVariablesRouter.get(
 
     if (search && typeof search === 'string') {
       const term = search.toLowerCase()
-      result = result.filter(
-        (v) => v.name.toLowerCase().includes(term) || v.value.toLowerCase().includes(term),
-      )
+      result = result.filter((v) => v.name.toLowerCase().includes(term) || v.value.toLowerCase().includes(term))
     }
 
     res.json(result)
@@ -73,11 +71,7 @@ globalVariablesRouter.post(
       return
     }
 
-    const existing = db
-      .select()
-      .from(schema.globalVariables)
-      .where(eq(schema.globalVariables.name, name.trim()))
-      .get()
+    const existing = db.select().from(schema.globalVariables).where(eq(schema.globalVariables.name, name.trim())).get()
 
     if (existing) {
       res.status(409).json({error: `Variable "${name.trim()}" already exists`})

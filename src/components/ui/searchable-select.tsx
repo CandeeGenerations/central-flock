@@ -12,7 +12,14 @@ interface SearchableSelectProps {
   searchable?: boolean
 }
 
-export function SearchableSelect({value, onValueChange, options, placeholder, className, searchable = true}: SearchableSelectProps) {
+export function SearchableSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  className,
+  searchable = true,
+}: SearchableSelectProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [highlightIndex, setHighlightIndex] = useState(-1)
@@ -20,9 +27,7 @@ export function SearchableSelect({value, onValueChange, options, placeholder, cl
   const listRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
-  const filtered = search
-    ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
-    : options
+  const filtered = search ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase())) : options
 
   const selectedLabel = options.find((o) => o.value === value)?.label
 

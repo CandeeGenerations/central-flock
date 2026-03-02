@@ -34,20 +34,14 @@ function checkScheduledMessages(processSendJob: ProcessSendJobFn) {
 
     if (scheduledTime >= fiveMinutesAgo) {
       // On time — transition to pending and send
-      db.update(schema.messages)
-        .set({status: 'pending'})
-        .where(eq(schema.messages.id, msg.id))
-        .run()
+      db.update(schema.messages).set({status: 'pending'}).where(eq(schema.messages.id, msg.id)).run()
 
       const job = createJob(msg.id, msg.batchSize, msg.batchDelayMs)
       processSendJob(job)
       console.log(`Scheduler: message ${msg.id} triggered for sending`)
     } else {
       // Past due — mark as past_due, do NOT send
-      db.update(schema.messages)
-        .set({status: 'past_due'})
-        .where(eq(schema.messages.id, msg.id))
-        .run()
+      db.update(schema.messages).set({status: 'past_due'}).where(eq(schema.messages.id, msg.id)).run()
       console.log(`Scheduler: message ${msg.id} marked as past_due`)
     }
   }

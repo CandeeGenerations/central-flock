@@ -1,10 +1,11 @@
-import type {Request, Response} from 'express'
-
 import {eq} from 'drizzle-orm'
+import type {Request, Response} from 'express'
 
 import {db, schema} from '../db/index.js'
 
-export function asyncHandler(fn: (req: Request, res: Response) => Promise<void>): (req: Request, res: Response) => void {
+export function asyncHandler(
+  fn: (req: Request, res: Response) => Promise<void>,
+): (req: Request, res: Response) => void {
   return (req, res) => {
     fn(req, res).catch((error) => {
       console.error('Unhandled route error:', error)
@@ -14,11 +15,7 @@ export function asyncHandler(fn: (req: Request, res: Response) => Promise<void>)
 }
 
 export function getGroupName(groupId: number): string | null {
-  const group = db
-    .select({name: schema.groups.name})
-    .from(schema.groups)
-    .where(eq(schema.groups.id, groupId))
-    .get()
+  const group = db.select({name: schema.groups.name}).from(schema.groups).where(eq(schema.groups.id, groupId)).get()
   return group?.name || null
 }
 

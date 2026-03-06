@@ -8,6 +8,7 @@ FNM_PATH="$HOME/Library/Application Support/fnm"
 if [ -d "$FNM_PATH" ]; then
   export PATH="$FNM_PATH:$PATH"
   eval "$(fnm env)"
+  fnm use --resolve-engines 2>/dev/null || fnm use
 fi
 
 PROJECT_DIR="/Users/cgen01/repos/cgen/central-flock"
@@ -24,7 +25,7 @@ start() {
 
   echo "Starting Central Flock..."
   cd "$PROJECT_DIR" || exit 1
-  NODE_BIN="$HOME/.local/share/fnm/node-versions/v24.13.1/installation/bin"
+  NODE_BIN=$(cd "$PROJECT_DIR" && fnm exec -- sh -c 'dirname "$(command -v node)"' 2>/dev/null)
   nohup env PATH="$NODE_BIN:/opt/homebrew/bin:/usr/local/bin:$PATH" pnpm run dev > "$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
 

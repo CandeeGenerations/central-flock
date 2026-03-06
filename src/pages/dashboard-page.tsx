@@ -74,7 +74,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{people.total}</div>
-            <div className="flex gap-2 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               <Badge variant="default">{people.active} active</Badge>
               <Badge variant="outline">{people.inactive} inactive</Badge>
               <Badge variant="destructive">{people.doNotContact} DNC</Badge>

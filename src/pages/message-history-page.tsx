@@ -8,7 +8,7 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
-import {deleteDrafts, deleteMessages, duplicateDraft, fetchDrafts, fetchMessages} from '@/lib/api'
+import {deleteDrafts, deleteMessages, duplicateDraft, duplicateMessage, fetchDrafts, fetchMessages} from '@/lib/api'
 import type {Draft} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
@@ -107,6 +107,18 @@ export function MessageHistoryPage() {
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : 'Failed to duplicate draft')
+    },
+  })
+
+  const duplicateMessageMutation = useMutation({
+    mutationFn: (id: number) => duplicateMessage(id),
+    onSuccess: (draft) => {
+      queryClient.invalidateQueries({queryKey: queryKeys.drafts()})
+      toast.success('Duplicated as draft')
+      navigate(`/messages/compose?draftId=${draft.id}`)
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Failed to duplicate message')
     },
   })
 
@@ -277,7 +289,7 @@ export function MessageHistoryPage() {
                         <Checkbox checked={selectedIds.has(msg.id)} onCheckedChange={() => toggleSelect(msg.id)} />
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {formatDateTime(msg.createdAt)}
+                        {formatDateTime(msg.completedAt || msg.createdAt)}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
                         <TooltipProvider>
@@ -308,14 +320,7 @@ export function MessageHistoryPage() {
                           variant="ghost"
                           size="icon"
                           title="Duplicate as draft"
-                          onClick={() =>
-                            navigate('/messages/compose', {
-                              state: {
-                                content: msg.content,
-                                groupId: msg.groupId,
-                              },
-                            })
-                          }
+                          onClick={() => duplicateMessageMutation.mutate(msg.id)}
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -418,14 +423,7 @@ export function MessageHistoryPage() {
                             variant="ghost"
                             size="icon"
                             title="Duplicate as draft"
-                            onClick={() =>
-                              navigate('/messages/compose', {
-                                state: {
-                                  content: msg.content,
-                                  groupId: msg.groupId,
-                                },
-                              })
-                            }
+                            onClick={() => duplicateMessageMutation.mutate(msg.id)}
                           >
                             <Copy className="h-4 w-4" />
                           </Button>

@@ -263,6 +263,10 @@ export function sendNowMessage(id: number) {
   return request<{success: boolean; jobId: string}>(`/messages/${id}/send-now`, {method: 'POST'})
 }
 
+export function duplicateMessage(id: number) {
+  return request<Draft>(`/messages/${id}/duplicate`, {method: 'POST'})
+}
+
 export function updateMessage(
   id: number,
   data: {

@@ -455,6 +455,46 @@ messagesRouter.post(
   }),
 )
 
+// POST /api/messages/:id/duplicate - Duplicate a message as a new draft
+messagesRouter.post(
+  '/:id/duplicate',
+  asyncHandler(async (req, res) => {
+    const messageId = Number(req.params.id)
+    const message = db.select().from(schema.messages).where(eq(schema.messages.id, messageId)).get()
+
+    if (!message) {
+      res.status(404).json({error: 'Message not found'})
+      return
+    }
+
+    const recipients = db
+      .select({personId: schema.messageRecipients.personId, status: schema.messageRecipients.status})
+      .from(schema.messageRecipients)
+      .where(eq(schema.messageRecipients.messageId, messageId))
+      .all()
+
+    const excludeIds = recipients.filter((r) => r.status === 'skipped').map((r) => r.personId)
+    const selectedIndividualIds = recipients.filter((r) => r.status !== 'skipped').map((r) => r.personId)
+
+    const draft = db
+      .insert(schema.drafts)
+      .values({
+        content: message.content,
+        recipientMode: message.groupId ? 'group' : 'individual',
+        groupId: message.groupId,
+        selectedIndividualIds: message.groupId ? null : JSON.stringify(selectedIndividualIds),
+        excludeIds: excludeIds.length > 0 ? JSON.stringify(excludeIds) : null,
+        batchSize: message.batchSize,
+        batchDelayMs: message.batchDelayMs,
+        templateState: message.templateState,
+      })
+      .returning()
+      .get()
+
+    res.json(draft)
+  }),
+)
+
 export async function processSendJob(job: SendJob) {
   const pendingRecipients = db
     .select({

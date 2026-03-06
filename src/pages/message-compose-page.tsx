@@ -514,7 +514,7 @@ export function MessageComposePage() {
           /* ignore */
         }
       }
-      queryClient.invalidateQueries({queryKey: queryKeys.messages()})
+      await queryClient.resetQueries({queryKey: queryKeys.messages()})
       if (data.scheduled) {
         toast.success('Message scheduled')
         navigate('/messages?tab=scheduled')

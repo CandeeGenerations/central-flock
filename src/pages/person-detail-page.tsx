@@ -123,7 +123,7 @@ export function PersonDetailPage() {
   if (!person) return <div className="p-6">Person not found</div>
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
+    <div className="p-4 md:p-6 space-y-6 max-w-2xl">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/people')}>
           <ArrowLeft className="h-4 w-4" />
@@ -139,9 +139,9 @@ export function PersonDetailPage() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <CardTitle>Details</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {!editing && (
               <Button variant="outline" size="sm" onClick={startEditing}>
                 Edit
@@ -167,7 +167,7 @@ export function PersonDetailPage() {
         <CardContent className="space-y-4">
           {editing ? (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>First Name</Label>
                   <Input
@@ -183,7 +183,7 @@ export function PersonDetailPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Phone Number</Label>
                   <Input
@@ -210,7 +210,7 @@ export function PersonDetailPage() {
                   <Input value={form.phoneNumber || ''} readOnly className="bg-muted" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Status</Label>
                   <SearchableSelect
@@ -249,7 +249,7 @@ export function PersonDetailPage() {
             </>
           ) : (
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <span className="text-sm text-muted-foreground">First Name</span>
                   <p>{person.firstName || '—'}</p>
@@ -259,7 +259,7 @@ export function PersonDetailPage() {
                   <p>{person.lastName || '—'}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <span className="text-sm text-muted-foreground">Phone</span>
                   <p>{person.phoneDisplay || person.phoneNumber}</p>
@@ -282,9 +282,9 @@ export function PersonDetailPage() {
 
       {/* Groups */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <CardTitle>Groups</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {person.groups && person.groups.length > 0 && (
               <Button variant="outline" size="sm" onClick={() => setRemoveAllConfirmOpen(true)}>
                 <UserMinus className="h-4 w-4 mr-1" />

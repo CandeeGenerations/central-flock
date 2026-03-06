@@ -192,7 +192,7 @@ export function GroupDetailPage() {
   if (!group) return <div className="p-6">Group not found</div>
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/groups')}>
           <ArrowLeft className="h-4 w-4" />
@@ -203,9 +203,9 @@ export function GroupDetailPage() {
 
       {/* Group info */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <CardTitle>Group Info</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {!editing && (
               <Button variant="outline" size="sm" onClick={startEditing}>
                 Edit
@@ -266,9 +266,9 @@ export function GroupDetailPage() {
 
       {/* Members */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <CardTitle>Members</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {inactiveMembers.length > 0 && (
               <Button variant="outline" size="sm" onClick={() => setRemoveInactiveOpen(true)}>
                 <UserX className="h-4 w-4 mr-1" />

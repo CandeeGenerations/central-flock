@@ -126,8 +126,8 @@ export function TemplatesPage() {
   }
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Templates</h2>
       </div>
 
@@ -167,7 +167,7 @@ export function TemplatesPage() {
 
       {activeTab === 'templates' && (
         <>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <SearchInput
               placeholder="Search templates..."
               value={search}
@@ -177,7 +177,7 @@ export function TemplatesPage() {
               }}
               containerClassName="max-w-sm"
             />
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {selectedIds.size > 0 && (
                 <Button variant="destructive" onClick={() => setConfirmOpen(true)}>
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -196,7 +196,7 @@ export function TemplatesPage() {
           {isLoading ? (
             <PageSpinner />
           ) : (
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -475,7 +475,7 @@ function VariablesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <SearchInput
           placeholder="Search variables..."
           value={search}
@@ -524,7 +524,7 @@ function VariablesTab() {
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading...</div>
       ) : (
-        <div className="border rounded-md">
+        <div className="border rounded-md overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

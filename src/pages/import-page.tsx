@@ -58,7 +58,7 @@ export function ImportPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <h2 className="text-2xl font-bold">Import CSV</h2>
 
       {/* Upload area */}
@@ -203,7 +203,7 @@ export function ImportPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <label className="flex items-center gap-2">
               <Checkbox checked={skipDuplicates} onCheckedChange={(v) => setSkipDuplicates(v === true)} />
               <span className="text-sm">Skip duplicates (same phone number)</span>

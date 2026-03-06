@@ -77,7 +77,7 @@ export function MessageDetailPage() {
       : 0
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
+    <div className="p-4 md:p-6 space-y-6 max-w-4xl">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/messages')}>
           <ArrowLeft className="h-4 w-4" />
@@ -132,7 +132,7 @@ export function MessageDetailPage() {
               <p className="whitespace-pre-wrap bg-muted p-4 rounded-md mt-1">{message.content}</p>
             </details>
           )}
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Group</span>
               <p>{message.groupName || '—'}</p>
@@ -175,9 +175,9 @@ export function MessageDetailPage() {
       {/* Progress — hidden for scheduled/past_due */}
       {message.status !== 'scheduled' && message.status !== 'past_due' && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <CardTitle>Progress</CardTitle>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {message.status === 'sending' && (
                 <Button
                   variant="destructive"

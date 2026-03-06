@@ -146,10 +146,10 @@ export function PeoplePage() {
   const totalPages = data ? Math.ceil(data.total / data.limit) : 1
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">People</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             variant="outline"
             onClick={async () => {
@@ -361,7 +361,7 @@ export function PeoplePage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <SearchInput
           placeholder="Search name or phone..."
           value={search}
@@ -394,7 +394,7 @@ export function PeoplePage() {
         <PageSpinner />
       ) : (
         <>
-          <div className="border rounded-md">
+          <div className="border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

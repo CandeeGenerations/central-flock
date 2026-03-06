@@ -181,10 +181,10 @@ export function MessageHistoryPage() {
   }
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Messages</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {(activeTab === 'sent' || activeTab === 'scheduled') && selectedIds.size > 0 && (
             <Button variant="destructive" onClick={() => setConfirmOpen(true)}>
               <Trash2 className="h-4 w-4 mr-2" />
@@ -272,7 +272,7 @@ export function MessageHistoryPage() {
           {messagesLoading ? (
             <PageSpinner />
           ) : (
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -358,7 +358,7 @@ export function MessageHistoryPage() {
           {messagesLoading ? (
             <PageSpinner />
           ) : (
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -459,7 +459,7 @@ export function MessageHistoryPage() {
           {draftsLoading ? (
             <PageSpinner />
           ) : (
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

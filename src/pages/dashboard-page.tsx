@@ -44,11 +44,11 @@ export function DashboardPage() {
   const skippedPct = totalProcessed > 0 ? Math.round((messages.totalSkipped / totalProcessed) * 100) : 0
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Dashboard</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Link to="/messages/compose">
             <Button size="sm">
               <MessageSquare className="h-4 w-4 mr-2" />
@@ -67,7 +67,7 @@ export function DashboardPage() {
       </div>
 
       {/* Row 1 — Stat cards */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">People</CardTitle>
@@ -121,7 +121,7 @@ export function DashboardPage() {
       </div>
 
       {/* Row 2 — Messages Over Time + Delivery Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="col-span-2">
           <CardHeader>
             <CardTitle>Messages Over Time</CardTitle>
@@ -225,7 +225,7 @@ export function DashboardPage() {
       </div>
 
       {/* Row 3 — Recent Messages + Scheduled Messages */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Recent Messages</CardTitle>
@@ -234,7 +234,7 @@ export function DashboardPage() {
             {messages.recentMessages.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No messages yet.</p>
             ) : (
-              <div className="border rounded-md">
+              <div className="border rounded-md overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

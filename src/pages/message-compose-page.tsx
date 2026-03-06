@@ -594,7 +594,7 @@ export function MessageComposePage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
+    <div className="p-4 md:p-6 space-y-6 max-w-4xl">
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
@@ -610,7 +610,7 @@ export function MessageComposePage() {
 
       {/* Recipient selection */}
       <div className="space-y-2">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label>Recipients</Label>
             <SearchableSelect
@@ -843,7 +843,7 @@ export function MessageComposePage() {
                           placeholder={`Enter ${v.name}...`}
                         />
                       ) : (
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button
@@ -929,7 +929,7 @@ export function MessageComposePage() {
       <Separator />
 
       {/* Batch settings */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Schedule date */}
         <div className="space-y-2">
           <Label>Schedule Date (optional)</Label>
@@ -955,7 +955,7 @@ export function MessageComposePage() {
       </div>
 
       {/* Summary & send */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm font-medium">
             Sending to <Badge variant="secondary">{recipients.length}</Badge> of{' '}
@@ -963,7 +963,7 @@ export function MessageComposePage() {
           </p>
           {excludeIds.size > 0 && <p className="text-sm text-muted-foreground">{excludeIds.size} excluded</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {!isEditMode && currentDraftId && (
             <Button variant="outline" size="lg" onClick={() => setDeleteConfirmOpen(true)}>
               <Trash2 className="h-4 w-4 mr-2" />

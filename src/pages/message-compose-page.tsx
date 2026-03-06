@@ -7,7 +7,6 @@ import {DateTimePicker} from '@/components/ui/date-time-picker'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
-import {Progress} from '@/components/ui/progress'
 import {SearchInput} from '@/components/ui/search-input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Separator} from '@/components/ui/separator'
@@ -22,7 +21,6 @@ import {
   fetchGroup,
   fetchGroups,
   fetchMessage,
-  fetchMessageStatus,
   fetchPeople,
   fetchSettings,
   fetchTemplates,
@@ -105,19 +103,11 @@ export function MessageComposePage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [batchDelayMs, setBatchDelayMs] = useState<number>(BATCH_DEFAULTS.batchDelayMs)
   const [scheduledAt, setScheduledAt] = useState('')
-  const [sending, setSending] = useState(false)
-  const [sendProgress, setSendProgress] = useState<{
-    messageId: number
-    sentCount: number
-    failedCount: number
-    skippedCount: number
-    totalRecipients: number
-    status: string
-  } | null>(null)
-
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(draftIdParam ? Number(draftIdParam) : null)
   const [individualSearch, setIndividualSearch] = useState('')
   const debouncedIndividualSearch = useDebouncedValue(individualSearch, 250)
+  const [individualHighlight, setIndividualHighlight] = useState(-1)
+  const individualSearchRef = useRef<HTMLInputElement>(null)
   const [selectedIndividualIds, setSelectedIndividualIds] = useState<Set<number>>(() => {
     return presetRecipientId ? new Set([Number(presetRecipientId)]) : new Set()
   })
@@ -400,6 +390,37 @@ export function MessageComposePage() {
     [excludeResults, excludeHighlight, toggleExclude],
   )
 
+  const individualResults = useMemo(() => {
+    if (!debouncedIndividualSearch || !allPeople) return []
+    const q = debouncedIndividualSearch.toLowerCase()
+    return allPeople.data.filter((p) => {
+      if (selectedIndividualIds.has(p.id)) return false
+      const name = formatFullName(p, '').toLowerCase()
+      const phone = (p.phoneDisplay || p.phoneNumber || '').toLowerCase()
+      return name.includes(q) || phone.includes(q)
+    })
+  }, [debouncedIndividualSearch, allPeople, selectedIndividualIds])
+
+  const handleIndividualKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!individualResults.length) return
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setIndividualHighlight((i) => (i < individualResults.length - 1 ? i + 1 : 0))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setIndividualHighlight((i) => (i > 0 ? i - 1 : individualResults.length - 1))
+      } else if (e.key === 'Enter' && individualHighlight >= 0 && individualHighlight < individualResults.length) {
+        e.preventDefault()
+        toggleIndividual(individualResults[individualHighlight].id)
+        setIndividualSearch('')
+        setIndividualHighlight(-1)
+        individualSearchRef.current?.focus()
+      }
+    },
+    [individualResults, individualHighlight, toggleIndividual],
+  )
+
   // Build resolved custom var values for preview and send
   const resolvedCustomVarValues = useMemo(() => {
     const resolved: Record<string, string> = {...customVarValues}
@@ -486,22 +507,7 @@ export function MessageComposePage() {
           navigate('/messages?tab=scheduled')
         } else {
           toast.success('Message updated and sending')
-          setSending(true)
-          const messageId = data.messageId
-          const poll = setInterval(async () => {
-            try {
-              const status = await fetchMessageStatus(messageId)
-              setSendProgress({messageId, ...status})
-              if (status.status === 'completed' || status.status === 'cancelled') {
-                clearInterval(poll)
-                setSending(false)
-                toast.success(`Message sending complete: ${status.sentCount} sent, ${status.failedCount} failed`)
-              }
-            } catch {
-              clearInterval(poll)
-              setSending(false)
-            }
-          }, 1000)
+          navigate(`/messages/${data.messageId}`)
         }
         return
       }
@@ -520,23 +526,8 @@ export function MessageComposePage() {
         navigate('/messages?tab=scheduled')
         return
       }
-      setSending(true)
-      const messageId = data.messageId
-      // Poll for progress
-      const poll = setInterval(async () => {
-        try {
-          const status = await fetchMessageStatus(messageId)
-          setSendProgress({messageId, ...status})
-          if (status.status === 'completed' || status.status === 'cancelled') {
-            clearInterval(poll)
-            setSending(false)
-            toast.success(`Message sending complete: ${status.sentCount} sent, ${status.failedCount} failed`)
-          }
-        } catch {
-          clearInterval(poll)
-          setSending(false)
-        }
-      }, 1000)
+      toast.success('Message sending')
+      navigate(`/messages/${data.messageId}`)
     },
     onError: (err: Error) => toast.error(err.message),
   })
@@ -602,11 +593,6 @@ export function MessageComposePage() {
     setSendConfirmOpen(true)
   }
 
-  const progressPercent = sendProgress
-    ? ((sendProgress.sentCount + sendProgress.failedCount + sendProgress.skippedCount) / sendProgress.totalRecipients) *
-      100
-    : 0
-
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       <div className="flex items-center gap-3">
@@ -622,428 +608,402 @@ export function MessageComposePage() {
         <h2 className="text-2xl font-bold">{isEditMode ? 'Edit Scheduled Message' : 'Compose Message'}</h2>
       </div>
 
-      {/* Sending progress overlay */}
-      {sending && sendProgress && (
-        <Card className="border-primary">
-          <CardHeader>
-            <CardTitle>Sending in progress...</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Progress value={progressPercent} />
-            <div className="flex gap-4 text-sm">
-              <span>Sent: {sendProgress.sentCount}</span>
-              <span>Failed: {sendProgress.failedCount}</span>
-              <span>Total: {sendProgress.totalRecipients}</span>
-            </div>
-            <Button variant="outline" onClick={() => navigate(`/messages/${sendProgress.messageId}`)}>
-              View Details
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {!sending && (
-        <>
-          {/* Recipient selection */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Recipients</Label>
-                <SearchableSelect
-                  value={recipientMode}
-                  onValueChange={(v) => setRecipientMode(v as 'group' | 'individual')}
-                  options={[
-                    {value: 'group', label: 'Send to Group'},
-                    {value: 'individual', label: 'Select Individuals'},
-                  ]}
-                  className="w-full"
-                  searchable={false}
-                />
-              </div>
-
-              {recipientMode === 'group' && (
-                <div>
-                  <Label>Group</Label>
-                  <SearchableSelect
-                    value={selectedGroupId}
-                    onValueChange={setSelectedGroupId}
-                    options={groups?.map((g) => ({value: String(g.id), label: `${g.name} (${g.memberCount})`})) || []}
-                    placeholder="Choose a group..."
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </div>
+      {/* Recipient selection */}
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Recipients</Label>
+            <SearchableSelect
+              value={recipientMode}
+              onValueChange={(v) => setRecipientMode(v as 'group' | 'individual')}
+              options={[
+                {value: 'group', label: 'Send to Group'},
+                {value: 'individual', label: 'Select Individuals'},
+              ]}
+              className="w-full"
+              searchable={false}
+            />
           </div>
 
-          {recipientMode === 'individual' && allPeople && (
-            <div className="space-y-2">
-              <Label>People to send to</Label>
-              <SearchInput
-                placeholder="Search people to add..."
-                value={individualSearch}
-                onChange={setIndividualSearch}
-              />
-              {debouncedIndividualSearch && (
-                <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
-                  {(() => {
-                    const q = debouncedIndividualSearch.toLowerCase()
-                    const results = allPeople.data.filter((p) => {
-                      if (selectedIndividualIds.has(p.id)) return false
-                      const name = formatFullName(p, '').toLowerCase()
-                      const phone = (p.phoneDisplay || p.phoneNumber || '').toLowerCase()
-                      return name.includes(q) || phone.includes(q)
-                    })
-                    if (results.length === 0) {
-                      return <p className="text-sm text-muted-foreground text-center py-3">No matching people found</p>
-                    }
-                    return results.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className="flex items-center gap-2 w-full px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm text-left"
-                        onClick={() => {
-                          toggleIndividual(p.id)
-                          setIndividualSearch('')
-                        }}
-                      >
-                        <span>{formatFullName(p, '') || <em className="text-muted-foreground">Unnamed</em>}</span>
-                        <span className="text-muted-foreground ml-auto">{p.phoneDisplay}</span>
-                      </button>
-                    ))
-                  })()}
-                </div>
-              )}
-              {selectedIndividualIds.size > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {allPeople.data
-                    .filter((p) => selectedIndividualIds.has(p.id))
-                    .map((p) => (
-                      <Badge
-                        key={p.id}
-                        variant="secondary"
-                        className="gap-1 cursor-pointer hover:bg-destructive/20"
-                        onClick={() => toggleIndividual(p.id)}
-                      >
-                        {formatFullName(p)}
-                        <span className="text-muted-foreground">&times;</span>
-                      </Badge>
-                    ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Exclusion list for group mode */}
-          {recipientMode === 'group' && groupDetail && groupDetail.members.length > 0 && (
-            <div className="space-y-2">
-              <Label>Exclude from send (optional)</Label>
-              <SearchInput
-                ref={excludeSearchRef}
-                placeholder="Search members to exclude..."
-                value={excludeSearch}
-                onChange={(v) => {
-                  setExcludeSearch(v)
-                  setExcludeHighlight(-1)
-                }}
-                onKeyDown={handleExcludeKeyDown}
-              />
-              {debouncedExcludeSearch && (
-                <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
-                  {excludeResults.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-3">No matching members found</p>
-                  ) : (
-                    excludeResults.map((m, i) => (
-                      <button
-                        key={m.id}
-                        ref={i === excludeHighlight ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
-                        type="button"
-                        className={cn(
-                          'flex items-center gap-2 w-full px-2 py-1 rounded cursor-pointer text-sm text-left',
-                          i === excludeHighlight
-                            ? 'bg-accent text-accent-foreground'
-                            : 'hover:bg-accent hover:text-accent-foreground',
-                        )}
-                        onClick={() => {
-                          toggleExclude(m.id)
-                          setExcludeSearch('')
-                          setExcludeHighlight(-1)
-                          excludeSearchRef.current?.focus()
-                        }}
-                      >
-                        <span>{formatFullName(m, '') || <em className="text-muted-foreground">Unnamed</em>}</span>
-                        <span className="text-muted-foreground ml-auto">{m.phoneDisplay}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-              {excludeIds.size > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {groupDetail.members
-                    .filter((m) => excludeIds.has(m.id))
-                    .map((m) => (
-                      <Badge
-                        key={m.id}
-                        variant="secondary"
-                        className="gap-1 cursor-pointer hover:bg-destructive/20"
-                        onClick={() => toggleExclude(m.id)}
-                      >
-                        {formatFullName(m)}
-                        <span className="text-muted-foreground">&times;</span>
-                      </Badge>
-                    ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <Separator />
-
-          {/* Template selector */}
-          {templatesList && templatesList.length > 0 && (
-            <div className="space-y-2">
-              <Label>Template (optional)</Label>
+          {recipientMode === 'group' && (
+            <div>
+              <Label>Group</Label>
               <SearchableSelect
-                value={selectedTemplateId}
-                onValueChange={handleTemplateSelect}
-                options={[
-                  {value: 'none', label: 'No template'},
-                  ...[...templatesList]
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((t) => ({
-                      value: String(t.id),
-                      label: t.name,
-                    })),
-                ]}
-                placeholder="Choose a template..."
+                value={selectedGroupId}
+                onValueChange={setSelectedGroupId}
+                options={groups?.map((g) => ({value: String(g.id), label: `${g.name} (${g.memberCount})`})) || []}
+                placeholder="Choose a group..."
                 className="w-full"
               />
             </div>
           )}
+        </div>
+      </div>
 
-          {/* Message editor */}
-          <div className="space-y-2">
-            <Label>Message</Label>
-            <div className="space-y-2 mb-2">
-              <VariableDropdown label="Person Variables">
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{firstName}}')}>
-                    {'{{firstName}}'}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{lastName}}')}>
-                    {'{{lastName}}'}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{fullName}}')}>
-                    {'{{fullName}}'}
-                  </Button>
-                </div>
-              </VariableDropdown>
-              {activeTemplateVars.length > 0 && (
-                <VariableDropdown label="Template Variables" count={activeTemplateVars.length} defaultOpen>
-                  <div className="space-y-3 mt-2">
-                    <div className="flex flex-wrap gap-2">
-                      <span className="text-xs text-muted-foreground self-center mr-1">Insert:</span>
-                      {activeTemplateVars.map((v) => (
-                        <Button
-                          key={v.name}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => insertAtCursor(`{{${v.name}}}`)}
-                        >
-                          {v.type === 'date' ? (
-                            <CalendarIcon className="h-3 w-3 mr-1" />
-                          ) : (
-                            <Type className="h-3 w-3 mr-1" />
-                          )}
-                          {`{{${v.name}}}`}
-                        </Button>
-                      ))}
-                    </div>
-                    <Separator />
-                    <div className="grid gap-3">
-                      {activeTemplateVars.map((v) => (
-                        <div key={v.name} className="space-y-1">
-                          <label className="text-sm font-medium flex items-center gap-1.5">
-                            {v.type === 'date' ? (
-                              <CalendarIcon className="h-3.5 w-3.5" />
-                            ) : (
-                              <Type className="h-3.5 w-3.5" />
-                            )}
-                            {v.name}
-                          </label>
-                          {v.type === 'text' ? (
-                            <Input
-                              value={customVarValues[v.name] || ''}
-                              onChange={(e) => setCustomVarValues((prev) => ({...prev, [v.name]: e.target.value}))}
-                              placeholder={`Enter ${v.name}...`}
-                            />
-                          ) : (
-                            <div className="grid grid-cols-2 gap-4">
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    className={cn(
-                                      'w-full justify-start text-left font-normal',
-                                      !dateValues[v.name] && 'text-muted-foreground',
-                                    )}
-                                  >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {dateValues[v.name]
-                                      ? format(dateValues[v.name]!, dateFormats[v.name] || 'MMMM d, yyyy')
-                                      : 'Pick a date'}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    defaultMonth={dateValues[v.name]}
-                                    selected={dateValues[v.name]}
-                                    onSelect={(date) =>
-                                      setDateValues((prev) => ({...prev, [v.name]: date ?? undefined}))
-                                    }
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                              <SearchableSelect
-                                value={dateFormats[v.name] || 'MMMM d, yyyy'}
-                                onValueChange={(fmt) => setDateFormats((prev) => ({...prev, [v.name]: fmt}))}
-                                options={getDateFormatOptions(dateValues[v.name] || new Date()).map((opt) => ({
-                                  value: opt.format,
-                                  label: opt.label,
-                                }))}
-                                className="w-full"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </VariableDropdown>
-              )}
-              {globalVariables && globalVariables.length > 0 && (
-                <VariableDropdown label="Global Variables" count={globalVariables.length} defaultOpen>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {globalVariables.map((v) => (
-                      <Button key={v.name} variant="outline" size="sm" onClick={() => insertAtCursor(`{{${v.name}}}`)}>
-                        <Globe className="h-3 w-3 mr-1" />
-                        {`{{${v.name}}}`}
-                      </Button>
-                    ))}
-                  </div>
-                </VariableDropdown>
+      {recipientMode === 'individual' && allPeople && (
+        <div className="space-y-2">
+          <Label>People to send to</Label>
+          <SearchInput
+            ref={individualSearchRef}
+            placeholder="Search people to add..."
+            value={individualSearch}
+            onChange={(v) => {
+              setIndividualSearch(v)
+              setIndividualHighlight(-1)
+            }}
+            onKeyDown={handleIndividualKeyDown}
+          />
+          {debouncedIndividualSearch && (
+            <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
+              {individualResults.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3">No matching people found</p>
+              ) : (
+                individualResults.map((p, i) => (
+                  <button
+                    key={p.id}
+                    ref={i === individualHighlight ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
+                    type="button"
+                    className={cn(
+                      'flex items-center gap-2 w-full px-2 py-1 rounded cursor-pointer text-sm text-left',
+                      i === individualHighlight
+                        ? 'bg-accent text-accent-foreground'
+                        : 'hover:bg-accent hover:text-accent-foreground',
+                    )}
+                    onClick={() => {
+                      toggleIndividual(p.id)
+                      setIndividualSearch('')
+                      setIndividualHighlight(-1)
+                      individualSearchRef.current?.focus()
+                    }}
+                  >
+                    <span>{formatFullName(p, '') || <em className="text-muted-foreground">Unnamed</em>}</span>
+                    <span className="text-muted-foreground ml-auto">{p.phoneDisplay}</span>
+                  </button>
+                ))
               )}
             </div>
-            <Textarea
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={10}
-              placeholder="Type your message here. Use template variables for personalization..."
-            />
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span>{charCount} characters</span>
-              {charCount > 160 && <span className="text-orange-500">{Math.ceil(charCount / 160)} segments</span>}
-            </div>
-          </div>
-
-          {/* Preview */}
-          {content && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Eye className="h-4 w-4" />
-                  Preview {previewPerson ? `(for ${previewPerson.firstName || 'first recipient'})` : ''}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="whitespace-pre-wrap">{renderedPreview}</p>
-              </CardContent>
-            </Card>
           )}
+          {selectedIndividualIds.size > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {allPeople.data
+                .filter((p) => selectedIndividualIds.has(p.id))
+                .map((p) => (
+                  <Badge
+                    key={p.id}
+                    variant="secondary"
+                    className="gap-1 cursor-pointer hover:bg-destructive/20"
+                    onClick={() => toggleIndividual(p.id)}
+                  >
+                    {formatFullName(p)}
+                    <span className="text-muted-foreground">&times;</span>
+                  </Badge>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
 
-          <Separator />
-
-          {/* Batch settings */}
-          <div className="grid grid-cols-3 gap-4">
-            {/* Schedule date */}
-            <div className="space-y-2">
-              <Label>Schedule Date (optional)</Label>
-              <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
-              {scheduledAt && new Date(scheduledAt).getTime() <= Date.now() && (
-                <p className="text-xs text-destructive">Scheduled time must be in the future</p>
+      {/* Exclusion list for group mode */}
+      {recipientMode === 'group' && groupDetail && groupDetail.members.length > 0 && (
+        <div className="space-y-2">
+          <Label>Exclude from send (optional)</Label>
+          <SearchInput
+            ref={excludeSearchRef}
+            placeholder="Search members to exclude..."
+            value={excludeSearch}
+            onChange={(v) => {
+              setExcludeSearch(v)
+              setExcludeHighlight(-1)
+            }}
+            onKeyDown={handleExcludeKeyDown}
+          />
+          {debouncedExcludeSearch && (
+            <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
+              {excludeResults.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3">No matching members found</p>
+              ) : (
+                excludeResults.map((m, i) => (
+                  <button
+                    key={m.id}
+                    ref={i === excludeHighlight ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
+                    type="button"
+                    className={cn(
+                      'flex items-center gap-2 w-full px-2 py-1 rounded cursor-pointer text-sm text-left',
+                      i === excludeHighlight
+                        ? 'bg-accent text-accent-foreground'
+                        : 'hover:bg-accent hover:text-accent-foreground',
+                    )}
+                    onClick={() => {
+                      toggleExclude(m.id)
+                      setExcludeSearch('')
+                      setExcludeHighlight(-1)
+                      excludeSearchRef.current?.focus()
+                    }}
+                  >
+                    <span>{formatFullName(m, '') || <em className="text-muted-foreground">Unnamed</em>}</span>
+                    <span className="text-muted-foreground ml-auto">{m.phoneDisplay}</span>
+                  </button>
+                ))
               )}
             </div>
-            <div>
-              <Label>Batch Size</Label>
-              <Input type="number" min={1} value={batchSize} onChange={(e) => setBatchSize(Number(e.target.value))} />
+          )}
+          {excludeIds.size > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {groupDetail.members
+                .filter((m) => excludeIds.has(m.id))
+                .map((m) => (
+                  <Badge
+                    key={m.id}
+                    variant="secondary"
+                    className="gap-1 cursor-pointer hover:bg-destructive/20"
+                    onClick={() => toggleExclude(m.id)}
+                  >
+                    {formatFullName(m)}
+                    <span className="text-muted-foreground">&times;</span>
+                  </Badge>
+                ))}
             </div>
-            <div>
-              <Label>Delay Between Batches (ms)</Label>
-              <Input
-                type="number"
-                min={1000}
-                step={1000}
-                value={batchDelayMs}
-                onChange={(e) => setBatchDelayMs(Number(e.target.value))}
-              />
-            </div>
-          </div>
+          )}
+        </div>
+      )}
 
-          {/* Summary & send */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">
-                Sending to <Badge variant="secondary">{recipients.length}</Badge> of{' '}
-                <Badge variant="outline">{allRecipientIds.length}</Badge> people
-              </p>
-              {excludeIds.size > 0 && <p className="text-sm text-muted-foreground">{excludeIds.size} excluded</p>}
-            </div>
-            <div className="flex gap-2">
-              {!isEditMode && currentDraftId && (
-                <Button variant="outline" size="lg" onClick={() => setDeleteConfirmOpen(true)}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-              )}
-              {!isEditMode && (
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => saveDraftMutation.mutate()}
-                  disabled={saveDraftMutation.isPending}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {saveDraftMutation.isPending ? 'Saving...' : 'Save Draft'}
-                </Button>
-              )}
-              <Button
-                size="lg"
-                onClick={handleSend}
-                disabled={
-                  sendMutation.isPending ||
-                  recipients.length === 0 ||
-                  !content.trim() ||
-                  (!!scheduledAt && new Date(scheduledAt).getTime() <= Date.now())
-                }
-              >
-                <Send className="h-4 w-4 mr-2" />
-                {sendMutation.isPending
-                  ? 'Updating...'
-                  : isEditMode
-                    ? scheduledAt
-                      ? 'Update Schedule'
-                      : 'Update & Send'
-                    : scheduledAt
-                      ? 'Schedule Message'
-                      : 'Send Message'}
+      <Separator />
+
+      {/* Template selector */}
+      {templatesList && templatesList.length > 0 && (
+        <div className="space-y-2">
+          <Label>Template (optional)</Label>
+          <SearchableSelect
+            value={selectedTemplateId}
+            onValueChange={handleTemplateSelect}
+            options={[
+              {value: 'none', label: 'No template'},
+              ...[...templatesList]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((t) => ({
+                  value: String(t.id),
+                  label: t.name,
+                })),
+            ]}
+            placeholder="Choose a template..."
+            className="w-full"
+          />
+        </div>
+      )}
+
+      {/* Message editor */}
+      <div className="space-y-2">
+        <Label>Message</Label>
+        <div className="space-y-2 mb-2">
+          <VariableDropdown label="Person Variables">
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{firstName}}')}>
+                {'{{firstName}}'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{lastName}}')}>
+                {'{{lastName}}'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{fullName}}')}>
+                {'{{fullName}}'}
               </Button>
             </div>
-          </div>
-        </>
+          </VariableDropdown>
+          {activeTemplateVars.length > 0 && (
+            <VariableDropdown label="Template Variables" count={activeTemplateVars.length} defaultOpen>
+              <div className="space-y-3 mt-2">
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-xs text-muted-foreground self-center mr-1">Insert:</span>
+                  {activeTemplateVars.map((v) => (
+                    <Button key={v.name} variant="outline" size="sm" onClick={() => insertAtCursor(`{{${v.name}}}`)}>
+                      {v.type === 'date' ? (
+                        <CalendarIcon className="h-3 w-3 mr-1" />
+                      ) : (
+                        <Type className="h-3 w-3 mr-1" />
+                      )}
+                      {`{{${v.name}}}`}
+                    </Button>
+                  ))}
+                </div>
+                <Separator />
+                <div className="grid gap-3">
+                  {activeTemplateVars.map((v) => (
+                    <div key={v.name} className="space-y-1">
+                      <label className="text-sm font-medium flex items-center gap-1.5">
+                        {v.type === 'date' ? (
+                          <CalendarIcon className="h-3.5 w-3.5" />
+                        ) : (
+                          <Type className="h-3.5 w-3.5" />
+                        )}
+                        {v.name}
+                      </label>
+                      {v.type === 'text' ? (
+                        <Input
+                          value={customVarValues[v.name] || ''}
+                          onChange={(e) => setCustomVarValues((prev) => ({...prev, [v.name]: e.target.value}))}
+                          placeholder={`Enter ${v.name}...`}
+                        />
+                      ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  'w-full justify-start text-left font-normal',
+                                  !dateValues[v.name] && 'text-muted-foreground',
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {dateValues[v.name]
+                                  ? format(dateValues[v.name]!, dateFormats[v.name] || 'MMMM d, yyyy')
+                                  : 'Pick a date'}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                defaultMonth={dateValues[v.name]}
+                                selected={dateValues[v.name]}
+                                onSelect={(date) => setDateValues((prev) => ({...prev, [v.name]: date ?? undefined}))}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <SearchableSelect
+                            value={dateFormats[v.name] || 'MMMM d, yyyy'}
+                            onValueChange={(fmt) => setDateFormats((prev) => ({...prev, [v.name]: fmt}))}
+                            options={getDateFormatOptions(dateValues[v.name] || new Date()).map((opt) => ({
+                              value: opt.format,
+                              label: opt.label,
+                            }))}
+                            className="w-full"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </VariableDropdown>
+          )}
+          {globalVariables && globalVariables.length > 0 && (
+            <VariableDropdown label="Global Variables" count={globalVariables.length} defaultOpen>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {globalVariables.map((v) => (
+                  <Button key={v.name} variant="outline" size="sm" onClick={() => insertAtCursor(`{{${v.name}}}`)}>
+                    <Globe className="h-3 w-3 mr-1" />
+                    {`{{${v.name}}}`}
+                  </Button>
+                ))}
+              </div>
+            </VariableDropdown>
+          )}
+        </div>
+        <Textarea
+          ref={textareaRef}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          rows={10}
+          placeholder="Type your message here. Use template variables for personalization..."
+        />
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <span>{charCount} characters</span>
+          {charCount > 160 && <span className="text-orange-500">{Math.ceil(charCount / 160)} segments</span>}
+        </div>
+      </div>
+
+      {/* Preview */}
+      {content && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Preview {previewPerson ? `(for ${previewPerson.firstName || 'first recipient'})` : ''}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-wrap">{renderedPreview}</p>
+          </CardContent>
+        </Card>
       )}
+
+      <Separator />
+
+      {/* Batch settings */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* Schedule date */}
+        <div className="space-y-2">
+          <Label>Schedule Date (optional)</Label>
+          <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
+          {scheduledAt && new Date(scheduledAt).getTime() <= Date.now() && (
+            <p className="text-xs text-destructive">Scheduled time must be in the future</p>
+          )}
+        </div>
+        <div>
+          <Label>Batch Size</Label>
+          <Input type="number" min={1} value={batchSize} onChange={(e) => setBatchSize(Number(e.target.value))} />
+        </div>
+        <div>
+          <Label>Delay Between Batches (ms)</Label>
+          <Input
+            type="number"
+            min={1000}
+            step={1000}
+            value={batchDelayMs}
+            onChange={(e) => setBatchDelayMs(Number(e.target.value))}
+          />
+        </div>
+      </div>
+
+      {/* Summary & send */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium">
+            Sending to <Badge variant="secondary">{recipients.length}</Badge> of{' '}
+            <Badge variant="outline">{allRecipientIds.length}</Badge> people
+          </p>
+          {excludeIds.size > 0 && <p className="text-sm text-muted-foreground">{excludeIds.size} excluded</p>}
+        </div>
+        <div className="flex gap-2">
+          {!isEditMode && currentDraftId && (
+            <Button variant="outline" size="lg" onClick={() => setDeleteConfirmOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          )}
+          {!isEditMode && (
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => saveDraftMutation.mutate()}
+              disabled={saveDraftMutation.isPending}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {saveDraftMutation.isPending ? 'Saving...' : 'Save Draft'}
+            </Button>
+          )}
+          <Button
+            size="lg"
+            onClick={handleSend}
+            disabled={
+              sendMutation.isPending ||
+              recipients.length === 0 ||
+              !content.trim() ||
+              (!!scheduledAt && new Date(scheduledAt).getTime() <= Date.now())
+            }
+          >
+            <Send className="h-4 w-4 mr-2" />
+            {sendMutation.isPending
+              ? 'Updating...'
+              : isEditMode
+                ? scheduledAt
+                  ? 'Update Schedule'
+                  : 'Update & Send'
+                : scheduledAt
+                  ? 'Schedule Message'
+                  : 'Send Message'}
+          </Button>
+        </div>
+      </div>
       <ConfirmDialog
         open={sendConfirmOpen}
         onOpenChange={setSendConfirmOpen}

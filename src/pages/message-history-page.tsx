@@ -14,7 +14,7 @@ import {formatDateTime} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Copy, Pencil, Plus, Trash2} from 'lucide-react'
-import {useMemo, useState} from 'react'
+import {useEffect, useMemo, useState} from 'react'
 import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -42,10 +42,18 @@ export function MessageHistoryPage() {
   const debouncedSearch = useDebouncedValue(search, 250)
 
   // Sent messages state
-  const {data: messages, isLoading: messagesLoading} = useQuery({
+  const {
+    data: messages,
+    isLoading: messagesLoading,
+    refetch: refetchMessages,
+  } = useQuery({
     queryKey: queryKeys.messages(debouncedSearch || undefined),
     queryFn: () => fetchMessages({search: debouncedSearch || undefined}),
   })
+  // Refetch when switching tabs so status changes (e.g. scheduled → sent) are reflected
+  useEffect(() => {
+    refetchMessages()
+  }, [activeTab, refetchMessages])
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
 

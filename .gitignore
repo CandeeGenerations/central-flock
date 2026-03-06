@@ -29,5 +29,6 @@ dist-ssr
 *.db-shm
 
 .claude/settings.local.json
+.env
 
 *.pid

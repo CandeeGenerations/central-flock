@@ -2,9 +2,14 @@ const BASE_URL = '/api'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${url}`, {
+    credentials: 'include',
     headers: {'Content-Type': 'application/json'},
     ...options,
   })
+  if (res.status === 401 && !url.startsWith('/auth/')) {
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error || `Request failed: ${res.status}`)
@@ -20,6 +25,28 @@ function buildQueryString(params?: Record<string, string | number | undefined>):
   }
   const qs = searchParams.toString()
   return qs ? `?${qs}` : ''
+}
+
+// Auth
+export interface AuthStatus {
+  authRequired: boolean
+  authenticated: boolean
+}
+
+export function login(password: string) {
+  return request<{success: boolean}>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({password}),
+  })
+}
+
+export function logout() {
+  return request<{success: boolean}>('/auth/logout', {method: 'POST'})
+}
+
+export async function checkAuthStatus(): Promise<AuthStatus> {
+  const res = await fetch(`${BASE_URL}/auth/status`, {credentials: 'include'})
+  return res.json()
 }
 
 // People
@@ -91,7 +118,7 @@ export function togglePersonStatus(id: number) {
 }
 
 export async function exportPeopleCSV() {
-  const res = await fetch(`${BASE_URL}/people/export`)
+  const res = await fetch(`${BASE_URL}/people/export`, {credentials: 'include'})
   if (!res.ok) throw new Error('Export failed')
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)
@@ -147,7 +174,7 @@ export function addGroupMembers(groupId: number, personIds: number[]) {
 }
 
 export async function exportGroupCSV(groupId: number) {
-  const res = await fetch(`${BASE_URL}/groups/${groupId}/export`)
+  const res = await fetch(`${BASE_URL}/groups/${groupId}/export`, {credentials: 'include'})
   if (!res.ok) throw new Error('Export failed')
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)

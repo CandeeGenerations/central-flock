@@ -11,6 +11,8 @@ export default defineConfig({
     },
   },
   server: {
+    host: true,
+    allowedHosts: ['flock.cgen.cc'],
     proxy: {
       '/api': 'http://localhost:5172',
     },

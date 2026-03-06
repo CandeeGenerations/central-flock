@@ -1,8 +1,11 @@
+import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import express from 'express'
 import path from 'path'
 import {fileURLToPath} from 'url'
 
+import {requireAuth} from './middleware/auth.js'
+import {authRouter} from './routes/auth.js'
 import {contactsRouter} from './routes/contacts.js'
 import {draftsRouter} from './routes/drafts.js'
 import {globalVariablesRouter} from './routes/global-variables.js'
@@ -19,8 +22,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 5172
 
-app.use(cors())
+app.use(cors({origin: true, credentials: true}))
 app.use(express.json({limit: '10mb'}))
+app.use(cookieParser())
+
+// Auth routes (unprotected)
+app.use('/api/auth', authRouter)
+
+// Auth middleware — before all other /api routes
+app.use('/api', requireAuth)
 
 // API routes
 app.use('/api/people', peopleRouter)

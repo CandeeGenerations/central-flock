@@ -103,6 +103,70 @@ Scripts in `scripts/raycast/` provide quick start, stop, and toggle commands for
 └── vite.config.ts             # Vite configuration with API proxy
 ```
 
+## Authentication
+
+Authentication is optional. When no auth environment variables are set, the app works without a login screen (ideal for local use). To enable password protection (recommended when exposing via a tunnel):
+
+1. Generate a password hash:
+
+   ```bash
+   pnpm auth:hash
+   ```
+
+2. Set the environment variables (see [Deployment](#deployment) for where to put them):
+
+   ```
+   AUTH_PASSWORD_HASH=$2b$10$...your-bcrypt-hash...
+   JWT_SECRET=a-random-secret-string-at-least-32-chars
+   JWT_EXPIRY=7d   # optional, defaults to 7d
+   ```
+
+3. Restart the server. The app will now show a login page.
+
+## Deployment
+
+Central Flock runs as a macOS launchd service with an optional Cloudflare Tunnel for remote access.
+
+### launchd Services
+
+| Service           | Plist                                                | Logs                               |
+| ----------------- | ---------------------------------------------------- | ---------------------------------- |
+| Central Flock     | `~/Library/LaunchAgents/cc.cgen.central-flock.plist` | `~/Library/Logs/central-flock.log` |
+| Cloudflare Tunnel | `~/Library/LaunchAgents/cc.cgen.cloudflared.plist`   | `~/Library/Logs/cloudflared.log`   |
+
+Both services have `RunAtLoad` and `KeepAlive` enabled (start on login, auto-restart on crash).
+
+### Environment Variables
+
+Environment variables are set directly in the launchd plist (no `.env` file). To add or update a variable:
+
+1. Edit `~/Library/LaunchAgents/cc.cgen.central-flock.plist`
+2. Add entries inside the `<key>EnvironmentVariables</key>` dict:
+   ```xml
+   <key>AUTH_PASSWORD_HASH</key>
+   <string>your-bcrypt-hash</string>
+   ```
+3. Restart the service (see below)
+
+### Restarting Services
+
+```bash
+# Restart Central Flock
+launchctl unload ~/Library/LaunchAgents/cc.cgen.central-flock.plist && \
+launchctl load ~/Library/LaunchAgents/cc.cgen.central-flock.plist
+
+# Restart Cloudflare Tunnel
+launchctl unload ~/Library/LaunchAgents/cc.cgen.cloudflared.plist && \
+launchctl load ~/Library/LaunchAgents/cc.cgen.cloudflared.plist
+
+# Check service status (columns: PID, last exit code, label)
+launchctl list | grep cc.cgen
+
+# View logs
+tail -f ~/Library/Logs/central-flock.log
+tail -f ~/Library/Logs/cloudflared.log
+```
+
 ## CSV Import Format
 
 The import feature expects CSV files with the following columns:

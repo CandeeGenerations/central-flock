@@ -3,8 +3,10 @@ import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Progress} from '@/components/ui/progress'
+import {SearchInput} from '@/components/ui/search-input'
 import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {cancelMessage, fetchMessage, sendNowMessage} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
@@ -12,11 +14,22 @@ import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, Pencil, Play, XCircle} from 'lucide-react'
-import {useState} from 'react'
+import {useMemo, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 type ErrorInfo = {name: string; error: string}
+
+type Recipient = {
+  id: number
+  personId: number
+  firstName: string | null
+  lastName: string | null
+  phoneDisplay: string | null
+  status: string
+  renderedContent: string | null
+  errorMessage?: string | null
+}
 
 const recipientStatusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   sent: 'default',
@@ -25,11 +38,126 @@ const recipientStatusColors: Record<string, 'default' | 'secondary' | 'destructi
   skipped: 'secondary',
 }
 
+function RecipientsCard({
+  recipients,
+  search,
+  debouncedSearch,
+  onSearchChange,
+  page,
+  pageSize,
+  onPageChange,
+  onErrorClick,
+  navigate,
+}: {
+  recipients: Recipient[]
+  search: string
+  debouncedSearch: string
+  onSearchChange: (v: string) => void
+  page: number
+  pageSize: number
+  onPageChange: (fn: (p: number) => number) => void
+  onErrorClick: (info: ErrorInfo) => void
+  navigate: ReturnType<typeof useNavigate>
+}) {
+  const filtered = useMemo(() => {
+    if (!debouncedSearch) return recipients
+    const q = debouncedSearch.toLowerCase()
+    return recipients.filter((r) => formatFullName(r).toLowerCase().includes(q) || (r.phoneDisplay || '').includes(q))
+  }, [recipients, debouncedSearch])
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Recipients</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <SearchInput
+          placeholder="Search recipients..."
+          value={search}
+          onChange={onSearchChange}
+          containerClassName="sm:max-w-sm"
+        />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Rendered Message</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.slice((page - 1) * pageSize, page * pageSize).map((r) => (
+              <TableRow key={r.id} className="cursor-pointer" onClick={() => navigate(`/people/${r.personId}`)}>
+                <TableCell className="font-medium">{formatFullName(r)}</TableCell>
+                <TableCell className="text-muted-foreground">{r.phoneDisplay}</TableCell>
+                <TableCell>
+                  <Badge variant={recipientStatusColors[r.status] || 'outline'}>{r.status}</Badge>
+                </TableCell>
+                <TableCell className="max-w-xs truncate text-sm">{r.renderedContent}</TableCell>
+                <TableCell>
+                  {r.errorMessage && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 h-7 px-2"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onErrorClick({
+                          name: formatFullName(r),
+                          error: r.errorMessage!,
+                        })
+                      }}
+                    >
+                      <AlertCircle className="h-4 w-4 mr-1" />
+                      Error
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                  {recipients.length === 0 ? 'No recipients' : 'No recipients match your search.'}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+        {filtered.length > pageSize && (
+          <div className="flex items-center justify-between pt-4">
+            <span className="text-sm text-muted-foreground">
+              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} of {filtered.length}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange((p) => p - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page * pageSize >= filtered.length}
+                onClick={() => onPageChange((p) => p + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function MessageDetailPage() {
   const {id} = useParams<{id: string}>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null)
+  const [recipientSearch, setRecipientSearch] = useState('')
+  const debouncedRecipientSearch = useDebouncedValue(recipientSearch, 250)
   const [page, setPage] = usePersistedState(`messageDetail.${id}.page`, 1)
   const pageSize = 25
 
@@ -78,46 +206,48 @@ export function MessageDetailPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-4xl">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/messages')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h2 className="text-2xl font-bold">Message Detail</h2>
-        <Badge
-          variant={
-            message.status === 'completed' ? 'default' : message.status === 'cancelled' ? 'destructive' : 'secondary'
-          }
-        >
-          {message.status}
-        </Badge>
-        {(message.status === 'scheduled' || message.status === 'past_due') && (
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/messages')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h2 className="text-2xl font-bold">Message Detail</h2>
+          <Badge
+            variant={
+              message.status === 'completed' ? 'default' : message.status === 'cancelled' ? 'destructive' : 'secondary'
+            }
+          >
+            {message.status}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 sm:ml-auto pl-12 sm:pl-0">
+          {(message.status === 'scheduled' || message.status === 'past_due') && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/messages/compose?editMessageId=${message.id}`)}
+            >
+              <Pencil className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
-            className="ml-auto"
-            onClick={() => navigate(`/messages/compose?editMessageId=${message.id}`)}
+            onClick={() =>
+              navigate('/messages/compose', {
+                state: {
+                  content: message.content,
+                  groupId: message.groupId,
+                  excludeIds: message.recipients.filter((r) => r.status === 'skipped').map((r) => r.personId),
+                },
+              })
+            }
           >
-            <Pencil className="h-4 w-4 mr-1" />
-            Edit
+            <Copy className="h-4 w-4 mr-1" />
+            Duplicate
           </Button>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          className={message.status !== 'scheduled' && message.status !== 'past_due' ? 'ml-auto' : ''}
-          onClick={() =>
-            navigate('/messages/compose', {
-              state: {
-                content: message.content,
-                groupId: message.groupId,
-                excludeIds: message.recipients.filter((r) => r.status === 'skipped').map((r) => r.personId),
-              },
-            })
-          }
-        >
-          <Copy className="h-4 w-4 mr-1" />
-          Duplicate
-        </Button>
+        </div>
       </div>
 
       <Card>
@@ -205,75 +335,20 @@ export function MessageDetailPage() {
 
       {/* Recipients — hidden for scheduled/past_due */}
       {message.status !== 'scheduled' && message.status !== 'past_due' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Recipients</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Rendered Message</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {message.recipients.slice((page - 1) * pageSize, page * pageSize).map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>{formatFullName(r)}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.phoneDisplay}</TableCell>
-                    <TableCell>
-                      <Badge variant={recipientStatusColors[r.status] || 'outline'}>{r.status}</Badge>
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-sm">{r.renderedContent}</TableCell>
-                    <TableCell>
-                      {r.errorMessage && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500 h-7 px-2"
-                          onClick={() =>
-                            setErrorInfo({
-                              name: formatFullName(r),
-                              error: r.errorMessage!,
-                            })
-                          }
-                        >
-                          <AlertCircle className="h-4 w-4 mr-1" />
-                          Error
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {message.recipients.length > pageSize && (
-              <div className="flex items-center justify-between pt-4">
-                <span className="text-sm text-muted-foreground">
-                  Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, message.recipients.length)} of{' '}
-                  {message.recipients.length}
-                </span>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page * pageSize >= message.recipients.length}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <RecipientsCard
+          recipients={message.recipients}
+          search={recipientSearch}
+          debouncedSearch={debouncedRecipientSearch}
+          onSearchChange={(v) => {
+            setRecipientSearch(v)
+            setPage(1)
+          }}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onErrorClick={setErrorInfo}
+          navigate={navigate}
+        />
       )}
       <Dialog
         open={!!errorInfo}

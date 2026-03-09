@@ -167,7 +167,7 @@ export function TemplatesPage() {
 
       {activeTab === 'templates' && (
         <>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <SearchInput
               placeholder="Search templates..."
               value={search}
@@ -175,9 +175,9 @@ export function TemplatesPage() {
                 setSearch(v)
                 setPage(1)
               }}
-              containerClassName="max-w-sm"
+              containerClassName="flex-1 sm:max-w-sm"
             />
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 shrink-0">
               {selectedIds.size > 0 && (
                 <Button variant="destructive" onClick={() => setConfirmOpen(true)}>
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -475,7 +475,7 @@ function VariablesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <SearchInput
           placeholder="Search variables..."
           value={search}
@@ -483,7 +483,7 @@ function VariablesTab() {
             setSearch(v)
             setPage(1)
           }}
-          containerClassName="max-w-sm"
+          containerClassName="w-full sm:max-w-sm"
         />
         {selectedIds.size > 0 && (
           <Button variant="destructive" onClick={() => setConfirmOpen(true)}>

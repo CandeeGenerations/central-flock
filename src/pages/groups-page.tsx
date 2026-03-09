@@ -14,17 +14,18 @@ import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowDown, ArrowUp, ArrowUpDown, MessageSquare, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
-import {Link} from 'react-router-dom'
+import {Link, useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
 
 type SortKey = 'name' | 'memberCount' | 'createdAt'
 type SortDir = 'asc' | 'desc'
 
 export function GroupsPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [addOpen, setAddOpen] = useState(false)
   const [newGroup, setNewGroup] = useState({name: '', description: ''})
-  const [search, setSearch] = usePersistedState('groups.search', '')
+  const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 250)
   const [sortKey, setSortKey] = usePersistedState<SortKey>('groups.sortKey', 'name')
   const [sortDir, setSortDir] = usePersistedState<SortDir>('groups.sortDir', 'asc')
@@ -96,7 +97,7 @@ export function GroupsPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Groups</h2>
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
@@ -138,7 +139,12 @@ export function GroupsPage() {
       </div>
 
       {/* Search */}
-      <SearchInput placeholder="Search groups..." value={search} onChange={setSearch} containerClassName="max-w-sm" />
+      <SearchInput
+        placeholder="Search groups..."
+        value={search}
+        onChange={setSearch}
+        containerClassName="sm:max-w-sm"
+      />
 
       {isLoading ? (
         <PageSpinner />
@@ -173,14 +179,12 @@ export function GroupsPage() {
             </TableHeader>
             <TableBody>
               {filteredGroups.map((group) => (
-                <TableRow key={group.id}>
-                  <TableCell>
-                    <Link to={`/groups/${group.id}`} className="font-medium hover:underline">
-                      {group.name}
-                      {group.description && (
-                        <span className="text-muted-foreground font-normal"> ({group.description})</span>
-                      )}
-                    </Link>
+                <TableRow key={group.id} className="cursor-pointer" onClick={() => navigate(`/groups/${group.id}`)}>
+                  <TableCell className="font-medium">
+                    {group.name}
+                    {group.description && (
+                      <span className="text-muted-foreground font-normal"> ({group.description})</span>
+                    )}
                   </TableCell>
                   <TableCell>{group.memberCount}</TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
@@ -188,7 +192,7 @@ export function GroupsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Link to={`/messages/compose?groupId=${group.id}`}>
+                      <Link to={`/messages/compose?groupId=${group.id}`} onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" title="Send message to group">
                           <MessageSquare className="h-4 w-4" />
                         </Button>
@@ -196,7 +200,10 @@ export function GroupsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setDeleteTarget({id: group.id, name: group.name})}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setDeleteTarget({id: group.id, name: group.name})
+                        }}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

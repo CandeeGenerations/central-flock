@@ -182,7 +182,7 @@ export function MessageHistoryPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Messages</h2>
         <div className="flex gap-2 flex-wrap">
           {(activeTab === 'sent' || activeTab === 'scheduled') && selectedIds.size > 0 && (
@@ -201,7 +201,7 @@ export function MessageHistoryPage() {
             <Button>
               <Plus className="h-4 w-4 mr-2" />
               Compose
-              <kbd className="ml-2 text-[10px] font-mono opacity-60">
+              <kbd className="ml-2 text-[10px] font-mono opacity-60 hidden md:inline">
                 {typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl+'}J
               </kbd>
             </Button>
@@ -214,7 +214,7 @@ export function MessageHistoryPage() {
         placeholder={activeTab === 'drafts' ? 'Search drafts...' : 'Search messages...'}
         value={search}
         onChange={setSearch}
-        containerClassName="max-w-sm"
+        containerClassName="sm:max-w-sm"
       />
 
       {/* Tab toggle */}

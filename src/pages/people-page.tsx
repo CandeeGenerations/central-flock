@@ -2,6 +2,7 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
@@ -29,6 +30,7 @@ import {
   ArrowUpDown,
   Ban,
   Download,
+  EllipsisVertical,
   Plus,
   ToggleLeft,
   ToggleRight,
@@ -37,10 +39,11 @@ import {
   Users,
 } from 'lucide-react'
 import {useState} from 'react'
-import {Link, useSearchParams} from 'react-router-dom'
+import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 export function PeoplePage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [search, setSearch] = usePersistedState('people.search', '')
   const debouncedSearch = useDebouncedValue(search, 250)
@@ -147,36 +150,40 @@ export function PeoplePage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">People</h2>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={async () => {
-              try {
-                await exportPeopleCSV()
-                toast.success('CSV exported')
-              } catch {
-                toast.error('Failed to export CSV')
-              }
-            }}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-          <Link to="/import">
-            <Button variant="outline">
-              <Upload className="h-4 w-4 mr-2" />
-              Import CSV
-            </Button>
-          </Link>
-          <Dialog open={duplicatesOpen} onOpenChange={setDuplicatesOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
+        <div className="flex gap-2 items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <EllipsisVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={async () => {
+                  try {
+                    await exportPeopleCSV()
+                    toast.success('CSV exported')
+                  } catch {
+                    toast.error('Failed to export CSV')
+                  }
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/import')}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDuplicatesOpen(true)}>
                 <Users className="h-4 w-4 mr-2" />
                 Find Duplicates
-              </Button>
-            </DialogTrigger>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Dialog open={duplicatesOpen} onOpenChange={setDuplicatesOpen}>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
@@ -370,7 +377,7 @@ export function PeoplePage() {
             setPage(1)
           }}
           onClear={() => setPage(1)}
-          containerClassName="flex-1 max-w-sm"
+          containerClassName="sm:max-w-sm"
         />
         <SearchableSelect
           value={statusFilter}
@@ -384,7 +391,7 @@ export function PeoplePage() {
             {value: 'inactive', label: 'Inactive'},
             {value: 'do_not_contact', label: 'Do Not Contact'},
           ]}
-          className="w-48"
+          className="w-full sm:w-48"
           searchable={false}
         />
       </div>
@@ -475,16 +482,12 @@ export function PeoplePage() {
               </TableHeader>
               <TableBody>
                 {data?.data.map((person) => (
-                  <TableRow key={person.id}>
-                    <TableCell>
-                      <Link to={`/people/${person.id}`} className="font-medium hover:underline">
-                        {person.firstName || <em className="text-muted-foreground">—</em>}
-                      </Link>
+                  <TableRow key={person.id} className="cursor-pointer" onClick={() => navigate(`/people/${person.id}`)}>
+                    <TableCell className="font-medium">
+                      {person.firstName || <em className="text-muted-foreground">—</em>}
                     </TableCell>
-                    <TableCell>
-                      <Link to={`/people/${person.id}`} className="font-medium hover:underline">
-                        {person.lastName || <em className="text-muted-foreground">—</em>}
-                      </Link>
+                    <TableCell className="font-medium">
+                      {person.lastName || <em className="text-muted-foreground">—</em>}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{person.phoneDisplay || person.phoneNumber}</TableCell>
                     <TableCell>
@@ -527,7 +530,10 @@ export function PeoplePage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => toggleMutation.mutate(person.id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleMutation.mutate(person.id)
+                            }}
                             title={person.status === 'active' ? 'Deactivate' : 'Activate'}
                           >
                             {person.status === 'active' ? (
@@ -537,7 +543,14 @@ export function PeoplePage() {
                             )}
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(person.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeleteTarget(person.id)
+                          }}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>

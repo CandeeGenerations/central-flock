@@ -33,7 +33,7 @@ import {
   XIcon,
 } from 'lucide-react'
 import {useCallback, useEffect, useState} from 'react'
-import {BrowserRouter, NavLink, Route, Routes} from 'react-router-dom'
+import {BrowserRouter, Link, NavLink, Route, Routes} from 'react-router-dom'
 
 const queryClient = new QueryClient({
   defaultOptions: {queries: {staleTime: 30_000}},
@@ -70,7 +70,7 @@ function AuthGate() {
 
 function SidebarNav({onNavClick}: {onNavClick?: () => void}) {
   return (
-    <nav className="flex-1 p-2 space-y-1">
+    <nav className="flex-1 p-3 md:p-2 space-y-1">
       {navItems.map(({to, label, icon: Icon, shortcut}) => (
         <NavLink
           key={to}
@@ -79,12 +79,12 @@ function SidebarNav({onNavClick}: {onNavClick?: () => void}) {
           onClick={onNavClick}
           className={({isActive}) =>
             cn(
-              'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer',
+              'flex items-center gap-3 px-3 py-3 md:py-2 rounded-md text-base md:text-sm font-medium transition-colors cursor-pointer',
               isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/50',
             )
           }
         >
-          <Icon className="h-4 w-4" />
+          <Icon className="h-5 w-5 md:h-4 md:w-4" />
           <span className="flex-1">{label}</span>
           <kbd className="text-[10px] font-mono text-muted-foreground opacity-60 hidden md:inline">{shortcut}</kbd>
         </NavLink>
@@ -108,18 +108,18 @@ function SidebarFooter({
   const qc = useQueryClient()
 
   return (
-    <div className="p-3 border-t space-y-1">
+    <div className="p-3 border-t space-y-1 shrink-0">
       <NavLink
         to="/settings"
         onClick={onNavClick}
         className={({isActive}) =>
           cn(
-            'flex items-center gap-2 px-3 py-2 rounded-md text-sm w-full transition-colors cursor-pointer',
+            'flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm w-full transition-colors cursor-pointer',
             isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/50',
           )
         }
       >
-        <Settings className="h-4 w-4" />
+        <Settings className="h-5 w-5 md:h-4 md:w-4" />
         <span className="flex-1 text-left">Settings</span>
         <kbd className="text-[10px] font-mono text-muted-foreground opacity-60 hidden md:inline">{mod},</kbd>
       </NavLink>
@@ -128,17 +128,17 @@ function SidebarFooter({
           setShortcutsOpen(true)
           onNavClick?.()
         }}
-        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-sidebar-accent/50 w-full transition-colors cursor-pointer"
+        className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 w-full transition-colors cursor-pointer"
       >
-        <Keyboard className="h-4 w-4" />
+        <Keyboard className="h-5 w-5 md:h-4 md:w-4" />
         <span className="flex-1 text-left">Shortcuts</span>
         <kbd className="text-[10px] font-mono text-muted-foreground opacity-60 hidden md:inline">?</kbd>
       </button>
       <button
         onClick={() => setDark((d) => !d)}
-        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-sidebar-accent/50 w-full transition-colors cursor-pointer"
+        className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 w-full transition-colors cursor-pointer"
       >
-        {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        {dark ? <Sun className="h-5 w-5 md:h-4 md:w-4" /> : <Moon className="h-5 w-5 md:h-4 md:w-4" />}
         <span className="flex-1 text-left">{dark ? 'Light Mode' : 'Dark Mode'}</span>
         <kbd className="text-[10px] font-mono text-muted-foreground opacity-60 hidden md:inline">{mod}D</kbd>
       </button>
@@ -149,9 +149,9 @@ function SidebarFooter({
             qc.invalidateQueries({queryKey: ['auth-status']})
             onNavClick?.()
           }}
-          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-sidebar-accent/50 w-full transition-colors cursor-pointer"
+          className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 w-full transition-colors cursor-pointer"
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="h-5 w-5 md:h-4 md:w-4" />
           <span className="flex-1 text-left">Logout</span>
         </button>
       )}
@@ -182,11 +182,11 @@ function AppLayout() {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="w-56 border-r bg-sidebar text-sidebar-foreground hidden md:flex flex-col shrink-0">
-        <div className="p-4 border-b">
+      <aside className="w-56 border-r bg-sidebar text-sidebar-foreground hidden md:flex flex-col shrink-0 overflow-hidden">
+        <Link to="/" className="block p-4 border-b">
           <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-6 dark:hidden" />
           <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6 hidden dark:block" />
-        </div>
+        </Link>
         <SidebarNav />
         <SidebarFooter {...footerProps} />
       </aside>
@@ -194,12 +194,14 @@ function AppLayout() {
       {/* Mobile fullscreen nav */}
       {mobileNavOpen && (
         <div className="fixed inset-0 z-50 md:hidden bg-sidebar text-sidebar-foreground flex flex-col">
-          <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
-            <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu">
-              <XIcon className="h-5 w-5" />
+          <div className="flex items-center gap-3 px-4 py-4 border-b shrink-0">
+            <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu" className="p-1">
+              <XIcon className="h-6 w-6" />
             </button>
-            <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-5 dark:hidden" />
-            <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-5 hidden dark:block" />
+            <Link to="/" onClick={() => setMobileNavOpen(false)}>
+              <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-6 dark:hidden" />
+              <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6 hidden dark:block" />
+            </Link>
           </div>
           <div className="flex-1 flex flex-col overflow-auto pt-2 pb-4">
             <SidebarNav onNavClick={() => setMobileNavOpen(false)} />
@@ -210,12 +212,14 @@ function AppLayout() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center gap-3 border-b px-4 py-3 bg-white dark:bg-sidebar text-foreground dark:text-sidebar-foreground shrink-0">
-          <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu">
-            <Menu className="h-5 w-5" />
+        <header className="md:hidden flex items-center gap-3 border-b px-4 py-4 bg-white dark:bg-sidebar text-foreground dark:text-sidebar-foreground shrink-0">
+          <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu" className="p-1">
+            <Menu className="h-6 w-6" />
           </button>
-          <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-5 dark:hidden" />
-          <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-5 hidden dark:block" />
+          <Link to="/">
+            <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-6 dark:hidden" />
+            <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6 hidden dark:block" />
+          </Link>
         </header>
 
         {/* Main content */}

@@ -10,7 +10,7 @@ import {queryKeys} from '@/lib/query-keys'
 import {useQuery} from '@tanstack/react-query'
 import {Calendar, MessageSquare, Plus} from 'lucide-react'
 import {useState} from 'react'
-import {Link} from 'react-router-dom'
+import {Link, useNavigate} from 'react-router-dom'
 import {Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts'
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -28,6 +28,7 @@ const periods = ['week', 'month', 'year'] as const
 type Period = (typeof periods)[number]
 
 export function DashboardPage() {
+  const navigate = useNavigate()
   const [period, setPeriod] = useState<Period>('month')
 
   const {data: stats, isLoading} = useQuery({
@@ -44,80 +45,90 @@ export function DashboardPage() {
   const skippedPct = totalProcessed > 0 ? Math.round((messages.totalSkipped / totalProcessed) * 100) : 0
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold">Dashboard</h2>
+        <h2 className="text-2xl md:text-2xl font-bold">Dashboard</h2>
         <div className="flex gap-2 flex-wrap">
           <Link to="/messages/compose">
             <Button size="sm">
               <MessageSquare className="h-4 w-4 mr-2" />
               Compose Message
-              <kbd className="ml-2 text-[10px] font-mono opacity-60">{isMac ? '⌘' : 'Ctrl+'}J</kbd>
+              <kbd className="ml-2 text-[10px] font-mono opacity-60 hidden md:inline">{isMac ? '⌘' : 'Ctrl+'}J</kbd>
             </Button>
           </Link>
           <Link to="/people?add=1">
             <Button size="sm" variant="outline">
               <Plus className="h-4 w-4 mr-2" />
               Add Person
-              <kbd className="ml-2 text-[10px] font-mono opacity-60">{isMac ? '⌘' : 'Ctrl+'}P</kbd>
+              <kbd className="ml-2 text-[10px] font-mono opacity-60 hidden md:inline">{isMac ? '⌘' : 'Ctrl+'}P</kbd>
             </Button>
           </Link>
         </div>
       </div>
 
       {/* Row 1 — Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">People</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{people.total}</div>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Badge variant="default">{people.active} active</Badge>
-              <Badge variant="outline">{people.inactive} inactive</Badge>
-              <Badge variant="destructive">{people.doNotContact} DNC</Badge>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+        <Link to="/people">
+          <Card className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors h-full">
+            <CardHeader className="p-4 md:p-6 pb-2 md:pb-2">
+              <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">People</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+              <div className="text-4xl md:text-3xl font-bold">{people.total}</div>
+              <div className="flex flex-wrap gap-1.5 md:gap-2 mt-2">
+                <Badge variant="default">{people.active} active</Badge>
+                <Badge variant="outline">{people.inactive} inactive</Badge>
+                <Badge variant="destructive">{people.doNotContact} DNC</Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Groups</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{groups.total}</div>
-          </CardContent>
-        </Card>
+        <Link to="/groups">
+          <Card className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors h-full">
+            <CardHeader className="p-4 md:p-6 pb-2 md:pb-2">
+              <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">Groups</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+              <div className="text-4xl md:text-3xl font-bold">{groups.total}</div>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Messages Sent</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{messages.totalSent}</div>
-            <p className="text-sm text-muted-foreground mt-1">of {totalProcessed} processed</p>
-          </CardContent>
-        </Card>
+        <Link to="/messages">
+          <Card className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors h-full">
+            <CardHeader className="p-4 md:p-6 pb-2 md:pb-2">
+              <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">Messages Sent</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+              <div className="text-4xl md:text-3xl font-bold">{messages.totalSent}</div>
+              <p className="text-sm text-muted-foreground mt-1">of {totalProcessed} processed</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Scheduled</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{messages.scheduledMessages.length}</div>
-          </CardContent>
-        </Card>
+        <Link to="/messages?tab=scheduled">
+          <Card className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors h-full">
+            <CardHeader className="p-4 md:p-6 pb-2 md:pb-2">
+              <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">Scheduled</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+              <div className="text-4xl md:text-3xl font-bold">{messages.scheduledMessages.length}</div>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Drafts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{drafts.total}</div>
-          </CardContent>
-        </Card>
+        <Link to="/messages?tab=drafts">
+          <Card className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors h-full">
+            <CardHeader className="p-4 md:p-6 pb-2 md:pb-2">
+              <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">Drafts</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+              <div className="text-4xl md:text-3xl font-bold">{drafts.total}</div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Row 2 — Messages Over Time + Delivery Stats */}
@@ -195,29 +206,29 @@ export function DashboardPage() {
           <CardHeader>
             <CardTitle>Delivery Stats</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5 md:space-y-4">
             <div>
-              <div className="flex justify-between text-sm mb-1">
+              <div className="flex justify-between text-base md:text-sm mb-1">
                 <span>Sent</span>
                 <span className="text-green-600">{messages.totalSent}</span>
               </div>
-              <Progress value={successRate} className="**:data-[slot=progress-indicator]:bg-green-500" />
+              <Progress value={successRate} className="h-3 md:h-2 **:data-[slot=progress-indicator]:bg-green-500" />
             </div>
             <div>
-              <div className="flex justify-between text-sm mb-1">
+              <div className="flex justify-between text-base md:text-sm mb-1">
                 <span>Failed</span>
                 <span className="text-red-500">{messages.totalFailed}</span>
               </div>
-              <Progress value={failedPct} className="**:data-[slot=progress-indicator]:bg-red-500" />
+              <Progress value={failedPct} className="h-3 md:h-2 **:data-[slot=progress-indicator]:bg-red-500" />
             </div>
             <div>
-              <div className="flex justify-between text-sm mb-1">
+              <div className="flex justify-between text-base md:text-sm mb-1">
                 <span>Skipped</span>
                 <span className="text-yellow-600">{messages.totalSkipped}</span>
               </div>
-              <Progress value={skippedPct} className="**:data-[slot=progress-indicator]:bg-yellow-500" />
+              <Progress value={skippedPct} className="h-3 md:h-2 **:data-[slot=progress-indicator]:bg-yellow-500" />
             </div>
-            <p className="text-sm text-muted-foreground pt-2">
+            <p className="text-base md:text-sm text-muted-foreground pt-2">
               Overall success rate: <span className="font-semibold text-foreground">{successRate}%</span>
             </p>
           </CardContent>
@@ -246,15 +257,17 @@ export function DashboardPage() {
                   </TableHeader>
                   <TableBody>
                     {messages.recentMessages.map((msg) => (
-                      <TableRow key={msg.id}>
+                      <TableRow
+                        key={msg.id}
+                        className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer"
+                        onClick={() => navigate(`/messages/${msg.id}`)}
+                      >
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {formatDateTime(msg.createdAt)}
                         </TableCell>
                         <TableCell className="max-w-xs truncate">
-                          <Link to={`/messages/${msg.id}`} className="hover:underline truncate block">
-                            {(msg.renderedPreview || msg.content).substring(0, 60)}
-                            {(msg.renderedPreview || msg.content).length > 60 ? '...' : ''}
-                          </Link>
+                          {(msg.renderedPreview || msg.content).substring(0, 60)}
+                          {(msg.renderedPreview || msg.content).length > 60 ? '...' : ''}
                         </TableCell>
                         <TableCell>
                           <span className="text-green-600">{msg.sentCount}</span>
@@ -270,8 +283,8 @@ export function DashboardPage() {
                 </Table>
               </div>
             )}
-            <div className="mt-3 text-center">
-              <Link to="/messages" className="text-sm text-primary hover:underline">
+            <div className="mt-4 md:mt-3 text-center">
+              <Link to="/messages" className="text-base md:text-sm text-primary hover:underline">
                 View all messages
               </Link>
             </div>
@@ -291,15 +304,15 @@ export function DashboardPage() {
                   <Link
                     key={msg.id}
                     to={`/messages/${msg.id}`}
-                    className="flex items-start gap-3 p-3 rounded-md border hover:bg-accent/50 transition-colors"
+                    className="flex items-start gap-3 p-4 md:p-3 rounded-md border bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                   >
-                    <Calendar className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <Calendar className="h-5 w-5 md:h-4 md:w-4 mt-0.5 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate">
+                      <p className="text-base md:text-sm truncate">
                         {(msg.renderedPreview || msg.content).substring(0, 60)}
                         {(msg.renderedPreview || msg.content).length > 60 ? '...' : ''}
                       </p>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 mt-1 text-sm md:text-xs text-muted-foreground">
                         {msg.scheduledAt && <span>{formatDateTime(msg.scheduledAt)}</span>}
                         <span>{msg.totalRecipients} recipients</span>
                       </div>

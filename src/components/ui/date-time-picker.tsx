@@ -1,10 +1,20 @@
 import {Button} from '@/components/ui/button'
 import {Calendar} from '@/components/ui/calendar'
-import {Input} from '@/components/ui/input'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {cn} from '@/lib/utils'
 import {CalendarIcon, X} from 'lucide-react'
 import {useState} from 'react'
+
+const hourOptions = Array.from({length: 24}, (_, i) => {
+  const h = String(i).padStart(2, '0')
+  const label = i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`
+  return {value: h, label}
+})
+
+const minuteOptions = Array.from({length: 12}, (_, i) => {
+  const m = String(i * 5).padStart(2, '0')
+  return {value: m, label: `:${m}`}
+})
 
 interface DateTimePickerProps {
   value: string
@@ -17,7 +27,7 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
 
   const date = value ? new Date(value) : undefined
   const hours = date ? String(date.getHours()).padStart(2, '0') : '09'
-  const minutes = date ? String(date.getMinutes()).padStart(2, '0') : '00'
+  const minutes = date ? String(Math.round(date.getMinutes() / 5) * 5).padStart(2, '0') : '00'
 
   const handleDateSelect = (selected: Date | undefined) => {
     if (!selected) return
@@ -31,7 +41,6 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
     const d = date ? new Date(date) : new Date()
     d.setHours(Number(h), Number(m), 0, 0)
     if (!date) {
-      // If no date was set yet, use today
       const today = new Date()
       d.setFullYear(today.getFullYear(), today.getMonth(), today.getDate())
     }
@@ -82,7 +91,7 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
           </button>
         )}
       </div>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto max-w-[calc(100vw-2rem)] p-0" align="start">
         <Calendar
           mode="single"
           defaultMonth={date}
@@ -92,25 +101,29 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
           initialFocus
         />
         <div className="border-t px-4 py-3 flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Time:</span>
-          <Input
-            type="number"
-            min={0}
-            max={23}
+          <span className="text-sm text-muted-foreground shrink-0">Time:</span>
+          <select
             value={hours}
             onChange={(e) => handleTimeChange(e.target.value, minutes)}
-            className="w-16 text-center"
-          />
-          <span className="text-sm font-medium">:</span>
-          <Input
-            type="number"
-            min={0}
-            max={59}
-            step={5}
+            className="flex-1 h-9 rounded-md border border-input bg-background px-2 text-sm cursor-pointer"
+          >
+            {hourOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <select
             value={minutes}
             onChange={(e) => handleTimeChange(hours, e.target.value)}
-            className="w-16 text-center"
-          />
+            className="flex-1 h-9 rounded-md border border-input bg-background px-2 text-sm cursor-pointer"
+          >
+            {minuteOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </div>
       </PopoverContent>
     </Popover>

@@ -1,9 +1,7 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Input} from '@/components/ui/input'
-import {Label} from '@/components/ui/label'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {InlineSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
@@ -12,7 +10,19 @@ import type {TemplateVariable} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {format} from 'date-fns'
-import {ArrowLeft, Calendar, ChevronDown, ChevronRight, Eye, Globe, Save, Trash2, Type, X} from 'lucide-react'
+import {
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  Globe,
+  MessageSquare,
+  Save,
+  Send,
+  Settings,
+  Trash2,
+  Type,
+  X,
+} from 'lucide-react'
 import {type ReactNode, useCallback, useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -178,147 +188,221 @@ export function TemplateEditPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-4xl">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/templates')}>
-          <ArrowLeft className="h-4 w-4" />
+    <div className="p-4 md:p-6">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <X className="h-4 w-4" />
         </Button>
-        <h2 className="text-2xl font-bold">{isEdit ? 'Edit Template' : 'Create Template'}</h2>
+        <h2 className="text-xl font-semibold">{isEdit ? 'Edit Template' : 'Create Template'}</h2>
       </div>
 
-      {/* Name */}
-      <div className="space-y-2">
-        <Label>Template Name</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Event Invitation" />
-      </div>
-
-      {/* Variable sections as dropdowns */}
-      <div className="space-y-2">
-        <VariableDropdown label="Person Variables">
-          <div className="flex flex-wrap gap-2 mt-2">
-            <Button variant="outline" size="sm" onClick={() => insertVariable('firstName')}>
-              {'{{firstName}}'}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => insertVariable('lastName')}>
-              {'{{lastName}}'}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => insertVariable('fullName')}>
-              {'{{fullName}}'}
-            </Button>
+      {/* Two-column layout: form + phone preview */}
+      <div className="flex gap-8">
+        {/* Left: Form */}
+        <div className="flex-1 min-w-0 space-y-0 max-w-3xl">
+          {/* === NAME Section === */}
+          <div className="py-6 border-b">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Settings className="h-4 w-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold">Template Name</h3>
+                <p className="text-sm text-muted-foreground mb-3">Give your template a descriptive name.</p>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Event Invitation" />
+              </div>
+            </div>
           </div>
-        </VariableDropdown>
 
-        <VariableDropdown label="Custom Variables" count={customVariables.length} defaultOpen>
-          <div className="space-y-3 mt-2">
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <Input
-                  value={newVarName}
-                  onChange={(e) => setNewVarName(e.target.value)}
-                  placeholder="variableName"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAddVariable()
-                  }}
+          {/* === MESSAGE Section === */}
+          <div className="py-6 border-b">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <MessageSquare className="h-4 w-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold">Message Body</h3>
+                <p className="text-sm text-muted-foreground mb-3">Compose your template message content.</p>
+
+                {/* Variable insertion */}
+                <div className="space-y-2 mb-3">
+                  <VariableDropdown label="Person Variables">
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Button variant="outline" size="sm" onClick={() => insertVariable('firstName')}>
+                        {'{{firstName}}'}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => insertVariable('lastName')}>
+                        {'{{lastName}}'}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => insertVariable('fullName')}>
+                        {'{{fullName}}'}
+                      </Button>
+                    </div>
+                  </VariableDropdown>
+
+                  <VariableDropdown label="Custom Variables" count={customVariables.length} defaultOpen>
+                    <div className="space-y-3 mt-2">
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <Input
+                            value={newVarName}
+                            onChange={(e) => setNewVarName(e.target.value)}
+                            placeholder="variableName"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddVariable()
+                            }}
+                          />
+                        </div>
+                        <SearchableSelect
+                          value={newVarType}
+                          onValueChange={(v) => setNewVarType(v as 'text' | 'date')}
+                          options={[
+                            {value: 'text', label: 'Text'},
+                            {value: 'date', label: 'Date'},
+                          ]}
+                          className="w-28"
+                          searchable={false}
+                        />
+                        <Button onClick={handleAddVariable}>Add</Button>
+                      </div>
+                      {customVariables.length > 0 && (
+                        <>
+                          <div className="flex flex-wrap gap-2">
+                            {customVariables.map((v) => (
+                              <Badge key={v.name} variant="secondary" className="gap-1 pr-1">
+                                {v.type === 'date' ? <Calendar className="h-3 w-3" /> : <Type className="h-3 w-3" />}
+                                {v.name}
+                                <button
+                                  type="button"
+                                  className="ml-1 rounded-full hover:bg-destructive/20 p-0.5 cursor-pointer"
+                                  onClick={() => removeVariable(v.name)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="text-xs text-muted-foreground self-center mr-1">Insert:</span>
+                            {customVariables.map((v) => (
+                              <Button key={v.name} variant="outline" size="sm" onClick={() => insertVariable(v.name)}>
+                                {v.type === 'date' ? (
+                                  <Calendar className="h-3 w-3 mr-1" />
+                                ) : (
+                                  <Type className="h-3 w-3 mr-1" />
+                                )}
+                                {`{{${v.name}}}`}
+                              </Button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </VariableDropdown>
+
+                  {globalVariables && globalVariables.length > 0 && (
+                    <VariableDropdown label="Global Variables" count={globalVariables.length} defaultOpen>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {globalVariables.map((v) => (
+                          <Button key={v.name} variant="outline" size="sm" onClick={() => insertVariable(v.name)}>
+                            <Globe className="h-3 w-3 mr-1" />
+                            {`{{${v.name}}}`}
+                          </Button>
+                        ))}
+                      </div>
+                    </VariableDropdown>
+                  )}
+                </div>
+
+                <Textarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  rows={8}
+                  placeholder="Type your template message here..."
                 />
               </div>
-              <SearchableSelect
-                value={newVarType}
-                onValueChange={(v) => setNewVarType(v as 'text' | 'date')}
-                options={[
-                  {value: 'text', label: 'Text'},
-                  {value: 'date', label: 'Date'},
-                ]}
-                className="w-28"
-                searchable={false}
-              />
-              <Button onClick={handleAddVariable}>Add</Button>
             </div>
-            {customVariables.length > 0 && (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  {customVariables.map((v) => (
-                    <Badge key={v.name} variant="secondary" className="gap-1 pr-1">
-                      {v.type === 'date' ? <Calendar className="h-3 w-3" /> : <Type className="h-3 w-3" />}
-                      {v.name}
-                      <button
-                        type="button"
-                        className="ml-1 rounded-full hover:bg-destructive/20 p-0.5 cursor-pointer"
-                        onClick={() => removeVariable(v.name)}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-xs text-muted-foreground self-center mr-1">Insert:</span>
-                  {customVariables.map((v) => (
-                    <Button key={v.name} variant="outline" size="sm" onClick={() => insertVariable(v.name)}>
-                      {v.type === 'date' ? <Calendar className="h-3 w-3 mr-1" /> : <Type className="h-3 w-3 mr-1" />}
-                      {`{{${v.name}}}`}
-                    </Button>
-                  ))}
-                </div>
-              </>
-            )}
           </div>
-        </VariableDropdown>
 
-        {globalVariables && globalVariables.length > 0 && (
-          <VariableDropdown label="Global Variables" count={globalVariables.length} defaultOpen>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {globalVariables.map((v) => (
-                <Button key={v.name} variant="outline" size="sm" onClick={() => insertVariable(v.name)}>
-                  <Globe className="h-3 w-3 mr-1" />
-                  {`{{${v.name}}}`}
-                </Button>
-              ))}
+          {/* Bottom actions */}
+          <div className="py-6 flex items-center justify-between">
+            {isEdit ? (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmDeleteOpen(true)}>
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                Delete
+              </Button>
+            ) : (
+              <div />
+            )}
+            <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending || !name.trim()}>
+              <Save className="h-4 w-4 mr-1.5" />
+              {saveMutation.isPending ? 'Saving...' : isEdit ? 'Update Template' : 'Create Template'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Right: Phone Preview (desktop only) */}
+        <div className="hidden lg:block w-[300px] shrink-0">
+          <div className="sticky top-6">
+            <div className="text-center mb-3">
+              <p className="text-sm font-medium">SMS Preview</p>
+              <p className="text-xs text-muted-foreground">John Doe</p>
             </div>
-          </VariableDropdown>
-        )}
-      </div>
-
-      {/* Message body */}
-      <div className="space-y-2">
-        <Label>Message Body</Label>
-        <Textarea
-          ref={textareaRef}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={10}
-          placeholder="Type your template message here..."
-        />
-      </div>
-
-      {/* Preview */}
-      {content && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Eye className="h-4 w-4" />
-              Preview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap">{renderPreview()}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Actions */}
-      <div className="flex justify-between">
-        {isEdit ? (
-          <Button variant="destructive" size="lg" onClick={() => setConfirmDeleteOpen(true)}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
-        ) : (
-          <div />
-        )}
-        <Button size="lg" onClick={handleSave} disabled={saveMutation.isPending || !name.trim()}>
-          <Save className="h-4 w-4 mr-2" />
-          {saveMutation.isPending ? 'Saving...' : isEdit ? 'Update Template' : 'Create Template'}
-        </Button>
+            {/* Phone mockup */}
+            <div className="relative mx-auto w-[280px]">
+              <div className="rounded-[2rem] border-[3px] border-foreground/20 bg-background shadow-xl overflow-hidden">
+                {/* Status bar */}
+                <div className="flex items-center justify-between px-6 pt-3 pb-1 text-[10px] text-muted-foreground">
+                  <span>{format(new Date(), 'h:mm')}</span>
+                  <div className="flex items-center gap-1">
+                    <div className="flex gap-0.5">
+                      <div className="w-1 h-1.5 bg-muted-foreground/60 rounded-sm" />
+                      <div className="w-1 h-2 bg-muted-foreground/60 rounded-sm" />
+                      <div className="w-1 h-2.5 bg-muted-foreground/60 rounded-sm" />
+                      <div className="w-1 h-3 bg-muted-foreground/30 rounded-sm" />
+                    </div>
+                  </div>
+                </div>
+                {/* Contact header */}
+                <div className="text-center py-3 border-b">
+                  <div className="w-8 h-8 rounded-full bg-muted mx-auto mb-1 flex items-center justify-center">
+                    <Type className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-xs font-medium">John Doe</p>
+                </div>
+                {/* Messages area */}
+                <div className="min-h-[320px] max-h-[400px] overflow-auto p-3 bg-muted/30">
+                  {content ? (
+                    <div className="flex justify-start">
+                      <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-3 py-2">
+                        <p className="text-xs whitespace-pre-wrap leading-relaxed">{renderPreview()}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-[280px]">
+                      <p className="text-xs text-muted-foreground">Message preview will appear here</p>
+                    </div>
+                  )}
+                </div>
+                {/* Input bar */}
+                <div className="flex items-center gap-2 p-2 border-t bg-background">
+                  <div className="flex-1 rounded-full bg-muted px-3 py-1.5">
+                    <span className="text-[10px] text-muted-foreground">Your message</span>
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0">
+                    <Send className="h-3 w-3 text-primary-foreground" />
+                  </div>
+                </div>
+                {/* Home indicator */}
+                <div className="flex justify-center py-2">
+                  <div className="w-24 h-1 bg-foreground/20 rounded-full" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <ConfirmDialog
@@ -352,7 +436,7 @@ function VariableDropdown({
     <div className="border rounded-md">
       <button
         type="button"
-        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer"
+        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer rounded-t-md"
         onClick={() => setOpen(!open)}
       >
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}

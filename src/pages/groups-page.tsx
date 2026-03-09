@@ -14,7 +14,7 @@ import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowDown, ArrowUp, ArrowUpDown, MessageSquare, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
-import {Link, useNavigate} from 'react-router-dom'
+import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 type SortKey = 'name' | 'memberCount' | 'createdAt'
@@ -22,8 +22,23 @@ type SortDir = 'asc' | 'desc'
 
 export function GroupsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
-  const [addOpen, setAddOpen] = useState(false)
+  const addFromParam = searchParams.get('add') === '1'
+  const [addOpenLocal, setAddOpenLocal] = useState(false)
+  const addOpen = addFromParam || addOpenLocal
+  const setAddOpen = (open: boolean) => {
+    setAddOpenLocal(open)
+    if (!open && addFromParam) {
+      setSearchParams(
+        (p) => {
+          p.delete('add')
+          return p
+        },
+        {replace: true},
+      )
+    }
+  }
   const [newGroup, setNewGroup] = useState({name: '', description: ''})
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 250)
@@ -106,7 +121,13 @@ export function GroupsPage() {
               Create Group
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent
+            onOpenAutoFocus={(e) => {
+              e.preventDefault()
+              const input = (e.target as HTMLElement).querySelector<HTMLInputElement>('input')
+              input?.focus()
+            }}
+          >
             <DialogHeader>
               <DialogTitle>Create Group</DialogTitle>
             </DialogHeader>

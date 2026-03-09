@@ -49,19 +49,19 @@ export function DashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h2 className="text-2xl md:text-2xl font-bold">Dashboard</h2>
-        <div className="flex gap-2 flex-wrap">
+        <div className="hidden md:flex gap-2 flex-wrap">
           <Link to="/messages/compose">
             <Button size="sm">
               <MessageSquare className="h-4 w-4 mr-2" />
               Compose Message
-              <kbd className="ml-2 text-[10px] font-mono opacity-60 hidden md:inline">{isMac ? '⌘' : 'Ctrl+'}J</kbd>
+              <kbd className="ml-2 text-[10px] font-mono opacity-60">{isMac ? '⌘' : 'Ctrl+'}J</kbd>
             </Button>
           </Link>
           <Link to="/people?add=1">
             <Button size="sm" variant="outline">
               <Plus className="h-4 w-4 mr-2" />
               Add Person
-              <kbd className="ml-2 text-[10px] font-mono opacity-60 hidden md:inline">{isMac ? '⌘' : 'Ctrl+'}P</kbd>
+              <kbd className="ml-2 text-[10px] font-mono opacity-60">{isMac ? '⌘' : 'Ctrl+'}P</kbd>
             </Button>
           </Link>
         </div>

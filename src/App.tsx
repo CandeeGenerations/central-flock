@@ -24,16 +24,15 @@ import {
   Keyboard,
   LayoutDashboard,
   LogOut,
-  Menu,
   MessageSquare,
   Moon,
+  Plus,
   Settings,
   Sun,
   Users,
-  XIcon,
 } from 'lucide-react'
 import {useCallback, useEffect, useState} from 'react'
-import {BrowserRouter, Link, NavLink, Route, Routes} from 'react-router-dom'
+import {BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate} from 'react-router-dom'
 
 const queryClient = new QueryClient({
   defaultOptions: {queries: {staleTime: 30_000}},
@@ -159,6 +158,56 @@ function SidebarFooter({
   )
 }
 
+const fabActions: Record<string, {label: string; to: string}> = {
+  '/': {label: 'Compose', to: '/messages/compose'},
+  '/people': {label: 'Add Person', to: '/people?add=1'},
+  '/groups': {label: 'Create Group', to: '/groups?add=1'},
+  '/messages': {label: 'Compose', to: '/messages/compose'},
+  '/templates': {label: 'New Template', to: '/templates/new'},
+}
+
+function MobileFab() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const action = fabActions[location.pathname]
+  if (!action) return null
+
+  return (
+    <button
+      onClick={() => navigate(action.to)}
+      aria-label={action.label}
+      className="fixed right-5 bottom-28 z-50 md:hidden flex items-center justify-center h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
+    >
+      <Plus className="h-7 w-7" />
+    </button>
+  )
+}
+
+function BottomTabBar() {
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-sidebar text-sidebar-foreground border-t safe-bottom">
+      <div className="flex items-center justify-around px-3 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        {navItems.map(({to, label, icon: Icon}) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={({isActive}) =>
+              cn(
+                'flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors min-w-[4rem]',
+                isActive ? 'text-sidebar-accent-foreground bg-sidebar-accent' : 'text-sidebar-foreground/60',
+              )
+            }
+          >
+            <Icon className="h-6 w-6" />
+            <span>{label}</span>
+          </NavLink>
+        ))}
+      </div>
+    </nav>
+  )
+}
+
 function AppLayout() {
   const [dark, setDark] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -167,7 +216,6 @@ function AppLayout() {
     return false
   })
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const showShortcuts = useCallback(() => setShortcutsOpen(true), [])
   const toggleDark = useCallback(() => setDark((d) => !d), [])
   useKeyboardShortcuts(showShortcuts, toggleDark)
@@ -191,39 +239,17 @@ function AppLayout() {
         <SidebarFooter {...footerProps} />
       </aside>
 
-      {/* Mobile fullscreen nav */}
-      {mobileNavOpen && (
-        <div className="fixed inset-0 z-50 md:hidden bg-sidebar text-sidebar-foreground flex flex-col">
-          <div className="flex items-center gap-3 px-4 py-4 border-b shrink-0">
-            <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu" className="p-1">
-              <XIcon className="h-6 w-6" />
-            </button>
-            <Link to="/" onClick={() => setMobileNavOpen(false)}>
-              <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-6 dark:hidden" />
-              <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6 hidden dark:block" />
-            </Link>
-          </div>
-          <div className="flex-1 flex flex-col overflow-auto pt-2 pb-4">
-            <SidebarNav onNavClick={() => setMobileNavOpen(false)} />
-            <SidebarFooter {...footerProps} onNavClick={() => setMobileNavOpen(false)} />
-          </div>
-        </div>
-      )}
-
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center gap-3 border-b px-4 py-4 bg-white dark:bg-sidebar text-foreground dark:text-sidebar-foreground shrink-0">
-          <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu" className="p-1">
-            <Menu className="h-6 w-6" />
-          </button>
+        <header className="md:hidden flex items-center justify-center border-b px-4 py-3 bg-white dark:bg-neutral-900 shrink-0">
           <Link to="/">
-            <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-6 dark:hidden" />
-            <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6 hidden dark:block" />
+            <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-5 dark:hidden" />
+            <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-5 hidden dark:block" />
           </Link>
         </header>
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto pb-48">
+        <main className="flex-1 overflow-auto pb-48 md:pb-8">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/people" element={<PeoplePage />} />
@@ -241,6 +267,11 @@ function AppLayout() {
           </Routes>
         </main>
       </div>
+
+      {/* Mobile FAB + bottom tab bar */}
+      <MobileFab />
+      <BottomTabBar />
+
       <Toaster />
       <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>

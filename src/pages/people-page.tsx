@@ -49,8 +49,22 @@ export function PeoplePage() {
   const debouncedSearch = useDebouncedValue(search, 250)
   const [statusFilter, setStatusFilter] = usePersistedState('people.statusFilter', 'all')
   const [page, setPage] = usePersistedState('people.page', 1)
-  const [searchParams] = useSearchParams()
-  const [addOpen, setAddOpen] = useState(() => searchParams.get('add') === '1')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const addFromParam = searchParams.get('add') === '1'
+  const [addOpenLocal, setAddOpenLocal] = useState(false)
+  const addOpen = addFromParam || addOpenLocal
+  const setAddOpen = (open: boolean) => {
+    setAddOpenLocal(open)
+    if (!open && addFromParam) {
+      setSearchParams(
+        (p) => {
+          p.delete('add')
+          return p
+        },
+        {replace: true},
+      )
+    }
+  }
   const [duplicatesOpen, setDuplicatesOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [sort, setSort] = usePersistedState<'createdAt' | 'firstName' | 'lastName'>('people.sort', 'createdAt')
@@ -319,7 +333,13 @@ export function PeoplePage() {
                 Add Person
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent
+              onOpenAutoFocus={(e) => {
+                e.preventDefault()
+                const input = (e.target as HTMLElement).querySelector<HTMLInputElement>('input')
+                input?.focus()
+              }}
+            >
               <DialogHeader>
                 <DialogTitle>Add Person</DialogTitle>
               </DialogHeader>

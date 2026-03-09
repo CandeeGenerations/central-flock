@@ -210,7 +210,12 @@ export function TemplateEditPage() {
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold">Template Name</h3>
                 <p className="text-sm text-muted-foreground mb-3">Give your template a descriptive name.</p>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Event Invitation" />
+                <Input
+                  autoFocus
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Event Invitation"
+                />
               </div>
             </div>
           </div>

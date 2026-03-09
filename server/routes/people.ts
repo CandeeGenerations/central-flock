@@ -6,6 +6,13 @@ import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 
 export const peopleRouter = Router()
 
+function e164ToDisplay(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits
+  if (local.length === 10) return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`
+  return phone
+}
+
 // GET /api/people/duplicates - Find duplicate people
 peopleRouter.get(
   '/duplicates',
@@ -285,7 +292,7 @@ peopleRouter.post(
           firstName: firstName || null,
           lastName: lastName || null,
           phoneNumber,
-          phoneDisplay: phoneDisplay || null,
+          phoneDisplay: phoneDisplay || e164ToDisplay(phoneNumber),
           status: status || 'active',
           notes: notes || null,
         })

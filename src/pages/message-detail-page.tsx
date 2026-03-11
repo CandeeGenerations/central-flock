@@ -8,14 +8,14 @@ import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
-import {cancelMessage, fetchMessage, sendNowMessage} from '@/lib/api'
+import {cancelMessage, fetchMessage, resumeMessage, sendNowMessage} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, Pencil, Play, XCircle} from 'lucide-react'
+import {AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Copy, ExternalLink, Pencil, Play, XCircle} from 'lucide-react'
 import {useMemo, useState} from 'react'
-import {useNavigate, useParams} from 'react-router-dom'
+import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 type ErrorInfo = {name: string; error: string}
@@ -47,7 +47,6 @@ function RecipientsCard({
   pageSize,
   onPageChange,
   onErrorClick,
-  navigate,
 }: {
   recipients: Recipient[]
   search: string
@@ -57,8 +56,9 @@ function RecipientsCard({
   pageSize: number
   onPageChange: (fn: (p: number) => number) => void
   onErrorClick: (info: ErrorInfo) => void
-  navigate: ReturnType<typeof useNavigate>
 }) {
+  const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null)
+
   const filtered = useMemo(() => {
     if (!debouncedSearch) return recipients
     const q = debouncedSearch.toLowerCase()
@@ -77,55 +77,59 @@ function RecipientsCard({
           onChange={onSearchChange}
           containerClassName="sm:max-w-sm"
         />
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Rendered Message</TableHead>
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.slice((page - 1) * pageSize, page * pageSize).map((r) => (
-              <TableRow key={r.id} className="cursor-pointer" onClick={() => navigate(`/people/${r.personId}`)}>
-                <TableCell className="font-medium">{formatFullName(r)}</TableCell>
-                <TableCell className="text-muted-foreground">{r.phoneDisplay}</TableCell>
-                <TableCell>
-                  <Badge variant={recipientStatusColors[r.status] || 'outline'}>{r.status}</Badge>
-                </TableCell>
-                <TableCell className="max-w-xs truncate text-sm">{r.renderedContent}</TableCell>
-                <TableCell>
-                  {r.errorMessage && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-500 h-7 px-2"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onErrorClick({
-                          name: formatFullName(r),
-                          error: r.errorMessage!,
-                        })
-                      }}
-                    >
-                      <AlertCircle className="h-4 w-4 mr-1" />
-                      Error
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 && (
+        <div className="border rounded-md bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
-                  {recipients.length === 0 ? 'No recipients' : 'No recipients match your search.'}
-                </TableCell>
+                <TableHead>Name</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead></TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filtered.slice((page - 1) * pageSize, page * pageSize).map((r) => (
+                <TableRow
+                  key={r.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => setSelectedRecipient(r)}
+                >
+                  <TableCell className="font-medium">{formatFullName(r)}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.phoneDisplay}</TableCell>
+                  <TableCell>
+                    <Badge variant={recipientStatusColors[r.status] || 'outline'}>{r.status}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {r.errorMessage && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 h-7 px-2"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onErrorClick({
+                            name: formatFullName(r),
+                            error: r.errorMessage!,
+                          })
+                        }}
+                      >
+                        <AlertCircle className="h-4 w-4 mr-1" />
+                        Error
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                    {recipients.length === 0 ? 'No recipients' : 'No recipients match your search.'}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
         {filtered.length > pageSize && (
           <div className="flex items-center justify-between pt-4">
             <span className="text-sm text-muted-foreground">
@@ -147,6 +151,56 @@ function RecipientsCard({
           </div>
         )}
       </CardContent>
+
+      <Dialog open={!!selectedRecipient} onOpenChange={(open) => !open && setSelectedRecipient(null)}>
+        {selectedRecipient && (
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{formatFullName(selectedRecipient)}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground mb-0.5">Phone</p>
+                  <p>{selectedRecipient.phoneDisplay || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-0.5">Status</p>
+                  <Badge variant={recipientStatusColors[selectedRecipient.status] || 'outline'}>
+                    {selectedRecipient.status}
+                  </Badge>
+                </div>
+              </div>
+
+              {selectedRecipient.renderedContent && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Sent Message</p>
+                  <p className="text-sm whitespace-pre-wrap bg-muted p-3 rounded-md">
+                    {selectedRecipient.renderedContent}
+                  </p>
+                </div>
+              )}
+
+              {selectedRecipient.errorMessage && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Error</p>
+                  <pre className="text-sm text-red-500 whitespace-pre-wrap break-all bg-muted rounded-md p-3 overflow-auto max-h-32 font-mono">
+                    <code>{selectedRecipient.errorMessage}</code>
+                  </pre>
+                </div>
+              )}
+
+              <Link
+                to={`/people/${selectedRecipient.personId}`}
+                className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                View Person Profile
+              </Link>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
     </Card>
   )
 }
@@ -192,6 +246,15 @@ export function MessageDetailPage() {
       queryClient.invalidateQueries({queryKey: queryKeys.message(id!)})
       queryClient.invalidateQueries({queryKey: queryKeys.messages()})
       toast.success('Message sending started')
+    },
+  })
+
+  const resumeMutation = useMutation({
+    mutationFn: () => resumeMessage(Number(id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: queryKeys.message(id!)})
+      queryClient.invalidateQueries({queryKey: queryKeys.messages()})
+      toast.success('Message sending resumed')
     },
   })
 
@@ -309,15 +372,21 @@ export function MessageDetailPage() {
             <CardTitle>Progress</CardTitle>
             <div className="flex flex-wrap gap-2">
               {message.status === 'sending' && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => cancelMutation.mutate()}
-                  disabled={cancelMutation.isPending}
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  Cancel
-                </Button>
+                <>
+                  <Button size="sm" onClick={() => resumeMutation.mutate()} disabled={resumeMutation.isPending}>
+                    <Play className="h-4 w-4 mr-1" />
+                    Resume
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => cancelMutation.mutate()}
+                    disabled={cancelMutation.isPending}
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Cancel
+                  </Button>
+                </>
               )}
             </div>
           </CardHeader>
@@ -347,7 +416,6 @@ export function MessageDetailPage() {
           pageSize={pageSize}
           onPageChange={setPage}
           onErrorClick={setErrorInfo}
-          navigate={navigate}
         />
       )}
       <Dialog

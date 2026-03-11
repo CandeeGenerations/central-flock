@@ -357,7 +357,7 @@ export function TemplateEditPage() {
             </div>
             {/* Phone mockup */}
             <div className="relative mx-auto w-[280px]">
-              <div className="rounded-[2rem] border-[3px] border-foreground/20 bg-background shadow-xl overflow-hidden">
+              <div className="rounded-[2rem] border-[3px] border-foreground/20 bg-card shadow-xl overflow-hidden">
                 {/* Status bar */}
                 <div className="flex items-center justify-between px-6 pt-3 pb-1 text-[10px] text-muted-foreground">
                   <span>{format(new Date(), 'h:mm')}</span>
@@ -392,7 +392,7 @@ export function TemplateEditPage() {
                   )}
                 </div>
                 {/* Input bar */}
-                <div className="flex items-center gap-2 p-2 border-t bg-background">
+                <div className="flex items-center gap-2 p-2 border-t bg-card">
                   <div className="flex-1 rounded-full bg-muted px-3 py-1.5">
                     <span className="text-[10px] text-muted-foreground">Your message</span>
                   </div>
@@ -438,10 +438,10 @@ function VariableDropdown({
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <div className="border rounded-md">
+    <div className="border rounded-md bg-card">
       <button
         type="button"
-        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer rounded-t-md"
+        className={`flex items-center gap-2 w-full px-3 py-2 text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer rounded-t-md ${!open ? 'rounded-b-md' : ''}`}
         onClick={() => setOpen(!open)}
       >
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}

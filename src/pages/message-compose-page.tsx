@@ -106,6 +106,7 @@ export function MessageComposePage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [batchDelayMs, setBatchDelayMs] = useState<number>(BATCH_DEFAULTS.batchDelayMs)
   const [scheduledAt, setScheduledAt] = useState('')
+  const [sendTimeMode, setSendTimeMode] = useState<'now' | 'schedule'>('now')
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(draftIdParam ? Number(draftIdParam) : null)
   const [individualSearch, setIndividualSearch] = useState('')
   const debouncedIndividualSearch = useDebouncedValue(individualSearch, 250)
@@ -164,6 +165,7 @@ export function MessageComposePage() {
     setBatchSize(draftData.batchSize ?? BATCH_DEFAULTS.batchSize)
     setBatchDelayMs(draftData.batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs)
     setScheduledAt(draftData.scheduledAt || '')
+    if (draftData.scheduledAt) setSendTimeMode('schedule')
     if (draftData.excludeIds) {
       try {
         setExcludeIds(new Set(JSON.parse(draftData.excludeIds)))
@@ -235,6 +237,7 @@ export function MessageComposePage() {
       const d = new Date(editMessageData.scheduledAt + (editMessageData.scheduledAt.endsWith('Z') ? '' : 'Z'))
       const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
       setScheduledAt(local)
+      setSendTimeMode('schedule')
     }
     // Derive exclude/include from recipients
     const pendingIds = editMessageData.recipients.filter((r) => r.status === 'pending').map((r) => r.personId)
@@ -293,7 +296,6 @@ export function MessageComposePage() {
   const {data: allPeople} = useQuery({
     queryKey: [...queryKeys.people, 'all'],
     queryFn: () => fetchPeople({limit: 1000}),
-    enabled: recipientMode === 'individual',
   })
   const {data: globalVariables} = useQuery({
     queryKey: queryKeys.globalVariables(),
@@ -345,22 +347,36 @@ export function MessageComposePage() {
     setDateFormats(defaultFormats)
   }
 
+  const groupMemberIds = useMemo(
+    () => new Set(groupDetail?.members.map((m) => m.id) || []),
+    [groupDetail],
+  )
+
   const recipients = useMemo(() => {
     if (recipientMode === 'group' && groupDetail) {
-      return groupDetail.members.filter((m) => !excludeIds.has(m.id))
+      const groupRecipients = groupDetail.members.filter((m) => !excludeIds.has(m.id))
+      if (selectedIndividualIds.size > 0 && allPeople) {
+        const extras = allPeople.data.filter((p) => selectedIndividualIds.has(p.id) && !groupMemberIds.has(p.id))
+        return [...groupRecipients, ...extras]
+      }
+      return groupRecipients
     }
     if (recipientMode === 'individual' && allPeople) {
       return allPeople.data.filter((p) => selectedIndividualIds.has(p.id))
     }
     return []
-  }, [recipientMode, groupDetail, allPeople, excludeIds, selectedIndividualIds])
+  }, [recipientMode, groupDetail, allPeople, excludeIds, selectedIndividualIds, groupMemberIds])
 
   const allRecipientIds = useMemo(() => {
     if (recipientMode === 'group' && groupDetail) {
-      return groupDetail.members.map((m) => m.id)
+      const ids = groupDetail.members.map((m) => m.id)
+      for (const id of selectedIndividualIds) {
+        if (!groupMemberIds.has(id)) ids.push(id)
+      }
+      return ids
     }
     return [...selectedIndividualIds]
-  }, [recipientMode, groupDetail, selectedIndividualIds])
+  }, [recipientMode, groupDetail, selectedIndividualIds, groupMemberIds])
 
   const excludeResults = useMemo(() => {
     if (!debouncedExcludeSearch || !groupDetail) return []
@@ -393,16 +409,18 @@ export function MessageComposePage() {
     [excludeResults, excludeHighlight, toggleExclude],
   )
 
+
   const individualResults = useMemo(() => {
     if (!debouncedIndividualSearch || !allPeople) return []
     const q = debouncedIndividualSearch.toLowerCase()
     return allPeople.data.filter((p) => {
       if (selectedIndividualIds.has(p.id)) return false
+      if (recipientMode === 'group' && groupMemberIds.has(p.id)) return false
       const name = formatFullName(p, '').toLowerCase()
       const phone = (p.phoneDisplay || p.phoneNumber || '').toLowerCase()
       return name.includes(q) || phone.includes(q)
     })
-  }, [debouncedIndividualSearch, allPeople, selectedIndividualIds])
+  }, [debouncedIndividualSearch, allPeople, selectedIndividualIds, recipientMode, groupMemberIds])
 
   const handleIndividualKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -553,7 +571,7 @@ export function MessageComposePage() {
       content,
       recipientMode,
       groupId: recipientMode === 'group' && selectedGroupId ? Number(selectedGroupId) : null,
-      selectedIndividualIds: recipientMode === 'individual' ? JSON.stringify([...selectedIndividualIds]) : null,
+      selectedIndividualIds: selectedIndividualIds.size > 0 ? JSON.stringify([...selectedIndividualIds]) : null,
       excludeIds: excludeIds.size > 0 ? JSON.stringify([...excludeIds]) : null,
       batchSize,
       batchDelayMs,
@@ -595,8 +613,6 @@ export function MessageComposePage() {
     }
     setSendConfirmOpen(true)
   }
-
-  const [sendTimeMode, setSendTimeMode] = useState<'now' | 'schedule'>(scheduledAt ? 'schedule' : 'now')
 
   return (
     <div className="p-4 md:p-6">
@@ -655,9 +671,12 @@ export function MessageComposePage() {
                     )}
                   </div>
 
-                  {/* Selected recipients as tags */}
-                  {recipientMode === 'individual' && allPeople && (
+                  {/* Add individuals search */}
+                  {allPeople && (
                     <div className="space-y-2">
+                      {recipientMode === 'group' && (
+                        <Label className="text-xs text-muted-foreground">Add people outside this group (optional)</Label>
+                      )}
                       <SearchInput
                         ref={individualSearchRef}
                         placeholder="Search people to add..."
@@ -669,7 +688,7 @@ export function MessageComposePage() {
                         onKeyDown={handleIndividualKeyDown}
                       />
                       {debouncedIndividualSearch && (
-                        <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
+                        <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1 bg-card">
                           {individualResults.length === 0 ? (
                             <p className="text-sm text-muted-foreground text-center py-3">No matching people found</p>
                           ) : (
@@ -694,9 +713,9 @@ export function MessageComposePage() {
                                 }}
                               >
                                 <span>
-                                  {formatFullName(p, '') || <em className="text-muted-foreground">Unnamed</em>}
+                                  {formatFullName(p, '') || <em className="opacity-50">Unnamed</em>}
                                 </span>
-                                <span className="text-muted-foreground ml-auto">{p.phoneDisplay}</span>
+                                <span className="opacity-60 ml-auto">{p.phoneDisplay}</span>
                               </button>
                             ))
                           )}
@@ -707,10 +726,19 @@ export function MessageComposePage() {
 
                   {/* Recipient tags */}
                   <div className="flex flex-wrap gap-1.5">
-                    {recipientMode === 'individual' &&
-                      allPeople &&
+                    {recipientMode === 'group' && groupDetail && (
+                      <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:hover:bg-teal-800 border-0">
+                        <Users className="h-3 w-3 mr-1" />
+                        {groupDetail.name} ({groupDetail.members.filter((m) => !excludeIds.has(m.id)).length})
+                      </Badge>
+                    )}
+                    {allPeople &&
                       allPeople.data
-                        .filter((p) => selectedIndividualIds.has(p.id))
+                        .filter(
+                          (p) =>
+                            selectedIndividualIds.has(p.id) &&
+                            (recipientMode === 'individual' || !groupMemberIds.has(p.id)),
+                        )
                         .map((p) => (
                           <Badge
                             key={p.id}
@@ -724,12 +752,6 @@ export function MessageComposePage() {
                             <X className="h-3 w-3 ml-0.5" />
                           </Badge>
                         ))}
-                    {recipientMode === 'group' && groupDetail && (
-                      <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:hover:bg-teal-800 border-0">
-                        <Users className="h-3 w-3 mr-1" />
-                        {groupDetail.name} ({recipients.length})
-                      </Badge>
-                    )}
                     {excludeIds.size > 0 && (
                       <Badge variant="outline" className="text-muted-foreground">
                         {excludeIds.size} excluded
@@ -752,7 +774,7 @@ export function MessageComposePage() {
                         onKeyDown={handleExcludeKeyDown}
                       />
                       {debouncedExcludeSearch && (
-                        <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1">
+                        <div className="border rounded-md max-h-36 overflow-auto p-2 space-y-1 bg-card">
                           {excludeResults.length === 0 ? (
                             <p className="text-sm text-muted-foreground text-center py-3">No matching members found</p>
                           ) : (
@@ -777,9 +799,9 @@ export function MessageComposePage() {
                                 }}
                               >
                                 <span>
-                                  {formatFullName(m, '') || <em className="text-muted-foreground">Unnamed</em>}
+                                  {formatFullName(m, '') || <em className="opacity-50">Unnamed</em>}
                                 </span>
-                                <span className="text-muted-foreground ml-auto">{m.phoneDisplay}</span>
+                                <span className="opacity-60 ml-auto">{m.phoneDisplay}</span>
                               </button>
                             ))
                           )}
@@ -993,7 +1015,7 @@ export function MessageComposePage() {
                       'flex flex-col items-start gap-1.5 rounded-lg border-2 p-4 text-left transition-colors cursor-pointer',
                       sendTimeMode === 'now'
                         ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-muted-foreground/30',
+                        : 'border-border bg-card hover:border-muted-foreground/30',
                     )}
                     onClick={() => {
                       setSendTimeMode('now')
@@ -1010,7 +1032,7 @@ export function MessageComposePage() {
                       'flex flex-col items-start gap-1.5 rounded-lg border-2 p-4 text-left transition-colors cursor-pointer',
                       sendTimeMode === 'schedule'
                         ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-muted-foreground/30',
+                        : 'border-border bg-card hover:border-muted-foreground/30',
                     )}
                     onClick={() => setSendTimeMode('schedule')}
                   >
@@ -1083,7 +1105,7 @@ export function MessageComposePage() {
             </div>
             <div className="flex items-center gap-2 self-end sm:self-auto">
               {!isEditMode && currentDraftId && (
-                <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
+                <Button variant="ghost" size="sm" className="hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}>
                   <Trash2 className="h-4 w-4 mr-1.5" />
                   Delete
                 </Button>
@@ -1133,7 +1155,7 @@ export function MessageComposePage() {
             </div>
             {/* Phone mockup */}
             <div className="relative mx-auto w-[280px]">
-              <div className="rounded-[2rem] border-[3px] border-foreground/20 bg-background shadow-xl overflow-hidden">
+              <div className="rounded-[2rem] border-[3px] border-foreground/20 bg-card shadow-xl overflow-hidden">
                 {/* Status bar */}
                 <div className="flex items-center justify-between px-6 pt-3 pb-1 text-[10px] text-muted-foreground">
                   <span>{format(new Date(), 'h:mm')}</span>
@@ -1170,7 +1192,7 @@ export function MessageComposePage() {
                   )}
                 </div>
                 {/* Input bar */}
-                <div className="flex items-center gap-2 p-2 border-t bg-background">
+                <div className="flex items-center gap-2 p-2 border-t bg-card">
                   <div className="flex-1 rounded-full bg-muted px-3 py-1.5">
                     <span className="text-[10px] text-muted-foreground">Your message</span>
                   </div>
@@ -1297,10 +1319,10 @@ function VariableDropdown({
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <div className="border rounded-md">
+    <div className="border rounded-md bg-card">
       <button
         type="button"
-        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer rounded-t-md"
+        className={`flex items-center gap-2 w-full px-3 py-2 text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer rounded-t-md ${!open ? 'rounded-b-md' : ''}`}
         onClick={() => setOpen(!open)}
       >
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}

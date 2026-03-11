@@ -304,59 +304,65 @@ export function GroupDetailPage() {
               : group.members
             return (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-16"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredMembers
-                      .slice((membersPage - 1) * membersPageSize, membersPage * membersPageSize)
-                      .map((m: Person) => (
-                        <TableRow key={m.id} className="cursor-pointer" onClick={() => navigate(`/people/${m.id}`)}>
-                          <TableCell className="font-medium">{formatFullName(m)}</TableCell>
-                          <TableCell className="text-muted-foreground">{m.phoneDisplay || m.phoneNumber}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                m.status === 'active'
-                                  ? 'default'
-                                  : m.status === 'do_not_contact'
-                                    ? 'destructive'
-                                    : 'secondary'
-                              }
-                            >
-                              {m.status === 'do_not_contact' ? 'do not contact' : m.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                removeMemberMutation.mutate(m.id)
-                              }}
-                              title="Remove from group"
-                            >
-                              <UserMinus className="h-4 w-4" />
-                            </Button>
+                <div className="border rounded-md bg-card overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-16"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredMembers
+                        .slice((membersPage - 1) * membersPageSize, membersPage * membersPageSize)
+                        .map((m: Person) => (
+                          <TableRow
+                            key={m.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => navigate(`/people/${m.id}`)}
+                          >
+                            <TableCell className="font-medium">{formatFullName(m)}</TableCell>
+                            <TableCell className="text-muted-foreground">{m.phoneDisplay || m.phoneNumber}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  m.status === 'active'
+                                    ? 'default'
+                                    : m.status === 'do_not_contact'
+                                      ? 'destructive'
+                                      : 'secondary'
+                                }
+                              >
+                                {m.status === 'do_not_contact' ? 'do not contact' : m.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removeMemberMutation.mutate(m.id)
+                                }}
+                                title="Remove from group"
+                              >
+                                <UserMinus className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      {filteredMembers.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                            {group.members.length === 0 ? 'No members' : 'No members match your search.'}
                           </TableCell>
                         </TableRow>
-                      ))}
-                    {filteredMembers.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
-                          {group.members.length === 0 ? 'No members' : 'No members match your search.'}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
                 {filteredMembers.length > membersPageSize && (
                   <div className="flex items-center justify-between pt-4">
                     <span className="text-sm text-muted-foreground">

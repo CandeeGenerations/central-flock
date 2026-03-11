@@ -170,7 +170,7 @@ export function GroupsPage() {
       {isLoading ? (
         <PageSpinner />
       ) : (
-        <div className="border rounded-md overflow-x-auto">
+        <div className="border rounded-md overflow-x-auto bg-card">
           <Table>
             <TableHeader>
               <TableRow>
@@ -200,7 +200,11 @@ export function GroupsPage() {
             </TableHeader>
             <TableBody>
               {filteredGroups.map((group) => (
-                <TableRow key={group.id} className="cursor-pointer" onClick={() => navigate(`/groups/${group.id}`)}>
+                <TableRow
+                  key={group.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate(`/groups/${group.id}`)}
+                >
                   <TableCell className="font-medium">
                     {group.name}
                     {group.description && (

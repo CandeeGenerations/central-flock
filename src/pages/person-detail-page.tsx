@@ -207,7 +207,7 @@ export function PersonDetailPage() {
                 </div>
                 <div>
                   <Label>E.164 Format</Label>
-                  <Input value={form.phoneNumber || ''} readOnly className="bg-muted" />
+                  <p className="text-sm font-mono mt-1">{form.phoneNumber || '—'}</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -299,35 +299,37 @@ export function PersonDetailPage() {
         </CardHeader>
         <CardContent>
           {person.groups && person.groups.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="w-16">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {person.groups.map((g) => (
-                  <TableRow key={g.id}>
-                    <TableCell>
-                      <Link to={`/groups/${g.id}`} className="font-medium hover:underline">
-                        {g.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeGroupMutation.mutate(g.id)}
-                        title={`Remove from ${g.name}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
+            <div className="border rounded-md bg-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {person.groups.map((g) => (
+                    <TableRow
+                      key={g.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/groups/${g.id}`)}
+                    >
+                      <TableCell className="font-medium">{g.name}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeGroupMutation.mutate(g.id)}
+                          title={`Remove from ${g.name}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <p className="text-muted-foreground text-sm">Not a member of any groups</p>
           )}

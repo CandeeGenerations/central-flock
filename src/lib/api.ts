@@ -221,6 +221,7 @@ export interface Message {
   templateState: string | null
   createdAt: string
   completedAt: string | null
+  extraNames?: string[]
 }
 
 export interface MessageRecipient {
@@ -290,6 +291,10 @@ export function sendNowMessage(id: number) {
   return request<{success: boolean; jobId: string}>(`/messages/${id}/send-now`, {method: 'POST'})
 }
 
+export function resumeMessage(id: number) {
+  return request<{success: boolean; jobId: string}>(`/messages/${id}/resume`, {method: 'POST'})
+}
+
 export function duplicateMessage(id: number) {
   return request<Draft>(`/messages/${id}/duplicate`, {method: 'POST'})
 }
@@ -330,6 +335,7 @@ export interface Draft {
   templateState: string | null
   recipientCount?: number
   renderedPreview?: string | null
+  extraNames?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -553,14 +559,14 @@ export interface StatsResponse {
       scheduledAt: string | null
     }[]
     overTime: {
-      period: 'week' | 'month' | 'year'
       data: {label: string; sent: number; failed: number; skipped: number}[]
     }
   }
   drafts: {total: number}
   templates: {total: number}
+  previous: {people: number; groups: number; messagesSent: number; scheduled: number; drafts: number} | null
 }
 
-export function fetchStats(period?: 'week' | 'month' | 'year') {
-  return request<StatsResponse>(`/stats${buildQueryString({period})}`)
+export function fetchStats(params?: {from?: string; to?: string}) {
+  return request<StatsResponse>(`/stats${buildQueryString(params)}`)
 }

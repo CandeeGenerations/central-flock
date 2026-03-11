@@ -196,7 +196,7 @@ export function TemplatesPage() {
           {isLoading ? (
             <PageSpinner />
           ) : (
-            <div className="border rounded-md overflow-x-auto">
+            <div className="border rounded-md overflow-x-auto bg-card">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -263,7 +263,7 @@ export function TemplatesPage() {
                     return (
                       <TableRow
                         key={template.id}
-                        className="cursor-pointer"
+                        className="cursor-pointer hover:bg-muted/50"
                         onClick={(e) => {
                           if ((e.target as HTMLElement).closest('button')) return
                           navigate(`/templates/${template.id}/edit`)
@@ -524,7 +524,7 @@ function VariablesTab() {
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading...</div>
       ) : (
-        <div className="border rounded-md overflow-x-auto">
+        <div className="border rounded-md overflow-x-auto bg-card">
           <Table>
             <TableHeader>
               <TableRow>

@@ -1,5 +1,5 @@
 import {format} from 'date-fns'
-import {asc, desc, eq, sql} from 'drizzle-orm'
+import {asc, desc, eq, inArray, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
@@ -28,6 +28,7 @@ draftsRouter.get(
     let result = draftsList.map((draft) => {
       let recipientCount = 0
       let excludeCount = 0
+      let extraNames: string[] = []
       if (draft.excludeIds) {
         try {
           excludeCount = JSON.parse(draft.excludeIds).length
@@ -43,6 +44,31 @@ draftsRouter.get(
           .where(eq(schema.peopleGroups.groupId, draft.groupId))
           .get()
         recipientCount = Math.max(0, (count?.count || 0) - excludeCount)
+        // Add extra individuals not in the group
+        if (draft.selectedIndividualIds) {
+          try {
+            const extraIds: number[] = JSON.parse(draft.selectedIndividualIds)
+            const groupMemberIds = db
+              .select({personId: schema.peopleGroups.personId})
+              .from(schema.peopleGroups)
+              .where(eq(schema.peopleGroups.groupId, draft.groupId))
+              .all()
+              .map((r) => r.personId)
+            const groupSet = new Set(groupMemberIds)
+            const actualExtraIds = extraIds.filter((id) => !groupSet.has(id))
+            recipientCount += actualExtraIds.length
+            if (actualExtraIds.length > 0) {
+              extraNames = db
+                .select({firstName: schema.people.firstName, lastName: schema.people.lastName})
+                .from(schema.people)
+                .where(inArray(schema.people.id, actualExtraIds))
+                .all()
+                .map((p) => [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unknown')
+            }
+          } catch {
+            /* ignore */
+          }
+        }
       } else if (draft.selectedIndividualIds) {
         try {
           recipientCount = Math.max(0, JSON.parse(draft.selectedIndividualIds).length - excludeCount)
@@ -105,7 +131,7 @@ draftsRouter.get(
         renderedPreview = renderTemplate(draft.content, samplePerson, varValues)
       }
 
-      return {...draft, groupName, recipientCount, renderedPreview}
+      return {...draft, groupName, recipientCount, renderedPreview, extraNames}
     })
 
     if (search && typeof search === 'string') {

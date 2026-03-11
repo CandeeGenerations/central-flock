@@ -1,332 +1,503 @@
-import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Progress} from '@/components/ui/progress'
+import {Calendar} from '@/components/ui/calendar'
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {PageSpinner} from '@/components/ui/spinner'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {fetchStats} from '@/lib/api'
-import {formatDateTime} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {useQuery} from '@tanstack/react-query'
-import {Calendar, MessageSquare, Plus} from 'lucide-react'
-import {useState} from 'react'
-import {Link, useNavigate} from 'react-router-dom'
-import {Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts'
-
-const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  completed: 'default',
-  sending: 'secondary',
-  pending: 'outline',
-  cancelled: 'destructive',
-  scheduled: 'secondary',
-  past_due: 'destructive',
-}
+import {CalendarIcon, MessageSquare, Plus, Settings} from 'lucide-react'
+import {useEffect, useMemo, useState} from 'react'
+import type {DateRange} from 'react-day-picker'
+import {Link} from 'react-router-dom'
+import {Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts'
 
 const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC')
 
-const periods = ['week', 'month', 'year'] as const
-type Period = (typeof periods)[number]
+const DONUT_COLORS = {
+  sent: '#22c55e',
+  failed: '#ef4444',
+  skipped: '#eab308',
+}
+
+const PEOPLE_COLORS = {
+  active: '#4f46e5',
+  inactive: '#a5b4fc',
+  doNotContact: '#ef4444',
+}
+
+type RangePreset = 'last7' | 'last30' | 'last90' | 'last12m' | 'all' | 'custom'
+
+const PRESETS: {key: RangePreset; label: string}[] = [
+  {key: 'last7', label: 'Last 7 days'},
+  {key: 'last30', label: 'Last 30 days'},
+  {key: 'last90', label: 'Last 90 days'},
+  {key: 'last12m', label: 'Last 12 months'},
+  {key: 'all', label: 'All time'},
+  {key: 'custom', label: 'Custom range'},
+]
+
+function getPresetRange(preset: RangePreset): {from?: string; to?: string} {
+  if (preset === 'all') return {}
+  const now = new Date()
+  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const toStr = to.toISOString().slice(0, 10)
+  let from: Date
+  switch (preset) {
+    case 'last7':
+      from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
+      break
+    case 'last30':
+      from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30)
+      break
+    case 'last90':
+      from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90)
+      break
+    case 'last12m':
+      from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+      break
+    default:
+      return {}
+  }
+  return {from: from.toISOString().slice(0, 10), to: toStr}
+}
+
+function formatRangeLabel(preset: RangePreset, customRange?: DateRange): string {
+  if (preset !== 'custom') return PRESETS.find((p) => p.key === preset)!.label
+  if (!customRange?.from) return 'Select dates...'
+  const fmt = (d: Date) => d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})
+  if (!customRange.to) return fmt(customRange.from)
+  return `${fmt(customRange.from)} – ${fmt(customRange.to)}`
+}
+
+function calcChange(current: number, previous: number): {pct: number; positive: boolean} | null {
+  if (previous === 0 && current === 0) return null
+  if (previous === 0) return {pct: 100, positive: true}
+  const pct = Math.round(((current - previous) / previous) * 100)
+  return {pct, positive: pct >= 0}
+}
 
 export function DashboardPage() {
-  const navigate = useNavigate()
-  const [period, setPeriod] = useState<Period>('month')
+  const [preset, setPreset] = useState<RangePreset>(() => {
+    const saved = localStorage.getItem('dashboard-range-preset')
+    return saved && PRESETS.some((p) => p.key === saved) ? (saved as RangePreset) : 'last12m'
+  })
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(() => {
+    try {
+      const saved = localStorage.getItem('dashboard-range-custom')
+      if (!saved) return undefined
+      const parsed = JSON.parse(saved)
+      return {
+        from: parsed.from ? new Date(parsed.from) : undefined,
+        to: parsed.to ? new Date(parsed.to) : undefined,
+      }
+    } catch {
+      return undefined
+    }
+  })
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  useEffect(() => {
+    localStorage.setItem('dashboard-range-preset', preset)
+  }, [preset])
+
+  useEffect(() => {
+    if (customRange?.from) {
+      localStorage.setItem(
+        'dashboard-range-custom',
+        JSON.stringify({from: customRange.from.toISOString(), to: customRange.to?.toISOString()}),
+      )
+    }
+  }, [customRange])
+
+  const queryParams = useMemo(() => {
+    if (preset === 'custom' && customRange?.from) {
+      const from = customRange.from.toISOString().slice(0, 10)
+      const to = customRange.to
+        ? new Date(customRange.to.getFullYear(), customRange.to.getMonth(), customRange.to.getDate() + 1)
+            .toISOString()
+            .slice(0, 10)
+        : undefined
+      return {from, to}
+    }
+    return getPresetRange(preset)
+  }, [preset, customRange])
 
   const {data: stats, isLoading} = useQuery({
-    queryKey: [...queryKeys.stats, period],
-    queryFn: () => fetchStats(period),
+    queryKey: [...queryKeys.stats, queryParams.from, queryParams.to],
+    queryFn: () => fetchStats(queryParams),
   })
 
   if (isLoading || !stats) return <PageSpinner />
 
-  const {people, groups, messages, drafts} = stats
+  const {people, groups, messages, drafts, previous} = stats
   const totalProcessed = messages.totalSent + messages.totalFailed + messages.totalSkipped
   const successRate = totalProcessed > 0 ? Math.round((messages.totalSent / totalProcessed) * 100) : 0
   const failedPct = totalProcessed > 0 ? Math.round((messages.totalFailed / totalProcessed) * 100) : 0
   const skippedPct = totalProcessed > 0 ? Math.round((messages.totalSkipped / totalProcessed) * 100) : 0
 
+  const deliveryData = [
+    {name: 'Sent', value: messages.totalSent, pct: successRate, color: DONUT_COLORS.sent},
+    {name: 'Failed', value: messages.totalFailed, pct: failedPct, color: DONUT_COLORS.failed},
+    {name: 'Skipped', value: messages.totalSkipped, pct: skippedPct, color: DONUT_COLORS.skipped},
+  ]
+
+  const peopleData = [
+    {name: 'Active', value: people.active, color: PEOPLE_COLORS.active},
+    {name: 'Inactive', value: people.inactive, color: PEOPLE_COLORS.inactive},
+    {name: 'Do Not Contact', value: people.doNotContact, color: PEOPLE_COLORS.doNotContact},
+  ]
+
+  const peoplePcts = peopleData.map((d) => ({
+    ...d,
+    pct: people.total > 0 ? Math.round((d.value / people.total) * 100) : 0,
+  }))
+
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h2 className="text-2xl md:text-2xl font-bold">Dashboard</h2>
-        <div className="hidden md:flex gap-2 flex-wrap">
-          <Link to="/messages/compose">
-            <Button size="sm">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Compose Message
-              <kbd className="ml-2 text-[10px] font-mono opacity-60">{isMac ? '⌘' : 'Ctrl+'}J</kbd>
-            </Button>
-          </Link>
-          <Link to="/people?add=1">
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Person
-              <kbd className="ml-2 text-[10px] font-mono opacity-60">{isMac ? '⌘' : 'Ctrl+'}P</kbd>
-            </Button>
-          </Link>
+        <h2 className="text-2xl font-bold">Dashboard</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="font-normal">
+                <CalendarIcon className="h-4 w-4 mr-2" />
+                {formatRangeLabel(preset, customRange)}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="flex">
+                <div className="border-r p-2 space-y-0.5">
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p.key}
+                      className={`block w-full text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors ${
+                        preset === p.key ? 'bg-muted font-medium' : ''
+                      }`}
+                      onClick={() => {
+                        setPreset(p.key)
+                        if (p.key !== 'custom') {
+                          setPickerOpen(false)
+                        }
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                {preset === 'custom' && (
+                  <div className="p-2">
+                    <Calendar
+                      mode="range"
+                      selected={customRange}
+                      onSelect={(range) => {
+                        setCustomRange(range)
+                        if (range?.from && range?.to) {
+                          setPickerOpen(false)
+                        }
+                      }}
+                      numberOfMonths={2}
+                      disabled={{after: new Date()}}
+                    />
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <div className="hidden md:flex gap-2">
+            <Link to="/messages/compose">
+              <Button size="sm">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Compose
+                <kbd className="ml-2 text-[10px] font-mono opacity-60">{isMac ? '⌘' : 'Ctrl+'}J</kbd>
+              </Button>
+            </Link>
+            <Link to="/people?add=1">
+              <Button size="sm" variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Person
+                <kbd className="ml-2 text-[10px] font-mono opacity-60">{isMac ? '⌘' : 'Ctrl+'}P</kbd>
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
       {/* Row 1 — Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
-        <Link to="/people">
-          <Card className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors h-full">
-            <CardHeader className="p-4 md:p-6 pb-2 md:pb-2">
-              <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">People</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-              <div className="text-4xl md:text-3xl font-bold">{people.total}</div>
-              <div className="flex flex-wrap gap-1.5 md:gap-2 mt-2">
-                <Badge variant="default">{people.active} active</Badge>
-                <Badge variant="outline">{people.inactive} inactive</Badge>
-                <Badge variant="destructive">{people.doNotContact} DNC</Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link to="/groups">
-          <Card className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors h-full">
-            <CardHeader className="p-4 md:p-6 pb-2 md:pb-2">
-              <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">Groups</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-              <div className="text-4xl md:text-3xl font-bold">{groups.total}</div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link to="/messages">
-          <Card className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors h-full">
-            <CardHeader className="p-4 md:p-6 pb-2 md:pb-2">
-              <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">Messages Sent</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-              <div className="text-4xl md:text-3xl font-bold">{messages.totalSent}</div>
-              <p className="text-sm text-muted-foreground mt-1">of {totalProcessed} processed</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link to="/messages?tab=scheduled">
-          <Card className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors h-full">
-            <CardHeader className="p-4 md:p-6 pb-2 md:pb-2">
-              <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">Scheduled</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-              <div className="text-4xl md:text-3xl font-bold">{messages.scheduledMessages.length}</div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link to="/messages?tab=drafts">
-          <Card className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors h-full">
-            <CardHeader className="p-4 md:p-6 pb-2 md:pb-2">
-              <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">Drafts</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-              <div className="text-4xl md:text-3xl font-bold">{drafts.total}</div>
-            </CardContent>
-          </Card>
-        </Link>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <StatCard
+          label="People"
+          value={people.total}
+          to="/people"
+          change={previous ? calcChange(people.total, previous.people) : null}
+          previousValue={previous?.people}
+        />
+        <StatCard
+          label="Groups"
+          value={groups.total}
+          to="/groups"
+          change={previous ? calcChange(groups.total, previous.groups) : null}
+          previousValue={previous?.groups}
+        />
+        <StatCard
+          label="Messages Sent"
+          value={messages.totalSent}
+          to="/messages"
+          change={previous ? calcChange(messages.totalSent, previous.messagesSent) : null}
+          previousValue={previous?.messagesSent}
+        />
+        <StatCard label="Scheduled Messages" value={messages.scheduledMessages.length} to="/messages?tab=scheduled" />
+        <StatCard label="Draft Messages" value={drafts.total} to="/messages?tab=drafts" />
       </div>
 
-      {/* Row 2 — Messages Over Time + Delivery Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="col-span-2">
-          <CardHeader>
-            <CardTitle>Messages Over Time</CardTitle>
-            <CardAction>
-              <div className="flex gap-1">
-                {periods.map((p) => (
-                  <Button key={p} size="sm" variant={period === p ? 'default' : 'outline'} onClick={() => setPeriod(p)}>
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </Button>
-                ))}
-              </div>
-            </CardAction>
-          </CardHeader>
-          <CardContent>
-            {messages.overTime.data.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No message data for this period.</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={messages.overTime.data} barCategoryGap="20%">
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis
-                    dataKey="label"
-                    tick={{fontSize: 12, fill: 'var(--muted-foreground)'}}
-                    axisLine={{stroke: 'var(--border)'}}
-                    tickLine={false}
-                    padding={{left: 20, right: 20}}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{fontSize: 12, fill: 'var(--muted-foreground)'}}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    cursor={{fill: 'var(--muted)'}}
-                    content={({active, payload, label}) => {
-                      if (!active || !payload?.length) return null
-                      return (
-                        <div className="rounded-lg border bg-card px-3 py-2 shadow-md">
-                          <p className="text-sm font-medium mb-1">{label}</p>
-                          {payload.map((entry) => (
-                            <p key={entry.name} className="text-xs text-muted-foreground">
-                              <span
-                                className="inline-block w-2 h-2 rounded-full mr-1.5"
-                                style={{backgroundColor: entry.color}}
-                              />
-                              {entry.name}: <span className="font-medium text-foreground">{entry.value}</span>
-                            </p>
-                          ))}
-                        </div>
-                      )
-                    }}
-                  />
-                  <Bar dataKey="sent" stackId="a" fill="var(--primary)" name="Sent" maxBarSize={80} />
-                  <Bar dataKey="failed" stackId="a" fill="var(--destructive)" name="Failed" maxBarSize={80} />
-                  <Bar
-                    dataKey="skipped"
-                    stackId="a"
-                    fill="var(--muted-foreground)"
-                    name="Skipped"
-                    maxBarSize={80}
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Delivery Stats</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5 md:space-y-4">
-            <div>
-              <div className="flex justify-between text-base md:text-sm mb-1">
-                <span>Sent</span>
-                <span className="text-green-600">{messages.totalSent}</span>
-              </div>
-              <Progress value={successRate} className="h-3 md:h-2 **:data-[slot=progress-indicator]:bg-green-500" />
-            </div>
-            <div>
-              <div className="flex justify-between text-base md:text-sm mb-1">
-                <span>Failed</span>
-                <span className="text-red-500">{messages.totalFailed}</span>
-              </div>
-              <Progress value={failedPct} className="h-3 md:h-2 **:data-[slot=progress-indicator]:bg-red-500" />
-            </div>
-            <div>
-              <div className="flex justify-between text-base md:text-sm mb-1">
-                <span>Skipped</span>
-                <span className="text-yellow-600">{messages.totalSkipped}</span>
-              </div>
-              <Progress value={skippedPct} className="h-3 md:h-2 **:data-[slot=progress-indicator]:bg-yellow-500" />
-            </div>
-            <p className="text-base md:text-sm text-muted-foreground pt-2">
-              Overall success rate: <span className="font-semibold text-foreground">{successRate}%</span>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Row 3 — Recent Messages + Scheduled Messages */}
+      {/* Row 2 — Donut charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Recent Messages</CardTitle>
+            <CardTitle>Delivery Overview</CardTitle>
           </CardHeader>
           <CardContent>
-            {messages.recentMessages.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No messages yet.</p>
+            {totalProcessed === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No messages processed yet.</p>
             ) : (
-              <div className="border rounded-md overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Message</TableHead>
-                      <TableHead>Recipients</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {messages.recentMessages.map((msg) => (
-                      <TableRow
-                        key={msg.id}
-                        className="bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer"
-                        onClick={() => navigate(`/messages/${msg.id}`)}
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div className="shrink-0">
+                  <ResponsiveContainer width={180} height={180}>
+                    <PieChart>
+                      <Pie
+                        data={deliveryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="value"
+                        strokeWidth={0}
                       >
-                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                          {formatDateTime(msg.createdAt)}
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {(msg.renderedPreview || msg.content).substring(0, 60)}
-                          {(msg.renderedPreview || msg.content).length > 60 ? '...' : ''}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-green-600">{msg.sentCount}</span>
-                          {msg.failedCount > 0 && <span className="text-red-500 ml-1">/ {msg.failedCount} failed</span>}
-                          <span className="text-muted-foreground"> of {msg.totalRecipients}</span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusColors[msg.status] || 'outline'}>{msg.status}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        {deliveryData.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={({active, payload}) => {
+                          if (!active || !payload?.length) return null
+                          const d = payload[0].payload
+                          return (
+                            <div className="rounded-lg border bg-card px-3 py-2 shadow-md text-sm">
+                              <span className="font-medium">{d.name}</span>: {d.value} ({d.pct}%)
+                            </div>
+                          )
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-3">
+                  {deliveryData.map((d) => (
+                    <div key={d.name} className="flex items-center gap-2.5">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{backgroundColor: d.color}} />
+                      <span className="text-sm">
+                        {d.name} &ndash; <span className="font-semibold">{d.pct}%</span>{' '}
+                        <span className="text-muted-foreground">({d.value.toLocaleString()})</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-            <div className="mt-4 md:mt-3 text-center">
-              <Link to="/messages" className="text-base md:text-sm text-primary hover:underline">
-                View all messages
-              </Link>
-            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Scheduled Messages</CardTitle>
+            <CardTitle>People Overview</CardTitle>
           </CardHeader>
           <CardContent>
-            {messages.scheduledMessages.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No scheduled messages.</p>
+            {people.total === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No people added yet.</p>
             ) : (
-              <div className="space-y-3">
-                {messages.scheduledMessages.map((msg) => (
-                  <Link
-                    key={msg.id}
-                    to={`/messages/${msg.id}`}
-                    className="flex items-start gap-3 p-4 md:p-3 rounded-md border bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-                  >
-                    <Calendar className="h-5 w-5 md:h-4 md:w-4 mt-0.5 text-muted-foreground shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-base md:text-sm truncate">
-                        {(msg.renderedPreview || msg.content).substring(0, 60)}
-                        {(msg.renderedPreview || msg.content).length > 60 ? '...' : ''}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1 text-sm md:text-xs text-muted-foreground">
-                        {msg.scheduledAt && <span>{formatDateTime(msg.scheduledAt)}</span>}
-                        <span>{msg.totalRecipients} recipients</span>
-                      </div>
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div className="shrink-0">
+                  <ResponsiveContainer width={180} height={180}>
+                    <PieChart>
+                      <Pie
+                        data={peopleData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="value"
+                        strokeWidth={0}
+                      >
+                        {peopleData.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={({active, payload}) => {
+                          if (!active || !payload?.length) return null
+                          const d = payload[0].payload
+                          return (
+                            <div className="rounded-lg border bg-card px-3 py-2 shadow-md text-sm">
+                              <span className="font-medium">{d.name}</span>: {d.value}
+                            </div>
+                          )
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-3">
+                  {peoplePcts.map((d) => (
+                    <div key={d.name} className="flex items-center gap-2.5">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{backgroundColor: d.color}} />
+                      <span className="text-sm">
+                        {d.name} &ndash; <span className="font-semibold">{d.pct}%</span>{' '}
+                        <span className="text-muted-foreground">({d.value.toLocaleString()})</span>
+                      </span>
                     </div>
-                    <Badge variant={statusColors[msg.status] || 'outline'}>
-                      {msg.status === 'past_due' ? 'past due' : msg.status}
-                    </Badge>
-                  </Link>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Row 3 — Messages Over Time (area chart) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Messages Over Time</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {messages.overTime.data.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No message data for this period.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={messages.overTime.data}>
+                <defs>
+                  <linearGradient id="sentGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis
+                  dataKey="label"
+                  tick={{fontSize: 12, fill: 'var(--muted-foreground)'}}
+                  axisLine={{stroke: 'var(--border)'}}
+                  tickLine={false}
+                  padding={{left: 20, right: 20}}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{fontSize: 12, fill: 'var(--muted-foreground)'}}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  content={({active, payload, label}) => {
+                    if (!active || !payload?.length) return null
+                    return (
+                      <div className="rounded-lg border bg-card px-3 py-2 shadow-md">
+                        <p className="text-sm font-medium mb-1">{label}</p>
+                        {payload.map((entry) => (
+                          <p key={entry.name} className="text-xs text-muted-foreground">
+                            <span
+                              className="inline-block w-2 h-2 rounded-full mr-1.5"
+                              style={{backgroundColor: entry.color}}
+                            />
+                            {entry.name}: <span className="font-medium text-foreground">{entry.value}</span>
+                          </p>
+                        ))}
+                      </div>
+                    )
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="sent"
+                  stroke="var(--primary)"
+                  strokeWidth={2}
+                  fill="url(#sentGradient)"
+                  name="Sent"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="failed"
+                  stroke="var(--destructive)"
+                  strokeWidth={2}
+                  fill="transparent"
+                  name="Failed"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="skipped"
+                  stroke="var(--muted-foreground)"
+                  strokeWidth={2}
+                  fill="transparent"
+                  strokeDasharray="4 4"
+                  name="Skipped"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Mobile settings link */}
+      <div className="md:hidden">
+        <Link to="/settings">
+          <Button variant="outline" className="w-full">
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
+        </Link>
+      </div>
     </div>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  to,
+  change,
+  previousValue,
+}: {
+  label: string
+  value: number
+  to: string
+  change?: {pct: number; positive: boolean} | null
+  previousValue?: number
+}) {
+  return (
+    <Link to={to}>
+      <Card className="bg-card shadow-none hover:bg-muted/50 transition-colors h-full">
+        <div className="px-4 pt-3 pb-3 md:px-5 md:pt-4 md:pb-4 space-y-1">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl md:text-[28px] font-bold leading-none">{value.toLocaleString()}</span>
+            {change && (
+              <span
+                className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
+                  change.positive
+                    ? 'text-green-600 bg-green-100 dark:bg-green-950/40 dark:text-green-400'
+                    : 'text-red-500 bg-red-100 dark:bg-red-950/40 dark:text-red-400'
+                }`}
+              >
+                {change.positive ? '+' : ''}
+                {change.pct}%
+              </span>
+            )}
+          </div>
+          {previousValue !== undefined && (
+            <p className="text-xs text-muted-foreground">Previously: {previousValue.toLocaleString()}</p>
+          )}
+        </div>
+      </Card>
+    </Link>
   )
 }

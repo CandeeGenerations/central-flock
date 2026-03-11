@@ -31,7 +31,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'cd $(git rev-parse --show-toplevel) && npx tsx .claude/hooks/index.ts'"
+            "command": "sh -c 'cd $(git rev-parse --show-toplevel) && npx tsx .claude/hooks/index.ts'",
+            "async": true
           },
           {
             "type": "command",

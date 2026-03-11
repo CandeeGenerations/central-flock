@@ -2,7 +2,7 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
+import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
@@ -167,14 +167,15 @@ export function PeoplePage() {
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">People</h2>
         <div className="flex gap-2 items-center">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <Popover>
+            <PopoverTrigger asChild>
               <Button variant="outline" size="icon">
                 <EllipsisVertical className="h-4 w-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-2 space-y-0.5" align="end">
+              <button
+                className="flex w-full items-center gap-2 text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
                 onClick={async () => {
                   try {
                     await exportPeopleCSV()
@@ -184,19 +185,25 @@ export function PeoplePage() {
                   }
                 }}
               >
-                <Download className="h-4 w-4 mr-2" />
+                <Download className="h-4 w-4" />
                 Export CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/import')}>
-                <Upload className="h-4 w-4 mr-2" />
+              </button>
+              <button
+                className="flex w-full items-center gap-2 text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+                onClick={() => navigate('/import')}
+              >
+                <Upload className="h-4 w-4" />
                 Import CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDuplicatesOpen(true)}>
-                <Users className="h-4 w-4 mr-2" />
+              </button>
+              <button
+                className="flex w-full items-center gap-2 text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+                onClick={() => setDuplicatesOpen(true)}
+              >
+                <Users className="h-4 w-4" />
                 Find Duplicates
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </button>
+            </PopoverContent>
+          </Popover>
           <Dialog open={duplicatesOpen} onOpenChange={setDuplicatesOpen}>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
@@ -371,7 +378,7 @@ export function PeoplePage() {
                 </div>
                 <div>
                   <Label>E.164 Format</Label>
-                  <Input value={newPerson.phoneNumber} readOnly className="bg-muted" />
+                  <p className="text-sm font-mono mt-1">{newPerson.phoneNumber || '—'}</p>
                 </div>
               </div>
               <DialogFooter>
@@ -421,7 +428,7 @@ export function PeoplePage() {
         <PageSpinner />
       ) : (
         <>
-          <div className="border rounded-md overflow-x-auto">
+          <div className="border rounded-md overflow-x-auto bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -502,7 +509,11 @@ export function PeoplePage() {
               </TableHeader>
               <TableBody>
                 {data?.data.map((person) => (
-                  <TableRow key={person.id} className="cursor-pointer" onClick={() => navigate(`/people/${person.id}`)}>
+                  <TableRow
+                    key={person.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/people/${person.id}`)}
+                  >
                     <TableCell className="font-medium">
                       {person.firstName || <em className="text-muted-foreground">—</em>}
                     </TableCell>

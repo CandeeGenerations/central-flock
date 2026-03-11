@@ -3,8 +3,10 @@ import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {fetchSettings, updateSetting} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
+import {type ThemeMode, useTheme} from '@/lib/theme-context'
+import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Settings} from 'lucide-react'
+import {Monitor, Moon, Settings, Sun} from 'lucide-react'
 import {toast} from 'sonner'
 
 export function SettingsPage() {
@@ -26,13 +28,44 @@ export function SettingsPage() {
   })
 
   const sendMethod = settings?.sendMethod ?? 'api'
+  const {mode, setMode} = useTheme()
+
+  const themeOptions: {key: ThemeMode; label: string; icon: typeof Sun}[] = [
+    {key: 'light', label: 'Light', icon: Sun},
+    {key: 'dark', label: 'Dark', icon: Moon},
+    {key: 'system', label: 'System', icon: Monitor},
+  ]
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl">
+    <div className="p-4 md:p-6 max-w-2xl space-y-4">
       <div className="flex items-center gap-3 mb-6">
         <Settings className="h-6 w-6" />
         <h1 className="text-2xl font-bold">Settings</h1>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Label className="mb-3 block">Theme</Label>
+          <div className="flex gap-2">
+            {themeOptions.map(({key, label, icon: Icon}) => (
+              <button
+                key={key}
+                onClick={() => setMode(key)}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-medium transition-colors cursor-pointer',
+                  mode === key ? 'border-primary bg-primary/5 text-primary' : 'border-border bg-card hover:bg-muted/50',
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -3,6 +3,7 @@ import {Toaster} from '@/components/ui/sonner'
 import {Spinner} from '@/components/ui/spinner'
 import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts'
 import {checkAuthStatus, logout} from '@/lib/api'
+import {ThemeProvider, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
 import {DashboardPage} from '@/pages/dashboard-page'
 import {GroupDetailPage} from '@/pages/group-detail-page'
@@ -31,7 +32,7 @@ import {
   Sun,
   Users,
 } from 'lucide-react'
-import {useCallback, useEffect, useState} from 'react'
+import {useCallback, useState} from 'react'
 import {BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate} from 'react-router-dom'
 
 const queryClient = new QueryClient({
@@ -85,7 +86,7 @@ function SidebarNav({onNavClick}: {onNavClick?: () => void}) {
         >
           <Icon className="h-5 w-5 md:h-4 md:w-4" />
           <span className="flex-1">{label}</span>
-          <kbd className="text-[10px] font-mono text-muted-foreground opacity-60 hidden md:inline">{shortcut}</kbd>
+          <kbd className="text-[10px] font-mono text-sidebar-foreground/50 hidden md:inline">{shortcut}</kbd>
         </NavLink>
       ))}
     </nav>
@@ -93,21 +94,18 @@ function SidebarNav({onNavClick}: {onNavClick?: () => void}) {
 }
 
 function SidebarFooter({
-  dark,
-  setDark,
   setShortcutsOpen,
   onNavClick,
 }: {
-  dark: boolean
-  setDark: React.Dispatch<React.SetStateAction<boolean>>
   setShortcutsOpen: (open: boolean) => void
   onNavClick?: () => void
 }) {
   const {data: authStatus} = useQuery({queryKey: ['auth-status'], queryFn: checkAuthStatus})
   const qc = useQueryClient()
+  const {isDark, toggleDark} = useTheme()
 
   return (
-    <div className="p-3 border-t space-y-1 shrink-0">
+    <div className="p-3 border-t border-sidebar-border space-y-1 shrink-0">
       <NavLink
         to="/settings"
         onClick={onNavClick}
@@ -120,7 +118,7 @@ function SidebarFooter({
       >
         <Settings className="h-5 w-5 md:h-4 md:w-4" />
         <span className="flex-1 text-left">Settings</span>
-        <kbd className="text-[10px] font-mono text-muted-foreground opacity-60 hidden md:inline">{mod},</kbd>
+        <kbd className="text-[10px] font-mono text-sidebar-foreground/50 hidden md:inline">{mod},</kbd>
       </NavLink>
       <button
         onClick={() => {
@@ -131,15 +129,15 @@ function SidebarFooter({
       >
         <Keyboard className="h-5 w-5 md:h-4 md:w-4" />
         <span className="flex-1 text-left">Shortcuts</span>
-        <kbd className="text-[10px] font-mono text-muted-foreground opacity-60 hidden md:inline">?</kbd>
+        <kbd className="text-[10px] font-mono text-sidebar-foreground/50 hidden md:inline">?</kbd>
       </button>
       <button
-        onClick={() => setDark((d) => !d)}
+        onClick={toggleDark}
         className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 w-full transition-colors cursor-pointer"
       >
-        {dark ? <Sun className="h-5 w-5 md:h-4 md:w-4" /> : <Moon className="h-5 w-5 md:h-4 md:w-4" />}
-        <span className="flex-1 text-left">{dark ? 'Light Mode' : 'Dark Mode'}</span>
-        <kbd className="text-[10px] font-mono text-muted-foreground opacity-60 hidden md:inline">{mod}D</kbd>
+        {isDark ? <Sun className="h-5 w-5 md:h-4 md:w-4" /> : <Moon className="h-5 w-5 md:h-4 md:w-4" />}
+        <span className="flex-1 text-left">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+        <kbd className="text-[10px] font-mono text-sidebar-foreground/50 hidden md:inline">{mod}D</kbd>
       </button>
       {authStatus?.authRequired && (
         <button
@@ -209,31 +207,19 @@ function BottomTabBar() {
 }
 
 function AppLayout() {
-  const [dark, setDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark'
-    }
-    return false
-  })
+  const {toggleDark} = useTheme()
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const showShortcuts = useCallback(() => setShortcutsOpen(true), [])
-  const toggleDark = useCallback(() => setDark((d) => !d), [])
   useKeyboardShortcuts(showShortcuts, toggleDark)
 
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-    localStorage.setItem('theme', dark ? 'dark' : 'light')
-  }, [dark])
-
-  const footerProps = {dark, setDark, setShortcutsOpen}
+  const footerProps = {setShortcutsOpen}
 
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="w-56 border-r bg-sidebar text-sidebar-foreground hidden md:flex flex-col shrink-0 overflow-hidden">
-        <Link to="/" className="block p-4 border-b">
-          <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-6 dark:hidden" />
-          <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6 hidden dark:block" />
+      <aside className="w-56 border-r border-sidebar-border bg-sidebar text-sidebar-foreground hidden md:flex flex-col shrink-0 overflow-hidden">
+        <Link to="/" className="block p-4 border-b border-sidebar-border">
+          <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6" />
         </Link>
         <SidebarNav />
         <SidebarFooter {...footerProps} />
@@ -241,7 +227,7 @@ function AppLayout() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center justify-center border-b px-4 py-3 bg-white dark:bg-neutral-900 shrink-0">
+        <header className="md:hidden flex items-center justify-center border-b px-4 py-3 bg-background shrink-0">
           <Link to="/">
             <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-5 dark:hidden" />
             <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-5 hidden dark:block" />
@@ -280,11 +266,13 @@ function AppLayout() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthGate />
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthGate />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ThemeProvider>
   )
 }
 

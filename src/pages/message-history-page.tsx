@@ -9,7 +9,7 @@ import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/compon
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {deleteDrafts, deleteMessages, duplicateDraft, duplicateMessage, fetchDrafts, fetchMessages} from '@/lib/api'
-import type {Draft} from '@/lib/api'
+import type {Draft, Message} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
@@ -25,6 +25,33 @@ const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'ou
   cancelled: 'destructive',
   scheduled: 'secondary',
   past_due: 'destructive',
+}
+
+function MessageGroupCell({msg}: {msg: Message}) {
+  if (!msg.groupName) return <>{'\u2014'}</>
+  const extraNames = msg.extraNames ?? []
+  if (extraNames.length === 0) return <>{msg.groupName}</>
+  return (
+    <>
+      {msg.groupName} +{' '}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="underline decoration-dotted cursor-default">
+              {extraNames.length} extra
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="text-sm">
+              {extraNames.map((name, i) => (
+                <div key={i}>{name}</div>
+              ))}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </>
+  )
 }
 
 export function MessageHistoryPage() {
@@ -156,6 +183,30 @@ export function MessageHistoryPage() {
     const count = draft.recipientCount ?? 0
     if (draft.recipientMode === 'group') {
       if (!draft.groupName) return 'No group selected'
+      const extraNames = draft.extraNames ?? []
+      if (extraNames.length > 0) {
+        return (
+          <>
+            {draft.groupName} ({count}) +{' '}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="underline decoration-dotted cursor-default">
+                    {extraNames.length} extra
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">
+                    {extraNames.map((name, i) => (
+                      <div key={i}>{name}</div>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
+        )
+      }
       return `${draft.groupName} (${count})`
     }
     if (count > 0) {
@@ -272,7 +323,7 @@ export function MessageHistoryPage() {
           {messagesLoading ? (
             <PageSpinner />
           ) : (
-            <div className="border rounded-md overflow-x-auto">
+            <div className="border rounded-md overflow-x-auto bg-card">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -292,8 +343,12 @@ export function MessageHistoryPage() {
                 </TableHeader>
                 <TableBody>
                   {sentMessages?.map((msg) => (
-                    <TableRow key={msg.id}>
-                      <TableCell>
+                    <TableRow
+                      key={msg.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/messages/${msg.id}`)}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={selectedIds.has(msg.id)} onCheckedChange={() => toggleSelect(msg.id)} />
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
@@ -303,10 +358,10 @@ export function MessageHistoryPage() {
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Link to={`/messages/${msg.id}`} className="hover:underline truncate block">
+                              <span className="truncate block">
                                 {(msg.renderedPreview || msg.content).substring(0, 80)}
                                 {(msg.renderedPreview || msg.content).length > 80 ? '...' : ''}
-                              </Link>
+                              </span>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
                               {msg.renderedPreview || msg.content}
@@ -322,8 +377,8 @@ export function MessageHistoryPage() {
                       <TableCell>
                         <Badge variant={statusColors[msg.status] || 'outline'}>{msg.status}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{msg.groupName || '\u2014'}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-muted-foreground"><MessageGroupCell msg={msg} /></TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -358,7 +413,7 @@ export function MessageHistoryPage() {
           {messagesLoading ? (
             <PageSpinner />
           ) : (
-            <div className="border rounded-md overflow-x-auto">
+            <div className="border rounded-md overflow-x-auto bg-card">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -382,8 +437,12 @@ export function MessageHistoryPage() {
                 </TableHeader>
                 <TableBody>
                   {scheduledMessages?.map((msg) => (
-                    <TableRow key={msg.id}>
-                      <TableCell>
+                    <TableRow
+                      key={msg.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/messages/${msg.id}`)}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={selectedIds.has(msg.id)} onCheckedChange={() => toggleSelect(msg.id)} />
                       </TableCell>
                       <TableCell className="text-sm whitespace-nowrap">
@@ -397,10 +456,10 @@ export function MessageHistoryPage() {
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Link to={`/messages/${msg.id}`} className="hover:underline truncate block">
+                              <span className="truncate block">
                                 {(msg.renderedPreview || msg.content).substring(0, 80)}
                                 {(msg.renderedPreview || msg.content).length > 80 ? '...' : ''}
-                              </Link>
+                              </span>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
                               {msg.renderedPreview || msg.content}
@@ -416,8 +475,8 @@ export function MessageHistoryPage() {
                           {msg.status === 'past_due' ? 'past due' : msg.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{msg.groupName || '\u2014'}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-muted-foreground"><MessageGroupCell msg={msg} /></TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-1">
                           <Button
                             variant="ghost"
@@ -459,7 +518,7 @@ export function MessageHistoryPage() {
           {draftsLoading ? (
             <PageSpinner />
           ) : (
-            <div className="border rounded-md overflow-x-auto">
+            <div className="border rounded-md overflow-x-auto bg-card">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -480,7 +539,7 @@ export function MessageHistoryPage() {
                   {drafts?.map((draft) => (
                     <TableRow
                       key={draft.id}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-muted/50"
                       onClick={(e) => {
                         // Don't navigate when clicking checkbox
                         if ((e.target as HTMLElement).closest('button')) return

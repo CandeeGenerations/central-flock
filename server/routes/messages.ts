@@ -1,4 +1,4 @@
-import {desc, eq, sql} from 'drizzle-orm'
+import {desc, eq, inArray, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
@@ -150,10 +150,36 @@ messagesRouter.get(
 
     const messagesList = db.select().from(schema.messages).orderBy(desc(schema.messages.createdAt)).all()
 
-    // Attach group names
+    // Attach group names and extra recipient names
     let result = messagesList.map((msg) => {
       const groupName = msg.groupId ? getGroupName(msg.groupId) : null
-      return {...msg, groupName}
+      let extraNames: string[] = []
+      if (msg.groupId) {
+        const groupMemberIds = new Set(
+          db
+            .select({personId: schema.peopleGroups.personId})
+            .from(schema.peopleGroups)
+            .where(eq(schema.peopleGroups.groupId, msg.groupId))
+            .all()
+            .map((r) => r.personId),
+        )
+        const recipientPersonIds = db
+          .select({personId: schema.messageRecipients.personId})
+          .from(schema.messageRecipients)
+          .where(eq(schema.messageRecipients.messageId, msg.id))
+          .all()
+          .map((r) => r.personId)
+        const extraIds = recipientPersonIds.filter((id) => !groupMemberIds.has(id))
+        if (extraIds.length > 0) {
+          extraNames = db
+            .select({firstName: schema.people.firstName, lastName: schema.people.lastName})
+            .from(schema.people)
+            .where(inArray(schema.people.id, extraIds))
+            .all()
+            .map((p) => [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unknown')
+        }
+      }
+      return {...msg, groupName, extraNames}
     })
 
     if (search && typeof search === 'string') {
@@ -447,6 +473,36 @@ messagesRouter.post(
     }
 
     db.update(schema.messages).set({status: 'pending'}).where(eq(schema.messages.id, messageId)).run()
+
+    const job = createJob(messageId, message.batchSize, message.batchDelayMs)
+    processSendJob(job)
+
+    res.json({success: true, jobId: job.id})
+  }),
+)
+
+// POST /api/messages/:id/resume - Resume a stuck sending job
+messagesRouter.post(
+  '/:id/resume',
+  asyncHandler(async (req, res) => {
+    const messageId = Number(req.params.id)
+    const message = db.select().from(schema.messages).where(eq(schema.messages.id, messageId)).get()
+
+    if (!message) {
+      res.status(404).json({error: 'Message not found'})
+      return
+    }
+    if (message.status !== 'sending') {
+      res.status(400).json({error: 'Message is not in sending state'})
+      return
+    }
+
+    // Check if there's already an active job
+    const existingJob = getJob(messageId)
+    if (existingJob && existingJob.status === 'processing') {
+      res.status(400).json({error: 'Message is already being processed'})
+      return
+    }
 
     const job = createJob(messageId, message.batchSize, message.batchDelayMs)
     processSendJob(job)

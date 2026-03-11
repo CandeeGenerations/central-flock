@@ -347,10 +347,7 @@ export function MessageComposePage() {
     setDateFormats(defaultFormats)
   }
 
-  const groupMemberIds = useMemo(
-    () => new Set(groupDetail?.members.map((m) => m.id) || []),
-    [groupDetail],
-  )
+  const groupMemberIds = useMemo(() => new Set(groupDetail?.members.map((m) => m.id) || []), [groupDetail])
 
   const recipients = useMemo(() => {
     if (recipientMode === 'group' && groupDetail) {
@@ -408,7 +405,6 @@ export function MessageComposePage() {
     },
     [excludeResults, excludeHighlight, toggleExclude],
   )
-
 
   const individualResults = useMemo(() => {
     if (!debouncedIndividualSearch || !allPeople) return []
@@ -675,7 +671,9 @@ export function MessageComposePage() {
                   {allPeople && (
                     <div className="space-y-2">
                       {recipientMode === 'group' && (
-                        <Label className="text-xs text-muted-foreground">Add people outside this group (optional)</Label>
+                        <Label className="text-xs text-muted-foreground">
+                          Add people outside this group (optional)
+                        </Label>
                       )}
                       <SearchInput
                         ref={individualSearchRef}
@@ -712,9 +710,7 @@ export function MessageComposePage() {
                                   individualSearchRef.current?.focus()
                                 }}
                               >
-                                <span>
-                                  {formatFullName(p, '') || <em className="opacity-50">Unnamed</em>}
-                                </span>
+                                <span>{formatFullName(p, '') || <em className="opacity-50">Unnamed</em>}</span>
                                 <span className="opacity-60 ml-auto">{p.phoneDisplay}</span>
                               </button>
                             ))
@@ -798,9 +794,7 @@ export function MessageComposePage() {
                                   excludeSearchRef.current?.focus()
                                 }}
                               >
-                                <span>
-                                  {formatFullName(m, '') || <em className="opacity-50">Unnamed</em>}
-                                </span>
+                                <span>{formatFullName(m, '') || <em className="opacity-50">Unnamed</em>}</span>
                                 <span className="opacity-60 ml-auto">{m.phoneDisplay}</span>
                               </button>
                             ))
@@ -1105,7 +1099,12 @@ export function MessageComposePage() {
             </div>
             <div className="flex items-center gap-2 self-end sm:self-auto">
               {!isEditMode && currentDraftId && (
-                <Button variant="ghost" size="sm" className="hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
                   <Trash2 className="h-4 w-4 mr-1.5" />
                   Delete
                 </Button>

@@ -37,9 +37,7 @@ function MessageGroupCell({msg}: {msg: Message}) {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="underline decoration-dotted cursor-default">
-              {extraNames.length} extra
-            </span>
+            <span className="underline decoration-dotted cursor-default">{extraNames.length} extra</span>
           </TooltipTrigger>
           <TooltipContent>
             <div className="text-sm">
@@ -191,9 +189,7 @@ export function MessageHistoryPage() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="underline decoration-dotted cursor-default">
-                    {extraNames.length} extra
-                  </span>
+                  <span className="underline decoration-dotted cursor-default">{extraNames.length} extra</span>
                 </TooltipTrigger>
                 <TooltipContent>
                   <div className="text-sm">
@@ -377,7 +373,9 @@ export function MessageHistoryPage() {
                       <TableCell>
                         <Badge variant={statusColors[msg.status] || 'outline'}>{msg.status}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground"><MessageGroupCell msg={msg} /></TableCell>
+                      <TableCell className="text-muted-foreground">
+                        <MessageGroupCell msg={msg} />
+                      </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
@@ -475,7 +473,9 @@ export function MessageHistoryPage() {
                           {msg.status === 'past_due' ? 'past due' : msg.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground"><MessageGroupCell msg={msg} /></TableCell>
+                      <TableCell className="text-muted-foreground">
+                        <MessageGroupCell msg={msg} />
+                      </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-1">
                           <Button

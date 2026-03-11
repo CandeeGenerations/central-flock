@@ -27,7 +27,11 @@ export function ThemeProvider({children}: {children: React.ReactNode}) {
     if (saved === 'dark' || saved === 'light' || saved === 'system') return saved
     return 'light'
   })
-  const [isDark, setIsDark] = useState(() => resolveIsDark(mode))
+  const [isDark, setIsDark] = useState(() => {
+    const dark = resolveIsDark(mode)
+    if (typeof document !== 'undefined') document.documentElement.classList.toggle('dark', dark)
+    return dark
+  })
 
   const applyDark = useCallback((dark: boolean) => {
     document.documentElement.classList.toggle('dark', dark)
@@ -46,10 +50,6 @@ export function ThemeProvider({children}: {children: React.ReactNode}) {
   const toggleDark = useCallback(() => {
     setMode(isDark ? 'light' : 'dark')
   }, [isDark, setMode])
-
-  useEffect(() => {
-    applyDark(resolveIsDark(mode))
-  }, [mode, applyDark])
 
   // Listen for system theme changes when mode is 'system'
   useEffect(() => {

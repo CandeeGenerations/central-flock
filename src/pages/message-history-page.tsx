@@ -27,28 +27,50 @@ const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'ou
   past_due: 'destructive',
 }
 
-function MessageGroupCell({msg}: {msg: Message}) {
-  if (!msg.groupName) return <>{'\u2014'}</>
-  const extraNames = msg.extraNames ?? []
-  if (extraNames.length === 0) return <>{msg.groupName}</>
+function MessageRecipientsCell({msg}: {msg: Message}) {
+  if (msg.groupName) {
+    const extraNames = msg.extraNames ?? []
+    if (extraNames.length === 0) return <>{msg.groupName}</>
+    return (
+      <>
+        {msg.groupName} +{' '}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="underline decoration-dotted cursor-default">{extraNames.length} extra</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">
+                {extraNames.map((name, i) => (
+                  <div key={i}>{name}</div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </>
+    )
+  }
+  const names = msg.recipientNames ?? []
+  if (names.length === 0) return <>{'\u2014'}</>
+  if (names.length <= 2) return <>{names.join(', ')}</>
   return (
-    <>
-      {msg.groupName} +{' '}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="underline decoration-dotted cursor-default">{extraNames.length} extra</span>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="text-sm">
-              {extraNames.map((name, i) => (
-                <div key={i}>{name}</div>
-              ))}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="underline decoration-dotted cursor-default">
+            {names[0]}, {names[1]} + {names.length - 2} more
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          <div className="text-sm">
+            {names.map((name, i) => (
+              <div key={i}>{name}</div>
+            ))}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -333,7 +355,7 @@ export function MessageHistoryPage() {
                     <TableHead>Message</TableHead>
                     <TableHead>Recipients</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Group</TableHead>
+                    <TableHead>Recipients</TableHead>
                     <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -374,7 +396,7 @@ export function MessageHistoryPage() {
                         <Badge variant={statusColors[msg.status] || 'outline'}>{msg.status}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        <MessageGroupCell msg={msg} />
+                        <MessageRecipientsCell msg={msg} />
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Button
@@ -429,7 +451,7 @@ export function MessageHistoryPage() {
                     <TableHead>Message</TableHead>
                     <TableHead>Recipients</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Group</TableHead>
+                    <TableHead>Recipients</TableHead>
                     <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -474,7 +496,7 @@ export function MessageHistoryPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        <MessageGroupCell msg={msg} />
+                        <MessageRecipientsCell msg={msg} />
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-1">

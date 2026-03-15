@@ -222,6 +222,7 @@ export interface Message {
   createdAt: string
   completedAt: string | null
   extraNames?: string[]
+  recipientNames?: string[]
 }
 
 export interface MessageRecipient {

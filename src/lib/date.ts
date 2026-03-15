@@ -16,5 +16,5 @@ export function formatDate(dateStr: string): string {
 }
 
 export function formatDateTime(dateStr: string): string {
-  return format(parseUTC(dateStr), 'M/d/yyyy h:mm a')
+  return format(parseUTC(dateStr), 'EEE M/d/yyyy h:mm a')
 }

@@ -179,7 +179,18 @@ messagesRouter.get(
             .map((p) => [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unknown')
         }
       }
-      return {...msg, groupName, extraNames}
+      // For non-group messages, fetch individual recipient names
+      let recipientNames: string[] = []
+      if (!msg.groupId) {
+        recipientNames = db
+          .select({firstName: schema.people.firstName, lastName: schema.people.lastName})
+          .from(schema.messageRecipients)
+          .innerJoin(schema.people, eq(schema.messageRecipients.personId, schema.people.id))
+          .where(eq(schema.messageRecipients.messageId, msg.id))
+          .all()
+          .map((p) => [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unknown')
+      }
+      return {...msg, groupName, extraNames, recipientNames}
     })
 
     if (search && typeof search === 'string') {
@@ -188,7 +199,8 @@ messagesRouter.get(
         (msg) =>
           msg.content.toLowerCase().includes(term) ||
           msg.groupName?.toLowerCase().includes(term) ||
-          msg.status.toLowerCase().includes(term),
+          msg.status.toLowerCase().includes(term) ||
+          msg.recipientNames.some((name) => name.toLowerCase().includes(term)),
       )
     }
 

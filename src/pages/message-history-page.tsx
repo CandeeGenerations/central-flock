@@ -106,9 +106,12 @@ export function MessageHistoryPage() {
 
   const sentMessages = useMemo(
     () =>
-      messages?.filter(
-        (m) => m.status === 'pending' || m.status === 'sending' || m.status === 'completed' || m.status === 'cancelled',
-      ),
+      messages
+        ?.filter(
+          (m) =>
+            m.status === 'pending' || m.status === 'sending' || m.status === 'completed' || m.status === 'cancelled',
+        )
+        .sort((a, b) => (b.completedAt ?? b.createdAt).localeCompare(a.completedAt ?? a.createdAt)),
     [messages],
   )
   const scheduledMessages = useMemo(

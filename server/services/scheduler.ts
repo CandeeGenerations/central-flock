@@ -7,7 +7,7 @@ type ProcessSendJobFn = (job: ReturnType<typeof createJob>) => Promise<void>
 
 let intervalId: ReturnType<typeof setInterval> | null = null
 
-export function startScheduler(processSendJob: ProcessSendJobFn, pollIntervalMs = 60_000) {
+export function startScheduler(processSendJob: ProcessSendJobFn, pollIntervalMs = 300_000) {
   checkScheduledMessages(processSendJob)
   intervalId = setInterval(() => checkScheduledMessages(processSendJob), pollIntervalMs)
   console.log(`Scheduler started (polling every ${pollIntervalMs / 1000}s)`)

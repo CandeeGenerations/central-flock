@@ -3,10 +3,10 @@ import {Calendar} from '@/components/ui/calendar'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {PageSpinner} from '@/components/ui/spinner'
-import {fetchStats} from '@/lib/api'
+import {checkAuthStatus, fetchStats, logout} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
-import {useQuery} from '@tanstack/react-query'
-import {CalendarIcon, MessageSquare, Plus, Settings} from 'lucide-react'
+import {useQuery, useQueryClient} from '@tanstack/react-query'
+import {CalendarIcon, LogOut, MessageSquare, Plus, Settings} from 'lucide-react'
 import {useEffect, useMemo, useState} from 'react'
 import type {DateRange} from 'react-day-picker'
 import {Link} from 'react-router-dom'
@@ -78,6 +78,8 @@ function calcChange(current: number, previous: number): {pct: number; positive: 
 }
 
 export function DashboardPage() {
+  const {data: authStatus} = useQuery({queryKey: ['auth-status'], queryFn: checkAuthStatus})
+  const qc = useQueryClient()
   const [preset, setPreset] = useState<RangePreset>(() => {
     const saved = localStorage.getItem('dashboard-range-preset')
     return saved && PRESETS.some((p) => p.key === saved) ? (saved as RangePreset) : 'last12m'
@@ -447,14 +449,27 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Mobile settings link */}
-      <div className="md:hidden">
+      {/* Mobile settings & logout links */}
+      <div className="md:hidden flex flex-col gap-3 pt-4">
         <Link to="/settings">
           <Button variant="outline" className="w-full">
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
         </Link>
+        {authStatus?.authRequired && (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={async () => {
+              await logout()
+              qc.invalidateQueries({queryKey: ['auth-status']})
+            }}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        )}
       </div>
     </div>
   )

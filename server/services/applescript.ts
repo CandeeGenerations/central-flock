@@ -1,19 +1,28 @@
-import {execFile, spawn} from 'child_process'
-import {promisify} from 'util'
+import {spawn} from 'child_process'
 
-const execFileAsync = promisify(execFile)
-
-function setClipboard(text: string): Promise<void> {
+function spawnStdin(command: string, args: string[], input: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn('pbcopy')
+    const proc = spawn(command, args)
+    let stdout = ''
+    let stderr = ''
+    proc.stdout.on('data', (data) => (stdout += data))
+    proc.stderr.on('data', (data) => (stderr += data))
     proc.on('error', reject)
     proc.on('close', (code) => {
-      if (code === 0) resolve()
-      else reject(new Error(`pbcopy exited with code ${code}`))
+      if (code === 0) resolve(stdout)
+      else reject(new Error(`${command} exited with code ${code}: ${stderr}`))
     })
-    proc.stdin.write(text)
+    proc.stdin.write(input)
     proc.stdin.end()
   })
+}
+
+function setClipboard(text: string): Promise<string> {
+  return spawnStdin('pbcopy', [], text)
+}
+
+function runAppleScript(script: string): Promise<string> {
+  return spawnStdin('osascript', [], script)
 }
 
 export async function sendMessage(phoneNumber: string, message: string): Promise<void> {
@@ -28,7 +37,7 @@ tell application "Messages"
 end tell`
 
   try {
-    await execFileAsync('osascript', ['-e', script])
+    await runAppleScript(script)
   } catch (error) {
     throw new Error(
       `Failed to send message to ${phoneNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -58,7 +67,7 @@ delay 0.5`
   try {
     // Set clipboard via pbcopy stdin — avoids AppleScript string escaping issues
     await setClipboard(message)
-    await execFileAsync('osascript', ['-e', script])
+    await runAppleScript(script)
   } catch (error) {
     throw new Error(
       `Failed to send message via UI to ${phoneNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -80,7 +89,7 @@ tell application "Contacts"
 end tell`
 
   try {
-    await execFileAsync('osascript', ['-e', script])
+    await runAppleScript(script)
   } catch (error) {
     throw new Error(
       `Failed to create contact for ${firstName} ${lastName}: ${error instanceof Error ? error.message : 'Unknown error'}`,

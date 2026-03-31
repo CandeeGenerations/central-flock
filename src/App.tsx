@@ -6,8 +6,15 @@ import {checkAuthStatus, logout} from '@/lib/api'
 import {ThemeProvider, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
 import {DashboardPage} from '@/pages/dashboard-page'
+import {DevotionAuditPage} from '@/pages/devotions/devotion-audit-page'
+import {DevotionDetailPage} from '@/pages/devotions/devotion-detail-page'
+import {DevotionScanPage} from '@/pages/devotions/devotion-scan-page'
+import {DevotionScripturesPage} from '@/pages/devotions/devotion-scriptures-page'
+import {DevotionListPage} from '@/pages/devotions/devotion-list-page'
+import {DevotionStatsPage} from '@/pages/devotions/devotion-stats-page'
 import {GroupDetailPage} from '@/pages/group-detail-page'
 import {GroupsPage} from '@/pages/groups-page'
+import {ContactsImportPage} from '@/pages/contacts-import-page'
 import {ImportPage} from '@/pages/import-page'
 import {LoginPage} from '@/pages/login-page'
 import {MessageComposePage} from '@/pages/message-compose-page'
@@ -20,8 +27,12 @@ import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
 import {QueryClient, QueryClientProvider, useQuery, useQueryClient} from '@tanstack/react-query'
 import {
+  AlertTriangle,
+  BarChart3,
+  BookOpen,
   FileText,
   FolderOpen,
+  List,
   Keyboard,
   LayoutDashboard,
   LogOut,
@@ -68,6 +79,13 @@ function AuthGate() {
   return <AppLayout />
 }
 
+const devotionNavItems = [
+  {to: '/devotions/stats', label: 'Stats', icon: BarChart3, shortcut: `${mod}6`},
+  {to: '/devotions', label: 'Devotions', icon: List, shortcut: `${mod}7`},
+  {to: '/devotions/scriptures', label: 'Scriptures', icon: BookOpen, shortcut: `${mod}8`},
+  {to: '/devotions/audit', label: 'Audit', icon: AlertTriangle, shortcut: `${mod}9`},
+]
+
 function SidebarNav({onNavClick}: {onNavClick?: () => void}) {
   return (
     <nav className="flex-1 p-3 md:p-2 space-y-1">
@@ -76,6 +94,28 @@ function SidebarNav({onNavClick}: {onNavClick?: () => void}) {
           key={to}
           to={to}
           end={to === '/'}
+          onClick={onNavClick}
+          className={({isActive}) =>
+            cn(
+              'flex items-center gap-3 px-3 py-3 md:py-2 rounded-md text-base md:text-sm font-medium transition-colors cursor-pointer',
+              isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/50',
+            )
+          }
+        >
+          <Icon className="h-5 w-5 md:h-4 md:w-4" />
+          <span className="flex-1">{label}</span>
+          <kbd className="text-[10px] font-mono text-sidebar-foreground/50 hidden md:inline">{shortcut}</kbd>
+        </NavLink>
+      ))}
+      <div className="border-t border-sidebar-border my-2" />
+      <div className="px-3 py-1 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider hidden md:block">
+        Devotions
+      </div>
+      {devotionNavItems.map(({to, label, icon: Icon, shortcut}) => (
+        <NavLink
+          key={to}
+          to={to}
+          end
           onClick={onNavClick}
           className={({isActive}) =>
             cn(
@@ -249,6 +289,14 @@ function AppLayout() {
             <Route path="/templates/new" element={<TemplateEditPage />} />
             <Route path="/templates/:id/edit" element={<TemplateEditPage />} />
             <Route path="/import" element={<ImportPage />} />
+            <Route path="/import/contacts" element={<ContactsImportPage />} />
+            <Route path="/devotions" element={<DevotionListPage />} />
+            <Route path="/devotions/stats" element={<DevotionStatsPage />} />
+            <Route path="/devotions/scan" element={<DevotionScanPage />} />
+            <Route path="/devotions/scriptures" element={<DevotionScripturesPage />} />
+            <Route path="/devotions/audit" element={<DevotionAuditPage />} />
+            <Route path="/devotions/new" element={<DevotionDetailPage />} />
+            <Route path="/devotions/:id" element={<DevotionDetailPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>

@@ -54,9 +54,15 @@ export interface Person {
   id: number
   firstName: string | null
   lastName: string | null
-  phoneNumber: string
+  phoneNumber: string | null
   phoneDisplay: string | null
   status: 'active' | 'inactive' | 'do_not_contact'
+  birthMonth: number | null
+  birthDay: number | null
+  birthYear: number | null
+  anniversaryMonth: number | null
+  anniversaryDay: number | null
+  anniversaryYear: number | null
   notes: string | null
   createdAt: string
   updatedAt: string
@@ -497,7 +503,66 @@ export function executeImport(people: ImportPreview['people'], skipDuplicates = 
   })
 }
 
-// Contacts
+// Contacts - Import from macOS
+export interface MacContactPhone {
+  label: string
+  value: string
+  normalized: string
+}
+
+export interface MacContactMatch {
+  id: string
+  firstName: string
+  lastName: string
+  phones: MacContactPhone[]
+  matchStatus: 'new' | 'exists' | 'differs'
+  existingPersonId?: number
+  differences?: {field: string; contact: string; existing: string}[]
+}
+
+export interface MacContactsResponse {
+  contacts: MacContactMatch[]
+  total: number
+}
+
+export function fetchMacContacts() {
+  return request<MacContactsResponse>('/contacts')
+}
+
+export function importMacContacts(
+  contacts: {firstName: string; lastName: string; phoneNumber: string; phoneDisplay: string}[],
+  skipDuplicates = true,
+) {
+  return request<{created: number; updated: number; skipped: number}>('/contacts/import', {
+    method: 'POST',
+    body: JSON.stringify({contacts, skipDuplicates}),
+  })
+}
+
+export function dismissContacts(contacts: {contactId: string; firstName?: string; lastName?: string}[]) {
+  return request<{dismissed: number}>('/contacts/dismiss', {
+    method: 'POST',
+    body: JSON.stringify({contacts}),
+  })
+}
+
+export interface DismissedContact {
+  id: number
+  contactId: string
+  firstName: string | null
+  lastName: string | null
+  dismissedAt: string
+}
+
+export function fetchDismissedContacts() {
+  return request<{contacts: DismissedContact[]; total: number}>('/contacts/dismissed')
+}
+
+export function undismissContact(contactId: string) {
+  return request<{success: boolean}>(`/contacts/dismiss/${contactId}`, {method: 'DELETE'})
+}
+
+// Contacts - Create in macOS
 export function createMacContact(personId: number) {
   return request('/contacts/create', {
     method: 'POST',

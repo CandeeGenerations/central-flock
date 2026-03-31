@@ -6,12 +6,7 @@ import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 
 export const peopleRouter = Router()
 
-function e164ToDisplay(phone: string): string {
-  const digits = phone.replace(/\D/g, '')
-  const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits
-  if (local.length === 10) return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`
-  return phone
-}
+import {e164ToDisplay} from '../services/csv-parser.js'
 
 // GET /api/people/duplicates - Find duplicate people
 peopleRouter.get(
@@ -58,6 +53,7 @@ peopleRouter.get(
       for (let j = i + 1; j < allPeople.length; j++) {
         const a = allPeople[i].phoneNumber
         const b = allPeople[j].phoneNumber
+        if (!a || !b) continue
         if (a.length === b.length) {
           let diff = 0
           for (let k = 0; k < a.length; k++) {
@@ -142,7 +138,7 @@ peopleRouter.get(
 
     const rows = ['First Name,Last Name,Phone Number,Status,Groups']
     for (const p of peopleList) {
-      const phone = p.phoneDisplay || p.phoneNumber
+      const phone = p.phoneDisplay || p.phoneNumber || ''
       const groups = (membershipMap.get(p.id) || []).join(', ')
       rows.push([p.firstName || '', p.lastName || '', phone, p.status, groups].map((v) => escapeCSV(v)).join(','))
     }
@@ -280,21 +276,53 @@ peopleRouter.get(
   }),
 )
 
+function validateMonthDay(month: number | null, day: number | null, label: string): string | null {
+  if (month != null && day == null) return `${label} day is required when month is set`
+  if (day != null && month == null) return `${label} month is required when day is set`
+  if (month != null && (month < 1 || month > 12)) return `${label} month must be 1-12`
+  if (day != null && month != null) {
+    const maxDays: Record<number, number> = {1: 31, 2: 29, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31}
+    if (day < 1 || day > maxDays[month]) {
+      return `${label} day must be 1-${maxDays[month]} for month ${month}`
+    }
+  }
+  return null
+}
+
 // POST /api/people - Create person
 peopleRouter.post(
   '/',
   asyncHandler(async (req, res) => {
-    const {firstName, lastName, phoneNumber, phoneDisplay, status, notes} = req.body
+    const {firstName, lastName, phoneNumber, phoneDisplay, status, notes, birthMonth, birthDay, birthYear, anniversaryMonth, anniversaryDay, anniversaryYear} = req.body
+
+    const bdayError = validateMonthDay(birthMonth ?? null, birthDay ?? null, 'Birth')
+    if (bdayError) {
+      res.status(400).json({error: bdayError})
+      return
+    }
+
+    const annivError = validateMonthDay(anniversaryMonth ?? null, anniversaryDay ?? null, 'Anniversary')
+    if (annivError) {
+      res.status(400).json({error: annivError})
+      return
+    }
+
     try {
       const result = db
         .insert(schema.people)
         .values({
           firstName: firstName || null,
           lastName: lastName || null,
-          phoneNumber,
-          phoneDisplay: phoneDisplay || e164ToDisplay(phoneNumber),
+          phoneNumber: phoneNumber || null,
+          phoneDisplay: phoneNumber ? phoneDisplay || e164ToDisplay(phoneNumber) : null,
           status: status || 'active',
           notes: notes || null,
+          birthMonth: birthMonth ?? null,
+          birthDay: birthDay ?? null,
+          birthYear: birthYear ?? null,
+          anniversaryMonth: anniversaryMonth ?? null,
+          anniversaryDay: anniversaryDay ?? null,
+          anniversaryYear: anniversaryYear ?? null,
         })
         .returning()
         .get()
@@ -314,16 +342,39 @@ peopleRouter.post(
 peopleRouter.put(
   '/:id',
   asyncHandler(async (req, res) => {
-    const {firstName, lastName, phoneNumber, phoneDisplay, status, notes} = req.body
+    const {firstName, lastName, phoneNumber, phoneDisplay, status, notes, birthMonth, birthDay, birthYear, anniversaryMonth, anniversaryDay, anniversaryYear} = req.body
+
+    if (birthMonth !== undefined || birthDay !== undefined) {
+      const bdayError = validateMonthDay(birthMonth ?? null, birthDay ?? null, 'Birth')
+      if (bdayError) {
+        res.status(400).json({error: bdayError})
+        return
+      }
+    }
+
+    if (anniversaryMonth !== undefined || anniversaryDay !== undefined) {
+      const annivError = validateMonthDay(anniversaryMonth ?? null, anniversaryDay ?? null, 'Anniversary')
+      if (annivError) {
+        res.status(400).json({error: annivError})
+        return
+      }
+    }
+
     const result = db
       .update(schema.people)
       .set({
         firstName: firstName ?? undefined,
         lastName: lastName ?? undefined,
-        phoneNumber: phoneNumber ?? undefined,
+        phoneNumber: phoneNumber !== undefined ? phoneNumber || null : undefined,
         phoneDisplay: phoneDisplay ?? undefined,
         status: status ?? undefined,
         notes: notes ?? undefined,
+        birthMonth: birthMonth !== undefined ? birthMonth ?? null : undefined,
+        birthDay: birthDay !== undefined ? birthDay ?? null : undefined,
+        birthYear: birthYear !== undefined ? birthYear ?? null : undefined,
+        anniversaryMonth: anniversaryMonth !== undefined ? anniversaryMonth ?? null : undefined,
+        anniversaryDay: anniversaryDay !== undefined ? anniversaryDay ?? null : undefined,
+        anniversaryYear: anniversaryYear !== undefined ? anniversaryYear ?? null : undefined,
         updatedAt: sql`datetime('now')`,
       })
       .where(eq(schema.people.id, Number(req.params.id)))

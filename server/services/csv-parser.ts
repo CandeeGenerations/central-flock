@@ -9,6 +9,13 @@ export interface ParsedPerson {
   groups: string[]
 }
 
+export function e164ToDisplay(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits
+  if (local.length === 10) return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`
+  return phone
+}
+
 // Mirrors src/lib/utils.ts:phoneToE164 — keep both in sync
 export function normalizePhoneNumber(phone: string): string {
   const digits = phone.replace(/\D/g, '')
@@ -50,11 +57,12 @@ export function parseCSV(csvData: string): ParsedPerson[] {
           ? 'do_not_contact'
           : 'active'
 
+    const e164 = normalizePhoneNumber(phoneRaw)
     return {
       firstName,
       lastName,
-      phoneNumber: normalizePhoneNumber(phoneRaw),
-      phoneDisplay: phoneRaw,
+      phoneNumber: e164,
+      phoneDisplay: e164ToDisplay(e164),
       status,
       groups,
     }

@@ -1,0 +1,16 @@
+import Database from 'better-sqlite3'
+import {drizzle} from 'drizzle-orm/better-sqlite3'
+import path from 'path'
+import {fileURLToPath} from 'url'
+
+import * as schema from './schema.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const dbPath = path.join(__dirname, '..', '..', 'devotions.db')
+
+const sqlite = new Database(dbPath)
+sqlite.pragma('journal_mode = WAL')
+sqlite.pragma('foreign_keys = ON')
+
+export const devotionsDb = drizzle(sqlite, {schema})
+export {schema as devotionsSchema}

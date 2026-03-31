@@ -5,6 +5,66 @@ import {cn} from '@/lib/utils'
 import {CalendarIcon, X} from 'lucide-react'
 import {useState} from 'react'
 
+interface DatePickerProps {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+}
+
+export function DatePicker({value, onChange, placeholder = 'Pick a date...'}: DatePickerProps) {
+  const [open, setOpen] = useState(false)
+
+  const date = value ? new Date(value + 'T12:00:00') : undefined
+
+  const handleDateSelect = (selected: Date | undefined) => {
+    if (!selected) return
+    const yyyy = selected.getFullYear()
+    const mm = String(selected.getMonth() + 1).padStart(2, '0')
+    const dd = String(selected.getDate()).padStart(2, '0')
+    onChange(`${yyyy}-${mm}-${dd}`)
+    setOpen(false)
+  }
+
+  const displayValue = date
+    ? date.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})
+    : null
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <div className="relative">
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              'w-full justify-start text-left font-normal',
+              !value && 'text-muted-foreground',
+              value && 'pr-8',
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {displayValue || placeholder}
+          </Button>
+        </PopoverTrigger>
+        {value && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onChange('')
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm opacity-70 hover:opacity-100 cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <PopoverContent className="w-auto max-w-[calc(100vw-2rem)] p-0" align="start">
+        <Calendar mode="single" defaultMonth={date} selected={date} onSelect={handleDateSelect} initialFocus />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 const hourOptions = Array.from({length: 24}, (_, i) => {
   const h = String(i).padStart(2, '0')
   const label = i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`

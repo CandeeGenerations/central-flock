@@ -12,7 +12,11 @@ export function parseUTC(dateStr: string): Date {
 }
 
 export function formatDate(dateStr: string): string {
-  return format(parseUTC(dateStr), 'M/d/yyyy')
+  // Date-only strings (YYYY-MM-DD) should be parsed as local, not UTC
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return format(new Date(dateStr + 'T12:00:00'), 'MMM d, yyyy')
+  }
+  return format(parseUTC(dateStr), 'MMM d, yyyy')
 }
 
 export function formatDateTime(dateStr: string): string {

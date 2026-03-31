@@ -410,6 +410,7 @@ export function MessageComposePage() {
     if (!debouncedIndividualSearch || !allPeople) return []
     const q = debouncedIndividualSearch.toLowerCase()
     return allPeople.data.filter((p) => {
+      if (!p.phoneNumber) return false
       if (selectedIndividualIds.has(p.id)) return false
       if (recipientMode === 'group' && groupMemberIds.has(p.id)) return false
       const name = formatFullName(p, '').toLowerCase()

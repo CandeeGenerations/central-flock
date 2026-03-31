@@ -5,11 +5,17 @@ export const people = sqliteTable('people', {
   id: integer('id').primaryKey({autoIncrement: true}),
   firstName: text('first_name'),
   lastName: text('last_name'),
-  phoneNumber: text('phone_number').notNull().unique(),
+  phoneNumber: text('phone_number').unique(),
   phoneDisplay: text('phone_display'),
   status: text('status', {enum: ['active', 'inactive', 'do_not_contact']})
     .default('active')
     .notNull(),
+  birthMonth: integer('birth_month'),
+  birthDay: integer('birth_day'),
+  birthYear: integer('birth_year'),
+  anniversaryMonth: integer('anniversary_month'),
+  anniversaryDay: integer('anniversary_day'),
+  anniversaryYear: integer('anniversary_year'),
   notes: text('notes'),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
@@ -117,6 +123,28 @@ export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
   updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})
+
+export const birthdayMessagesSent = sqliteTable('birthday_messages_sent', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  personId: integer('person_id')
+    .notNull()
+    .references(() => people.id, {onDelete: 'cascade'}),
+  type: text('type', {enum: ['birthday', 'pre_3', 'pre_7', 'pre_10', 'anniversary', 'anniversary_pre_3', 'anniversary_pre_7', 'anniversary_pre_10']}).notNull(),
+  year: integer('year').notNull(),
+  sentAt: text('sent_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})
+
+export const dismissedContacts = sqliteTable('dismissed_contacts', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  contactId: text('contact_id').notNull().unique(),
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  dismissedAt: text('dismissed_at')
     .default(sql`(datetime('now'))`)
     .notNull(),
 })

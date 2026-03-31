@@ -40,21 +40,25 @@ const PRESETS: {key: RangePreset; label: string}[] = [
 function getPresetRange(preset: RangePreset): {from?: string; to?: string} {
   if (preset === 'all') return {}
   const now = new Date()
-  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  // Use UTC to match DB timestamps (stored via SQLite datetime('now') which is UTC)
+  const y = now.getUTCFullYear()
+  const m = now.getUTCMonth()
+  const d = now.getUTCDate()
+  const to = new Date(Date.UTC(y, m, d + 1))
   const toStr = to.toISOString().slice(0, 10)
   let from: Date
   switch (preset) {
     case 'last7':
-      from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
+      from = new Date(Date.UTC(y, m, d - 7))
       break
     case 'last30':
-      from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30)
+      from = new Date(Date.UTC(y, m, d - 30))
       break
     case 'last90':
-      from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90)
+      from = new Date(Date.UTC(y, m, d - 90))
       break
     case 'last12m':
-      from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+      from = new Date(Date.UTC(y - 1, m, d))
       break
     default:
       return {}
@@ -116,7 +120,7 @@ export function DashboardPage() {
     if (preset === 'custom' && customRange?.from) {
       const from = customRange.from.toISOString().slice(0, 10)
       const to = customRange.to
-        ? new Date(customRange.to.getFullYear(), customRange.to.getMonth(), customRange.to.getDate() + 1)
+        ? new Date(Date.UTC(customRange.to.getUTCFullYear(), customRange.to.getUTCMonth(), customRange.to.getUTCDate() + 1))
             .toISOString()
             .slice(0, 10)
         : undefined
@@ -212,14 +216,14 @@ export function DashboardPage() {
               <Button size="sm">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Compose
-                <kbd className="ml-2 text-[10px] font-mono opacity-60">{isMac ? '⌘' : 'Ctrl+'}J</kbd>
+                <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">{isMac ? '⌘' : 'Ctrl+'}J</kbd>
               </Button>
             </Link>
             <Link to="/people?add=1">
               <Button size="sm" variant="outline">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Person
-                <kbd className="ml-2 text-[10px] font-mono opacity-60">{isMac ? '⌘' : 'Ctrl+'}P</kbd>
+                <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">{isMac ? '⌘' : 'Ctrl+'}P</kbd>
               </Button>
             </Link>
           </div>

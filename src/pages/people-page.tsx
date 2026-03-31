@@ -29,6 +29,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   Ban,
+  BookUser,
   Download,
   EllipsisVertical,
   Plus,
@@ -74,6 +75,12 @@ export function PeoplePage() {
     lastName: '',
     phoneNumber: '',
     phoneDisplay: '',
+    birthMonth: null as number | null,
+    birthDay: null as number | null,
+    birthYear: null as number | null,
+    anniversaryMonth: null as number | null,
+    anniversaryDay: null as number | null,
+    anniversaryYear: null as number | null,
   })
 
   const {data, isLoading} = useQuery({
@@ -108,6 +115,12 @@ export function PeoplePage() {
         lastName: '',
         phoneNumber: '',
         phoneDisplay: '',
+        birthMonth: null,
+        birthDay: null,
+        birthYear: null,
+        anniversaryMonth: null,
+        anniversaryDay: null,
+        anniversaryYear: null,
       })
       toast.success('Person created')
     },
@@ -144,19 +157,21 @@ export function PeoplePage() {
   const phoneValid = phoneDigits.length === 10
 
   const handleAddPerson = () => {
-    if (!newPerson.phoneDisplay.trim()) {
-      toast.error('Phone number is required')
-      return
-    }
-    if (!phoneValid) {
+    if (phoneDigits.length > 0 && !phoneValid) {
       toast.error('Phone number must be 10 digits')
       return
     }
     createMutation.mutate({
       firstName: newPerson.firstName || null,
       lastName: newPerson.lastName || null,
-      phoneNumber: newPerson.phoneNumber,
-      phoneDisplay: newPerson.phoneDisplay || newPerson.phoneNumber,
+      phoneNumber: newPerson.phoneNumber || null,
+      phoneDisplay: newPerson.phoneDisplay || newPerson.phoneNumber || null,
+      birthMonth: newPerson.birthMonth,
+      birthDay: newPerson.birthDay,
+      birthYear: newPerson.birthYear,
+      anniversaryMonth: newPerson.anniversaryMonth,
+      anniversaryDay: newPerson.anniversaryDay,
+      anniversaryYear: newPerson.anniversaryYear,
     })
   }
 
@@ -194,6 +209,13 @@ export function PeoplePage() {
               >
                 <Upload className="h-4 w-4" />
                 Import CSV
+              </button>
+              <button
+                className="flex w-full items-center gap-2 text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+                onClick={() => navigate('/import/contacts')}
+              >
+                <BookUser className="h-4 w-4" />
+                Import from Contacts
               </button>
               <button
                 className="flex w-full items-center gap-2 text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
@@ -338,6 +360,9 @@ export function PeoplePage() {
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Person
+                <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">
+                  ⌘P
+                </kbd>
               </Button>
             </DialogTrigger>
             <DialogContent
@@ -379,6 +404,86 @@ export function PeoplePage() {
                 <div>
                   <Label>E.164 Format</Label>
                   <p className="text-sm font-mono mt-1">{newPerson.phoneNumber || '—'}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>Birth Month</Label>
+                    <SearchableSelect
+                      value={newPerson.birthMonth ? String(newPerson.birthMonth) : ''}
+                      onValueChange={(v) => setNewPerson((p) => ({...p, birthMonth: v ? Number(v) : null}))}
+                      options={[
+                        {value: '', label: 'None'},
+                        ...Array.from({length: 12}, (_, i) => ({
+                          value: String(i + 1),
+                          label: new Date(2000, i).toLocaleString('default', {month: 'long'}),
+                        })),
+                      ]}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <Label>Birth Day</Label>
+                    <SearchableSelect
+                      value={newPerson.birthDay ? String(newPerson.birthDay) : ''}
+                      onValueChange={(v) => setNewPerson((p) => ({...p, birthDay: v ? Number(v) : null}))}
+                      options={[
+                        {value: '', label: 'None'},
+                        ...Array.from({length: 31}, (_, i) => ({value: String(i + 1), label: String(i + 1)})),
+                      ]}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <Label>Birth Year</Label>
+                    <Input
+                      type="number"
+                      value={newPerson.birthYear ?? ''}
+                      onChange={(e) =>
+                        setNewPerson((p) => ({...p, birthYear: e.target.value ? Number(e.target.value) : null}))
+                      }
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>Anniversary Month</Label>
+                    <SearchableSelect
+                      value={newPerson.anniversaryMonth ? String(newPerson.anniversaryMonth) : ''}
+                      onValueChange={(v) => setNewPerson((p) => ({...p, anniversaryMonth: v ? Number(v) : null}))}
+                      options={[
+                        {value: '', label: 'None'},
+                        ...Array.from({length: 12}, (_, i) => ({
+                          value: String(i + 1),
+                          label: new Date(2000, i).toLocaleString('default', {month: 'long'}),
+                        })),
+                      ]}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <Label>Anniversary Day</Label>
+                    <SearchableSelect
+                      value={newPerson.anniversaryDay ? String(newPerson.anniversaryDay) : ''}
+                      onValueChange={(v) => setNewPerson((p) => ({...p, anniversaryDay: v ? Number(v) : null}))}
+                      options={[
+                        {value: '', label: 'None'},
+                        ...Array.from({length: 31}, (_, i) => ({value: String(i + 1), label: String(i + 1)})),
+                      ]}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <Label>Anniversary Year</Label>
+                    <Input
+                      type="number"
+                      value={newPerson.anniversaryYear ?? ''}
+                      onChange={(e) =>
+                        setNewPerson((p) => ({...p, anniversaryYear: e.target.value ? Number(e.target.value) : null}))
+                      }
+                      placeholder="Optional"
+                    />
+                  </div>
                 </div>
               </div>
               <DialogFooter>
@@ -481,6 +586,9 @@ export function PeoplePage() {
                   <TableHead>Phone</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Groups</TableHead>
+                  <TableHead>Birthday</TableHead>
+                  <TableHead>Age</TableHead>
+                  <TableHead>Anniversary</TableHead>
                   <TableHead>
                     <button
                       className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
@@ -520,7 +628,9 @@ export function PeoplePage() {
                     <TableCell className="font-medium">
                       {person.lastName || <em className="text-muted-foreground">—</em>}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{person.phoneDisplay || person.phoneNumber}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {person.phoneDisplay || person.phoneNumber || <em>No phone</em>}
+                    </TableCell>
                     <TableCell>
                       <Badge
                         variant={
@@ -547,6 +657,29 @@ export function PeoplePage() {
                           </Badge>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {person.birthMonth && person.birthDay
+                        ? `${new Date(2000, person.birthMonth - 1).toLocaleString('default', {month: 'short'})} ${person.birthDay}${person.birthYear ? `, ${person.birthYear}` : ''}`
+                        : '—'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {person.birthMonth && person.birthDay && person.birthYear
+                        ? (() => {
+                            const today = new Date()
+                            let age = today.getFullYear() - person.birthYear
+                            const hadBirthday =
+                              today.getMonth() + 1 > person.birthMonth ||
+                              (today.getMonth() + 1 === person.birthMonth && today.getDate() >= person.birthDay)
+                            if (!hadBirthday) age--
+                            return age
+                          })()
+                        : '—'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {person.anniversaryMonth && person.anniversaryDay
+                        ? `${new Date(2000, person.anniversaryMonth - 1).toLocaleString('default', {month: 'short'})} ${person.anniversaryDay}${person.anniversaryYear ? `, ${person.anniversaryYear}` : ''}`
+                        : '—'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {formatDate(person.createdAt)}
@@ -590,7 +723,7 @@ export function PeoplePage() {
                 ))}
                 {data?.data.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                       No people found. Try importing from CSV or adding one manually.
                     </TableCell>
                   </TableRow>

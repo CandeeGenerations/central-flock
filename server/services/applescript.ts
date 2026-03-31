@@ -25,8 +25,22 @@ function runAppleScript(script: string): Promise<string> {
   return spawnStdin('osascript', [], script)
 }
 
+function runJXA(script: string): Promise<string> {
+  return spawnStdin('osascript', ['-l', 'JavaScript'], script)
+}
+
+// Replace curly/smart quotes with straight equivalents to avoid encoding issues with osascript
+function straightenQuotes(text: string): string {
+  return text
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u2014]/g, '--')
+    .replace(/[\u2013]/g, '-')
+    .replace(/[\u2026]/g, '...')
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+}
+
 export async function sendMessage(phoneNumber: string, message: string): Promise<void> {
-  const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  const escapedMessage = straightenQuotes(message).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
   const escapedPhone = phoneNumber.replace(/"/g, '')
 
   const script = `
@@ -66,7 +80,7 @@ delay 0.5`
 
   try {
     // Set clipboard via pbcopy stdin — avoids AppleScript string escaping issues
-    await setClipboard(message)
+    await setClipboard(straightenQuotes(message))
     await runAppleScript(script)
   } catch (error) {
     throw new Error(
@@ -74,6 +88,58 @@ delay 0.5`
       {cause: error},
     )
   }
+}
+
+export interface MacContact {
+  id: string
+  firstName: string
+  lastName: string
+  phones: {label: string; value: string}[]
+}
+
+function parseVCard(vcard: string): {firstName: string; lastName: string; phones: {label: string; value: string}[]; id: string} {
+  const lines = vcard.split(/\r?\n/)
+  let firstName = ''
+  let lastName = ''
+  let id = ''
+  const phones: {label: string; value: string}[] = []
+
+  for (const line of lines) {
+    if (line.startsWith('N:') || line.startsWith('N;')) {
+      const value = line.slice(line.indexOf(':') + 1)
+      const parts = value.split(';')
+      lastName = parts[0] || ''
+      firstName = parts[1] || ''
+    } else if (line.startsWith('TEL')) {
+      const colonIdx = line.indexOf(':')
+      const value = line.slice(colonIdx + 1).trim()
+      const params = line.slice(0, colonIdx)
+      const typeMatch = params.match(/type=([^;,:]+)/i)
+      const label = typeMatch ? typeMatch[1].replace(/^_\$!</, '').replace(/>!\$_$/, '') : ''
+      phones.push({label, value})
+    } else if (line.startsWith('X-ABUID:')) {
+      id = line.slice(8).trim()
+    }
+  }
+
+  return {firstName, lastName, phones, id}
+}
+
+export async function fetchContacts(): Promise<MacContact[]> {
+  // Bulk-fetches vCards via JXA (single Apple Event for all 900+ contacts in ~4s).
+  // Parses vCard text in Node.js to extract names, phones, and contact IDs.
+  const script = `
+const app = Application('Contacts');
+const vcards = app.people.vcard();
+vcards.join('\\n---SPLIT---\\n');`
+
+  const raw = await runJXA(script)
+  if (!raw.trim()) return []
+
+  return raw
+    .split('\n---SPLIT---\n')
+    .map(parseVCard)
+    .filter((c) => c.id)
 }
 
 export async function createContact(firstName: string, lastName: string, phoneNumber: string): Promise<void> {

@@ -592,6 +592,18 @@ export async function processSendJob(job: SendJob) {
 
     const recipient = pendingRecipients[i]
 
+    if (!recipient.phoneNumber) {
+      db.update(schema.messageRecipients)
+        .set({status: 'skipped', errorMessage: 'No phone number'})
+        .where(eq(schema.messageRecipients.id, recipient.id))
+        .run()
+      db.update(schema.messages)
+        .set({skippedCount: sql`skipped_count + 1`})
+        .where(eq(schema.messages.id, job.messageId))
+        .run()
+      continue
+    }
+
     try {
       await send(recipient.phoneNumber, recipient.renderedContent || '')
 

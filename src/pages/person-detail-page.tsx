@@ -114,6 +114,12 @@ export function PersonDetailPage() {
         phoneDisplay: person.phoneDisplay,
         status: person.status,
         notes: person.notes,
+        birthMonth: person.birthMonth,
+        birthDay: person.birthDay,
+        birthYear: person.birthYear,
+        anniversaryMonth: person.anniversaryMonth,
+        anniversaryDay: person.anniversaryDay,
+        anniversaryYear: person.anniversaryYear,
       })
       setEditing(true)
     }
@@ -156,12 +162,19 @@ export function PersonDetailPage() {
               <Contact className="h-4 w-4 mr-1" />
               Create Contact
             </Button>
-            <Link to={`/messages/compose?recipientId=${person.id}`}>
-              <Button variant="outline" size="sm">
+            {person.phoneNumber ? (
+              <Link to={`/messages/compose?recipientId=${person.id}`}>
+                <Button variant="outline" size="sm">
+                  <MessageSquare className="h-4 w-4 mr-1" />
+                  Send Message
+                </Button>
+              </Link>
+            ) : (
+              <Button variant="outline" size="sm" disabled title="No phone number">
                 <MessageSquare className="h-4 w-4 mr-1" />
                 Send Message
               </Button>
-            </Link>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -226,6 +239,86 @@ export function PersonDetailPage() {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label>Birth Month</Label>
+                  <SearchableSelect
+                    value={form.birthMonth ? String(form.birthMonth) : ''}
+                    onValueChange={(v) => setForm((f) => ({...f, birthMonth: v ? Number(v) : null}))}
+                    options={[
+                      {value: '', label: 'None'},
+                      ...Array.from({length: 12}, (_, i) => ({
+                        value: String(i + 1),
+                        label: new Date(2000, i).toLocaleString('default', {month: 'long'}),
+                      })),
+                    ]}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <Label>Birth Day</Label>
+                  <SearchableSelect
+                    value={form.birthDay ? String(form.birthDay) : ''}
+                    onValueChange={(v) => setForm((f) => ({...f, birthDay: v ? Number(v) : null}))}
+                    options={[
+                      {value: '', label: 'None'},
+                      ...Array.from({length: 31}, (_, i) => ({value: String(i + 1), label: String(i + 1)})),
+                    ]}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <Label>Birth Year</Label>
+                  <Input
+                    type="number"
+                    value={form.birthYear ?? ''}
+                    onChange={(e) =>
+                      setForm((f) => ({...f, birthYear: e.target.value ? Number(e.target.value) : null}))
+                    }
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label>Anniversary Month</Label>
+                  <SearchableSelect
+                    value={form.anniversaryMonth ? String(form.anniversaryMonth) : ''}
+                    onValueChange={(v) => setForm((f) => ({...f, anniversaryMonth: v ? Number(v) : null}))}
+                    options={[
+                      {value: '', label: 'None'},
+                      ...Array.from({length: 12}, (_, i) => ({
+                        value: String(i + 1),
+                        label: new Date(2000, i).toLocaleString('default', {month: 'long'}),
+                      })),
+                    ]}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <Label>Anniversary Day</Label>
+                  <SearchableSelect
+                    value={form.anniversaryDay ? String(form.anniversaryDay) : ''}
+                    onValueChange={(v) => setForm((f) => ({...f, anniversaryDay: v ? Number(v) : null}))}
+                    options={[
+                      {value: '', label: 'None'},
+                      ...Array.from({length: 31}, (_, i) => ({value: String(i + 1), label: String(i + 1)})),
+                    ]}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <Label>Anniversary Year</Label>
+                  <Input
+                    type="number"
+                    value={form.anniversaryYear ?? ''}
+                    onChange={(e) =>
+                      setForm((f) => ({...f, anniversaryYear: e.target.value ? Number(e.target.value) : null}))
+                    }
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
               <div>
                 <Label>Notes</Label>
                 <Textarea
@@ -237,7 +330,11 @@ export function PersonDetailPage() {
               <div className="flex gap-2">
                 <Button
                   onClick={() => updateMutation.mutate(form)}
-                  disabled={updateMutation.isPending || (form.phoneDisplay || '').replace(/\D/g, '').length !== 10}
+                  disabled={
+                    updateMutation.isPending ||
+                    ((form.phoneDisplay || '').replace(/\D/g, '').length > 0 &&
+                      (form.phoneDisplay || '').replace(/\D/g, '').length !== 10)
+                  }
                 >
                   <Save className="h-4 w-4 mr-1" />
                   {updateMutation.isPending ? 'Saving...' : 'Save'}
@@ -262,13 +359,59 @@ export function PersonDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <span className="text-sm text-muted-foreground">Phone</span>
-                  <p>{person.phoneDisplay || person.phoneNumber}</p>
+                  <p>{person.phoneDisplay || person.phoneNumber || <span className="text-muted-foreground">No phone</span>}</p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">E.164</span>
-                  <p className="font-mono text-sm">{person.phoneNumber}</p>
+                  <p className="font-mono text-sm">{person.phoneNumber || '—'}</p>
                 </div>
               </div>
+              {(person.birthMonth || person.birthDay || person.anniversaryMonth || person.anniversaryDay) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(person.birthMonth || person.birthDay) && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Birthday</span>
+                      <p>
+                        {person.birthMonth && person.birthDay
+                          ? `${new Date(2000, person.birthMonth - 1).toLocaleString('default', {month: 'long'})} ${person.birthDay}`
+                          : '—'}
+                        {person.birthYear && person.birthMonth && person.birthDay
+                          ? (() => {
+                              const today = new Date()
+                              let age = today.getFullYear() - person.birthYear
+                              const hadBirthday =
+                                today.getMonth() + 1 > person.birthMonth ||
+                                (today.getMonth() + 1 === person.birthMonth && today.getDate() >= person.birthDay)
+                              if (!hadBirthday) age--
+                              return `, ${person.birthYear} (age ${age})`
+                            })()
+                          : ''}
+                      </p>
+                    </div>
+                  )}
+                  {(person.anniversaryMonth || person.anniversaryDay) && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Anniversary</span>
+                      <p>
+                        {person.anniversaryMonth && person.anniversaryDay
+                          ? `${new Date(2000, person.anniversaryMonth - 1).toLocaleString('default', {month: 'long'})} ${person.anniversaryDay}`
+                          : '—'}
+                        {person.anniversaryYear && person.anniversaryMonth && person.anniversaryDay
+                          ? (() => {
+                              const today = new Date()
+                              let years = today.getFullYear() - person.anniversaryYear
+                              const hadAnniversary =
+                                today.getMonth() + 1 > person.anniversaryMonth ||
+                                (today.getMonth() + 1 === person.anniversaryMonth && today.getDate() >= person.anniversaryDay)
+                              if (!hadAnniversary) years--
+                              return `, ${person.anniversaryYear} (${years} ${years === 1 ? 'year' : 'years'})`
+                            })()
+                          : ''}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
               {person.notes && (
                 <div>
                   <span className="text-sm text-muted-foreground">Notes</span>
@@ -291,7 +434,13 @@ export function PersonDetailPage() {
                 Remove All
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setAddGroupOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddGroupOpen(true)}
+              disabled={!person.phoneNumber}
+              title={!person.phoneNumber ? 'No phone number' : undefined}
+            >
               <UserPlus className="h-4 w-4 mr-1" />
               Add to Group
             </Button>

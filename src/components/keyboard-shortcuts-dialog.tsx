@@ -15,6 +15,15 @@ const shortcuts = [
     ],
   },
   {
+    category: 'Devotions',
+    items: [
+      {keys: [`${mod} 6`], description: 'Go to Devotion Stats'},
+      {keys: [`${mod} 7`], description: 'Go to Devotions'},
+      {keys: [`${mod} 8`], description: 'Go to Scriptures'},
+      {keys: [`${mod} 9`], description: 'Go to Audit'},
+    ],
+  },
+  {
     category: 'Actions',
     items: [
       {keys: [`${mod} K`], description: 'Focus search'},

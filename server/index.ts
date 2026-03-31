@@ -7,6 +7,7 @@ import {fileURLToPath} from 'url'
 import {requireAuth} from './middleware/auth.js'
 import {authRouter} from './routes/auth.js'
 import {contactsRouter} from './routes/contacts.js'
+import {cleanupOrphanedScanImages, devotionsRouter} from './routes/devotions.js'
 import {draftsRouter} from './routes/drafts.js'
 import {globalVariablesRouter} from './routes/global-variables.js'
 import {groupsRouter} from './routes/groups.js'
@@ -16,6 +17,7 @@ import {peopleRouter} from './routes/people.js'
 import {settingsRouter} from './routes/settings.js'
 import {statsRouter} from './routes/stats.js'
 import {templatesRouter} from './routes/templates.js'
+import {startBirthdayScheduler} from './services/birthday-scheduler.js'
 import {startScheduler} from './services/scheduler.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -23,7 +25,7 @@ const app = express()
 const PORT = process.env.PORT || 5172
 
 app.use(cors({origin: true, credentials: true}))
-app.use(express.json({limit: '10mb'}))
+app.use(express.json({limit: '20mb'}))
 app.use(cookieParser())
 
 // Auth routes (unprotected)
@@ -42,7 +44,11 @@ app.use('/api/global-variables', globalVariablesRouter)
 app.use('/api/import', importRouter)
 app.use('/api/contacts', contactsRouter)
 app.use('/api/stats', statsRouter)
+app.use('/api/devotions', devotionsRouter)
 app.use('/api/settings', settingsRouter)
+
+// Serve scan images
+app.use('/data/scan-images', express.static(path.join(__dirname, '..', 'data', 'scan-images')))
 
 // In production, serve the built Vite static files
 const distPath = path.join(__dirname, '..', 'dist')
@@ -54,4 +60,6 @@ app.get('{*path}', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
   startScheduler(processSendJob)
+  startBirthdayScheduler()
+  cleanupOrphanedScanImages()
 })

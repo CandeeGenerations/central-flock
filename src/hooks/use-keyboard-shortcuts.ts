@@ -1,7 +1,17 @@
 import {useEffect} from 'react'
 import {useNavigate} from 'react-router-dom'
 
-const NAV_ROUTES = ['/', '/people', '/groups', '/messages', '/templates']
+const NAV_ROUTES = [
+  '/',
+  '/people',
+  '/groups',
+  '/messages',
+  '/templates',
+  '/devotions/stats',
+  '/devotions',
+  '/devotions/scriptures',
+  '/devotions/audit',
+]
 
 export function useKeyboardShortcuts(onShowHelp: () => void, onToggleDark: () => void) {
   const navigate = useNavigate()
@@ -53,7 +63,7 @@ export function useKeyboardShortcuts(onShowHelp: () => void, onToggleDark: () =>
       }
 
       // ⌘1-5 / Ctrl+1-5 — navigate between pages
-      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '5') {
+      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
         e.preventDefault()
         const index = Number(e.key) - 1
         if (NAV_ROUTES[index]) {

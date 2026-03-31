@@ -91,7 +91,7 @@ groupsRouter.get(
 
     const rows = ['First Name,Last Name,Phone Number,Status,Groups']
     for (const p of members) {
-      const phone = p.phoneDisplay || p.phoneNumber
+      const phone = p.phoneDisplay || p.phoneNumber || ''
       const groups = (membershipMap.get(p.id) || []).join(', ')
       rows.push([p.firstName || '', p.lastName || '', phone, p.status, groups].map((v) => escapeCSV(v)).join(','))
     }
@@ -217,6 +217,19 @@ groupsRouter.post(
       return
     }
 
+    // Validate all people have phone numbers
+    const peopleToAdd = db
+      .select({id: schema.people.id, phoneNumber: schema.people.phoneNumber})
+      .from(schema.people)
+      .where(inArray(schema.people.id, personIds))
+      .all()
+
+    const phoneless = peopleToAdd.filter((p) => !p.phoneNumber)
+    if (phoneless.length > 0) {
+      res.status(400).json({error: 'Cannot add people without phone numbers to a group'})
+      return
+    }
+
     // Get existing memberships to avoid duplicates
     const existing = db
       .select({personId: schema.peopleGroups.personId})
@@ -265,7 +278,7 @@ groupsRouter.get(
       .from(schema.peopleGroups)
       .where(eq(schema.peopleGroups.groupId, groupId))
 
-    const conditions = [notInArray(schema.people.id, memberIds)]
+    const conditions = [notInArray(schema.people.id, memberIds), sql`${schema.people.phoneNumber} IS NOT NULL`]
 
     if (search && typeof search === 'string') {
       conditions.push(

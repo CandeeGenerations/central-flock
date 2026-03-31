@@ -8,9 +8,18 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
-import {deleteDrafts, deleteMessages, duplicateDraft, duplicateMessage, fetchDrafts, fetchMessages} from '@/lib/api'
-import type {Draft, Message} from '@/lib/api'
+import {
+  deleteDrafts,
+  deleteMessages,
+  duplicateDraft,
+  duplicateMessage,
+  fetchDrafts,
+  fetchMessages,
+  fetchPeople,
+} from '@/lib/api'
+import type {Draft, Message, Person} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
+import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Copy, Pencil, Plus, Trash2} from 'lucide-react'
@@ -79,11 +88,10 @@ export function MessageHistoryPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const activeTab = (tabParam === 'drafts' ? 'drafts' : tabParam === 'scheduled' ? 'scheduled' : 'sent') as
-    | 'sent'
-    | 'scheduled'
-    | 'drafts'
-  const setActiveTab = (tab: 'sent' | 'scheduled' | 'drafts') =>
+  const activeTab = (
+    tabParam === 'drafts' ? 'drafts' : tabParam === 'scheduled' ? 'scheduled' : tabParam === 'upcoming' ? 'upcoming' : 'sent'
+  ) as 'sent' | 'scheduled' | 'drafts' | 'upcoming'
+  const setActiveTab = (tab: 'sent' | 'scheduled' | 'drafts' | 'upcoming') =>
     setSearchParams(tab === 'sent' ? {} : {tab}, {replace: true})
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 250)
@@ -129,6 +137,54 @@ export function MessageHistoryPage() {
   })
   const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set())
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false)
+
+  // Birthdays & Anniversaries
+  const {data: upcomingPeople} = useQuery({
+    queryKey: [...queryKeys.people, 'upcoming'],
+    queryFn: () => fetchPeople({limit: 1000}),
+    enabled: activeTab === 'upcoming',
+  })
+
+  const sortedUpcomingEvents = useMemo(() => {
+    if (!upcomingPeople) return []
+    const today = new Date()
+    const todayMonth = today.getMonth() + 1
+    const todayDay = today.getDate()
+    const thisYear = today.getFullYear()
+    const todayDate = new Date(thisYear, todayMonth - 1, todayDay)
+
+    const events: {
+      person: Person
+      type: 'birthday' | 'anniversary'
+      month: number
+      day: number
+      year: number | null
+      nextYear: number
+      daysUntil: number
+      age: number | null
+    }[] = []
+
+    for (const p of upcomingPeople.data) {
+      if (p.birthMonth != null && p.birthDay != null) {
+        let next = new Date(thisYear, p.birthMonth - 1, p.birthDay)
+        if (next < todayDate) next = new Date(thisYear + 1, p.birthMonth - 1, p.birthDay)
+        const nextYear = next.getFullYear()
+        const daysUntil = Math.round((next.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
+        const age = p.birthYear ? nextYear - p.birthYear : null
+        events.push({person: p, type: 'birthday', month: p.birthMonth, day: p.birthDay, year: p.birthYear, nextYear, daysUntil, age})
+      }
+      if (p.anniversaryMonth != null && p.anniversaryDay != null) {
+        let next = new Date(thisYear, p.anniversaryMonth - 1, p.anniversaryDay)
+        if (next < todayDate) next = new Date(thisYear + 1, p.anniversaryMonth - 1, p.anniversaryDay)
+        const nextYear = next.getFullYear()
+        const daysUntil = Math.round((next.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
+        const years = p.anniversaryYear ? nextYear - p.anniversaryYear : null
+        events.push({person: p, type: 'anniversary', month: p.anniversaryMonth, day: p.anniversaryDay, year: p.anniversaryYear, nextYear, daysUntil, age: years})
+      }
+    }
+
+    return events.sort((a, b) => a.daysUntil - b.daysUntil)
+  }, [upcomingPeople])
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteMessages([...selectedIds]),
@@ -273,7 +329,7 @@ export function MessageHistoryPage() {
             <Button>
               <Plus className="h-4 w-4 mr-2" />
               Compose
-              <kbd className="ml-2 text-[10px] font-mono opacity-60 hidden md:inline">
+              <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5 hidden md:inline">
                 {typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl+'}J
               </kbd>
             </Button>
@@ -333,6 +389,21 @@ export function MessageHistoryPage() {
           {drafts && drafts.length > 0 && (
             <Badge variant="secondary" className="text-xs">
               {drafts.length}
+            </Badge>
+          )}
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+            activeTab === 'upcoming'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+          onClick={() => setActiveTab('upcoming')}
+        >
+          Upcoming
+          {sortedUpcomingEvents.length > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {sortedUpcomingEvents.length}
             </Badge>
           )}
         </button>
@@ -634,6 +705,59 @@ export function MessageHistoryPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Upcoming Tab */}
+      {activeTab === 'upcoming' && (
+        <div className="border rounded-md overflow-x-auto bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Age / Years</TableHead>
+                <TableHead>Days Until</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedUpcomingEvents.map((event, i) => (
+                <TableRow
+                  key={`${event.person.id}-${event.type}-${i}`}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate(`/people/${event.person.id}`)}
+                >
+                  <TableCell className="font-medium">{formatFullName(event.person)}</TableCell>
+                  <TableCell>
+                    <Badge variant={event.type === 'birthday' ? 'default' : 'secondary'}>
+                      {event.type === 'birthday' ? 'Birthday' : 'Anniversary'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(2000, event.month - 1).toLocaleString('default', {month: 'long'})} {event.day}, {event.nextYear}
+                  </TableCell>
+                  <TableCell>{event.age != null ? event.age : '—'}</TableCell>
+                  <TableCell>
+                    {event.daysUntil === 0 ? (
+                      <Badge variant="default">Today!</Badge>
+                    ) : (
+                      <span>
+                        {event.daysUntil} day{event.daysUntil !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {sortedUpcomingEvents.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    No birthdays or anniversaries recorded. Add them on individual people pages.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       <ConfirmDialog

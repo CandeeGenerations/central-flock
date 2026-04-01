@@ -216,3 +216,67 @@ export function youtubeSearchUrl(number: number): string {
   const query = `From the Shepherd to the Sheep #${number} CBC`
   return `https://www.youtube.com/@cbcwoodbridgeva/search?query=${encodeURIComponent(query)}`
 }
+
+// Platform description generation
+
+function formatDevotionDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  return date.toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'})
+}
+
+function isTyler(devotion: Devotion): boolean {
+  return devotion.devotionType === 'guest' && devotion.guestSpeaker === 'Tyler'
+}
+
+function getPastorName(devotion: Devotion): string {
+  return isTyler(devotion) ? 'Pastor Candee' : 'Pastor Weniger'
+}
+
+export function generateYoutubeDescription(devotion: Devotion): string {
+  const year = devotion.date.split('-')[0]
+  const tagline = isTyler(devotion)
+    ? `Join ${getPastorName(devotion)} for this morning's devotional!`
+    : `Join ${getPastorName(devotion)} for daily devotions each morning!`
+
+  return [
+    'From the Shepherd to the Sheep',
+    `#${devotion.number} - ${formatDevotionDate(devotion.date)}`,
+    tagline,
+    '#cbc #cbcwoodbridge #dailydevotional',
+    'CBC - Central Baptist Church (Woodbridge, VA)',
+    `Copyright \u00A9 ${year}`,
+  ].join('\n\n')
+}
+
+export function generateFacebookDescription(devotion: Devotion): string {
+  const year = devotion.date.split('-')[0]
+  const tagline = isTyler(devotion)
+    ? `Join ${getPastorName(devotion)} for this morning's devotional!`
+    : `Join ${getPastorName(devotion)} for daily devotions each morning!`
+
+  return [
+    'From the Shepherd to the Sheep',
+    `#${devotion.number} - ${formatDevotionDate(devotion.date)}`,
+    tagline,
+    '#cbc #cbcwoodbridge #dailydevotional',
+    'CBC - Central Baptist Church (Woodbridge, VA)',
+    `Copyright \u00A9 ${year}`,
+  ].join('\n\n')
+}
+
+export function generatePodcastDescription(devotion: Devotion): string {
+  const year = devotion.date.split('-')[0]
+  return [
+    'From the Shepherd to the Sheep',
+    `#${devotion.number} - ${formatDevotionDate(devotion.date)}`,
+    `Join ${getPastorName(devotion)} for this morning's devotional!`,
+    '#cbc #cbcwoodbridge #dailydevotional',
+    'CBC - Central Baptist Church (Woodbridge, VA)',
+    `Copyright \u00A9 ${year}`,
+  ].join(' | ')
+}
+
+export function generatePodcastTitle(devotion: Devotion): string {
+  return `From the Shepherd to the Sheep - #${devotion.number} - CBC`
+}

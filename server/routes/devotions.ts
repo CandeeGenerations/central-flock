@@ -844,6 +844,62 @@ devotionsRouter.put(
   }),
 )
 
+// POST /api/devotions/timestamps - Add timestamps to a devotion's YouTube description
+devotionsRouter.post(
+  '/timestamps',
+  asyncHandler(async (req, res) => {
+    const {number, timestamp} = req.body
+    if (!number || !timestamp) {
+      res.status(400).json({error: 'number and timestamp are required'})
+      return
+    }
+
+    const devotion = devotionsDb
+      .select()
+      .from(devotionsSchema.devotions)
+      .where(eq(devotionsSchema.devotions.number, Number(number)))
+      .get()
+
+    if (!devotion) {
+      res.status(404).json({error: `Devotion #${number} not found`})
+      return
+    }
+
+    const isTyler = devotion.devotionType === 'guest' && devotion.guestSpeaker === 'Tyler'
+    if (!isTyler) {
+      res.status(400).json({error: `Devotion #${number} is not a Tyler devotion`})
+      return
+    }
+
+    const [y, m, d] = devotion.date.split('-').map(Number)
+    const formattedDate = new Date(y, m - 1, d).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    const year = devotion.date.split('-')[0]
+
+    const youtubeDescription = [
+      'From the Shepherd to the Sheep',
+      `#${devotion.number} - ${formattedDate}`,
+      `Timestamps:\n0:00 Intro by Pastor Weniger\n0:59 Devotional by Pastor Candee\n${timestamp.trim()} Conclusion by Pastor Weniger`,
+      'Join Pastor Candee for this morning\'s devotional!',
+      '#cbc #cbcwoodbridge #dailydevotional',
+      'CBC - Central Baptist Church (Woodbridge, VA)',
+      `Copyright \u00A9 ${year}`,
+    ].join('\n\n')
+
+    const result = devotionsDb
+      .update(devotionsSchema.devotions)
+      .set({youtubeDescription, updatedAt: sql`datetime('now')`})
+      .where(eq(devotionsSchema.devotions.id, devotion.id))
+      .returning()
+      .get()
+
+    res.json(result)
+  }),
+)
+
 // DELETE /api/devotions/:id - Delete devotion
 devotionsRouter.delete(
   '/:id',

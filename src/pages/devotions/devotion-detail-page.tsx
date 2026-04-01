@@ -14,8 +14,12 @@ import {
   deleteDevotion,
   fetchDevotion,
   fetchNextDevotionNumber,
+  generateFacebookDescription,
+  generatePodcastDescription,
+  generatePodcastTitle,
   generateSongDescription,
   generateSongTitle,
+  generateYoutubeDescription,
   updateDevotion,
   youtubeSearchUrl,
 } from '@/lib/devotion-api'
@@ -43,10 +47,6 @@ interface DevotionForm {
   youtube: boolean
   facebookInstagram: boolean
   podcast: boolean
-  title: string
-  youtubeDescription: string
-  facebookDescription: string
-  podcastDescription: string
 }
 
 const emptyForm: DevotionForm = {
@@ -65,10 +65,6 @@ const emptyForm: DevotionForm = {
   youtube: false,
   facebookInstagram: false,
   podcast: false,
-  title: '',
-  youtubeDescription: '',
-  facebookDescription: '',
-  podcastDescription: '',
 }
 
 function devotionToForm(d: Devotion): DevotionForm {
@@ -90,10 +86,6 @@ function devotionToForm(d: Devotion): DevotionForm {
     youtube: d.youtube ?? false,
     facebookInstagram: d.facebookInstagram ?? false,
     podcast: d.podcast ?? false,
-    title: d.title ?? '',
-    youtubeDescription: d.youtubeDescription ?? '',
-    facebookDescription: d.facebookDescription ?? '',
-    podcastDescription: d.podcastDescription ?? '',
   }
 }
 
@@ -116,10 +108,6 @@ function formToPayload(form: DevotionForm): Partial<Devotion> {
     youtube: form.youtube,
     facebookInstagram: form.facebookInstagram,
     podcast: form.podcast,
-    title: form.title || null,
-    youtubeDescription: form.youtubeDescription || null,
-    facebookDescription: form.facebookDescription || null,
-    podcastDescription: form.podcastDescription || null,
   }
 }
 
@@ -227,14 +215,19 @@ export function DevotionDetailPage() {
     bibleReference: form.bibleReference || null,
     songName: form.songName || null,
     notes: form.notes || null,
-    title: form.title || null,
-    youtubeDescription: form.youtubeDescription || null,
-    facebookDescription: form.facebookDescription || null,
-    podcastDescription: form.podcastDescription || null,
+    title: null,
+    youtubeDescription: null,
+    facebookDescription: null,
+    podcastDescription: null,
   } satisfies Devotion
 
   const songTitle = showSongUpload ? generateSongTitle(songDevotion) : null
   const songDescription = showSongUpload ? generateSongDescription(songDevotion) : null
+
+  const ytDescription = devotion?.youtubeDescription || generateYoutubeDescription(songDevotion)
+  const fbDescription = generateFacebookDescription(songDevotion)
+  const podDescription = generatePodcastDescription(songDevotion)
+  const podTitle = generatePodcastTitle(songDevotion)
 
   if (!isNew && isLoading) return <PageSpinner />
   if (!isNew && !devotion) return <div className="p-6">Devotion not found</div>
@@ -415,35 +408,27 @@ export function DevotionDetailPage() {
         </CardHeader>
         {publishingOpen && (
           <CardContent className="space-y-4">
-            <div>
-              <Label>Title</Label>
-              <Input value={form.title} onChange={(e) => update({title: e.target.value})} />
-            </div>
-
-            {(['youtubeDescription', 'facebookDescription', 'podcastDescription'] as const).map((field) => {
-              const labels: Record<string, string> = {
-                youtubeDescription: 'YouTube Description',
-                facebookDescription: 'Facebook Description',
-                podcastDescription: 'Podcast Description',
-              }
-              return (
-                <div key={field}>
-                  <div className="flex items-center justify-between mb-1">
-                    <Label>{labels[field]}</Label>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => copyToClipboard(form[field], field)}
-                      disabled={!form[field]}
-                    >
-                      {copiedField === field ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                    </Button>
-                  </div>
-                  <Textarea value={form[field]} onChange={(e) => update({[field]: e.target.value})} rows={4} />
+            {[
+              {label: 'Title', value: podTitle, key: 'podcastTitle'},
+              {label: 'YouTube Description', value: ytDescription, key: 'youtubeDescription'},
+              {label: 'Facebook / Instagram Description', value: fbDescription, key: 'facebookDescription'},
+              {label: 'Podcast Description', value: podDescription, key: 'podcastDescription'},
+            ].map(({label, value, key}) => (
+              <div key={key}>
+                <div className="flex items-center justify-between mb-1">
+                  <Label>{label}</Label>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => copyToClipboard(value, key)}
+                  >
+                    {copiedField === key ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  </Button>
                 </div>
-              )
-            })}
+                <p className="text-sm bg-muted rounded-md p-3 font-mono whitespace-pre-wrap">{value}</p>
+              </div>
+            ))}
           </CardContent>
         )}
       </Card>

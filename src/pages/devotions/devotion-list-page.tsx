@@ -17,8 +17,12 @@ import {usePersistedState} from '@/hooks/use-persisted-state'
 import {
   type Devotion,
   fetchDevotions,
+  generateFacebookDescription,
+  generatePodcastDescription,
+  generatePodcastTitle,
   generateSongDescription,
   generateSongTitle,
+  generateYoutubeDescription,
   toggleDevotionField,
   youtubeSearchUrl,
 } from '@/lib/devotion-api'
@@ -86,7 +90,10 @@ function CopyMenu({devotion}: {devotion: Devotion}) {
 
   const songTitle = generateSongTitle(devotion)
   const songDesc = generateSongDescription(devotion)
-  const hasPublishing = devotion.title || devotion.youtubeDescription || devotion.facebookDescription || devotion.podcastDescription
+  const ytDesc = devotion.youtubeDescription || generateYoutubeDescription(devotion)
+  const fbDesc = generateFacebookDescription(devotion)
+  const podDesc = generatePodcastDescription(devotion)
+  const podTitle = generatePodcastTitle(devotion)
   const hasSong = songTitle || songDesc
 
   return (
@@ -105,33 +112,21 @@ function CopyMenu({devotion}: {devotion: Devotion}) {
             Find on YouTube
           </a>
         </DropdownMenuItem>
-        {(hasPublishing || hasSong) && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="font-bold">Copy</DropdownMenuLabel>
-          </>
-        )}
-        {devotion.title && (
-          <DropdownMenuItem onClick={() => copy(devotion.title!, 'Title')}>
-            Title
-          </DropdownMenuItem>
-        )}
-        {devotion.youtubeDescription && (
-          <DropdownMenuItem onClick={() => copy(devotion.youtubeDescription!, 'YouTube description')}>
-            YouTube Description
-          </DropdownMenuItem>
-        )}
-        {devotion.facebookDescription && (
-          <DropdownMenuItem onClick={() => copy(devotion.facebookDescription!, 'Facebook description')}>
-            Facebook Description
-          </DropdownMenuItem>
-        )}
-        {devotion.podcastDescription && (
-          <DropdownMenuItem onClick={() => copy(devotion.podcastDescription!, 'Podcast description')}>
-            Podcast Description
-          </DropdownMenuItem>
-        )}
-        {hasPublishing && hasSong && <DropdownMenuSeparator />}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="font-bold">Copy</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => copy(podTitle, 'Title')}>
+          Title
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => copy(ytDesc, 'YouTube description')}>
+          YouTube Description
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => copy(fbDesc, 'FB/IG description')}>
+          FB/IG Description
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => copy(podDesc, 'Podcast description')}>
+          Podcast Description
+        </DropdownMenuItem>
+        {hasSong && <DropdownMenuSeparator />}
         {songTitle && (
           <DropdownMenuItem onClick={() => copy(songTitle, 'Song title')}>
             Song Title

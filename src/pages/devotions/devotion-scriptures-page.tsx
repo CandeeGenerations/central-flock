@@ -205,7 +205,9 @@ export function DevotionScripturesPage() {
                 >
                   #{String(d.number).padStart(3, '0')}
                 </Link>
-                <span className="text-sm text-muted-foreground">{d.date}</span>
+                <span className="text-sm text-muted-foreground">
+                  {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}
+                </span>
                 <Badge
                   variant="outline"
                   className="text-xs"

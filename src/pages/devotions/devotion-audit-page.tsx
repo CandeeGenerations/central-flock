@@ -6,6 +6,10 @@ import {AlertTriangle, CheckCircle2, ChevronDown, ChevronUp} from 'lucide-react'
 import {useState} from 'react'
 import {Link} from 'react-router-dom'
 
+function fmtDate(d: string) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})
+}
+
 interface AuditResult {
   missingNumbers: number[]
   missingDates: {after: string; before: string; days: number}[]
@@ -86,8 +90,8 @@ export function DevotionAuditPage() {
             <tbody>
               {audit.missingDates.map((gap, i) => (
                 <tr key={i} className="border-b last:border-0">
-                  <td className="py-2 px-3">{gap.after}</td>
-                  <td className="py-2 px-3">{gap.before}</td>
+                  <td className="py-2 px-3">{fmtDate(gap.after)}</td>
+                  <td className="py-2 px-3">{fmtDate(gap.before)}</td>
                   <td className="py-2 px-3 text-right">{gap.days}</td>
                 </tr>
               ))}
@@ -101,7 +105,7 @@ export function DevotionAuditPage() {
         <div className="space-y-3">
           {audit.duplicateDates.map((dup) => (
             <div key={dup.date} className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium">{dup.date}:</span>
+              <span className="text-sm font-medium">{fmtDate(dup.date)}:</span>
               {dup.devotions.map((d) => (
                 <Link key={d.id} to={`/devotions/${d.id}`} className="text-primary hover:underline text-sm">
                   <Badge variant="outline">#{String(d.number).padStart(3, '0')}</Badge>
@@ -132,7 +136,7 @@ export function DevotionAuditPage() {
                       #{String(d.number).padStart(3, '0')}
                     </Link>
                   </td>
-                  <td className="py-2 px-3 text-muted-foreground">{d.date}</td>
+                  <td className="py-2 px-3 text-muted-foreground">{fmtDate(d.date)}</td>
                   <td className="py-2 px-3">{d.devotionType}</td>
                   <td className="py-2 px-3 text-muted-foreground">{d.guestSpeaker || '\u2014'}</td>
                 </tr>
@@ -161,7 +165,7 @@ export function DevotionAuditPage() {
                       #{String(d.number).padStart(3, '0')}
                     </Link>
                   </td>
-                  <td className="py-2 px-3 text-muted-foreground">{d.date}</td>
+                  <td className="py-2 px-3 text-muted-foreground">{fmtDate(d.date)}</td>
                   <td className="py-2 px-3">{d.guestSpeaker || '\u2014'}</td>
                 </tr>
               ))}
@@ -188,7 +192,7 @@ export function DevotionAuditPage() {
                       #{String(d.number).padStart(3, '0')}
                     </Link>
                   </td>
-                  <td className="py-2 px-3 text-muted-foreground">{d.date}</td>
+                  <td className="py-2 px-3 text-muted-foreground">{fmtDate(d.date)}</td>
                 </tr>
               ))}
             </tbody>

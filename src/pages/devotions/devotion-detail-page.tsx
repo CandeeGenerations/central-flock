@@ -25,7 +25,7 @@ import {
 } from '@/lib/devotion-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowLeft, Check, ChevronDown, ChevronUp, Copy, ExternalLink, Save, Trash2} from 'lucide-react'
-import {useEffect, useState} from 'react'
+import {useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -75,9 +75,7 @@ function devotionToForm(d: Devotion): DevotionForm {
     subcode: d.subcode ?? '',
     guestSpeaker: d.guestSpeaker ?? '',
     guestNumber: d.guestNumber != null ? String(d.guestNumber) : '',
-    referencedDevotions: d.referencedDevotions
-      ? JSON.parse(d.referencedDevotions).join(', ')
-      : '',
+    referencedDevotions: d.referencedDevotions ? JSON.parse(d.referencedDevotions).join(', ') : '',
     bibleReference: d.bibleReference ?? '',
     songName: d.songName ?? '',
     notes: d.notes ?? '',
@@ -98,7 +96,12 @@ function formToPayload(form: DevotionForm): Partial<Devotion> {
     guestSpeaker: form.devotionType === 'guest' ? form.guestSpeaker || null : null,
     guestNumber: form.devotionType === 'guest' && form.guestNumber ? Number(form.guestNumber) : null,
     referencedDevotions: form.referencedDevotions
-      ? JSON.stringify(form.referencedDevotions.split(',').map((s) => Number(s.trim())).filter(Boolean))
+      ? JSON.stringify(
+          form.referencedDevotions
+            .split(',')
+            .map((s) => Number(s.trim()))
+            .filter(Boolean),
+        )
       : null,
     bibleReference: form.bibleReference || null,
     songName: form.songName || null,
@@ -134,17 +137,17 @@ export function DevotionDetailPage() {
     enabled: isNew,
   })
 
-  useEffect(() => {
-    if (devotion) {
-      setForm(devotionToForm(devotion))
-    }
-  }, [devotion])
+  const [loadedDevotionId, setLoadedDevotionId] = useState<number | null>(null)
+  if (devotion && loadedDevotionId !== devotion.id) {
+    setLoadedDevotionId(devotion.id)
+    setForm(devotionToForm(devotion))
+  }
 
-  useEffect(() => {
-    if (isNew && nextNumber?.next != null) {
-      setForm((f) => ({...f, number: nextNumber.next}))
-    }
-  }, [isNew, nextNumber])
+  const [loadedNextNumber, setLoadedNextNumber] = useState<number | null>(null)
+  if (isNew && nextNumber?.next != null && loadedNextNumber !== nextNumber.next) {
+    setLoadedNextNumber(nextNumber.next)
+    setForm((f) => ({...f, number: nextNumber.next}))
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<Devotion>) => createDevotion(data),
@@ -238,7 +241,9 @@ export function DevotionDetailPage() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/devotions')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-2xl font-bold">{isNew ? 'New Devotion' : `Devotion #${String(devotion?.number ?? id).padStart(3, '0')}`}</h2>
+        <h2 className="text-2xl font-bold">
+          {isNew ? 'New Devotion' : `Devotion #${String(devotion?.number ?? id).padStart(3, '0')}`}
+        </h2>
         {!isNew && devotion && (
           <a
             href={youtubeSearchUrl(devotion.number)}
@@ -417,12 +422,7 @@ export function DevotionDetailPage() {
               <div key={key}>
                 <div className="flex items-center justify-between mb-1">
                   <Label>{label}</Label>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => copyToClipboard(value, key)}
-                  >
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(value, key)}>
                     {copiedField === key ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
@@ -450,11 +450,7 @@ export function DevotionDetailPage() {
                   onClick={() => songTitle && copyToClipboard(songTitle, 'songTitle')}
                   disabled={!songTitle}
                 >
-                  {copiedField === 'songTitle' ? (
-                    <Check className="h-3.5 w-3.5" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5" />
-                  )}
+                  {copiedField === 'songTitle' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 </Button>
               </div>
               <p className="text-sm bg-muted rounded-md p-3 font-mono">{songTitle || '—'}</p>
@@ -477,9 +473,7 @@ export function DevotionDetailPage() {
                   )}
                 </Button>
               </div>
-              <p className="text-sm bg-muted rounded-md p-3 font-mono whitespace-pre-wrap">
-                {songDescription || '—'}
-              </p>
+              <p className="text-sm bg-muted rounded-md p-3 font-mono whitespace-pre-wrap">{songDescription || '—'}</p>
             </div>
           </CardContent>
         </Card>

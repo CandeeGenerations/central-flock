@@ -132,7 +132,18 @@ export const birthdayMessagesSent = sqliteTable('birthday_messages_sent', {
   personId: integer('person_id')
     .notNull()
     .references(() => people.id, {onDelete: 'cascade'}),
-  type: text('type', {enum: ['birthday', 'pre_3', 'pre_7', 'pre_10', 'anniversary', 'anniversary_pre_3', 'anniversary_pre_7', 'anniversary_pre_10']}).notNull(),
+  type: text('type', {
+    enum: [
+      'birthday',
+      'pre_3',
+      'pre_7',
+      'pre_10',
+      'anniversary',
+      'anniversary_pre_3',
+      'anniversary_pre_7',
+      'anniversary_pre_10',
+    ],
+  }).notNull(),
   year: integer('year').notNull(),
   sentAt: text('sent_at')
     .default(sql`(datetime('now'))`)

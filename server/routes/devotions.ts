@@ -5,14 +5,14 @@ import path from 'path'
 import {fileURLToPath} from 'url'
 import * as XLSX from 'xlsx'
 
-const __devotionsDir = path.dirname(fileURLToPath(import.meta.url))
-const SCAN_IMAGES_DIR = path.join(__devotionsDir, '..', '..', 'data', 'scan-images')
-
 import {devotionsDb, devotionsSchema} from '../db-devotions/index.js'
 import {parseReference, referenceKeys} from '../lib/bible-reference.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 import {importDevotions, parseSheetRows} from '../services/devotion-import.js'
 import {parseDevotionImage} from '../services/devotion-ocr.js'
+
+const __devotionsDir = path.dirname(fileURLToPath(import.meta.url))
+const SCAN_IMAGES_DIR = path.join(__devotionsDir, '..', '..', 'data', 'scan-images')
 
 export const devotionsRouter = Router()
 
@@ -37,7 +37,9 @@ export function cleanupOrphanedScanImages(): {deleted: number; kept: number} {
       try {
         fs.unlinkSync(path.join(SCAN_IMAGES_DIR, file))
         deleted++
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -95,7 +97,13 @@ devotionsRouter.get(
     const today = new Date().toISOString().slice(0, 10)
     const noReference = all
       .filter((d) => !d.bibleReference && d.date <= today)
-      .map((d) => ({id: d.id, number: d.number, date: d.date, devotionType: d.devotionType, guestSpeaker: d.guestSpeaker}))
+      .map((d) => ({
+        id: d.id,
+        number: d.number,
+        date: d.date,
+        devotionType: d.devotionType,
+        guestSpeaker: d.guestSpeaker,
+      }))
 
     // Guest devotions missing guest number
     const guestsNoNumber = all
@@ -135,7 +143,17 @@ devotionsRouter.get(
     }
 
     // Duplicate scripture references (original, favorite, guest only — not revisits)
-    const refMap = new Map<string, {id: number; number: number; date: string; devotionType: string; guestSpeaker: string | null; bibleReference: string}[]>()
+    const refMap = new Map<
+      string,
+      {
+        id: number
+        number: number
+        date: string
+        devotionType: string
+        guestSpeaker: string | null
+        bibleReference: string
+      }[]
+    >()
     for (const d of all) {
       if (!d.bibleReference || d.devotionType === 'revisit') continue
       const parsed = parseReference(d.bibleReference)
@@ -243,10 +261,11 @@ devotionsRouter.get(
       .orderBy(asc(sql`substr(${devotionsSchema.devotions.date}, 1, 4)`))
       .all()
 
-    const latestNumber = devotionsDb
-      .select({max: sql<number>`max(${devotionsSchema.devotions.number})`})
-      .from(devotionsSchema.devotions)
-      .get()?.max || 0
+    const latestNumber =
+      devotionsDb
+        .select({max: sql<number>`max(${devotionsSchema.devotions.number})`})
+        .from(devotionsSchema.devotions)
+        .get()?.max || 0
 
     const recentIncomplete = devotionsDb
       .select()
@@ -342,7 +361,17 @@ devotionsRouter.get(
       .orderBy(asc(devotionsSchema.devotions.number))
       .all()
 
-    const refMap = new Map<string, {id: number; number: number; date: string; devotionType: string; guestSpeaker: string | null; bibleReference: string}[]>()
+    const refMap = new Map<
+      string,
+      {
+        id: number
+        number: number
+        date: string
+        devotionType: string
+        guestSpeaker: string | null
+        bibleReference: string
+      }[]
+    >()
     for (const d of all) {
       if (!d.bibleReference) continue
       const parsed = parseReference(d.bibleReference)
@@ -352,7 +381,14 @@ devotionsRouter.get(
           if (!refMap.has(key)) refMap.set(key, [])
           const group = refMap.get(key)!
           if (!group.some((e) => e.id === d.id)) {
-            group.push({id: d.id, number: d.number, date: d.date, devotionType: d.devotionType, guestSpeaker: d.guestSpeaker, bibleReference: d.bibleReference})
+            group.push({
+              id: d.id,
+              number: d.number,
+              date: d.date,
+              devotionType: d.devotionType,
+              guestSpeaker: d.guestSpeaker,
+              bibleReference: d.bibleReference,
+            })
           }
         }
       }
@@ -398,7 +434,17 @@ devotionsRouter.get(
     const searchLower = search.toLowerCase()
 
     // Build matches: group by normalized verse key
-    const groups = new Map<string, {id: number; number: number; date: string; devotionType: string; guestSpeaker: string | null; bibleReference: string}[]>()
+    const groups = new Map<
+      string,
+      {
+        id: number
+        number: number
+        date: string
+        devotionType: string
+        guestSpeaker: string | null
+        bibleReference: string
+      }[]
+    >()
 
     for (const d of all) {
       if (!d.bibleReference) continue
@@ -413,7 +459,14 @@ devotionsRouter.get(
       if (matchedKeys.length > 0 || textMatch) {
         const groupKey = matchedKeys.length > 0 ? matchedKeys[0] : d.bibleReference
         if (!groups.has(groupKey)) groups.set(groupKey, [])
-        const entry = {id: d.id, number: d.number, date: d.date, devotionType: d.devotionType, guestSpeaker: d.guestSpeaker, bibleReference: d.bibleReference}
+        const entry = {
+          id: d.id,
+          number: d.number,
+          date: d.date,
+          devotionType: d.devotionType,
+          guestSpeaker: d.guestSpeaker,
+          bibleReference: d.bibleReference,
+        }
         // Avoid duplicate entries in the same group
         const existing = groups.get(groupKey)!
         if (!existing.some((e) => e.id === d.id)) {
@@ -531,7 +584,9 @@ devotionsRouter.get(
       conditions.push(sql`${devotionsSchema.devotions.date} <= ${dateTo}`)
     }
     if (devotionType && typeof devotionType === 'string') {
-      conditions.push(eq(devotionsSchema.devotions.devotionType, devotionType as 'original' | 'favorite' | 'guest' | 'revisit'))
+      conditions.push(
+        eq(devotionsSchema.devotions.devotionType, devotionType as 'original' | 'favorite' | 'guest' | 'revisit'),
+      )
     }
     if (guestSpeaker && typeof guestSpeaker === 'string') {
       conditions.push(eq(devotionsSchema.devotions.guestSpeaker, guestSpeaker))
@@ -584,7 +639,10 @@ devotionsRouter.get(
         .limit(Number(limit))
         .offset(offset)
         .orderBy(...getOrderBy()),
-      devotionsDb.select({count: sql<number>`count(*)`}).from(devotionsSchema.devotions).where(where),
+      devotionsDb
+        .select({count: sql<number>`count(*)`})
+        .from(devotionsSchema.devotions)
+        .where(where),
     ])
 
     res.json({
@@ -684,7 +742,11 @@ devotionsRouter.put(
 
       if (existing?.imagePath) {
         const oldPath = path.join(__devotionsDir, '..', '..', existing.imagePath)
-        try { fs.unlinkSync(oldPath) } catch { /* ignore */ }
+        try {
+          fs.unlinkSync(oldPath)
+        } catch {
+          /* ignore */
+        }
       }
 
       fs.mkdirSync(SCAN_IMAGES_DIR, {recursive: true})
@@ -702,11 +764,7 @@ devotionsRouter.put(
     }
     if (imagePath) updates.imagePath = imagePath
 
-    devotionsDb
-      .update(devotionsSchema.scanDrafts)
-      .set(updates)
-      .where(eq(devotionsSchema.scanDrafts.id, id))
-      .run()
+    devotionsDb.update(devotionsSchema.scanDrafts).set(updates).where(eq(devotionsSchema.scanDrafts.id, id)).run()
 
     res.json({id})
   }),
@@ -724,7 +782,11 @@ devotionsRouter.delete(
 
     if (draft?.imagePath) {
       const fullPath = path.join(__devotionsDir, '..', '..', draft.imagePath)
-      try { fs.unlinkSync(fullPath) } catch { /* file may not exist */ }
+      try {
+        fs.unlinkSync(fullPath)
+      } catch {
+        /* file may not exist */
+      }
     }
 
     devotionsDb
@@ -816,13 +878,15 @@ devotionsRouter.put(
         devotionType: req.body.devotionType ?? undefined,
         subcode: req.body.subcode !== undefined ? req.body.subcode || null : undefined,
         guestSpeaker: req.body.guestSpeaker !== undefined ? req.body.guestSpeaker || null : undefined,
-        guestNumber: req.body.guestNumber !== undefined ? req.body.guestNumber ?? null : undefined,
-        referencedDevotions: req.body.referencedDevotions !== undefined ? req.body.referencedDevotions || null : undefined,
+        guestNumber: req.body.guestNumber !== undefined ? (req.body.guestNumber ?? null) : undefined,
+        referencedDevotions:
+          req.body.referencedDevotions !== undefined ? req.body.referencedDevotions || null : undefined,
         bibleReference: req.body.bibleReference !== undefined ? req.body.bibleReference || null : undefined,
         songName: req.body.songName !== undefined ? req.body.songName || null : undefined,
         title: req.body.title !== undefined ? req.body.title || null : undefined,
         youtubeDescription: req.body.youtubeDescription !== undefined ? req.body.youtubeDescription || null : undefined,
-        facebookDescription: req.body.facebookDescription !== undefined ? req.body.facebookDescription || null : undefined,
+        facebookDescription:
+          req.body.facebookDescription !== undefined ? req.body.facebookDescription || null : undefined,
         podcastDescription: req.body.podcastDescription !== undefined ? req.body.podcastDescription || null : undefined,
         produced: req.body.produced ?? undefined,
         rendered: req.body.rendered ?? undefined,
@@ -883,7 +947,7 @@ devotionsRouter.post(
       'From the Shepherd to the Sheep',
       `#${String(devotion.number).padStart(3, '0')} - ${formattedDate}`,
       `Timestamps:\n0:00 Intro by Pastor Weniger\n0:59 Devotional by Pastor Candee\n${timestamp.trim()} Conclusion by Pastor Weniger`,
-      'Join Pastor Candee for this morning\'s devotional!',
+      "Join Pastor Candee for this morning's devotional!",
       '#cbc #cbcwoodbridge #dailydevotional',
       'CBC - Central Baptist Church (Woodbridge, VA)',
       `Copyright \u00A9 ${year}`,
@@ -972,8 +1036,18 @@ devotionsRouter.post(
     const fileYear = yearMatch ? parseInt(yearMatch[1]) : yearOverride || new Date().getFullYear()
 
     const monthNames: Record<string, number> = {
-      january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-      july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+      january: 1,
+      february: 2,
+      march: 3,
+      april: 4,
+      may: 5,
+      june: 6,
+      july: 7,
+      august: 8,
+      september: 9,
+      october: 10,
+      november: 11,
+      december: 12,
     }
 
     const allDevotions: ReturnType<typeof parseSheetRows>['devotions'] = []
@@ -1083,7 +1157,12 @@ devotionsRouter.post(
     const existing = devotionsDb
       .select({number: devotionsSchema.devotions.number})
       .from(devotionsSchema.devotions)
-      .where(sql`${devotionsSchema.devotions.number} IN (${sql.join(numbers.map((n) => sql`${n}`), sql`, `)})`)
+      .where(
+        sql`${devotionsSchema.devotions.number} IN (${sql.join(
+          numbers.map((n) => sql`${n}`),
+          sql`, `,
+        )})`,
+      )
       .all()
 
     res.json({existing: existing.map((e) => e.number)})
@@ -1242,10 +1321,15 @@ devotionsRouter.post(
         verseMatch = originalRef.trim().toLowerCase() === d.bibleReference.trim().toLowerCase()
       }
 
-      results.push({number: d.number, fullChain: chain, originalNumber: originalNum, originalReference: originalRef, verseMatch})
+      results.push({
+        number: d.number,
+        fullChain: chain,
+        originalNumber: originalNum,
+        originalReference: originalRef,
+        verseMatch,
+      })
     }
 
     res.json(results)
   }),
 )
-

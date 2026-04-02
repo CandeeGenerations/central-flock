@@ -14,7 +14,19 @@ import {
   updatePerson,
 } from '@/lib/api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, CheckCircle, Eye, EyeOff, ExternalLink, Loader2, Phone, RefreshCw, RotateCcw, Trash2, UserPlus} from 'lucide-react'
+import {
+  ArrowLeft,
+  CheckCircle,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Loader2,
+  Phone,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  UserPlus,
+} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -236,7 +248,11 @@ export function ContactsImportPage() {
           variant={statusFilter === 'new' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setStatusFilter('new')}
-          className={statusFilter === 'new' ? '' : 'text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/20'}
+          className={
+            statusFilter === 'new'
+              ? ''
+              : 'text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/20'
+          }
         >
           New ({counts.new})
         </Button>
@@ -244,7 +260,11 @@ export function ContactsImportPage() {
           variant={statusFilter === 'differs' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setStatusFilter('differs')}
-          className={statusFilter === 'differs' ? '' : 'text-orange-600 border-orange-300 hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-950/20'}
+          className={
+            statusFilter === 'differs'
+              ? ''
+              : 'text-orange-600 border-orange-300 hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-950/20'
+          }
         >
           Needs Update ({counts.differs})
         </Button>
@@ -252,7 +272,11 @@ export function ContactsImportPage() {
           variant={statusFilter === 'exists' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setStatusFilter('exists')}
-          className={statusFilter === 'exists' ? '' : 'text-green-600 border-green-300 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-950/20'}
+          className={
+            statusFilter === 'exists'
+              ? ''
+              : 'text-green-600 border-green-300 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-950/20'
+          }
         >
           Already Imported ({counts.exists})
         </Button>
@@ -260,7 +284,12 @@ export function ContactsImportPage() {
 
       {/* Search + actions */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <Input placeholder="Search contacts..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+        <Input
+          placeholder="Search contacts..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1"
+        />
         <div className="flex gap-2">
           {selected.size > 0 && (
             <>

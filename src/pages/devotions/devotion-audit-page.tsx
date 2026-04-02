@@ -238,7 +238,6 @@ export function DevotionAuditPage() {
           ))}
         </div>
       </AuditSection>
-
     </div>
   )
 }

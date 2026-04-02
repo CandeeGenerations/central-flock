@@ -1,7 +1,7 @@
 import {Badge} from '@/components/ui/badge'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {PageSpinner} from '@/components/ui/spinner'
-import {fetchDevotionStats, type DevotionStats} from '@/lib/devotion-api'
+import {type DevotionStats, fetchDevotionStats} from '@/lib/devotion-api'
 import {useQuery} from '@tanstack/react-query'
 import {AlertTriangle, ArrowRight, BookOpen, CheckCircle2, Hash, PieChartIcon} from 'lucide-react'
 import {Link} from 'react-router-dom'

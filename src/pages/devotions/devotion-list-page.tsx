@@ -14,6 +14,7 @@ import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
+import {formatDate} from '@/lib/date'
 import {
   type Devotion,
   fetchDevotions,
@@ -26,7 +27,6 @@ import {
   toggleDevotionField,
   youtubeSearchUrl,
 } from '@/lib/devotion-api'
-import {formatDate} from '@/lib/date'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {
   ArrowDown,
@@ -99,10 +99,7 @@ function CopyMenu({devotion}: {devotion: Devotion}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          className="p-1 rounded hover:bg-muted cursor-pointer"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <button className="p-1 rounded hover:bg-muted cursor-pointer" onClick={(e) => e.stopPropagation()}>
           <EllipsisVertical className="h-4 w-4 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
@@ -114,28 +111,14 @@ function CopyMenu({devotion}: {devotion: Devotion}) {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="font-bold">Copy</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => copy(podTitle, 'Title')}>
-          Title
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => copy(ytDesc, 'YouTube description')}>
-          YouTube Description
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => copy(fbDesc, 'FB/IG description')}>
-          FB/IG Description
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => copy(podDesc, 'Podcast description')}>
-          Podcast Description
-        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => copy(podTitle, 'Title')}>Title</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => copy(ytDesc, 'YouTube description')}>YouTube Description</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => copy(fbDesc, 'FB/IG description')}>FB/IG Description</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => copy(podDesc, 'Podcast description')}>Podcast Description</DropdownMenuItem>
         {hasSong && <DropdownMenuSeparator />}
-        {songTitle && (
-          <DropdownMenuItem onClick={() => copy(songTitle, 'Song title')}>
-            Song Title
-          </DropdownMenuItem>
-        )}
+        {songTitle && <DropdownMenuItem onClick={() => copy(songTitle, 'Song title')}>Song Title</DropdownMenuItem>}
         {songDesc && (
-          <DropdownMenuItem onClick={() => copy(songDesc, 'Song description')}>
-            Song Description
-          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => copy(songDesc, 'Song description')}>Song Description</DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -181,7 +164,8 @@ export function DevotionListPage() {
 
   const {data: draftCountData} = useQuery({
     queryKey: ['scan-draft-count'],
-    queryFn: () => fetch('/api/devotions/scan-drafts', {credentials: 'include'}).then((r) => r.json()) as Promise<{id: number}[]>,
+    queryFn: () =>
+      fetch('/api/devotions/scan-drafts', {credentials: 'include'}).then((r) => r.json()) as Promise<{id: number}[]>,
   })
   const draftCount = draftCountData?.length || 0
 
@@ -232,7 +216,7 @@ export function DevotionListPage() {
     }
   }
 
-  const SortIcon = ({column}: {column: 'date' | 'number'}) => {
+  const sortIcon = (column: 'date' | 'number') => {
     if (sort !== column) return <ArrowUpDown className="h-3 w-3 opacity-50" />
     return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
   }
@@ -347,7 +331,7 @@ export function DevotionListPage() {
                       onClick={() => handleSort('date')}
                     >
                       Date
-                      <SortIcon column="date" />
+                      {sortIcon('date')}
                     </button>
                   </TableHead>
                   <TableHead>
@@ -355,8 +339,7 @@ export function DevotionListPage() {
                       className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
                       onClick={() => handleSort('number')}
                     >
-                      #
-                      <SortIcon column="number" />
+                      #{sortIcon('number')}
                     </button>
                   </TableHead>
                   <TableHead>Type</TableHead>
@@ -380,7 +363,9 @@ export function DevotionListPage() {
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {formatDate(devotion.date)}
                     </TableCell>
-                    <TableCell className="font-medium tabular-nums">#{String(devotion.number).padStart(3, '0')}</TableCell>
+                    <TableCell className="font-medium tabular-nums">
+                      #{String(devotion.number).padStart(3, '0')}
+                    </TableCell>
                     <TableCell>
                       <TypeBadge devotion={devotion} />
                     </TableCell>
@@ -456,7 +441,13 @@ export function DevotionListPage() {
                 Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, data?.total || 0)} of {data?.total} devotions
               </p>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage(1)}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={page <= 1}
+                  onClick={() => setPage(1)}
+                >
                   <ChevronsLeft className="h-4 w-4" />
                 </Button>
                 <Button

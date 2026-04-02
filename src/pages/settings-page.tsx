@@ -69,7 +69,8 @@ export function SettingsPage() {
 
   const annivSendTimeHour = parseInt(anniversarySendTime.split(':')[0])
   const annivSendTimeMinute = parseInt(anniversarySendTime.split(':')[1])
-  const annivDisplayHour = annivSendTimeHour === 0 ? 12 : annivSendTimeHour > 12 ? annivSendTimeHour - 12 : annivSendTimeHour
+  const annivDisplayHour =
+    annivSendTimeHour === 0 ? 12 : annivSendTimeHour > 12 ? annivSendTimeHour - 12 : annivSendTimeHour
   const annivDisplayAmPm = annivSendTimeHour < 12 ? 'AM' : 'PM'
 
   const updateSendTime = (hour12: number, minute: number, amPm: string) => {
@@ -236,10 +237,7 @@ export function SettingsPage() {
 
           <div className="space-y-2">
             <Label>Send Birthday Text To</Label>
-            <Select
-              value={birthdaySendTo}
-              onValueChange={(value) => mutation.mutate({key: 'birthdaySendTo', value})}
-            >
+            <Select value={birthdaySendTo} onValueChange={(value) => mutation.mutate({key: 'birthdaySendTo', value})}>
               <SelectTrigger className="w-64">
                 <SelectValue />
               </SelectTrigger>
@@ -261,11 +259,15 @@ export function SettingsPage() {
               {preNotifySet.size > 0 && (
                 <div>
                   <span className="text-muted-foreground">Pre-notification (to you):</span>
-                  <p className="font-mono text-xs mt-0.5">&quot;Reminder - {[...preNotifySet][0]} days till John Smith&apos;s birthday!&quot;</p>
+                  <p className="font-mono text-xs mt-0.5">
+                    &quot;Reminder - {[...preNotifySet][0]} days till John Smith&apos;s birthday!&quot;
+                  </p>
                 </div>
               )}
               <div>
-                <span className="text-muted-foreground">With year ({birthdaySendTo === 'person' ? 'to person' : 'to you'}):</span>
+                <span className="text-muted-foreground">
+                  With year ({birthdaySendTo === 'person' ? 'to person' : 'to you'}):
+                </span>
                 <p className="font-mono text-xs mt-0.5">
                   {birthdaySendTo === 'person'
                     ? '"Happy 30th birthday to you!"'
@@ -273,11 +275,11 @@ export function SettingsPage() {
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">Without year ({birthdaySendTo === 'person' ? 'to person' : 'to you'}):</span>
+                <span className="text-muted-foreground">
+                  Without year ({birthdaySendTo === 'person' ? 'to person' : 'to you'}):
+                </span>
                 <p className="font-mono text-xs mt-0.5">
-                  {birthdaySendTo === 'person'
-                    ? '"Happy birthday to you!"'
-                    : '"Happy birthday to John Smith"'}
+                  {birthdaySendTo === 'person' ? '"Happy birthday to you!"' : '"Happy birthday to John Smith"'}
                 </p>
               </div>
             </div>
@@ -362,11 +364,15 @@ export function SettingsPage() {
               {annivPreNotifySet.size > 0 && (
                 <div>
                   <span className="text-muted-foreground">Pre-notification (to you):</span>
-                  <p className="font-mono text-xs mt-0.5">&quot;Reminder - {[...annivPreNotifySet][0]} days till John Smith&apos;s anniversary!&quot;</p>
+                  <p className="font-mono text-xs mt-0.5">
+                    &quot;Reminder - {[...annivPreNotifySet][0]} days till John Smith&apos;s anniversary!&quot;
+                  </p>
                 </div>
               )}
               <div>
-                <span className="text-muted-foreground">With year ({anniversarySendTo === 'person' ? 'to person' : 'to you'}):</span>
+                <span className="text-muted-foreground">
+                  With year ({anniversarySendTo === 'person' ? 'to person' : 'to you'}):
+                </span>
                 <p className="font-mono text-xs mt-0.5">
                   {anniversarySendTo === 'person'
                     ? '"Happy 5th anniversary!"'
@@ -374,11 +380,11 @@ export function SettingsPage() {
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">Without year ({anniversarySendTo === 'person' ? 'to person' : 'to you'}):</span>
+                <span className="text-muted-foreground">
+                  Without year ({anniversarySendTo === 'person' ? 'to person' : 'to you'}):
+                </span>
                 <p className="font-mono text-xs mt-0.5">
-                  {anniversarySendTo === 'person'
-                    ? '"Happy anniversary!"'
-                    : '"Happy anniversary to John Smith"'}
+                  {anniversarySendTo === 'person' ? '"Happy anniversary!"' : '"Happy anniversary to John Smith"'}
                 </p>
               </div>
             </div>

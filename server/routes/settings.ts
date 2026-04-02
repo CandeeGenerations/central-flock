@@ -49,7 +49,12 @@ settingsRouter.put(
     }
 
     // Allow empty string for settings that support it
-    if (!value && key !== 'birthdayPreNotifyDays' && key !== 'birthdayMyContactId' && key !== 'anniversaryPreNotifyDays') {
+    if (
+      !value &&
+      key !== 'birthdayPreNotifyDays' &&
+      key !== 'birthdayMyContactId' &&
+      key !== 'anniversaryPreNotifyDays'
+    ) {
       res.status(400).json({error: 'value is required'})
       return
     }

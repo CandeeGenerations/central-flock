@@ -86,7 +86,11 @@ export async function checkBirthdays() {
     return
   }
 
-  const myContact = db.select().from(schema.people).where(eq(schema.people.id, Number(myContactId))).get()
+  const myContact = db
+    .select()
+    .from(schema.people)
+    .where(eq(schema.people.id, Number(myContactId)))
+    .get()
   if (!myContact || !myContact.phoneNumber) {
     console.log('Birthday scheduler: my contact not found or has no phone number, skipping')
     return
@@ -174,7 +178,11 @@ export async function checkAnniversaries() {
     return
   }
 
-  const myContact = db.select().from(schema.people).where(eq(schema.people.id, Number(myContactId))).get()
+  const myContact = db
+    .select()
+    .from(schema.people)
+    .where(eq(schema.people.id, Number(myContactId)))
+    .get()
   if (!myContact || !myContact.phoneNumber) {
     console.log('Anniversary scheduler: my contact not found or has no phone number, skipping')
     return

@@ -3,11 +3,11 @@ import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Checkbox} from '@/components/ui/checkbox'
 import {DatePicker} from '@/components/ui/date-time-picker'
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useQuery} from '@tanstack/react-query'
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {AlertTriangle, Camera, Check, CircleX, FileText, Loader2, Save, Trash2, Upload, ZoomIn} from 'lucide-react'
 import {useRef, useState} from 'react'
 import {useNavigate, useSearchParams} from 'react-router-dom'
@@ -77,12 +77,24 @@ function isVerseMatch(row: RowState): boolean | null {
 function RowStatusIcon({row}: {row: RowState}) {
   const match = isVerseMatch(row)
   if (match === false) {
-    return <span title="Verse mismatch"><CircleX className="h-4 w-4 text-red-500" /></span>
+    return (
+      <span title="Verse mismatch">
+        <CircleX className="h-4 w-4 text-red-500" />
+      </span>
+    )
   }
   if (!row.devotion.bibleReference) {
-    return <span title="Missing verse"><AlertTriangle className="h-4 w-4 text-amber-500" /></span>
+    return (
+      <span title="Missing verse">
+        <AlertTriangle className="h-4 w-4 text-amber-500" />
+      </span>
+    )
   }
-  return <span title="OK"><Check className="h-4 w-4 text-green-500" /></span>
+  return (
+    <span title="OK">
+      <Check className="h-4 w-4 text-green-500" />
+    </span>
+  )
 }
 
 export function DevotionScanPage() {
@@ -105,17 +117,28 @@ export function DevotionScanPage() {
   const [editChainValue, setEditChainValue] = useState('')
   const [editChainLoading, setEditChainLoading] = useState(false)
   const [devoDetail, setDevoDetail] = useState<{
-    number: number; date: string; devotionType: string; subcode?: string | null
-    guestSpeaker?: string | null; guestNumber?: number | null
-    referencedDevotions?: string | null; bibleReference?: string | null
-    songName?: string | null; notes?: string | null
-    produced: boolean; rendered: boolean; youtube: boolean; facebookInstagram: boolean; podcast: boolean
+    number: number
+    date: string
+    devotionType: string
+    subcode?: string | null
+    guestSpeaker?: string | null
+    guestNumber?: number | null
+    referencedDevotions?: string | null
+    bibleReference?: string | null
+    songName?: string | null
+    notes?: string | null
+    produced: boolean
+    rendered: boolean
+    youtube: boolean
+    facebookInstagram: boolean
+    podcast: boolean
   } | null>(null)
 
   // Load saved drafts
   const {data: drafts, refetch: refetchDrafts} = useQuery({
     queryKey: ['scan-drafts'],
-    queryFn: () => fetch('/api/devotions/scan-drafts', {credentials: 'include'}).then((r) => r.json()) as Promise<ScanDraft[]>,
+    queryFn: () =>
+      fetch('/api/devotions/scan-drafts', {credentials: 'include'}).then((r) => r.json()) as Promise<ScanDraft[]>,
   })
 
   const loadDraft = async (id: number) => {
@@ -223,10 +246,13 @@ export function DevotionScanPage() {
     if (!imageData) return
     setParsing(true)
     try {
-      const data = await apiPost<{month: string; year: number; devotions: ParsedDevotion[]}>('/api/devotions/parse-image', {
-        image: imageData.base64,
-        mediaType: imageData.mediaType,
-      })
+      const data = await apiPost<{month: string; year: number; devotions: ParsedDevotion[]}>(
+        '/api/devotions/parse-image',
+        {
+          image: imageData.base64,
+          mediaType: imageData.mediaType,
+        },
+      )
       setResultMeta({month: data.month, year: data.year})
       await loadParsedData(data.devotions, data.month, data.year)
     } catch (err: unknown) {
@@ -290,7 +316,10 @@ export function DevotionScanPage() {
     }
     setImporting(true)
     try {
-      const data = await apiPost<{inserted: number; updated: number; errors: string[]}>('/api/devotions/import-parsed', {devotions: selected})
+      const data = await apiPost<{inserted: number; updated: number; errors: string[]}>(
+        '/api/devotions/import-parsed',
+        {devotions: selected},
+      )
       toast.success(`Imported: ${data.inserted} new, ${data.updated} updated`)
       if (data.errors.length > 0) {
         toast.error(`${data.errors.length} errors: ${data.errors.slice(0, 3).join(', ')}`)
@@ -307,11 +336,13 @@ export function DevotionScanPage() {
     setRows((prev) => prev.map((r, i) => (i === index ? {...r, devotion: {...r.devotion, ...patch}} : r)))
     if (patch.number != null) {
       try {
-        const {existing} = await apiPost<{existing: number[]}>('/api/devotions/check-existing', {numbers: [patch.number]})
-        setRows((prev) =>
-          prev.map((r, i) => (i === index ? {...r, existing: existing.includes(patch.number!)} : r)),
-        )
-      } catch { /* ignore */ }
+        const {existing} = await apiPost<{existing: number[]}>('/api/devotions/check-existing', {
+          numbers: [patch.number],
+        })
+        setRows((prev) => prev.map((r, i) => (i === index ? {...r, existing: existing.includes(patch.number!)} : r)))
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -339,13 +370,27 @@ export function DevotionScanPage() {
       const row = rows[editChainRow]
       const tempDevo = {...row.devotion, referencedDevotions: [num]}
       const enrichments = await apiPost<EnrichResult[]>('/api/devotions/enrich-parsed', {
-        devotions: [{number: tempDevo.number, devotionType: tempDevo.devotionType, referencedDevotions: [num], bibleReference: tempDevo.bibleReference}],
+        devotions: [
+          {
+            number: tempDevo.number,
+            devotionType: tempDevo.devotionType,
+            referencedDevotions: [num],
+            bibleReference: tempDevo.bibleReference,
+          },
+        ],
       })
       const enrichment = enrichments[0]
       setRows((prev) =>
         prev.map((r, i) =>
           i === editChainRow
-            ? {...r, devotion: {...r.devotion, referencedDevotions: enrichment?.fullChain.length ? enrichment.fullChain : [num]}, enrichment}
+            ? {
+                ...r,
+                devotion: {
+                  ...r.devotion,
+                  referencedDevotions: enrichment?.fullChain.length ? enrichment.fullChain : [num],
+                },
+                enrichment,
+              }
             : r,
         ),
       )
@@ -402,7 +447,9 @@ export function DevotionScanPage() {
                     {d.month} {d.year} ({d.count} devotions)
                   </button>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{new Date(d.createdAt + 'Z').toLocaleDateString()}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(d.createdAt + 'Z').toLocaleDateString()}
+                    </span>
                     <button
                       className="p-1 rounded hover:bg-destructive/10 cursor-pointer"
                       onClick={() => handleDeleteDraft(d.id)}
@@ -567,10 +614,7 @@ export function DevotionScanPage() {
                         <Checkbox checked={row.selected} onCheckedChange={() => toggleRow(i)} />
                       </TableCell>
                       <TableCell className="!align-top">
-                        <DatePicker
-                          value={row.devotion.date}
-                          onChange={(v) => updateRow(i, {date: v})}
-                        />
+                        <DatePicker value={row.devotion.date} onChange={(v) => updateRow(i, {date: v})} />
                       </TableCell>
                       <TableCell className="!align-top">
                         <div className="space-y-1">
@@ -580,14 +624,16 @@ export function DevotionScanPage() {
                             onChange={(e) => updateRow(i, {number: Number(e.target.value)})}
                             className="w-30 h-8 text-xs"
                           />
-                          {row.existing && (
-                            <p className="text-[10px] text-amber-600">Duplicate #</p>
-                          )}
+                          {row.existing && <p className="text-[10px] text-amber-600">Duplicate #</p>}
                         </div>
                       </TableCell>
                       <TableCell className="!align-top">
                         <SearchableSelect
-                          value={row.devotion.devotionType === 'guest' ? `guest-${row.devotion.guestSpeaker || ''}` : row.devotion.devotionType}
+                          value={
+                            row.devotion.devotionType === 'guest'
+                              ? `guest-${row.devotion.guestSpeaker || ''}`
+                              : row.devotion.devotionType
+                          }
                           onValueChange={(v) => {
                             if (v.startsWith('guest-')) {
                               updateRow(i, {devotionType: 'guest', guestSpeaker: v.replace('guest-', '')})
@@ -663,7 +709,20 @@ export function DevotionScanPage() {
                               }}
                               title="Edit reference number"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="text-muted-foreground"
+                              >
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                              </svg>
                             </button>
                           </div>
                         ) : (
@@ -707,7 +766,8 @@ export function DevotionScanPage() {
 
             {verseMismatches > 0 && (
               <p className="text-sm text-red-600">
-                {verseMismatches} verse{verseMismatches > 1 ? 's don\'t' : ' doesn\'t'} match the original devotion. Check the red-highlighted rows.
+                {verseMismatches} verse{verseMismatches > 1 ? "s don't" : " doesn't"} match the original devotion. Check
+                the red-highlighted rows.
               </p>
             )}
 
@@ -829,7 +889,10 @@ export function DevotionScanPage() {
                     {(JSON.parse(devoDetail.referencedDevotions) as number[]).map((n, j) => (
                       <span key={n}>
                         {j > 0 && ', '}
-                        <button className="text-primary hover:underline cursor-pointer" onClick={() => showDevoDetail(n)}>
+                        <button
+                          className="text-primary hover:underline cursor-pointer"
+                          onClick={() => showDevoDetail(n)}
+                        >
                           #{n}
                         </button>
                       </span>
@@ -845,10 +908,20 @@ export function DevotionScanPage() {
               )}
               <div className="col-span-2 flex gap-3 pt-1">
                 {(['produced', 'rendered', 'youtube', 'facebookInstagram', 'podcast'] as const).map((field) => {
-                  const labels: Record<string, string> = {produced: 'Produced', rendered: 'Rendered', youtube: 'YouTube', facebookInstagram: 'FB/IG', podcast: 'Podcast'}
+                  const labels: Record<string, string> = {
+                    produced: 'Produced',
+                    rendered: 'Rendered',
+                    youtube: 'YouTube',
+                    facebookInstagram: 'FB/IG',
+                    podcast: 'Podcast',
+                  }
                   return (
                     <div key={field} className="flex items-center gap-1">
-                      {devoDetail[field] ? <Check className="h-3.5 w-3.5 text-green-600" /> : <AlertTriangle className="h-3.5 w-3.5 text-red-500" />}
+                      {devoDetail[field] ? (
+                        <Check className="h-3.5 w-3.5 text-green-600" />
+                      ) : (
+                        <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                      )}
                       <span className="text-xs">{labels[field]}</span>
                     </div>
                   )
@@ -871,7 +944,20 @@ export function DevotionScanPage() {
             className="absolute top-4 right-4 text-white hover:text-white/80 cursor-pointer z-10"
             onClick={() => setLightboxOpen(false)}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
           {imagePreview && (
             <img

@@ -25,9 +25,7 @@ export function DatePicker({value, onChange, placeholder = 'Pick a date...'}: Da
     setOpen(false)
   }
 
-  const displayValue = date
-    ? date.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})
-    : null
+  const displayValue = date ? date.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}) : null
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

@@ -359,7 +359,11 @@ export function PersonDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <span className="text-sm text-muted-foreground">Phone</span>
-                  <p>{person.phoneDisplay || person.phoneNumber || <span className="text-muted-foreground">No phone</span>}</p>
+                  <p>
+                    {person.phoneDisplay || person.phoneNumber || (
+                      <span className="text-muted-foreground">No phone</span>
+                    )}
+                  </p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">E.164</span>
@@ -402,7 +406,8 @@ export function PersonDetailPage() {
                               let years = today.getFullYear() - person.anniversaryYear
                               const hadAnniversary =
                                 today.getMonth() + 1 > person.anniversaryMonth ||
-                                (today.getMonth() + 1 === person.anniversaryMonth && today.getDate() >= person.anniversaryDay)
+                                (today.getMonth() + 1 === person.anniversaryMonth &&
+                                  today.getDate() >= person.anniversaryDay)
                               if (!hadAnniversary) years--
                               return `, ${person.anniversaryYear} (${years} ${years === 1 ? 'year' : 'years'})`
                             })()

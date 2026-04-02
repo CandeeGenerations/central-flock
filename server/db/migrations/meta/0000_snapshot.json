@@ -50,12 +50,8 @@
           "name": "birthday_messages_sent_person_id_people_id_fk",
           "tableFrom": "birthday_messages_sent",
           "tableTo": "people",
-          "columnsFrom": [
-            "person_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["person_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -171,12 +167,8 @@
           "name": "drafts_group_id_groups_id_fk",
           "tableFrom": "drafts",
           "tableTo": "groups",
-          "columnsFrom": [
-            "group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["group_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -229,9 +221,7 @@
       "indexes": {
         "global_variables_name_unique": {
           "name": "global_variables_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -284,9 +274,7 @@
       "indexes": {
         "groups_name_unique": {
           "name": "groups_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -355,12 +343,8 @@
           "name": "message_recipients_message_id_messages_id_fk",
           "tableFrom": "message_recipients",
           "tableTo": "messages",
-          "columnsFrom": [
-            "message_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["message_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -368,12 +352,8 @@
           "name": "message_recipients_person_id_people_id_fk",
           "tableFrom": "message_recipients",
           "tableTo": "people",
-          "columnsFrom": [
-            "person_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["person_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -503,12 +483,8 @@
           "name": "messages_group_id_groups_id_fk",
           "tableFrom": "messages",
           "tableTo": "groups",
-          "columnsFrom": [
-            "group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["group_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -611,9 +587,7 @@
       "indexes": {
         "people_phone_number_unique": {
           "name": "people_phone_number_unique",
-          "columns": [
-            "phone_number"
-          ],
+          "columns": ["phone_number"],
           "isUnique": true
         }
       },
@@ -646,12 +620,8 @@
           "name": "people_groups_person_id_people_id_fk",
           "tableFrom": "people_groups",
           "tableTo": "people",
-          "columnsFrom": [
-            "person_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["person_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -659,22 +629,15 @@
           "name": "people_groups_group_id_groups_id_fk",
           "tableFrom": "people_groups",
           "tableTo": "groups",
-          "columnsFrom": [
-            "group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["group_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "people_groups_person_id_group_id_pk": {
-          "columns": [
-            "person_id",
-            "group_id"
-          ],
+          "columns": ["person_id", "group_id"],
           "name": "people_groups_person_id_group_id_pk"
         }
       },

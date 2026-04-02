@@ -40,9 +40,9 @@ interface DuplicateGroup {
 }
 
 function fetchDuplicateScriptures() {
-  return fetch('/api/devotions/scriptures/duplicates', {credentials: 'include'}).then((r) =>
-    r.json(),
-  ) as Promise<DuplicateGroup[]>
+  return fetch('/api/devotions/scriptures/duplicates', {credentials: 'include'}).then((r) => r.json()) as Promise<
+    DuplicateGroup[]
+  >
 }
 
 function fetchScriptureLookup(search: string) {
@@ -104,9 +104,7 @@ export function DevotionScripturesPage() {
             className="text-base"
           />
           {isSearching && !searchLoading && searchResults?.length === 0 && (
-            <p className="text-sm font-medium text-green-600 mt-2">
-              This verse hasn't been used yet!
-            </p>
+            <p className="text-sm font-medium text-green-600 mt-2">This verse hasn't been used yet!</p>
           )}
         </CardContent>
       </Card>
@@ -134,47 +132,57 @@ export function DevotionScripturesPage() {
               </p>
             ) : (
               <>
-              <div className="border rounded-md overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Reference</TableHead>
-                      <TableHead className="text-right">Times Used</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {showData?.map((group) => (
-                      <TableRow
-                        key={group.reference}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setSelected(group)}
-                      >
-                        <TableCell className="font-medium">{group.reference}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant={group.count > 2 ? 'destructive' : 'secondary'}>{group.count}</Badge>
-                        </TableCell>
+                <div className="border rounded-md overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Reference</TableHead>
+                        <TableHead className="text-right">Times Used</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-muted-foreground">
-                    {(safePage - 1) * perPage + 1}&ndash;{Math.min(safePage * perPage, totalItems)} of {totalItems}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((p) => p - 1)}>
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Previous
-                    </Button>
-                    <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
+                    </TableHeader>
+                    <TableBody>
+                      {showData?.map((group) => (
+                        <TableRow
+                          key={group.reference}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setSelected(group)}
+                        >
+                          <TableCell className="font-medium">{group.reference}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={group.count > 2 ? 'destructive' : 'secondary'}>{group.count}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
-              )}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <p className="text-sm text-muted-foreground">
+                      {(safePage - 1) * perPage + 1}&ndash;{Math.min(safePage * perPage, totalItems)} of {totalItems}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={safePage <= 1}
+                        onClick={() => setPage((p) => p - 1)}
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={safePage >= totalPages}
+                        onClick={() => setPage((p) => p + 1)}
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </CardContent>

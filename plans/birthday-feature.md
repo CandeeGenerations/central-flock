@@ -3,6 +3,7 @@
 ## Context
 
 Central Flock needs a birthday tracking and automated messaging feature. Users want to:
+
 - Store birthdays on person profiles (month/day, optionally with year)
 - Get pre-notification reminders (3, 7, 10 days before) sent to themselves
 - Automatically send birthday texts to either the person or themselves
@@ -15,6 +16,7 @@ Central Flock needs a birthday tracking and automated messaging feature. Users w
 **File:** `server/db/schema.ts`
 
 ### 1a. Add birthday fields to `people` table
+
 ```ts
 birthMonth: integer('birth_month'),  // 1-12
 birthDay: integer('birth_day'),      // 1-31
@@ -22,17 +24,24 @@ birthYear: integer('birth_year'),    // optional, e.g. 1993
 ```
 
 ### 1b. Make `phoneNumber` nullable
+
 Change `phoneNumber` from `.notNull().unique()` to `.unique()` (nullable). SQLite allows multiple NULLs in a unique column.
 
 ### 1c. Add `birthday_messages_sent` tracking table
+
 Prevents duplicate sends on the same day. Without this, if the server restarts, it would re-send.
+
 ```ts
 export const birthdayMessagesSent = sqliteTable('birthday_messages_sent', {
   id: integer('id').primaryKey({autoIncrement: true}),
-  personId: integer('person_id').notNull().references(() => people.id, {onDelete: 'cascade'}),
+  personId: integer('person_id')
+    .notNull()
+    .references(() => people.id, {onDelete: 'cascade'}),
   type: text('type', {enum: ['birthday', 'pre_3', 'pre_7', 'pre_10']}).notNull(),
-  year: integer('year').notNull(),  // the year this was sent for
-  sentAt: text('sent_at').default(sql`(datetime('now'))`).notNull(),
+  year: integer('year').notNull(), // the year this was sent for
+  sentAt: text('sent_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
 })
 ```
 
@@ -46,12 +55,12 @@ Run `pnpm db:migrate` after schema changes.
 
 Add new settings keys with defaults:
 
-| Key | Default | Valid Values |
-|-----|---------|-------------|
-| `birthdaySendTime` | `"07:00"` | HH:MM format |
-| `birthdayPreNotifyDays` | `""` | Comma-separated: any combo of `3,7,10` (empty = none) |
-| `birthdaySendTo` | `"self"` | `"self"`, `"person"` |
-| `birthdayMyContactId` | `""` | A person ID from the people table |
+| Key                     | Default   | Valid Values                                          |
+| ----------------------- | --------- | ----------------------------------------------------- |
+| `birthdaySendTime`      | `"07:00"` | HH:MM format                                          |
+| `birthdayPreNotifyDays` | `""`      | Comma-separated: any combo of `3,7,10` (empty = none) |
+| `birthdaySendTo`        | `"self"`  | `"self"`, `"person"`                                  |
+| `birthdayMyContactId`   | `""`      | A person ID from the people table                     |
 
 Add these to `DEFAULTS` and `VALID_VALUES` (with appropriate validation for each).
 
@@ -76,6 +85,7 @@ Add a new `<Card>` section titled **"Birthdays"** with:
 ## 4. Person Profile — Birthday Input
 
 ### 4a. Backend
+
 **File:** `server/routes/people.ts`
 
 - Accept `birthMonth`, `birthDay`, `birthYear` on create/update
@@ -86,6 +96,7 @@ Add a new `<Card>` section titled **"Birthdays"** with:
 - When phone is null, prevent adding as message recipient
 
 ### 4b. Frontend
+
 **File:** `src/pages/person-detail-page.tsx`
 
 - Add birthday fields: Month (select 1-12), Day (select 1-31), Year (optional text input)
@@ -104,11 +115,13 @@ Add a new `<Card>` section titled **"Birthdays"** with:
 **New file:** `server/services/birthday-scheduler.ts`
 
 ### Core logic:
+
 1. **Startup:** Calculate the next run time based on `birthdaySendTime` setting. Schedule a `setTimeout` for that time.
 2. **Each day at send time:** Run `checkBirthdays()`, then schedule the next run for tomorrow at the same time.
 3. If the setting changes, cancel the current timeout and reschedule.
 
 ### `checkBirthdays()` function:
+
 1. Read settings: `birthdaySendTime`, `birthdayPreNotifyDays`, `birthdaySendTo`, `birthdayMyContactId`
 2. If `birthdayMyContactId` is not set, log warning and skip
 3. Get today's date (month/day)
@@ -136,6 +149,7 @@ Add a new `<Card>` section titled **"Birthdays"** with:
 7. Use the existing `sendMessage` or `sendMessageViaUI` from `applescript.ts` directly (no need to create a message record in the messages table — these are system-generated, not user-composed). Respects the `sendMethod` setting (API vs UI).
 
 ### Age with ordinal suffix helper:
+
 ```ts
 function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
@@ -145,7 +159,9 @@ function ordinal(n: number): string {
 ```
 
 ### Register in server startup:
+
 **File:** `server/index.ts`
+
 - Import and call `startBirthdayScheduler()` alongside the existing `startScheduler()`
 
 ---
@@ -153,23 +169,31 @@ function ordinal(n: number): string {
 ## 6. Guard Phone-Required Operations
 
 ### Groups
+
 **File:** `server/routes/groups.ts`
+
 - In `POST /api/groups/:id/members`: validate that all `personIds` have a phone number. Return 400 for any that don't.
 
 **File:** Frontend group member selection
+
 - Remove people without phone numbers from the selectable dropdown/list entirely
 
 ### Messages
+
 **File:** `server/routes/messages.ts` (and/or compose page)
+
 - Filter out people without phone numbers from recipient lists
 - Frontend: in compose page recipient selection, remove people without phone numbers from the dropdown entirely (not just disabled — fully hidden)
 
 ### Frontend guards
+
 **File:** `src/pages/person-detail-page.tsx`
+
 - Disable "Send Message" link when person has no phone number
 - Disable "Add to Group" when person has no phone number
 
 ### General dropdown filtering
+
 - All people-selection dropdowns across the app (groups, messages, and any other selectors) should exclude people without phone numbers, except where the context is birthday-only (e.g. the "My Contact" birthday setting selector)
 
 ---
@@ -179,10 +203,11 @@ function ordinal(n: number): string {
 **File:** `src/lib/api.ts`
 
 Update `Person` interface:
+
 ```ts
 export interface Person {
   // ... existing fields
-  phoneNumber: string | null  // was: string
+  phoneNumber: string | null // was: string
   birthMonth: number | null
   birthDay: number | null
   birthYear: number | null
@@ -193,21 +218,21 @@ export interface Person {
 
 ## File Summary
 
-| File | Change |
-|------|--------|
-| `server/db/schema.ts` | Add birthday fields, nullable phone, birthday_messages_sent table |
-| `server/routes/settings.ts` | Add birthday setting keys + validation |
-| `server/routes/people.ts` | Accept birthday fields, optional phone |
-| `server/routes/groups.ts` | Validate phone on member add |
-| `server/routes/messages.ts` | Filter recipients without phone |
-| `server/services/birthday-scheduler.ts` | **New** — daily birthday check + send |
-| `server/index.ts` | Start birthday scheduler |
-| `src/pages/settings-page.tsx` | Birthday settings card |
-| `src/pages/person-detail-page.tsx` | Birthday input, optional phone |
-| `src/pages/people-page.tsx` | Optional phone in add form |
-| `src/pages/message-compose-page.tsx` | Filter out phoneless people |
-| `src/lib/api.ts` | Update Person type |
-| `src/lib/utils.ts` | Possibly update phone validation helpers |
+| File                                    | Change                                                            |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| `server/db/schema.ts`                   | Add birthday fields, nullable phone, birthday_messages_sent table |
+| `server/routes/settings.ts`             | Add birthday setting keys + validation                            |
+| `server/routes/people.ts`               | Accept birthday fields, optional phone                            |
+| `server/routes/groups.ts`               | Validate phone on member add                                      |
+| `server/routes/messages.ts`             | Filter recipients without phone                                   |
+| `server/services/birthday-scheduler.ts` | **New** — daily birthday check + send                             |
+| `server/index.ts`                       | Start birthday scheduler                                          |
+| `src/pages/settings-page.tsx`           | Birthday settings card                                            |
+| `src/pages/person-detail-page.tsx`      | Birthday input, optional phone                                    |
+| `src/pages/people-page.tsx`             | Optional phone in add form                                        |
+| `src/pages/message-compose-page.tsx`    | Filter out phoneless people                                       |
+| `src/lib/api.ts`                        | Update Person type                                                |
+| `src/lib/utils.ts`                      | Possibly update phone validation helpers                          |
 
 ---
 

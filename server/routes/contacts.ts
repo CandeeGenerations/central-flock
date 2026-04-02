@@ -39,8 +39,7 @@ contactsRouter.get('/', async (_req, res) => {
 
       if (existingPerson) {
         const nameMatches =
-          (existingPerson.firstName || '') === contact.firstName &&
-          (existingPerson.lastName || '') === contact.lastName
+          (existingPerson.firstName || '') === contact.firstName && (existingPerson.lastName || '') === contact.lastName
 
         if (nameMatches) {
           matchStatus = 'exists'
@@ -101,11 +100,7 @@ contactsRouter.post('/import', async (req, res) => {
     let skipped = 0
 
     for (const contact of contacts) {
-      const existing = db
-        .select()
-        .from(schema.people)
-        .where(eq(schema.people.phoneNumber, contact.phoneNumber))
-        .get()
+      const existing = db.select().from(schema.people).where(eq(schema.people.phoneNumber, contact.phoneNumber)).get()
 
       if (existing) {
         if (skipDuplicates) {

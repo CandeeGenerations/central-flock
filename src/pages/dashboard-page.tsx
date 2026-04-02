@@ -120,7 +120,9 @@ export function DashboardPage() {
     if (preset === 'custom' && customRange?.from) {
       const from = customRange.from.toISOString().slice(0, 10)
       const to = customRange.to
-        ? new Date(Date.UTC(customRange.to.getUTCFullYear(), customRange.to.getUTCMonth(), customRange.to.getUTCDate() + 1))
+        ? new Date(
+            Date.UTC(customRange.to.getUTCFullYear(), customRange.to.getUTCMonth(), customRange.to.getUTCDate() + 1),
+          )
             .toISOString()
             .slice(0, 10)
         : undefined
@@ -216,14 +218,18 @@ export function DashboardPage() {
               <Button size="sm">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Compose
-                <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">{isMac ? '⌘' : 'Ctrl+'}J</kbd>
+                <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">
+                  {isMac ? '⌘' : 'Ctrl+'}J
+                </kbd>
               </Button>
             </Link>
             <Link to="/people?add=1">
               <Button size="sm" variant="outline">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Person
-                <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">{isMac ? '⌘' : 'Ctrl+'}P</kbd>
+                <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">
+                  {isMac ? '⌘' : 'Ctrl+'}P
+                </kbd>
               </Button>
             </Link>
           </div>

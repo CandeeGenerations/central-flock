@@ -113,7 +113,12 @@ export interface MacContact {
   phones: {label: string; value: string}[]
 }
 
-function parseVCard(vcard: string): {firstName: string; lastName: string; phones: {label: string; value: string}[]; id: string} {
+function parseVCard(vcard: string): {
+  firstName: string
+  lastName: string
+  phones: {label: string; value: string}[]
+  id: string
+} {
   const lines = vcard.split(/\r?\n/)
   let firstName = ''
   let lastName = ''

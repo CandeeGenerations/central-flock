@@ -3,10 +3,9 @@ import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
+import {e164ToDisplay} from '../services/csv-parser.js'
 
 export const peopleRouter = Router()
-
-import {e164ToDisplay} from '../services/csv-parser.js'
 
 // GET /api/people/duplicates - Find duplicate people
 peopleRouter.get(
@@ -281,7 +280,20 @@ function validateMonthDay(month: number | null, day: number | null, label: strin
   if (day != null && month == null) return `${label} month is required when day is set`
   if (month != null && (month < 1 || month > 12)) return `${label} month must be 1-12`
   if (day != null && month != null) {
-    const maxDays: Record<number, number> = {1: 31, 2: 29, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31}
+    const maxDays: Record<number, number> = {
+      1: 31,
+      2: 29,
+      3: 31,
+      4: 30,
+      5: 31,
+      6: 30,
+      7: 31,
+      8: 31,
+      9: 30,
+      10: 31,
+      11: 30,
+      12: 31,
+    }
     if (day < 1 || day > maxDays[month]) {
       return `${label} day must be 1-${maxDays[month]} for month ${month}`
     }
@@ -293,7 +305,20 @@ function validateMonthDay(month: number | null, day: number | null, label: strin
 peopleRouter.post(
   '/',
   asyncHandler(async (req, res) => {
-    const {firstName, lastName, phoneNumber, phoneDisplay, status, notes, birthMonth, birthDay, birthYear, anniversaryMonth, anniversaryDay, anniversaryYear} = req.body
+    const {
+      firstName,
+      lastName,
+      phoneNumber,
+      phoneDisplay,
+      status,
+      notes,
+      birthMonth,
+      birthDay,
+      birthYear,
+      anniversaryMonth,
+      anniversaryDay,
+      anniversaryYear,
+    } = req.body
 
     const bdayError = validateMonthDay(birthMonth ?? null, birthDay ?? null, 'Birth')
     if (bdayError) {
@@ -342,7 +367,20 @@ peopleRouter.post(
 peopleRouter.put(
   '/:id',
   asyncHandler(async (req, res) => {
-    const {firstName, lastName, phoneNumber, phoneDisplay, status, notes, birthMonth, birthDay, birthYear, anniversaryMonth, anniversaryDay, anniversaryYear} = req.body
+    const {
+      firstName,
+      lastName,
+      phoneNumber,
+      phoneDisplay,
+      status,
+      notes,
+      birthMonth,
+      birthDay,
+      birthYear,
+      anniversaryMonth,
+      anniversaryDay,
+      anniversaryYear,
+    } = req.body
 
     if (birthMonth !== undefined || birthDay !== undefined) {
       const bdayError = validateMonthDay(birthMonth ?? null, birthDay ?? null, 'Birth')
@@ -369,12 +407,12 @@ peopleRouter.put(
         phoneDisplay: phoneDisplay ?? undefined,
         status: status ?? undefined,
         notes: notes ?? undefined,
-        birthMonth: birthMonth !== undefined ? birthMonth ?? null : undefined,
-        birthDay: birthDay !== undefined ? birthDay ?? null : undefined,
-        birthYear: birthYear !== undefined ? birthYear ?? null : undefined,
-        anniversaryMonth: anniversaryMonth !== undefined ? anniversaryMonth ?? null : undefined,
-        anniversaryDay: anniversaryDay !== undefined ? anniversaryDay ?? null : undefined,
-        anniversaryYear: anniversaryYear !== undefined ? anniversaryYear ?? null : undefined,
+        birthMonth: birthMonth !== undefined ? (birthMonth ?? null) : undefined,
+        birthDay: birthDay !== undefined ? (birthDay ?? null) : undefined,
+        birthYear: birthYear !== undefined ? (birthYear ?? null) : undefined,
+        anniversaryMonth: anniversaryMonth !== undefined ? (anniversaryMonth ?? null) : undefined,
+        anniversaryDay: anniversaryDay !== undefined ? (anniversaryDay ?? null) : undefined,
+        anniversaryYear: anniversaryYear !== undefined ? (anniversaryYear ?? null) : undefined,
         updatedAt: sql`datetime('now')`,
       })
       .where(eq(schema.people.id, Number(req.params.id)))

@@ -89,7 +89,13 @@ export function MessageHistoryPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
   const activeTab = (
-    tabParam === 'drafts' ? 'drafts' : tabParam === 'scheduled' ? 'scheduled' : tabParam === 'upcoming' ? 'upcoming' : 'sent'
+    tabParam === 'drafts'
+      ? 'drafts'
+      : tabParam === 'scheduled'
+        ? 'scheduled'
+        : tabParam === 'upcoming'
+          ? 'upcoming'
+          : 'sent'
   ) as 'sent' | 'scheduled' | 'drafts' | 'upcoming'
   const setActiveTab = (tab: 'sent' | 'scheduled' | 'drafts' | 'upcoming') =>
     setSearchParams(tab === 'sent' ? {} : {tab}, {replace: true})
@@ -171,7 +177,16 @@ export function MessageHistoryPage() {
         const nextYear = next.getFullYear()
         const daysUntil = Math.round((next.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
         const age = p.birthYear ? nextYear - p.birthYear : null
-        events.push({person: p, type: 'birthday', month: p.birthMonth, day: p.birthDay, year: p.birthYear, nextYear, daysUntil, age})
+        events.push({
+          person: p,
+          type: 'birthday',
+          month: p.birthMonth,
+          day: p.birthDay,
+          year: p.birthYear,
+          nextYear,
+          daysUntil,
+          age,
+        })
       }
       if (p.anniversaryMonth != null && p.anniversaryDay != null) {
         let next = new Date(thisYear, p.anniversaryMonth - 1, p.anniversaryDay)
@@ -179,7 +194,16 @@ export function MessageHistoryPage() {
         const nextYear = next.getFullYear()
         const daysUntil = Math.round((next.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
         const years = p.anniversaryYear ? nextYear - p.anniversaryYear : null
-        events.push({person: p, type: 'anniversary', month: p.anniversaryMonth, day: p.anniversaryDay, year: p.anniversaryYear, nextYear, daysUntil, age: years})
+        events.push({
+          person: p,
+          type: 'anniversary',
+          month: p.anniversaryMonth,
+          day: p.anniversaryDay,
+          year: p.anniversaryYear,
+          nextYear,
+          daysUntil,
+          age: years,
+        })
       }
     }
 
@@ -734,7 +758,8 @@ export function MessageHistoryPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {new Date(2000, event.month - 1).toLocaleString('default', {month: 'long'})} {event.day}, {event.nextYear}
+                    {new Date(2000, event.month - 1).toLocaleString('default', {month: 'long'})} {event.day},{' '}
+                    {event.nextYear}
                   </TableCell>
                   <TableCell>{event.age != null ? event.age : '—'}</TableCell>
                   <TableCell>

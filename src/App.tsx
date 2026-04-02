@@ -5,16 +5,16 @@ import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts'
 import {checkAuthStatus, logout} from '@/lib/api'
 import {ThemeProvider, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
+import {ContactsImportPage} from '@/pages/contacts-import-page'
 import {DashboardPage} from '@/pages/dashboard-page'
 import {DevotionAuditPage} from '@/pages/devotions/devotion-audit-page'
 import {DevotionDetailPage} from '@/pages/devotions/devotion-detail-page'
+import {DevotionListPage} from '@/pages/devotions/devotion-list-page'
 import {DevotionScanPage} from '@/pages/devotions/devotion-scan-page'
 import {DevotionScripturesPage} from '@/pages/devotions/devotion-scriptures-page'
-import {DevotionListPage} from '@/pages/devotions/devotion-list-page'
 import {DevotionStatsPage} from '@/pages/devotions/devotion-stats-page'
 import {GroupDetailPage} from '@/pages/group-detail-page'
 import {GroupsPage} from '@/pages/groups-page'
-import {ContactsImportPage} from '@/pages/contacts-import-page'
 import {ImportPage} from '@/pages/import-page'
 import {LoginPage} from '@/pages/login-page'
 import {MessageComposePage} from '@/pages/message-compose-page'
@@ -32,9 +32,9 @@ import {
   BookOpen,
   FileText,
   FolderOpen,
-  List,
   Keyboard,
   LayoutDashboard,
+  List,
   LogOut,
   MessageSquare,
   Moon,

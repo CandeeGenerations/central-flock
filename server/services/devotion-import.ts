@@ -121,7 +121,9 @@ function detectColumns(headers: unknown[]): Map<number, string> {
   const columnMap = new Map<number, string>()
   const usedFields = new Set<string>()
   for (let i = 0; i < headers.length; i++) {
-    const h = String(headers[i] || '').trim().toLowerCase()
+    const h = String(headers[i] || '')
+      .trim()
+      .toLowerCase()
     const mapped = HEADER_MAPS[h]
     if (mapped && !usedFields.has(mapped)) {
       columnMap.set(i, mapped)
@@ -157,11 +159,7 @@ function parseNumber(value: unknown): number | null {
   return isNaN(n) ? null : n
 }
 
-export function parseSheetRows(
-  rows: unknown[][],
-  year: number,
-  month: number,
-): ParseResult {
+export function parseSheetRows(rows: unknown[][], year: number, month: number): ParseResult {
   if (rows.length === 0) return {devotions: [], warnings: []}
 
   const columnMap = detectColumns(rows[0])
@@ -206,7 +204,8 @@ export function parseSheetRows(
     const noteStr = noteValue != null ? String(noteValue).trim() : null
     const parsed = parseNoteField(noteStr)
 
-    const facebookInstagram = isChecked(getValue('facebookInstagram')) ||
+    const facebookInstagram =
+      isChecked(getValue('facebookInstagram')) ||
       (hasInstagram && isChecked(getValue('instagram')) && isChecked(getValue('facebookInstagram'))) ||
       isChecked(getValue('facebookInstagram'))
 

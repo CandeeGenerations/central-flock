@@ -56,7 +56,10 @@ Return ONLY a JSON object with this shape:
 
 Be precise with the numbers. If you can't read a value clearly, use your best judgment based on context (sequential numbering, etc.). Do not skip any rows.`
 
-export async function parseDevotionImage(imageBase64: string, mediaType: string): Promise<{
+export async function parseDevotionImage(
+  imageBase64: string,
+  mediaType: string,
+): Promise<{
   month: string
   year: number
   devotions: ParsedDevotionRow[]

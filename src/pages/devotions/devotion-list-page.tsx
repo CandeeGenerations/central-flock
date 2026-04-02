@@ -267,7 +267,7 @@ export function DevotionListPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
         <SearchInput
-          placeholder="Search reference or song..."
+          placeholder="Search..."
           value={search}
           onChange={(v) => {
             setSearch(v)
@@ -374,13 +374,13 @@ export function DevotionListPage() {
                 {data?.data.map((devotion) => (
                   <TableRow
                     key={devotion.id}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted"
                     onClick={() => navigate(`/devotions/${devotion.id}`)}
                   >
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {formatDate(devotion.date)}
                     </TableCell>
-                    <TableCell className="font-medium tabular-nums">{devotion.number}</TableCell>
+                    <TableCell className="font-medium tabular-nums">#{String(devotion.number).padStart(3, '0')}</TableCell>
                     <TableCell>
                       <TypeBadge devotion={devotion} />
                     </TableCell>

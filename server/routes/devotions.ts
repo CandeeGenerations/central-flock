@@ -881,7 +881,7 @@ devotionsRouter.post(
 
     const youtubeDescription = [
       'From the Shepherd to the Sheep',
-      `#${devotion.number} - ${formattedDate}`,
+      `#${String(devotion.number).padStart(3, '0')} - ${formattedDate}`,
       `Timestamps:\n0:00 Intro by Pastor Weniger\n0:59 Devotional by Pastor Candee\n${timestamp.trim()} Conclusion by Pastor Weniger`,
       'Join Pastor Candee for this morning\'s devotional!',
       '#cbc #cbcwoodbridge #dailydevotional',

@@ -195,7 +195,7 @@ export function DevotionScripturesPage() {
                   className="text-primary hover:underline font-medium"
                   onClick={() => setSelected(null)}
                 >
-                  #{d.number}
+                  #{String(d.number).padStart(3, '0')}
                 </Link>
                 <span className="text-sm text-muted-foreground">{d.date}</span>
                 <Badge

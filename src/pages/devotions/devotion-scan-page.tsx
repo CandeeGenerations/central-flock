@@ -785,7 +785,7 @@ export function DevotionScanPage() {
       <Dialog open={!!devoDetail} onOpenChange={(open) => !open && setDevoDetail(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Devotion #{devoDetail?.number as number}</DialogTitle>
+            <DialogTitle>Devotion #{String(devoDetail?.number as number).padStart(3, '0')}</DialogTitle>
           </DialogHeader>
           {devoDetail && (
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">

@@ -157,7 +157,7 @@ export function MessageComposePage() {
 
   // Populate form from loaded draft (render-time state adjustment — React-recommended pattern)
   const [loadedDraftId, setLoadedDraftId] = useState<number | null>(null)
-  if (draftData && loadedDraftId !== draftData.id) {
+  if (draftData && templatesList && loadedDraftId !== draftData.id) {
     setLoadedDraftId(draftData.id)
     setContent(draftData.content || '')
     setRecipientMode(draftData.recipientMode || 'group')
@@ -225,7 +225,7 @@ export function MessageComposePage() {
   })
 
   const [loadedEditMessageId, setLoadedEditMessageId] = useState<number | null>(null)
-  if (editMessageData && loadedEditMessageId !== editMessageData.id) {
+  if (editMessageData && templatesList && loadedEditMessageId !== editMessageData.id) {
     setLoadedEditMessageId(editMessageData.id)
     setContent(editMessageData.content || '')
     setSelectedGroupId(editMessageData.groupId ? String(editMessageData.groupId) : '')

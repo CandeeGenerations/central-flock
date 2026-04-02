@@ -104,7 +104,7 @@ export function DevotionAuditPage() {
               <span className="text-sm font-medium">{dup.date}:</span>
               {dup.devotions.map((d) => (
                 <Link key={d.id} to={`/devotions/${d.id}`} className="text-primary hover:underline text-sm">
-                  <Badge variant="outline">#{d.number}</Badge>
+                  <Badge variant="outline">#{String(d.number).padStart(3, '0')}</Badge>
                 </Link>
               ))}
             </div>
@@ -129,7 +129,7 @@ export function DevotionAuditPage() {
                 <tr key={d.id} className="border-b last:border-0">
                   <td className="py-2 px-3">
                     <Link to={`/devotions/${d.id}`} className="text-primary hover:underline font-medium">
-                      #{d.number}
+                      #{String(d.number).padStart(3, '0')}
                     </Link>
                   </td>
                   <td className="py-2 px-3 text-muted-foreground">{d.date}</td>
@@ -158,7 +158,7 @@ export function DevotionAuditPage() {
                 <tr key={d.id} className="border-b last:border-0">
                   <td className="py-2 px-3">
                     <Link to={`/devotions/${d.id}`} className="text-primary hover:underline font-medium">
-                      #{d.number}
+                      #{String(d.number).padStart(3, '0')}
                     </Link>
                   </td>
                   <td className="py-2 px-3 text-muted-foreground">{d.date}</td>
@@ -185,7 +185,7 @@ export function DevotionAuditPage() {
                 <tr key={d.id} className="border-b last:border-0">
                   <td className="py-2 px-3">
                     <Link to={`/devotions/${d.id}`} className="text-primary hover:underline font-medium">
-                      #{d.number}
+                      #{String(d.number).padStart(3, '0')}
                     </Link>
                   </td>
                   <td className="py-2 px-3 text-muted-foreground">{d.date}</td>

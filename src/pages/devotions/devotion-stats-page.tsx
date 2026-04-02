@@ -274,7 +274,7 @@ export function DevotionStatsPage() {
                       <tr key={d.id} className="border-b last:border-0">
                         <td className="py-2 px-3">
                           <Link to={`/devotions/${d.id}`} className="text-primary hover:underline font-medium">
-                            #{d.number}
+                            #{String(d.number).padStart(3, '0')}
                           </Link>
                         </td>
                         <td className="py-2 px-3 text-muted-foreground">{d.date}</td>

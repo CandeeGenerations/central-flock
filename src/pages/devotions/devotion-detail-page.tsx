@@ -238,7 +238,7 @@ export function DevotionDetailPage() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/devotions')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-2xl font-bold">{isNew ? 'New Devotion' : `Devotion #${devotion?.number ?? id}`}</h2>
+        <h2 className="text-2xl font-bold">{isNew ? 'New Devotion' : `Devotion #${String(devotion?.number ?? id).padStart(3, '0')}`}</h2>
         {!isNew && devotion && (
           <a
             href={youtubeSearchUrl(devotion.number)}

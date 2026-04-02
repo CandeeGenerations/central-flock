@@ -17,6 +17,16 @@ function spawnStdin(command: string, args: string[], input: string): Promise<str
   })
 }
 
+// Mutex to prevent concurrent sends from corrupting clipboard / UI state
+let sendLock: Promise<void> = Promise.resolve()
+
+function acquireSendLock(): Promise<() => void> {
+  let release: () => void
+  const prev = sendLock
+  sendLock = new Promise((resolve) => (release = resolve))
+  return prev.then(() => release!)
+}
+
 function setClipboard(text: string): Promise<string> {
   return spawnStdin('pbcopy', [], text)
 }
@@ -40,30 +50,35 @@ function straightenQuotes(text: string): string {
 }
 
 export async function sendMessage(phoneNumber: string, message: string): Promise<void> {
-  const escapedMessage = straightenQuotes(message).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-  const escapedPhone = phoneNumber.replace(/"/g, '')
+  const release = await acquireSendLock()
+  try {
+    const escapedMessage = straightenQuotes(message).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    const escapedPhone = phoneNumber.replace(/"/g, '')
 
-  const script = `
+    const script = `
 tell application "Messages"
   set targetService to 1st account whose service type = SMS
   set targetBuddy to participant "${escapedPhone}" of targetService
   send "${escapedMessage}" to targetBuddy
 end tell`
 
-  try {
     await runAppleScript(script)
   } catch (error) {
     throw new Error(
       `Failed to send message to ${phoneNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       {cause: error},
     )
+  } finally {
+    release()
   }
 }
 
 export async function sendMessageViaUI(phoneNumber: string, message: string): Promise<void> {
-  const escapedPhone = phoneNumber.replace(/"/g, '')
+  const release = await acquireSendLock()
+  try {
+    const escapedPhone = phoneNumber.replace(/"/g, '')
 
-  const script = `
+    const script = `
 open location "imessage://${escapedPhone}"
 delay 1.5
 
@@ -76,9 +91,8 @@ tell application "System Events"
     key code 36
   end tell
 end tell
-delay 0.5`
+delay 1.5`
 
-  try {
     // Set clipboard via pbcopy stdin — avoids AppleScript string escaping issues
     await setClipboard(straightenQuotes(message))
     await runAppleScript(script)
@@ -87,6 +101,8 @@ delay 0.5`
       `Failed to send message via UI to ${phoneNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       {cause: error},
     )
+  } finally {
+    release()
   }
 }
 

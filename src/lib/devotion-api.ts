@@ -213,7 +213,7 @@ export function generateSongDescription(devotion: Devotion): string | null {
 }
 
 export function youtubeSearchUrl(number: number): string {
-  const query = `From the Shepherd to the Sheep #${number} CBC`
+  const query = `From the Shepherd to the Sheep #${String(number).padStart(3, '0')} CBC`
   return `https://www.youtube.com/@cbcwoodbridgeva/search?query=${encodeURIComponent(query)}`
 }
 
@@ -241,7 +241,7 @@ export function generateYoutubeDescription(devotion: Devotion): string {
 
   return [
     'From the Shepherd to the Sheep',
-    `#${devotion.number} - ${formatDevotionDate(devotion.date)}`,
+    `#${String(devotion.number).padStart(3, '0')} - ${formatDevotionDate(devotion.date)}`,
     tagline,
     '#cbc #cbcwoodbridge #dailydevotional',
     'CBC - Central Baptist Church (Woodbridge, VA)',
@@ -257,7 +257,7 @@ export function generateFacebookDescription(devotion: Devotion): string {
 
   return [
     'From the Shepherd to the Sheep',
-    `#${devotion.number} - ${formatDevotionDate(devotion.date)}`,
+    `#${String(devotion.number).padStart(3, '0')} - ${formatDevotionDate(devotion.date)}`,
     tagline,
     '#cbc #cbcwoodbridge #dailydevotional',
     'CBC - Central Baptist Church (Woodbridge, VA)',
@@ -269,7 +269,7 @@ export function generatePodcastDescription(devotion: Devotion): string {
   const year = devotion.date.split('-')[0]
   return [
     'From the Shepherd to the Sheep',
-    `#${devotion.number} - ${formatDevotionDate(devotion.date)}`,
+    `#${String(devotion.number).padStart(3, '0')} - ${formatDevotionDate(devotion.date)}`,
     `Join ${getPastorName(devotion)} for this morning's devotional!`,
     '#cbc #cbcwoodbridge #dailydevotional',
     'CBC - Central Baptist Church (Woodbridge, VA)',
@@ -278,5 +278,5 @@ export function generatePodcastDescription(devotion: Devotion): string {
 }
 
 export function generatePodcastTitle(devotion: Devotion): string {
-  return `From the Shepherd to the Sheep - #${devotion.number} - CBC`
+  return `From the Shepherd to the Sheep - #${String(devotion.number).padStart(3, '0')} - CBC`
 }

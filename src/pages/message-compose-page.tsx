@@ -9,6 +9,7 @@ import {Label} from '@/components/ui/label'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {SearchInput} from '@/components/ui/search-input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Separator} from '@/components/ui/separator'
 import {Textarea} from '@/components/ui/textarea'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
@@ -39,11 +40,8 @@ import {
   CalendarIcon,
   ChevronDown,
   ChevronRight,
-  Clock,
   Globe,
   Info,
-  Mail,
-  MessageSquare,
   Save,
   Send,
   Trash2,
@@ -629,33 +627,25 @@ export function MessageComposePage() {
           {/* === TO Section === */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Users className="h-4 w-4" />
-                </div>
-                <div>
-                  <div>To</div>
-                  <p className="text-sm text-muted-foreground font-normal">
-                    {recipients.length > 0
-                      ? `This message will be sent to ${recipients.length} contact${recipients.length !== 1 ? 's' : ''}.`
-                      : 'Select recipients for this message.'}
-                  </p>
-                </div>
-              </CardTitle>
+              <CardTitle>To</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {recipients.length > 0
+                  ? `This message will be sent to ${recipients.length} contact${recipients.length !== 1 ? 's' : ''}.`
+                  : 'Select recipients for this message.'}
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <SearchableSelect
-                    value={recipientMode}
-                    onValueChange={(v) => setRecipientMode(v as 'group' | 'individual')}
-                    options={[
-                      {value: 'group', label: 'Send to Group'},
-                      {value: 'individual', label: 'Select Individuals'},
-                    ]}
-                    className="w-full"
-                    searchable={false}
-                  />
+                  <Select value={recipientMode} onValueChange={(v) => setRecipientMode(v as 'group' | 'individual')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="group">Send to Group</SelectItem>
+                      <SelectItem value="individual">Select Individuals</SelectItem>
+                    </SelectContent>
+                  </Select>
                   {recipientMode === 'group' && (
                     <SearchableSelect
                       value={selectedGroupId}
@@ -684,7 +674,7 @@ export function MessageComposePage() {
                       onKeyDown={handleIndividualKeyDown}
                     />
                     {debouncedIndividualSearch && (
-                      <div className="border rounded-lg max-h-36 overflow-auto p-2 space-y-1 bg-card">
+                      <div className="rounded-3xl max-h-36 overflow-auto p-1.5 bg-popover/70 backdrop-blur-2xl backdrop-saturate-150 shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10">
                         {individualResults.length === 0 ? (
                           <p className="text-sm text-muted-foreground text-center py-3">No matching people found</p>
                         ) : (
@@ -696,10 +686,8 @@ export function MessageComposePage() {
                               }
                               type="button"
                               className={cn(
-                                'flex items-center gap-2 w-full px-2 py-1 rounded cursor-pointer text-sm text-left',
-                                i === individualHighlight
-                                  ? 'bg-accent text-accent-foreground'
-                                  : 'hover:bg-accent hover:text-accent-foreground',
+                                'flex items-center gap-2.5 w-full px-3 py-2 rounded-2xl cursor-pointer text-sm font-medium text-left',
+                                i === individualHighlight ? 'bg-foreground/10' : 'hover:bg-foreground/10',
                               )}
                               onClick={() => {
                                 toggleIndividual(p.id)
@@ -709,7 +697,7 @@ export function MessageComposePage() {
                               }}
                             >
                               <span>{formatFullName(p, '') || <em className="opacity-50">Unnamed</em>}</span>
-                              <span className="opacity-60 ml-auto">{p.phoneDisplay}</span>
+                              <span className="text-muted-foreground ml-auto">{p.phoneDisplay}</span>
                             </button>
                           ))
                         )}
@@ -766,9 +754,10 @@ export function MessageComposePage() {
                         setExcludeHighlight(-1)
                       }}
                       onKeyDown={handleExcludeKeyDown}
+                      hideShortcut
                     />
                     {debouncedExcludeSearch && (
-                      <div className="border rounded-lg max-h-36 overflow-auto p-2 space-y-1 bg-card">
+                      <div className="rounded-3xl max-h-36 overflow-auto p-1.5 bg-popover/70 backdrop-blur-2xl backdrop-saturate-150 shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10">
                         {excludeResults.length === 0 ? (
                           <p className="text-sm text-muted-foreground text-center py-3">No matching members found</p>
                         ) : (
@@ -778,10 +767,8 @@ export function MessageComposePage() {
                               ref={i === excludeHighlight ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
                               type="button"
                               className={cn(
-                                'flex items-center gap-2 w-full px-2 py-1 rounded cursor-pointer text-sm text-left',
-                                i === excludeHighlight
-                                  ? 'bg-accent text-accent-foreground'
-                                  : 'hover:bg-accent hover:text-accent-foreground',
+                                'flex items-center gap-2.5 w-full px-3 py-2 rounded-2xl cursor-pointer text-sm font-medium text-left',
+                                i === excludeHighlight ? 'bg-foreground/10' : 'hover:bg-foreground/10',
                               )}
                               onClick={() => {
                                 toggleExclude(m.id)
@@ -791,7 +778,7 @@ export function MessageComposePage() {
                               }}
                             >
                               <span>{formatFullName(m, '') || <em className="opacity-50">Unnamed</em>}</span>
-                              <span className="opacity-60 ml-auto">{m.phoneDisplay}</span>
+                              <span className="text-muted-foreground ml-auto">{m.phoneDisplay}</span>
                             </button>
                           ))
                         )}
@@ -822,15 +809,8 @@ export function MessageComposePage() {
           {/* === MESSAGE Section === */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <MessageSquare className="h-4 w-4" />
-                </div>
-                <div>
-                  <div>Message</div>
-                  <p className="text-sm text-muted-foreground font-normal">Compose your message content.</p>
-                </div>
-              </CardTitle>
+              <CardTitle>Message</CardTitle>
+              <p className="text-sm text-muted-foreground">Compose your message content.</p>
             </CardHeader>
             <CardContent>
               {/* Template selector */}
@@ -926,18 +906,18 @@ export function MessageComposePage() {
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Popover>
                                   <PopoverTrigger asChild>
-                                    <Button
-                                      variant="outline"
+                                    <button
+                                      type="button"
                                       className={cn(
-                                        'w-full justify-start text-left font-normal',
+                                        'flex w-full items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer',
                                         !dateValues[v.name] && 'text-muted-foreground',
                                       )}
                                     >
-                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                                       {dateValues[v.name]
                                         ? format(dateValues[v.name]!, dateFormats[v.name] || 'MMMM d, yyyy')
                                         : 'Pick a date'}
-                                    </Button>
+                                    </button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-auto p-0" align="start">
                                     <Calendar
@@ -950,15 +930,21 @@ export function MessageComposePage() {
                                     />
                                   </PopoverContent>
                                 </Popover>
-                                <SearchableSelect
+                                <Select
                                   value={dateFormats[v.name] || 'MMMM d, yyyy'}
                                   onValueChange={(fmt) => setDateFormats((prev) => ({...prev, [v.name]: fmt}))}
-                                  options={getDateFormatOptions(dateValues[v.name] || new Date()).map((opt) => ({
-                                    value: opt.format,
-                                    label: opt.label,
-                                  }))}
-                                  className="w-full"
-                                />
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {getDateFormatOptions(dateValues[v.name] || new Date()).map((opt) => (
+                                      <SelectItem key={opt.format} value={opt.format}>
+                                        {opt.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                             )}
                           </div>
@@ -991,15 +977,8 @@ export function MessageComposePage() {
           {/* === SEND TIME Section === */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Clock className="h-4 w-4" />
-                </div>
-                <div>
-                  <div>Send Time</div>
-                  <p className="text-sm text-muted-foreground font-normal">When do you want to send your message?</p>
-                </div>
-              </CardTitle>
+              <CardTitle>Send Time</CardTitle>
+              <p className="text-sm text-muted-foreground">When do you want to send your message?</p>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3 mb-4">
@@ -1053,51 +1032,44 @@ export function MessageComposePage() {
           </Card>
 
           {/* === BATCH SETTINGS Section === */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Mail className="h-4 w-4" />
+          {settings?.sendMethod !== 'ui' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Batch Settings</CardTitle>
+                <p className="text-sm text-muted-foreground">Configure how messages are sent in batches.</p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Batch Size</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={batchSize}
+                      onChange={(e) => setBatchSize(Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Delay Between Batches (ms)</Label>
+                    <Input
+                      type="number"
+                      min={1000}
+                      step={1000}
+                      value={batchDelayMs}
+                      onChange={(e) => setBatchDelayMs(Number(e.target.value))}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <div>Batch Settings</div>
-                  <p className="text-sm text-muted-foreground font-normal">
-                    Configure how messages are sent in batches.
-                  </p>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Batch Size</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={batchSize}
-                    onChange={(e) => setBatchSize(Number(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <Label>Delay Between Batches (ms)</Label>
-                  <Input
-                    type="number"
-                    min={1000}
-                    step={1000}
-                    value={batchDelayMs}
-                    onChange={(e) => setBatchDelayMs(Number(e.target.value))}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Bottom actions */}
           <div className="py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="space-y-1">
               <p className="text-sm font-medium">
-                Sending to <Badge variant="secondary">{recipients.length}</Badge> of{' '}
-                <Badge variant="outline">{allRecipientIds.length}</Badge> people
+                Sending to <Badge variant="default">{recipients.length}</Badge> of{' '}
+                <Badge variant="default">{allRecipientIds.length}</Badge> people
               </p>
               {excludeIds.size > 0 && <p className="text-sm text-muted-foreground">{excludeIds.size} excluded</p>}
             </div>
@@ -1322,10 +1294,10 @@ function VariableDropdown({
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <div className="border rounded-lg bg-card">
+    <div className="rounded-3xl bg-input/50 ring-1 ring-foreground/5 dark:ring-foreground/10 overflow-hidden">
       <button
         type="button"
-        className={`flex items-center gap-2 w-full px-3 py-2 text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer rounded-t-md ${!open ? 'rounded-b-md' : ''}`}
+        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors cursor-pointer"
         onClick={() => setOpen(!open)}
       >
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -1336,7 +1308,7 @@ function VariableDropdown({
           </Badge>
         )}
       </button>
-      {open && <div className="px-3 pb-3">{children}</div>}
+      {open && <div className="mx-2 mt-2 mb-2 rounded-2xl bg-card p-3">{children}</div>}
     </div>
   )
 }

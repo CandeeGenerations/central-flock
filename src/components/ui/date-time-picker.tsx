@@ -1,6 +1,6 @@
-import {Button} from '@/components/ui/button'
 import {Calendar} from '@/components/ui/calendar'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {cn} from '@/lib/utils'
 import {CalendarIcon, X} from 'lucide-react'
 import {useState} from 'react'
@@ -31,17 +31,17 @@ export function DatePicker({value, onChange, placeholder = 'Pick a date...'}: Da
     <Popover open={open} onOpenChange={setOpen}>
       <div className="relative">
         <PopoverTrigger asChild>
-          <Button
-            variant="outline"
+          <button
+            type="button"
             className={cn(
-              'w-full justify-start text-left font-normal',
+              'flex w-full items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer',
               !value && 'text-muted-foreground',
               value && 'pr-8',
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
             {displayValue || placeholder}
-          </Button>
+          </button>
         </PopoverTrigger>
         {value && (
           <button
@@ -124,17 +124,17 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
     <Popover open={open} onOpenChange={setOpen}>
       <div className="relative">
         <PopoverTrigger asChild>
-          <Button
-            variant="outline"
+          <button
+            type="button"
             className={cn(
-              'w-full justify-start text-left font-normal',
+              'flex w-full items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer',
               !value && 'text-muted-foreground',
               value && 'pr-8',
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
             {displayValue || placeholder}
-          </Button>
+          </button>
         </PopoverTrigger>
         {value && (
           <button
@@ -158,32 +158,81 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
           disabled={{before: new Date()}}
           initialFocus
         />
-        <div className="border-t px-4 py-3 flex items-center gap-2">
-          <span className="text-sm text-muted-foreground shrink-0">Time:</span>
-          <select
-            value={hours}
-            onChange={(e) => handleTimeChange(e.target.value, minutes)}
-            className="flex-1 h-9 rounded-lg border border-input bg-background px-2 text-sm cursor-pointer"
-          >
-            {hourOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={minutes}
-            onChange={(e) => handleTimeChange(hours, e.target.value)}
-            className="flex-1 h-9 rounded-lg border border-input bg-background px-2 text-sm cursor-pointer"
-          >
-            {minuteOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <TimeSelectors date={date} hours={hours} minutes={minutes} onTimeChange={handleTimeChange} />
       </PopoverContent>
     </Popover>
+  )
+}
+
+function TimeSelectors({
+  date,
+  hours,
+  minutes,
+  onTimeChange,
+}: {
+  date: Date | undefined
+  hours: string
+  minutes: string
+  onTimeChange: (h: string, m: string) => void
+}) {
+  const now = new Date()
+  const isToday =
+    date &&
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+
+  const currentHour = now.getHours()
+  const currentMinute = now.getMinutes()
+
+  const filteredHours = isToday ? hourOptions.filter((o) => Number(o.value) >= currentHour) : hourOptions
+  const filteredMinutes =
+    isToday && Number(hours) === currentHour
+      ? minuteOptions.filter((o) => Number(o.value) > currentMinute)
+      : minuteOptions
+
+  // Auto-select first available option if current selection is filtered out
+  const hourInList = filteredHours.some((o) => o.value === hours)
+  const minuteInList = filteredMinutes.some((o) => o.value === minutes)
+
+  if (!hourInList && filteredHours.length > 0) {
+    const firstHour = filteredHours[0].value
+    const newMinutes =
+      Number(firstHour) === currentHour && isToday
+        ? (minuteOptions.find((o) => Number(o.value) > currentMinute)?.value ?? '00')
+        : minutes
+    onTimeChange(firstHour, newMinutes)
+  } else if (!minuteInList && filteredMinutes.length > 0) {
+    onTimeChange(hours, filteredMinutes[0].value)
+  }
+
+  return (
+    <div className="border-t px-4 py-3 flex items-center gap-2">
+      <span className="text-sm text-muted-foreground shrink-0">Time:</span>
+      <Select value={hours} onValueChange={(v) => onTimeChange(v, minutes)}>
+        <SelectTrigger className="flex-1">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {filteredHours.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={minutes} onValueChange={(v) => onTimeChange(hours, v)}>
+        <SelectTrigger className="flex-1">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {filteredMinutes.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   )
 }

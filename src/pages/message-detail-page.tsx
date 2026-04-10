@@ -2,6 +2,7 @@ import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {Pagination} from '@/components/ui/pagination'
 import {Progress} from '@/components/ui/progress'
 import {SearchInput} from '@/components/ui/search-input'
 import {InlineSpinner} from '@/components/ui/spinner'
@@ -13,17 +14,7 @@ import {formatDateTime} from '@/lib/date'
 import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {
-  AlertCircle,
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  ExternalLink,
-  Pencil,
-  Play,
-  XCircle,
-} from 'lucide-react'
+import {AlertCircle, ArrowLeft, Copy, ExternalLink, Pencil, Play, XCircle} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -76,90 +67,73 @@ function RecipientsCard({
   }, [recipients, debouncedSearch])
 
   return (
-    <Card>
-      <CardHeader>
+    <Card size="sm">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <CardTitle>Recipients</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
         <SearchInput
           placeholder="Search recipients..."
           value={search}
           onChange={onSearchChange}
-          containerClassName="sm:max-w-sm"
+          containerClassName="w-48"
         />
-        <div className="border rounded-lg bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead></TableHead>
+      </CardHeader>
+      <div className="overflow-x-auto border-t">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.slice((page - 1) * pageSize, page * pageSize).map((r) => (
+              <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedRecipient(r)}>
+                <TableCell className="font-medium">{formatFullName(r)}</TableCell>
+                <TableCell className="text-muted-foreground">{r.phoneDisplay}</TableCell>
+                <TableCell>
+                  <Badge variant={recipientStatusColors[r.status] || 'outline'}>{r.status}</Badge>
+                </TableCell>
+                <TableCell>
+                  {r.errorMessage && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 h-7 px-2"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onErrorClick({
+                          name: formatFullName(r),
+                          error: r.errorMessage!,
+                        })
+                      }}
+                    >
+                      <AlertCircle className="h-4 w-4 mr-1" />
+                      Error
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.slice((page - 1) * pageSize, page * pageSize).map((r) => (
-                <TableRow
-                  key={r.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => setSelectedRecipient(r)}
-                >
-                  <TableCell className="font-medium">{formatFullName(r)}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.phoneDisplay}</TableCell>
-                  <TableCell>
-                    <Badge variant={recipientStatusColors[r.status] || 'outline'}>{r.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    {r.errorMessage && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 h-7 px-2"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onErrorClick({
-                            name: formatFullName(r),
-                            error: r.errorMessage!,
-                          })
-                        }}
-                      >
-                        <AlertCircle className="h-4 w-4 mr-1" />
-                        Error
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
-                    {recipients.length === 0 ? 'No recipients' : 'No recipients match your search.'}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        {filtered.length > pageSize && (
-          <div className="flex items-center justify-between pt-4">
-            <span className="text-sm text-muted-foreground">
-              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} of {filtered.length}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange((p) => p - 1)}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page * pageSize >= filtered.length}
-                onClick={() => onPageChange((p) => p + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+            ))}
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                  {recipients.length === 0 ? 'No recipients' : 'No recipients match your search.'}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <CardContent>
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={filtered.length}
+          onPageChange={(p) => onPageChange(() => p)}
+          noun="recipients"
+        />
       </CardContent>
 
       <Dialog open={!!selectedRecipient} onOpenChange={(open) => !open && setSelectedRecipient(null)}>

@@ -5,10 +5,11 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
-import {SearchableSelect} from '@/components/ui/searchable-select'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useQuery} from '@tanstack/react-query'
-import {AlertTriangle, Camera, Check, CircleX, FileText, Loader2, Save, Trash2, Upload, ZoomIn} from 'lucide-react'
+import {AlertTriangle, Camera, Check, CircleX, Loader2, Save, Trash2, Upload, ZoomIn} from 'lucide-react'
 import {useRef, useState} from 'react'
 import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -78,22 +79,43 @@ function RowStatusIcon({row}: {row: RowState}) {
   const match = isVerseMatch(row)
   if (match === false) {
     return (
-      <span title="Verse mismatch">
-        <CircleX className="h-4 w-4 text-red-500" />
-      </span>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <CircleX className="h-4 w-4 text-red-500" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Verse mismatch</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     )
   }
   if (!row.devotion.bibleReference) {
     return (
-      <span title="Missing verse">
-        <AlertTriangle className="h-4 w-4 text-amber-500" />
-      </span>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Missing verse</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     )
   }
   return (
-    <span title="OK">
-      <Check className="h-4 w-4 text-green-500" />
-    </span>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
+            <Check className="h-4 w-4 text-green-500" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>OK</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -429,38 +451,42 @@ export function DevotionScanPage() {
 
       {/* Saved Drafts */}
       {drafts && drafts.length > 0 && (
-        <Card>
+        <Card size="sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Saved Drafts
-            </CardTitle>
+            <CardTitle>Saved Drafts</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {drafts.map((d) => (
-                <div key={d.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <button
-                    className="text-sm font-medium text-primary hover:underline cursor-pointer text-left"
-                    onClick={() => loadDraft(d.id)}
-                  >
-                    {d.month} {d.year} ({d.count} devotions)
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
+          <div className="overflow-x-auto border-t">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Devotions</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {drafts.map((d) => (
+                  <TableRow key={d.id} className="cursor-pointer hover:bg-muted/50" onClick={() => loadDraft(d.id)}>
+                    <TableCell className="font-medium">
+                      {d.month} {d.year}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{d.count}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {new Date(d.createdAt + 'Z').toLocaleDateString()}
-                    </span>
-                    <button
-                      className="p-1 rounded hover:bg-destructive/10 cursor-pointer"
-                      onClick={() => handleDeleteDraft(d.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteDraft(d.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       )}
 
@@ -504,7 +530,7 @@ export function DevotionScanPage() {
             {imagePreview ? (
               <div className="space-y-4">
                 <div
-                  className="border rounded-md overflow-hidden max-w-xl mx-auto cursor-pointer relative group"
+                  className="border rounded-lg overflow-hidden max-w-xl mx-auto cursor-pointer relative group"
                   onClick={() => setLightboxOpen(true)}
                 >
                   <img src={imagePreview} alt="Uploaded sheet" className="w-full" />
@@ -572,32 +598,31 @@ export function DevotionScanPage() {
               {enriching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="border rounded-md overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8" />
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={selectedCount === rows.length}
-                        onCheckedChange={(checked) => toggleAll(!!checked)}
-                      />
-                    </TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>#</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead>Song</TableHead>
-                    <TableHead>Chain</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row, i) => (
-                    <TableRow
-                      key={i}
-                      className={`
+          <div className="overflow-x-auto border-t">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-8" />
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={selectedCount === rows.length}
+                      onCheckedChange={(checked) => toggleAll(!!checked)}
+                    />
+                  </TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>#</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead>Song</TableHead>
+                  <TableHead>Chain</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row, i) => (
+                  <TableRow
+                    key={i}
+                    className={`
                         row.existing && !row.selected
                           ? 'opacity-50'
                           : isVerseMatch(row) === false
@@ -606,143 +631,151 @@ export function DevotionScanPage() {
                               ? 'bg-amber-50 dark:bg-amber-950/20'
                               : ''
                       }`}
-                    >
-                      <TableCell className="px-2">
-                        <RowStatusIcon row={row} />
-                      </TableCell>
-                      <TableCell>
-                        <Checkbox checked={row.selected} onCheckedChange={() => toggleRow(i)} />
-                      </TableCell>
-                      <TableCell className="!align-top">
-                        <DatePicker value={row.devotion.date} onChange={(v) => updateRow(i, {date: v})} />
-                      </TableCell>
-                      <TableCell className="!align-top">
-                        <div className="space-y-1">
-                          <Input
-                            type="number"
-                            value={row.devotion.number}
-                            onChange={(e) => updateRow(i, {number: Number(e.target.value)})}
-                            className="w-30 h-8 text-xs"
-                          />
-                          {row.existing && <p className="text-[10px] text-amber-600">Duplicate #</p>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="!align-top">
-                        <SearchableSelect
-                          value={
-                            row.devotion.devotionType === 'guest'
-                              ? `guest-${row.devotion.guestSpeaker || ''}`
-                              : row.devotion.devotionType
-                          }
-                          onValueChange={(v) => {
-                            if (v.startsWith('guest-')) {
-                              updateRow(i, {devotionType: 'guest', guestSpeaker: v.replace('guest-', '')})
-                            } else {
-                              updateRow(i, {devotionType: v as ParsedDevotion['devotionType'], guestSpeaker: null})
-                            }
-                          }}
-                          options={[
-                            {value: 'original', label: 'Original'},
-                            {value: 'favorite', label: 'Favorite'},
-                            {value: 'revisit', label: 'Revisit'},
-                            {value: 'guest-Tyler', label: 'Guest - Tyler'},
-                            {value: 'guest-Gabe', label: 'Guest - Gabe'},
-                            {value: 'guest-Ed', label: 'Guest - Ed'},
-                          ]}
-                          className="w-36"
-                          searchable={false}
-                        />
-                      </TableCell>
-                      <TableCell className="!align-top">
-                        <div className="space-y-1">
-                          <Input
-                            value={row.devotion.bibleReference || ''}
-                            onChange={(e) => updateRow(i, {bibleReference: e.target.value || null})}
-                            className={`w-44 h-8 text-xs ${isVerseMatch(row) === false ? 'border-red-400' : !row.devotion.bibleReference ? 'border-amber-400' : ''}`}
-                            placeholder="e.g. John 3:16"
-                          />
-                          {isVerseMatch(row) === false && row.enrichment?.originalReference && (
-                            <p className="text-[10px] text-red-600">
-                              Original #{row.enrichment.originalNumber}: {row.enrichment.originalReference}{' '}
-                              <button
-                                className="underline hover:text-red-800 cursor-pointer"
-                                onClick={() => updateRow(i, {bibleReference: row.enrichment!.originalReference})}
-                              >
-                                Use this
-                              </button>
-                            </p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="!align-top">
+                  >
+                    <TableCell className="px-2">
+                      <RowStatusIcon row={row} />
+                    </TableCell>
+                    <TableCell>
+                      <Checkbox checked={row.selected} onCheckedChange={() => toggleRow(i)} />
+                    </TableCell>
+                    <TableCell className="!align-top">
+                      <DatePicker value={row.devotion.date} onChange={(v) => updateRow(i, {date: v})} />
+                    </TableCell>
+                    <TableCell className="!align-top">
+                      <div className="space-y-1">
                         <Input
-                          value={row.devotion.songName || ''}
-                          onChange={(e) => updateRow(i, {songName: e.target.value || null})}
-                          className="w-40 h-8 text-xs"
-                          placeholder="Song name"
+                          type="number"
+                          value={row.devotion.number}
+                          onChange={(e) => updateRow(i, {number: Number(e.target.value)})}
+                          className="w-30 h-8 text-xs"
                         />
-                      </TableCell>
-                      <TableCell>
-                        {row.devotion.devotionType === 'revisit' ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs">
-                              {row.devotion.referencedDevotions.map((n, j) => (
-                                <span key={n}>
-                                  {j > 0 && <span className="text-muted-foreground"> → </span>}
-                                  <button
-                                    className="text-primary hover:underline cursor-pointer"
-                                    onClick={() => showDevoDetail(n)}
-                                  >
-                                    #{n}
-                                  </button>
-                                </span>
-                              ))}
-                              {row.devotion.referencedDevotions.length === 0 && (
-                                <span className="text-muted-foreground">none</span>
-                              )}
-                            </span>
+                        {row.existing && <p className="text-[10px] text-amber-600">Duplicate #</p>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="!align-top">
+                      <Select
+                        value={
+                          row.devotion.devotionType === 'guest'
+                            ? `guest-${row.devotion.guestSpeaker || ''}`
+                            : row.devotion.devotionType
+                        }
+                        onValueChange={(v) => {
+                          if (v.startsWith('guest-')) {
+                            updateRow(i, {devotionType: 'guest', guestSpeaker: v.replace('guest-', '')})
+                          } else {
+                            updateRow(i, {devotionType: v as ParsedDevotion['devotionType'], guestSpeaker: null})
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="original">Original</SelectItem>
+                          <SelectItem value="favorite">Favorite</SelectItem>
+                          <SelectItem value="revisit">Revisit</SelectItem>
+                          <SelectItem value="guest-Tyler">Guest - Tyler</SelectItem>
+                          <SelectItem value="guest-Gabe">Guest - Gabe</SelectItem>
+                          <SelectItem value="guest-Ed">Guest - Ed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="!align-top">
+                      <div className="space-y-1">
+                        <Input
+                          value={row.devotion.bibleReference || ''}
+                          onChange={(e) => updateRow(i, {bibleReference: e.target.value || null})}
+                          className={`w-44 h-8 text-xs ${isVerseMatch(row) === false ? 'border-red-400' : !row.devotion.bibleReference ? 'border-amber-400' : ''}`}
+                          placeholder="e.g. John 3:16"
+                        />
+                        {isVerseMatch(row) === false && row.enrichment?.originalReference && (
+                          <p className="text-[10px] text-red-600">
+                            Original #{row.enrichment.originalNumber}: {row.enrichment.originalReference}{' '}
                             <button
-                              className="p-0.5 rounded hover:bg-muted cursor-pointer shrink-0"
-                              onClick={() => {
-                                setEditChainRow(i)
-                                setEditChainValue(String(row.devotion.referencedDevotions[0] || ''))
-                              }}
-                              title="Edit reference number"
+                              className="underline hover:text-red-800 cursor-pointer"
+                              onClick={() => updateRow(i, {bibleReference: row.enrichment!.originalReference})}
                             >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="text-muted-foreground"
-                              >
-                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                              </svg>
+                              Use this
                             </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">&mdash;</span>
+                          </p>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <button
-                          className="p-1 rounded hover:bg-destructive/10 cursor-pointer"
-                          onClick={() => removeRow(i)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                        </button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
+                      </div>
+                    </TableCell>
+                    <TableCell className="!align-top">
+                      <Input
+                        value={row.devotion.songName || ''}
+                        onChange={(e) => updateRow(i, {songName: e.target.value || null})}
+                        className="w-40 h-8 text-xs"
+                        placeholder="Song name"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {row.devotion.devotionType === 'revisit' ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs">
+                            {row.devotion.referencedDevotions.map((n, j) => (
+                              <span key={n}>
+                                {j > 0 && <span className="text-muted-foreground"> → </span>}
+                                <button
+                                  className="text-primary hover:underline cursor-pointer"
+                                  onClick={() => showDevoDetail(n)}
+                                >
+                                  #{n}
+                                </button>
+                              </span>
+                            ))}
+                            {row.devotion.referencedDevotions.length === 0 && (
+                              <span className="text-muted-foreground">none</span>
+                            )}
+                          </span>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className="p-0.5 rounded hover:bg-muted cursor-pointer shrink-0"
+                                  onClick={() => {
+                                    setEditChainRow(i)
+                                    setEditChainValue(String(row.devotion.referencedDevotions[0] || ''))
+                                  }}
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="text-muted-foreground"
+                                  >
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                  </svg>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit reference number</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">&mdash;</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <button
+                        className="p-1 rounded hover:bg-destructive/10 cursor-pointer"
+                        onClick={() => removeRow(i)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <CardContent className="space-y-4">
             {/* Summary */}
             <div className="flex flex-wrap gap-2 text-sm">
               {(['original', 'favorite', 'guest', 'revisit'] as const).map((type) => {
@@ -774,9 +807,8 @@ export function DevotionScanPage() {
             {/* Actions */}
             <div className="flex items-center justify-end gap-2">
               <Button
-                variant="ghost"
+                variant="destructive"
                 size="sm"
-                className="hover:bg-destructive/10 hover:text-destructive"
                 onClick={() => {
                   setResultMeta(null)
                   setRows([])

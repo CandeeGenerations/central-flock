@@ -10,6 +10,7 @@ import {SearchableSelect} from '@/components/ui/searchable-select'
 import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Textarea} from '@/components/ui/textarea'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {
   type Person,
   addGroupMembers,
@@ -164,16 +165,23 @@ export function PersonDetailPage() {
             </Button>
             {person.phoneNumber ? (
               <Link to={`/messages/compose?recipientId=${person.id}`}>
-                <Button variant="outline" size="sm">
+                <Button size="sm">
                   <MessageSquare className="h-4 w-4 mr-1" />
                   Send Message
                 </Button>
               </Link>
             ) : (
-              <Button variant="outline" size="sm" disabled title="No phone number">
-                <MessageSquare className="h-4 w-4 mr-1" />
-                Send Message
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" disabled>
+                      <MessageSquare className="h-4 w-4 mr-1" />
+                      Send Message
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>No phone number</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         </CardHeader>
@@ -434,7 +442,7 @@ export function PersonDetailPage() {
           <CardTitle>Groups</CardTitle>
           <div className="flex flex-wrap gap-2">
             {person.groups && person.groups.length > 0 && (
-              <Button variant="outline" size="sm" onClick={() => setRemoveAllConfirmOpen(true)}>
+              <Button variant="destructive" size="sm" onClick={() => setRemoveAllConfirmOpen(true)}>
                 <UserMinus className="h-4 w-4 mr-1" />
                 Remove All
               </Button>
@@ -451,43 +459,43 @@ export function PersonDetailPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          {person.groups && person.groups.length > 0 ? (
-            <div className="border rounded-md bg-card overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="w-16">Actions</TableHead>
+        {person.groups && person.groups.length > 0 ? (
+          <div className="overflow-x-auto border-t">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="w-16">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {person.groups.map((g) => (
+                  <TableRow
+                    key={g.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/groups/${g.id}`)}
+                  >
+                    <TableCell className="font-medium">{g.name}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeGroupMutation.mutate(g.id)}
+                        title={`Remove from ${g.name}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {person.groups.map((g) => (
-                    <TableRow
-                      key={g.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/groups/${g.id}`)}
-                    >
-                      <TableCell className="font-medium">{g.name}</TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeGroupMutation.mutate(g.id)}
-                          title={`Remove from ${g.name}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <CardContent>
             <p className="text-muted-foreground text-sm">Not a member of any groups</p>
-          )}
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
 
       {/* Add to Group Dialog */}

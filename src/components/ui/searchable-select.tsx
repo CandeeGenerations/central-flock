@@ -80,7 +80,7 @@ export function SearchableSelect({
           ref={triggerRef}
           type="button"
           className={cn(
-            "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50 flex w-fit items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 h-9 cursor-pointer",
+            'flex w-fit items-center justify-between gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 h-9 cursor-pointer data-[placeholder]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0',
             className,
           )}
           data-placeholder={!selectedLabel ? '' : undefined}
@@ -88,27 +88,27 @@ export function SearchableSelect({
           <span className={cn('line-clamp-1', !selectedLabel && 'text-muted-foreground')}>
             {selectedLabel || placeholder || 'Select...'}
           </span>
-          <ChevronDownIcon className="size-4 opacity-50 shrink-0" />
+          <ChevronDownIcon className="pointer-events-none size-4 text-muted-foreground shrink-0" />
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-(--radix-popover-trigger-width) p-0"
+        className="w-(--radix-popover-trigger-width) gap-0 p-0 bg-popover/70 backdrop-blur-2xl backdrop-saturate-150"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {searchable && (
-          <div className="p-2">
+          <div className="px-2 pt-2 pb-1">
             <input
               ref={inputRef}
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Search..."
-              className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground"
+              className="flex h-8 w-full rounded-2xl border border-input bg-transparent px-3 py-1 text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
         )}
-        <div ref={listRef} className="max-h-60 overflow-auto p-1">
+        <div ref={listRef} className="max-h-60 overflow-auto p-1.5">
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">No results</p>
           ) : (
@@ -118,10 +118,8 @@ export function SearchableSelect({
                 type="button"
                 ref={i === highlightIndex ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
                 className={cn(
-                  'relative flex w-full items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none cursor-pointer',
-                  i === highlightIndex
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent hover:text-accent-foreground',
+                  'relative flex w-full items-center gap-2.5 rounded-2xl py-2 pr-8 pl-3 text-sm font-medium outline-hidden select-none cursor-pointer',
+                  i === highlightIndex ? 'bg-foreground/10' : 'hover:bg-foreground/10',
                 )}
                 onClick={() => select(option.value)}
               >

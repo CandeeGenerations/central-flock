@@ -157,7 +157,7 @@ export function ImportPage() {
             </CardContent>
           </Card>
 
-          <div className="border rounded-md overflow-auto max-h-96">
+          <div className="border rounded-lg overflow-auto max-h-96">
             <Table>
               <TableHeader>
                 <TableRow>

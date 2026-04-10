@@ -8,6 +8,7 @@ interface SearchInputProps extends Omit<React.ComponentProps<'input'>, 'onChange
   onClear?: () => void
   containerClassName?: string
   ref?: React.Ref<HTMLInputElement>
+  hideShortcut?: boolean
 }
 
 export function SearchInput({
@@ -17,6 +18,7 @@ export function SearchInput({
   className,
   containerClassName,
   ref,
+  hideShortcut,
   ...props
 }: SearchInputProps) {
   return (
@@ -40,11 +42,11 @@ export function SearchInput({
         >
           <X className="h-5 w-5 md:h-4 md:w-4" />
         </button>
-      ) : (
+      ) : !hideShortcut ? (
         <kbd className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden md:inline-flex items-center rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono font-medium text-muted-foreground">
           {typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl+'}K
         </kbd>
-      )}
+      ) : null}
     </div>
   )
 }

@@ -17,7 +17,7 @@ importers:
     dependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.82.0
-        version: 0.82.0(zod@4.3.6)
+        version: 0.82.0(zod@3.25.76)
       '@fontsource-variable/raleway':
         specifier: ^5.2.8
         version: 5.2.8
@@ -4725,11 +4725,11 @@ packages:
 
 snapshots:
 
-  '@anthropic-ai/sdk@0.82.0(zod@4.3.6)':
+  '@anthropic-ai/sdk@0.82.0(zod@3.25.76)':
     dependencies:
       json-schema-to-ts: 3.1.1
     optionalDependencies:
-      zod: 4.3.6
+      zod: 3.25.76
 
   '@babel/code-frame@7.29.0':
     dependencies:

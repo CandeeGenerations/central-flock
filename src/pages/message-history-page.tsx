@@ -1,7 +1,9 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
+import {Card, CardContent} from '@/components/ui/card'
 import {Checkbox} from '@/components/ui/checkbox'
+import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
@@ -101,6 +103,11 @@ export function MessageHistoryPage() {
     setSearchParams(tab === 'sent' ? {} : {tab}, {replace: true})
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 250)
+  const pageSize = 25
+  const [sentPage, setSentPage] = useState(1)
+  const [scheduledPage, setScheduledPage] = useState(1)
+  const [draftsPage, setDraftsPage] = useState(1)
+  const [upcomingPage, setUpcomingPage] = useState(1)
 
   // Sent messages state
   const {
@@ -361,429 +368,519 @@ export function MessageHistoryPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <SearchInput
-        placeholder={activeTab === 'drafts' ? 'Search drafts...' : 'Search messages...'}
-        value={search}
-        onChange={setSearch}
-        containerClassName="sm:max-w-sm"
-      />
+      {/* Search & Tabs */}
+      <Card size="sm">
+        <CardContent>
+          <SearchInput
+            placeholder={activeTab === 'drafts' ? 'Search drafts...' : 'Search messages...'}
+            value={search}
+            onChange={(v) => {
+              setSearch(v)
+              setSentPage(1)
+              setScheduledPage(1)
+              setDraftsPage(1)
+              setUpcomingPage(1)
+            }}
+            containerClassName="sm:max-w-sm"
+          />
+        </CardContent>
 
-      {/* Tab toggle */}
-      <div className="flex gap-1 border-b">
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-            activeTab === 'sent'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => setActiveTab('sent')}
-        >
-          Sent Messages
-          {sentMessages && sentMessages.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {sentMessages.length}
-            </Badge>
-          )}
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-            activeTab === 'scheduled'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => setActiveTab('scheduled')}
-        >
-          Scheduled
-          {scheduledMessages && scheduledMessages.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {scheduledMessages.length}
-            </Badge>
-          )}
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-            activeTab === 'drafts'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => setActiveTab('drafts')}
-        >
-          Drafts
-          {drafts && drafts.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {drafts.length}
-            </Badge>
-          )}
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-            activeTab === 'upcoming'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => setActiveTab('upcoming')}
-        >
-          Upcoming
-          {sortedUpcomingEvents.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {sortedUpcomingEvents.length}
-            </Badge>
-          )}
-        </button>
-      </div>
+        {/* Tab toggle */}
+        <div className="flex border-b">
+          <button
+            className={`flex-1 px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === 'sent'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('sent')}
+          >
+            Sent
+            {sentMessages && sentMessages.length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {sentMessages.length}
+              </Badge>
+            )}
+          </button>
+          <button
+            className={`flex-1 px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === 'scheduled'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('scheduled')}
+          >
+            Scheduled
+            {scheduledMessages && scheduledMessages.length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {scheduledMessages.length}
+              </Badge>
+            )}
+          </button>
+          <button
+            className={`flex-1 px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === 'drafts'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('drafts')}
+          >
+            Drafts
+            {drafts && drafts.length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {drafts.length}
+              </Badge>
+            )}
+          </button>
+          <button
+            className={`flex-1 px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === 'upcoming'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('upcoming')}
+          >
+            Upcoming
+            {sortedUpcomingEvents.length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {sortedUpcomingEvents.length}
+              </Badge>
+            )}
+          </button>
+        </div>
 
-      {/* Sent Messages Tab */}
-      {activeTab === 'sent' && (
-        <>
-          {messagesLoading ? (
-            <PageSpinner />
-          ) : (
-            <div className="border rounded-md overflow-x-auto bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={sentMessages && sentMessages.length > 0 && selectedIds.size === sentMessages.length}
-                        onCheckedChange={toggleAll}
-                      />
-                    </TableHead>
-                    <TableHead>Date Sent</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead>Recipients</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Recipients</TableHead>
-                    <TableHead className="w-16">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sentMessages?.map((msg) => (
-                    <TableRow
-                      key={msg.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/messages/${msg.id}`)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={selectedIds.has(msg.id)} onCheckedChange={() => toggleSelect(msg.id)} />
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {formatDateTime(msg.completedAt || msg.createdAt)}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="truncate block">
-                                {(msg.renderedPreview || msg.content).substring(0, 80)}
-                                {(msg.renderedPreview || msg.content).length > 80 ? '...' : ''}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
-                              {msg.renderedPreview || msg.content}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-green-600">{msg.sentCount}</span>
-                        {msg.failedCount > 0 && <span className="text-red-500 ml-1">/ {msg.failedCount} failed</span>}
-                        <span className="text-muted-foreground"> of {msg.totalRecipients}</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusColors[msg.status] || 'outline'}>{msg.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        <MessageRecipientsCell msg={msg} />
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Duplicate as draft"
-                          onClick={() => duplicateMessageMutation.mutate(msg.id)}
+        {/* Sent Messages Tab */}
+        {activeTab === 'sent' && (
+          <>
+            {messagesLoading ? (
+              <CardContent>
+                <PageSpinner />
+              </CardContent>
+            ) : (
+              <>
+                <div className="overflow-x-auto border-t">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={
+                              sentMessages && sentMessages.length > 0 && selectedIds.size === sentMessages.length
+                            }
+                            onCheckedChange={toggleAll}
+                          />
+                        </TableHead>
+                        <TableHead>Date Sent</TableHead>
+                        <TableHead>Message</TableHead>
+                        <TableHead>Recipients</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Recipients</TableHead>
+                        <TableHead className="w-16">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sentMessages?.slice((sentPage - 1) * pageSize, sentPage * pageSize).map((msg) => (
+                        <TableRow
+                          key={msg.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => navigate(`/messages/${msg.id}`)}
                         >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {sentMessages?.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        No messages sent yet.{' '}
-                        <Link to="/messages/compose" className="underline">
-                          Compose one
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </>
-      )}
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox checked={selectedIds.has(msg.id)} onCheckedChange={() => toggleSelect(msg.id)} />
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {formatDateTime(msg.completedAt || msg.createdAt)}
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="truncate block">
+                                    {(msg.renderedPreview || msg.content).substring(0, 80)}
+                                    {(msg.renderedPreview || msg.content).length > 80 ? '...' : ''}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
+                                  {msg.renderedPreview || msg.content}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-green-600">{msg.sentCount}</span>
+                            {msg.failedCount > 0 && (
+                              <span className="text-red-500 ml-1">/ {msg.failedCount} failed</span>
+                            )}
+                            <span className="text-muted-foreground"> of {msg.totalRecipients}</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={statusColors[msg.status] || 'outline'}>{msg.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            <MessageRecipientsCell msg={msg} />
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => duplicateMessageMutation.mutate(msg.id)}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Duplicate as draft</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {sentMessages?.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No messages sent yet.{' '}
+                            <Link to="/messages/compose" className="underline">
+                              Compose one
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <CardContent>
+                  <Pagination
+                    page={sentPage}
+                    pageSize={pageSize}
+                    total={sentMessages?.length || 0}
+                    onPageChange={setSentPage}
+                    noun="messages"
+                  />
+                </CardContent>
+              </>
+            )}
+          </>
+        )}
 
-      {/* Scheduled Tab */}
-      {activeTab === 'scheduled' && (
-        <>
-          {messagesLoading ? (
-            <PageSpinner />
-          ) : (
-            <div className="border rounded-md overflow-x-auto bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={
-                          scheduledMessages &&
-                          scheduledMessages.length > 0 &&
-                          selectedIds.size === scheduledMessages.length
-                        }
-                        onCheckedChange={toggleAll}
-                      />
-                    </TableHead>
-                    <TableHead>Scheduled For</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead>Recipients</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Recipients</TableHead>
-                    <TableHead className="w-16">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {scheduledMessages?.map((msg) => (
-                    <TableRow
-                      key={msg.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/messages/${msg.id}`)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={selectedIds.has(msg.id)} onCheckedChange={() => toggleSelect(msg.id)} />
-                      </TableCell>
-                      <TableCell className="text-sm whitespace-nowrap">
-                        {msg.status === 'past_due' ? (
-                          <span className="text-destructive">Past Due: {formatDateTime(msg.scheduledAt!)}</span>
-                        ) : (
-                          <span className="text-muted-foreground">{formatDateTime(msg.scheduledAt!)}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="truncate block">
-                                {(msg.renderedPreview || msg.content).substring(0, 80)}
-                                {(msg.renderedPreview || msg.content).length > 80 ? '...' : ''}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
-                              {msg.renderedPreview || msg.content}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-muted-foreground">{msg.totalRecipients}</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusColors[msg.status] || 'outline'}>
-                          {msg.status === 'past_due' ? 'past due' : msg.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        <MessageRecipientsCell msg={msg} />
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Edit scheduled message"
-                            onClick={() => navigate(`/messages/compose?editMessageId=${msg.id}`)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Duplicate as draft"
-                            onClick={() => duplicateMessageMutation.mutate(msg.id)}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {scheduledMessages?.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        No scheduled messages.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </>
-      )}
+        {/* Scheduled Tab */}
+        {activeTab === 'scheduled' && (
+          <>
+            {messagesLoading ? (
+              <CardContent>
+                <PageSpinner />
+              </CardContent>
+            ) : (
+              <>
+                <div className="overflow-x-auto border-t">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={
+                              scheduledMessages &&
+                              scheduledMessages.length > 0 &&
+                              selectedIds.size === scheduledMessages.length
+                            }
+                            onCheckedChange={toggleAll}
+                          />
+                        </TableHead>
+                        <TableHead>Scheduled For</TableHead>
+                        <TableHead>Message</TableHead>
+                        <TableHead>Recipients</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Recipients</TableHead>
+                        <TableHead className="w-16">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {scheduledMessages?.slice((scheduledPage - 1) * pageSize, scheduledPage * pageSize).map((msg) => (
+                        <TableRow
+                          key={msg.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => navigate(`/messages/${msg.id}`)}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox checked={selectedIds.has(msg.id)} onCheckedChange={() => toggleSelect(msg.id)} />
+                          </TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">
+                            {msg.status === 'past_due' ? (
+                              <span className="text-destructive">Past Due: {formatDateTime(msg.scheduledAt!)}</span>
+                            ) : (
+                              <span className="text-muted-foreground">{formatDateTime(msg.scheduledAt!)}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="truncate block">
+                                    {(msg.renderedPreview || msg.content).substring(0, 80)}
+                                    {(msg.renderedPreview || msg.content).length > 80 ? '...' : ''}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
+                                  {msg.renderedPreview || msg.content}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-muted-foreground">{msg.totalRecipients}</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={statusColors[msg.status] || 'outline'}>
+                              {msg.status === 'past_due' ? 'past due' : msg.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            <MessageRecipientsCell msg={msg} />
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-1">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => navigate(`/messages/compose?editMessageId=${msg.id}`)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Edit scheduled message</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => duplicateMessageMutation.mutate(msg.id)}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Duplicate as draft</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {scheduledMessages?.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No scheduled messages.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <CardContent>
+                  <Pagination
+                    page={scheduledPage}
+                    pageSize={pageSize}
+                    total={scheduledMessages?.length || 0}
+                    onPageChange={setScheduledPage}
+                    noun="messages"
+                  />
+                </CardContent>
+              </>
+            )}
+          </>
+        )}
 
-      {/* Drafts Tab */}
-      {activeTab === 'drafts' && (
-        <>
-          {draftsLoading ? (
-            <PageSpinner />
-          ) : (
-            <div className="border rounded-md overflow-x-auto bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={drafts && drafts.length > 0 && selectedDraftIds.size === drafts.length}
-                        onCheckedChange={toggleAllDrafts}
-                      />
-                    </TableHead>
-                    <TableHead>Scheduled</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead>Recipients</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-16">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {drafts?.map((draft) => (
-                    <TableRow
-                      key={draft.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={(e) => {
-                        // Don't navigate when clicking checkbox
-                        if ((e.target as HTMLElement).closest('button')) return
-                        navigate(`/messages/compose?draftId=${draft.id}`)
-                      }}
-                    >
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedDraftIds.has(draft.id)}
-                          onCheckedChange={() => toggleDraftSelect(draft.id)}
-                        />
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {draft.scheduledAt ? formatDateTime(draft.scheduledAt) : '—'}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {draft.content ? (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="truncate block">
-                                  {draft.name || (
-                                    <>
-                                      {(draft.renderedPreview || draft.content).substring(0, 80)}
-                                      {(draft.renderedPreview || draft.content).length > 80 ? '...' : ''}
-                                    </>
-                                  )}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
-                                {draft.renderedPreview || draft.content}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          draft.name || <span className="text-muted-foreground italic">Empty draft</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{getDraftRecipientInfo(draft)}</TableCell>
-                      <TableCell>
-                        <Badge variant={getDraftStatus(draft).variant}>{getDraftStatus(draft).label}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Duplicate draft"
+        {/* Drafts Tab */}
+        {activeTab === 'drafts' && (
+          <>
+            {draftsLoading ? (
+              <CardContent>
+                <PageSpinner />
+              </CardContent>
+            ) : (
+              <>
+                <div className="overflow-x-auto border-t">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={drafts && drafts.length > 0 && selectedDraftIds.size === drafts.length}
+                            onCheckedChange={toggleAllDrafts}
+                          />
+                        </TableHead>
+                        <TableHead>Scheduled</TableHead>
+                        <TableHead>Message</TableHead>
+                        <TableHead>Recipients</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-16">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {drafts?.slice((draftsPage - 1) * pageSize, draftsPage * pageSize).map((draft) => (
+                        <TableRow
+                          key={draft.id}
+                          className="cursor-pointer hover:bg-muted/50"
                           onClick={(e) => {
-                            e.stopPropagation()
-                            duplicateDraftMutation.mutate(draft.id)
+                            // Don't navigate when clicking checkbox
+                            if ((e.target as HTMLElement).closest('button')) return
+                            navigate(`/messages/compose?draftId=${draft.id}`)
                           }}
                         >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {drafts?.length === 0 && (
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedDraftIds.has(draft.id)}
+                              onCheckedChange={() => toggleDraftSelect(draft.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {draft.scheduledAt ? formatDateTime(draft.scheduledAt) : '—'}
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {draft.content ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="truncate block">
+                                      {draft.name || (
+                                        <>
+                                          {(draft.renderedPreview || draft.content).substring(0, 80)}
+                                          {(draft.renderedPreview || draft.content).length > 80 ? '...' : ''}
+                                        </>
+                                      )}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
+                                    {draft.renderedPreview || draft.content}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              draft.name || <span className="text-muted-foreground italic">Empty draft</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{getDraftRecipientInfo(draft)}</TableCell>
+                          <TableCell>
+                            <Badge variant={getDraftStatus(draft).variant}>{getDraftStatus(draft).label}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      duplicateDraftMutation.mutate(draft.id)
+                                    }}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Duplicate draft</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {drafts?.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No drafts saved yet.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <CardContent>
+                  <Pagination
+                    page={draftsPage}
+                    pageSize={pageSize}
+                    total={drafts?.length || 0}
+                    onPageChange={setDraftsPage}
+                    noun="drafts"
+                  />
+                </CardContent>
+              </>
+            )}
+          </>
+        )}
+
+        {/* Upcoming Tab */}
+        {activeTab === 'upcoming' && (
+          <>
+            <div className="overflow-x-auto border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Age / Years</TableHead>
+                    <TableHead>Days Until</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedUpcomingEvents
+                    .slice((upcomingPage - 1) * pageSize, upcomingPage * pageSize)
+                    .map((event, i) => (
+                      <TableRow
+                        key={`${event.person.id}-${event.type}-${i}`}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/people/${event.person.id}`)}
+                      >
+                        <TableCell className="font-medium">{formatFullName(event.person)}</TableCell>
+                        <TableCell>
+                          <Badge variant={event.type === 'birthday' ? 'default' : 'secondary'}>
+                            {event.type === 'birthday' ? 'Birthday' : 'Anniversary'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(2000, event.month - 1).toLocaleString('default', {month: 'long'})} {event.day},{' '}
+                          {event.nextYear}
+                        </TableCell>
+                        <TableCell>{event.age != null ? event.age : '—'}</TableCell>
+                        <TableCell>
+                          {event.daysUntil === 0 ? (
+                            <Badge variant="default">Today!</Badge>
+                          ) : (
+                            <span>
+                              {event.daysUntil} day{event.daysUntil !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  {sortedUpcomingEvents.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        No drafts saved yet.
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No birthdays or anniversaries recorded. Add them on individual people pages.
                       </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
-          )}
-        </>
-      )}
-
-      {/* Upcoming Tab */}
-      {activeTab === 'upcoming' && (
-        <div className="border rounded-md overflow-x-auto bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Age / Years</TableHead>
-                <TableHead>Days Until</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedUpcomingEvents.map((event, i) => (
-                <TableRow
-                  key={`${event.person.id}-${event.type}-${i}`}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/people/${event.person.id}`)}
-                >
-                  <TableCell className="font-medium">{formatFullName(event.person)}</TableCell>
-                  <TableCell>
-                    <Badge variant={event.type === 'birthday' ? 'default' : 'secondary'}>
-                      {event.type === 'birthday' ? 'Birthday' : 'Anniversary'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(2000, event.month - 1).toLocaleString('default', {month: 'long'})} {event.day},{' '}
-                    {event.nextYear}
-                  </TableCell>
-                  <TableCell>{event.age != null ? event.age : '—'}</TableCell>
-                  <TableCell>
-                    {event.daysUntil === 0 ? (
-                      <Badge variant="default">Today!</Badge>
-                    ) : (
-                      <span>
-                        {event.daysUntil} day{event.daysUntil !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {sortedUpcomingEvents.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    No birthdays or anniversaries recorded. Add them on individual people pages.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+            <CardContent>
+              <Pagination
+                page={upcomingPage}
+                pageSize={pageSize}
+                total={sortedUpcomingEvents.length}
+                onPageChange={setUpcomingPage}
+                noun="events"
+              />
+            </CardContent>
+          </>
+        )}
+      </Card>
 
       <ConfirmDialog
         open={confirmOpen}

@@ -520,14 +520,20 @@ export function MessageHistoryPage() {
                             <MessageRecipientsCell msg={msg} />
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Duplicate as draft"
-                              onClick={() => duplicateMessageMutation.mutate(msg.id)}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => duplicateMessageMutation.mutate(msg.id)}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Duplicate as draft</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -634,22 +640,34 @@ export function MessageHistoryPage() {
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title="Edit scheduled message"
-                                onClick={() => navigate(`/messages/compose?editMessageId=${msg.id}`)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title="Duplicate as draft"
-                                onClick={() => duplicateMessageMutation.mutate(msg.id)}
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => navigate(`/messages/compose?editMessageId=${msg.id}`)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Edit scheduled message</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => duplicateMessageMutation.mutate(msg.id)}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Duplicate as draft</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -752,17 +770,23 @@ export function MessageHistoryPage() {
                             <Badge variant={getDraftStatus(draft).variant}>{getDraftStatus(draft).label}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Duplicate draft"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                duplicateDraftMutation.mutate(draft.id)
-                              }}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      duplicateDraftMutation.mutate(draft.id)
+                                    }}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Duplicate draft</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </TableCell>
                         </TableRow>
                       ))}

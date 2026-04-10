@@ -228,8 +228,31 @@ function MobileFab() {
 }
 
 function BottomTabBar() {
+  const location = useLocation()
+  const isDevotions = location.pathname.startsWith('/devotions')
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-sidebar text-sidebar-foreground border-t safe-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-sidebar text-sidebar-foreground border-t">
+      {isDevotions && (
+        <div className="flex items-center justify-around px-3 pt-2 pb-2">
+          {devotionNavItems.map(({to, label, icon: Icon}) => (
+            <NavLink
+              key={to}
+              to={to}
+              end
+              className={({isActive}) =>
+                cn(
+                  'flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors min-w-[4rem]',
+                  isActive ? 'text-sidebar-accent-foreground bg-sidebar-accent' : 'text-sidebar-foreground/60',
+                )
+              }
+            >
+              <Icon className="h-5 w-5" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </div>
+      )}
       <div className="flex items-center justify-around px-3 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {navItems.map(({to, label, icon: Icon}) => (
           <NavLink

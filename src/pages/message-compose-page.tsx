@@ -840,7 +840,7 @@ export function MessageComposePage() {
                 onChange={(e) => setContent(e.target.value)}
                 rows={8}
                 placeholder="Type your message here. Use template variables for personalization..."
-                className="mb-2"
+                className="min-h-48 md:min-h-0 mb-2"
               />
 
               <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">

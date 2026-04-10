@@ -204,7 +204,7 @@ export function DevotionListPage() {
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Devotions</h2>
         <div className="flex gap-2">
-          <Button variant="outline" asChild>
+          <Button variant="outline" asChild className="hidden md:inline-flex">
             <Link to="/devotions/scan">
               <Camera className="h-4 w-4 mr-2" />
               Scan Sheet

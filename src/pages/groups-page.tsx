@@ -8,6 +8,7 @@ import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {createGroup, deleteGroup, fetchGroups} from '@/lib/api'
@@ -227,11 +228,18 @@ export function GroupsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Link to={`/messages/compose?groupId=${group.id}`} onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" title="Send message to group">
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Link to={`/messages/compose?groupId=${group.id}`} onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon">
+                                  <MessageSquare className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            </TooltipTrigger>
+                            <TooltipContent>Send message to group</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <Button
                           variant="ghost"
                           size="icon"

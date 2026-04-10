@@ -4,6 +4,7 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {
   type MacContactMatch,
   dismissContacts,
@@ -423,27 +424,39 @@ export function ContactsImportPage() {
                 <TableCell>
                   <div className="flex items-center gap-1">
                     {contact.matchStatus === 'differs' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:bg-blue-100 dark:hover:bg-blue-950/30"
-                        onClick={() => updateMutation.mutate(contact)}
-                        disabled={updateMutation.isPending}
-                        title="Update contact in Central Flock"
-                      >
-                        <RefreshCw className="h-4 w-4 text-blue-600" />
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 hover:bg-blue-100 dark:hover:bg-blue-950/30"
+                              onClick={() => updateMutation.mutate(contact)}
+                              disabled={updateMutation.isPending}
+                            >
+                              <RefreshCw className="h-4 w-4 text-blue-600" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Update contact in Central Flock</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                     {contact.matchStatus !== 'exists' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="group/dismiss h-8 w-8 hover:bg-destructive"
-                        onClick={() => dismissMutation.mutate([contact])}
-                        title="Dismiss contact"
-                      >
-                        <Trash2 className="h-4 w-4 text-muted-foreground group-hover/dismiss:text-white" />
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="group/dismiss h-8 w-8 hover:bg-destructive"
+                              onClick={() => dismissMutation.mutate([contact])}
+                            >
+                              <Trash2 className="h-4 w-4 text-muted-foreground group-hover/dismiss:text-white" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Dismiss contact</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </div>
                 </TableCell>
@@ -491,15 +504,21 @@ export function ContactsImportPage() {
                       {new Date(dc.dismissedAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => undismissMutation.mutate(dc.contactId)}
-                        title="Restore contact"
-                      >
-                        <RotateCcw className="h-4 w-4 text-muted-foreground" />
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => undismissMutation.mutate(dc.contactId)}
+                            >
+                              <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Restore contact</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </TableCell>
                   </TableRow>
                 ))}

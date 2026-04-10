@@ -7,6 +7,7 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/
 import {Input} from '@/components/ui/input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useQuery} from '@tanstack/react-query'
 import {AlertTriangle, Camera, Check, CircleX, Loader2, Save, Trash2, Upload, ZoomIn} from 'lucide-react'
 import {useRef, useState} from 'react'
@@ -78,22 +79,43 @@ function RowStatusIcon({row}: {row: RowState}) {
   const match = isVerseMatch(row)
   if (match === false) {
     return (
-      <span title="Verse mismatch">
-        <CircleX className="h-4 w-4 text-red-500" />
-      </span>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <CircleX className="h-4 w-4 text-red-500" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Verse mismatch</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     )
   }
   if (!row.devotion.bibleReference) {
     return (
-      <span title="Missing verse">
-        <AlertTriangle className="h-4 w-4 text-amber-500" />
-      </span>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Missing verse</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     )
   }
   return (
-    <span title="OK">
-      <Check className="h-4 w-4 text-green-500" />
-    </span>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
+            <Check className="h-4 w-4 text-green-500" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>OK</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -706,29 +728,35 @@ export function DevotionScanPage() {
                               <span className="text-muted-foreground">none</span>
                             )}
                           </span>
-                          <button
-                            className="p-0.5 rounded hover:bg-muted cursor-pointer shrink-0"
-                            onClick={() => {
-                              setEditChainRow(i)
-                              setEditChainValue(String(row.devotion.referencedDevotions[0] || ''))
-                            }}
-                            title="Edit reference number"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="12"
-                              height="12"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="text-muted-foreground"
-                            >
-                              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                            </svg>
-                          </button>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className="p-0.5 rounded hover:bg-muted cursor-pointer shrink-0"
+                                  onClick={() => {
+                                    setEditChainRow(i)
+                                    setEditChainValue(String(row.devotion.referencedDevotions[0] || ''))
+                                  }}
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="text-muted-foreground"
+                                  >
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                  </svg>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit reference number</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">&mdash;</span>

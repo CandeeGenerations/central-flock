@@ -10,6 +10,7 @@ import {SearchableSelect} from '@/components/ui/searchable-select'
 import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Textarea} from '@/components/ui/textarea'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {
   type Person,
   addGroupMembers,
@@ -170,10 +171,17 @@ export function PersonDetailPage() {
                 </Button>
               </Link>
             ) : (
-              <Button variant="outline" size="sm" disabled title="No phone number">
-                <MessageSquare className="h-4 w-4 mr-1" />
-                Send Message
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" disabled>
+                      <MessageSquare className="h-4 w-4 mr-1" />
+                      Send Message
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>No phone number</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         </CardHeader>

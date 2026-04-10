@@ -303,14 +303,20 @@ export function TemplatesPage() {
                               {formatDateTime(template.updatedAt)}
                             </TableCell>
                             <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title="Duplicate template"
-                                onClick={() => duplicateMutation.mutate(template.id)}
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => duplicateMutation.mutate(template.id)}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Duplicate template</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </TableCell>
                           </TableRow>
                         )

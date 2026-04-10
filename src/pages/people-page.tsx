@@ -12,6 +12,7 @@ import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {
@@ -194,7 +195,7 @@ export function PeoplePage() {
               align="end"
             >
               <button
-                className="flex w-full items-center gap-2.5 text-left text-sm font-medium px-3 py-2 rounded-2xl hover:bg-foreground/10 transition-colors cursor-pointer"
+                className="hidden md:flex w-full items-center gap-2.5 text-left text-sm font-medium px-3 py-2 rounded-2xl hover:bg-foreground/10 transition-colors cursor-pointer"
                 onClick={async () => {
                   try {
                     await exportPeopleCSV()
@@ -208,7 +209,7 @@ export function PeoplePage() {
                 Export CSV
               </button>
               <button
-                className="flex w-full items-center gap-2.5 text-left text-sm font-medium px-3 py-2 rounded-2xl hover:bg-foreground/10 transition-colors cursor-pointer"
+                className="hidden md:flex w-full items-center gap-2.5 text-left text-sm font-medium px-3 py-2 rounded-2xl hover:bg-foreground/10 transition-colors cursor-pointer"
                 onClick={() => navigate('/import')}
               >
                 <Upload className="h-4 w-4" />
@@ -694,9 +695,16 @@ export function PeoplePage() {
                       <TableCell>
                         <div className="flex gap-1">
                           {person.status === 'do_not_contact' ? (
-                            <Button variant="ghost" size="icon" disabled title="Do Not Contact">
-                              <Ban className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" disabled>
+                                    <Ban className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Do Not Contact</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           ) : (
                             <Button
                               variant="ghost"

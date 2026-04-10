@@ -10,6 +10,7 @@ import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {
@@ -328,17 +329,23 @@ export function GroupDetailPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                removeMemberMutation.mutate(m.id)
-                              }}
-                              title="Remove from group"
-                            >
-                              <UserMinus className="h-4 w-4" />
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      removeMemberMutation.mutate(m.id)
+                                    }}
+                                  >
+                                    <UserMinus className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Remove from group</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </TableCell>
                         </TableRow>
                       ))}

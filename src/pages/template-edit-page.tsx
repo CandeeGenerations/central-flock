@@ -307,6 +307,7 @@ export function TemplateEditPage() {
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={8}
+                className="min-h-48 md:min-h-0"
                 placeholder="Type your template message here..."
               />
             </CardContent>

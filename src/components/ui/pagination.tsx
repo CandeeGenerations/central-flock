@@ -17,7 +17,7 @@ export function Pagination({page, pageSize, total, onPageChange, noun = 'items'}
   return (
     <div className="flex items-center justify-between">
       <p className="text-sm text-muted-foreground">
-        Showing {from}–{to} of {total} {noun}
+        Showing {from.toLocaleString()}–{to.toLocaleString()} of {total.toLocaleString()} {noun}
       </p>
       {totalPages > 1 && (
         <div className="flex gap-2">

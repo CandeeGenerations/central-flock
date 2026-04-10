@@ -7,7 +7,7 @@ import {checkAuthStatus, fetchStats, logout} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useQuery, useQueryClient} from '@tanstack/react-query'
-import {CalendarIcon, LogOut, MessageSquare, Plus, Settings} from 'lucide-react'
+import {BookOpen, CalendarIcon, LogOut, MessageSquare, Plus, Settings} from 'lucide-react'
 import {useEffect, useMemo, useState} from 'react'
 import type {DateRange} from 'react-day-picker'
 import {Link} from 'react-router-dom'
@@ -167,10 +167,10 @@ export function DashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Dashboard</h2>
-        <Card size="sm" className="flex-row items-center gap-2 px-3 py-2">
+        <Card size="sm" className="w-full sm:w-auto flex-row items-center gap-2 px-3 py-2">
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
-              <button className="flex items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer">
+              <button className="flex w-full sm:w-auto items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer">
                 <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                 {formatRangeLabel(preset, customRange)}
               </button>
@@ -464,25 +464,33 @@ export function DashboardPage() {
 
       {/* Mobile settings & logout links */}
       <div className="md:hidden flex flex-col gap-3 pt-4">
-        <Link to="/settings">
+        <Link to="/devotions/stats">
           <Button variant="outline" className="w-full">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
+            <BookOpen className="h-4 w-4 mr-2" />
+            Devotions
           </Button>
         </Link>
-        {authStatus?.authRequired && (
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={async () => {
-              await logout()
-              qc.invalidateQueries({queryKey: ['auth-status']})
-            }}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
-        )}
+        <div className="grid grid-cols-2 gap-3">
+          <Link to="/settings">
+            <Button variant="outline" className="w-full">
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+          </Link>
+          {authStatus?.authRequired && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={async () => {
+                await logout()
+                qc.invalidateQueries({queryKey: ['auth-status']})
+              }}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -98,7 +98,9 @@ function SidebarNav({onNavClick}: {onNavClick?: () => void}) {
           className={({isActive}) =>
             cn(
               'flex items-center gap-3 px-3 py-3 md:py-2 rounded-md text-base md:text-sm font-medium transition-colors cursor-pointer',
-              isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/50',
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground border border-border shadow-sm dark:border-transparent dark:shadow-none'
+                : 'hover:bg-sidebar-accent/50 border border-transparent hover:border-border hover:shadow-sm dark:hover:border-transparent dark:hover:shadow-none',
             )
           }
         >
@@ -120,7 +122,9 @@ function SidebarNav({onNavClick}: {onNavClick?: () => void}) {
           className={({isActive}) =>
             cn(
               'flex items-center gap-3 px-3 py-3 md:py-2 rounded-md text-base md:text-sm font-medium transition-colors cursor-pointer',
-              isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/50',
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground border border-border shadow-sm dark:border-transparent dark:shadow-none'
+                : 'hover:bg-sidebar-accent/50 border border-transparent hover:border-border hover:shadow-sm dark:hover:border-transparent dark:hover:shadow-none',
             )
           }
         >
@@ -152,7 +156,9 @@ function SidebarFooter({
         className={({isActive}) =>
           cn(
             'flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm w-full transition-colors cursor-pointer',
-            isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/50',
+            isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground border border-border shadow-sm dark:border-transparent dark:shadow-none'
+              : 'hover:bg-sidebar-accent/50 border border-transparent hover:border-border hover:shadow-sm dark:hover:border-transparent dark:hover:shadow-none',
           )
         }
       >
@@ -165,7 +171,7 @@ function SidebarFooter({
           setShortcutsOpen(true)
           onNavClick?.()
         }}
-        className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 w-full transition-colors cursor-pointer"
+        className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 border border-transparent hover:border-border hover:shadow-sm dark:hover:border-transparent dark:hover:shadow-none w-full transition-colors cursor-pointer"
       >
         <Keyboard className="h-5 w-5 md:h-4 md:w-4" />
         <span className="flex-1 text-left">Shortcuts</span>
@@ -173,7 +179,7 @@ function SidebarFooter({
       </button>
       <button
         onClick={toggleDark}
-        className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 w-full transition-colors cursor-pointer"
+        className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 border border-transparent hover:border-border hover:shadow-sm dark:hover:border-transparent dark:hover:shadow-none w-full transition-colors cursor-pointer"
       >
         {isDark ? <Sun className="h-5 w-5 md:h-4 md:w-4" /> : <Moon className="h-5 w-5 md:h-4 md:w-4" />}
         <span className="flex-1 text-left">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
@@ -186,7 +192,7 @@ function SidebarFooter({
             qc.invalidateQueries({queryKey: ['auth-status']})
             onNavClick?.()
           }}
-          className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 w-full transition-colors cursor-pointer"
+          className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 border border-transparent hover:border-border hover:shadow-sm dark:hover:border-transparent dark:hover:shadow-none w-full transition-colors cursor-pointer"
         >
           <LogOut className="h-5 w-5 md:h-4 md:w-4" />
           <span className="flex-1 text-left">Logout</span>
@@ -259,7 +265,8 @@ function AppLayout() {
       {/* Desktop Sidebar */}
       <aside className="w-56 border-r border-sidebar-border bg-sidebar text-sidebar-foreground hidden md:flex flex-col shrink-0 overflow-hidden">
         <Link to="/" className="block p-4 border-b border-sidebar-border">
-          <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6" />
+          <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-6 dark:hidden" />
+          <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-6 hidden dark:block" />
         </Link>
         <SidebarNav />
         <SidebarFooter {...footerProps} />

@@ -5,6 +5,7 @@ import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {PageSpinner} from '@/components/ui/spinner'
 import {checkAuthStatus, fetchStats, logout} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
+import {cn} from '@/lib/utils'
 import {useQuery, useQueryClient} from '@tanstack/react-query'
 import {CalendarIcon, LogOut, MessageSquare, Plus, Settings} from 'lucide-react'
 import {useEffect, useMemo, useState} from 'react'
@@ -166,23 +167,27 @@ export function DashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Dashboard</h2>
-        <div className="flex items-center gap-2 flex-wrap">
+        <Card size="sm" className="flex-row items-center gap-2 px-3 py-2">
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="font-normal">
-                <CalendarIcon className="h-4 w-4 mr-2" />
+              <button className="flex items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                 {formatRangeLabel(preset, customRange)}
-              </Button>
+              </button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
+            <PopoverContent
+              className="w-auto gap-0 p-0 bg-popover/70 backdrop-blur-2xl backdrop-saturate-150"
+              align="end"
+            >
               <div className="flex">
-                <div className="border-r p-2 space-y-0.5">
+                <div className={cn('p-1.5 space-y-0.5', preset === 'custom' && 'border-r')}>
                   {PRESETS.map((p) => (
                     <button
                       key={p.key}
-                      className={`block w-full text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors ${
-                        preset === p.key ? 'bg-muted font-medium' : ''
-                      }`}
+                      className={cn(
+                        'block w-full text-left text-sm px-3 py-2 rounded-2xl font-medium transition-colors cursor-pointer',
+                        preset === p.key ? 'bg-foreground/10' : 'hover:bg-foreground/10',
+                      )}
                       onClick={() => {
                         setPreset(p.key)
                         if (p.key !== 'custom') {
@@ -213,27 +218,25 @@ export function DashboardPage() {
               </div>
             </PopoverContent>
           </Popover>
-          <div className="hidden md:flex gap-2">
-            <Link to="/messages/compose">
-              <Button size="sm">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Compose
-                <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">
-                  {isMac ? '⌘' : 'Ctrl+'}J
-                </kbd>
-              </Button>
-            </Link>
-            <Link to="/people?add=1">
-              <Button size="sm" variant="outline">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Person
-                <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">
-                  {isMac ? '⌘' : 'Ctrl+'}P
-                </kbd>
-              </Button>
-            </Link>
-          </div>
-        </div>
+          <Link to="/messages/compose" className="hidden md:block">
+            <Button size="sm">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Compose
+              <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">
+                {isMac ? '⌘' : 'Ctrl+'}J
+              </kbd>
+            </Button>
+          </Link>
+          <Link to="/people?add=1" className="hidden md:block">
+            <Button size="sm" variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Person
+              <kbd className="ml-2 pointer-events-none text-[10px] font-medium opacity-60 border rounded px-1 py-0.5">
+                {isMac ? '⌘' : 'Ctrl+'}P
+              </kbd>
+            </Button>
+          </Link>
+        </Card>
       </div>
 
       {/* Row 1 — Stat cards */}
@@ -500,9 +503,11 @@ function StatCard({
 }) {
   return (
     <Link to={to}>
-      <Card className="bg-card shadow-none hover:bg-muted/50 transition-colors h-full">
-        <div className="px-4 pt-3 pb-3 md:px-5 md:pt-4 md:pb-4 space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <Card size="sm" className="hover:bg-muted/50 transition-colors h-full">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl md:text-[28px] font-bold leading-none">{value.toLocaleString()}</span>
             {change && (
@@ -519,9 +524,9 @@ function StatCard({
             )}
           </div>
           {previousValue !== undefined && (
-            <p className="text-xs text-muted-foreground">Previously: {previousValue.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">Previously: {previousValue.toLocaleString()}</p>
           )}
-        </div>
+        </CardContent>
       </Card>
     </Link>
   )

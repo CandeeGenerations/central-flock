@@ -12,6 +12,7 @@ const DEFAULTS: Record<string, string> = {
   birthdayPreNotifyDays: '',
   birthdaySendTo: 'self',
   birthdayMyContactId: '',
+  webhookUrl: '',
   anniversarySendTime: '07:00',
   anniversaryPreNotifyDays: '',
   anniversarySendTo: 'self',
@@ -36,6 +37,41 @@ settingsRouter.get(
   }),
 )
 
+// POST /api/settings/test-webhook - Test the configured webhook URL
+settingsRouter.post(
+  '/test-webhook',
+  asyncHandler(async (_req, res) => {
+    const webhookUrl = getSetting('webhookUrl')
+    if (!webhookUrl) {
+      res.status(400).json({error: 'Webhook URL is not configured'})
+      return
+    }
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          type: 'pre_notification',
+          personName: 'Tyler C',
+          message: "Reminder - 7 days till Tyler C's birthday!",
+          daysUntil: 7,
+        }),
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        res.status(502).json({error: `Webhook returned ${response.status}: ${text}`})
+        return
+      }
+
+      res.json({success: true})
+    } catch (error) {
+      res.status(502).json({error: error instanceof Error ? error.message : 'Webhook request failed'})
+    }
+  }),
+)
+
 // PUT /api/settings/:key - Upsert a setting
 settingsRouter.put(
   '/:key',
@@ -53,6 +89,7 @@ settingsRouter.put(
       !value &&
       key !== 'birthdayPreNotifyDays' &&
       key !== 'birthdayMyContactId' &&
+      key !== 'webhookUrl' &&
       key !== 'anniversaryPreNotifyDays'
     ) {
       res.status(400).json({error: 'value is required'})

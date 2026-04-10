@@ -504,7 +504,7 @@ export function DevotionScanPage() {
             {imagePreview ? (
               <div className="space-y-4">
                 <div
-                  className="border rounded-md overflow-hidden max-w-xl mx-auto cursor-pointer relative group"
+                  className="border rounded-lg overflow-hidden max-w-xl mx-auto cursor-pointer relative group"
                   onClick={() => setLightboxOpen(true)}
                 >
                   <img src={imagePreview} alt="Uploaded sheet" className="w-full" />
@@ -573,7 +573,7 @@ export function DevotionScanPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="border rounded-md overflow-x-auto">
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

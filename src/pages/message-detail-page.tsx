@@ -87,7 +87,7 @@ function RecipientsCard({
           onChange={onSearchChange}
           containerClassName="sm:max-w-sm"
         />
-        <div className="border rounded-md bg-card overflow-hidden">
+        <div className="border rounded-lg bg-card overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -185,7 +185,7 @@ function RecipientsCard({
               {selectedRecipient.renderedContent && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Sent Message</p>
-                  <p className="text-sm whitespace-pre-wrap bg-muted p-3 rounded-md">
+                  <p className="text-sm whitespace-pre-wrap bg-muted p-3 rounded-lg">
                     {selectedRecipient.renderedContent}
                   </p>
                 </div>
@@ -194,7 +194,7 @@ function RecipientsCard({
               {selectedRecipient.errorMessage && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Error</p>
-                  <pre className="text-sm text-red-500 whitespace-pre-wrap break-all bg-muted rounded-md p-3 overflow-auto max-h-32 font-mono">
+                  <pre className="text-sm text-red-500 whitespace-pre-wrap break-all bg-muted rounded-lg p-3 overflow-auto max-h-32 font-mono">
                     <code>{selectedRecipient.errorMessage}</code>
                   </pre>
                 </div>
@@ -328,11 +328,11 @@ export function MessageDetailPage() {
           <CardTitle>Message Content</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="whitespace-pre-wrap bg-muted p-4 rounded-md">{message.renderedPreview || message.content}</p>
+          <p className="whitespace-pre-wrap bg-muted p-4 rounded-lg">{message.renderedPreview || message.content}</p>
           {message.renderedPreview && message.renderedPreview !== message.content && (
             <details className="text-sm">
               <summary className="text-muted-foreground cursor-pointer">Template</summary>
-              <p className="whitespace-pre-wrap bg-muted p-4 rounded-md mt-1">{message.content}</p>
+              <p className="whitespace-pre-wrap bg-muted p-4 rounded-lg mt-1">{message.content}</p>
             </details>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -438,7 +438,7 @@ export function MessageDetailPage() {
           <DialogHeader>
             <DialogTitle>Error — {errorInfo?.name}</DialogTitle>
           </DialogHeader>
-          <pre className="text-sm text-red-500 whitespace-pre-wrap break-all bg-muted rounded-md p-3 overflow-auto max-h-64 font-mono">
+          <pre className="text-sm text-red-500 whitespace-pre-wrap break-all bg-muted rounded-lg p-3 overflow-auto max-h-64 font-mono">
             <code>{errorInfo?.error}</code>
           </pre>
         </DialogContent>

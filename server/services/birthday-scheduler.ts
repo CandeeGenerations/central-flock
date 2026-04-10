@@ -6,6 +6,20 @@ import {sendMessage, sendMessageViaUI} from './applescript.js'
 
 let timeoutId: ReturnType<typeof setTimeout> | null = null
 
+async function sendWebhook(
+  webhookUrl: string,
+  payload: {type: string; personName: string; message: string; daysUntil?: number},
+) {
+  const res = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    throw new Error(`Webhook returned ${res.status}: ${await res.text()}`)
+  }
+}
+
 function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
   const v = n % 100
@@ -80,22 +94,7 @@ function recordMessageInHistory(personId: number, content: string) {
 }
 
 export async function checkBirthdays() {
-  const myContactId = getSetting('birthdayMyContactId')
-  if (!myContactId) {
-    console.log('Birthday scheduler: birthdayMyContactId not set, skipping')
-    return
-  }
-
-  const myContact = db
-    .select()
-    .from(schema.people)
-    .where(eq(schema.people.id, Number(myContactId)))
-    .get()
-  if (!myContact || !myContact.phoneNumber) {
-    console.log('Birthday scheduler: my contact not found or has no phone number, skipping')
-    return
-  }
-
+  const webhookUrl = getSetting('webhookUrl')
   const sendTo = getSetting('birthdaySendTo') || 'self'
   const preNotifyDays = getSetting('birthdayPreNotifyDays')
   const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',').map((d) => Number(d.trim())) : [])
@@ -115,8 +114,9 @@ export async function checkBirthdays() {
     const bMonth = person.birthMonth!
     const bDay = person.birthDay!
     const days = daysUntilBirthday(bMonth, bDay, todayMonth, todayDay)
+    const name = formatPersonName(person)
 
-    // Check pre-notifications
+    // Check pre-notifications (always via webhook)
     for (const n of [3, 7, 10]) {
       if (!preNotifySet.has(n)) continue
       if (days !== n) continue
@@ -124,14 +124,18 @@ export async function checkBirthdays() {
       const type = `pre_${n}` as const
       if (wasSent(person.id, type, currentYear)) continue
 
-      const name = formatPersonName(person)
+      if (!webhookUrl) {
+        console.log(`Birthday scheduler: webhookUrl not set, skipping ${type} reminder for ${name}`)
+        continue
+      }
+
       const message = `Reminder - ${n} days till ${name}'s birthday!`
 
       try {
-        await send(myContact.phoneNumber, message)
+        await sendWebhook(webhookUrl, {type: 'pre_notification', personName: name, message, daysUntil: n})
         recordSent(person.id, type, currentYear)
         recordMessageInHistory(person.id, message)
-        console.log(`Birthday scheduler: sent ${type} reminder for ${name}`)
+        console.log(`Birthday scheduler: sent ${type} reminder for ${name} via webhook`)
       } catch (error) {
         console.error(`Birthday scheduler: failed to send ${type} for ${name}:`, error)
       }
@@ -141,53 +145,45 @@ export async function checkBirthdays() {
     if (days === 0 || (bMonth === todayMonth && bDay === todayDay)) {
       if (wasSent(person.id, 'birthday', currentYear)) continue
 
-      const name = formatPersonName(person)
       let ageStr = ''
       if (person.birthYear) {
         const age = currentYear - person.birthYear
         if (age > 0) ageStr = ` ${ordinal(age)}`
       }
 
-      let message: string
-      let targetPhone: string
-
       if (sendTo === 'person' && person.phoneNumber) {
-        targetPhone = person.phoneNumber
-        message = `Happy${ageStr} birthday to you!`
+        // Send directly to the person via AppleScript
+        const message = `Happy${ageStr} birthday to you!`
+        try {
+          await send(person.phoneNumber, message)
+          recordSent(person.id, 'birthday', currentYear)
+          recordMessageInHistory(person.id, message)
+          console.log(`Birthday scheduler: sent birthday message to ${name}`)
+        } catch (error) {
+          console.error(`Birthday scheduler: failed to send birthday message to ${name}:`, error)
+        }
       } else {
-        targetPhone = myContact.phoneNumber
-        message = `Happy${ageStr} birthday to ${name}`
-      }
-
-      try {
-        await send(targetPhone, message)
-        recordSent(person.id, 'birthday', currentYear)
-        recordMessageInHistory(person.id, message)
-        console.log(`Birthday scheduler: sent birthday message for ${name}`)
-      } catch (error) {
-        console.error(`Birthday scheduler: failed to send birthday message for ${name}:`, error)
+        // Send to self via webhook
+        if (!webhookUrl) {
+          console.log(`Birthday scheduler: webhookUrl not set, skipping self-send for ${name}`)
+          continue
+        }
+        const message = `Happy${ageStr} birthday to ${name}`
+        try {
+          await sendWebhook(webhookUrl, {type: 'birthday', personName: name, message})
+          recordSent(person.id, 'birthday', currentYear)
+          recordMessageInHistory(person.id, message)
+          console.log(`Birthday scheduler: sent birthday message for ${name} via webhook`)
+        } catch (error) {
+          console.error(`Birthday scheduler: failed to send birthday webhook for ${name}:`, error)
+        }
       }
     }
   }
 }
 
 export async function checkAnniversaries() {
-  const myContactId = getSetting('birthdayMyContactId')
-  if (!myContactId) {
-    console.log('Anniversary scheduler: birthdayMyContactId not set, skipping')
-    return
-  }
-
-  const myContact = db
-    .select()
-    .from(schema.people)
-    .where(eq(schema.people.id, Number(myContactId)))
-    .get()
-  if (!myContact || !myContact.phoneNumber) {
-    console.log('Anniversary scheduler: my contact not found or has no phone number, skipping')
-    return
-  }
-
+  const webhookUrl = getSetting('webhookUrl')
   const sendTo = getSetting('anniversarySendTo') || 'self'
   const preNotifyDays = getSetting('anniversaryPreNotifyDays')
   const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',').map((d) => Number(d.trim())) : [])
@@ -207,8 +203,9 @@ export async function checkAnniversaries() {
     const aMonth = person.anniversaryMonth!
     const aDay = person.anniversaryDay!
     const days = daysUntilBirthday(aMonth, aDay, todayMonth, todayDay)
+    const name = formatPersonName(person)
 
-    // Check pre-notifications
+    // Check pre-notifications (always via webhook)
     for (const n of [3, 7, 10]) {
       if (!preNotifySet.has(n)) continue
       if (days !== n) continue
@@ -216,14 +213,18 @@ export async function checkAnniversaries() {
       const type = `anniversary_pre_${n}`
       if (wasSent(person.id, type, currentYear)) continue
 
-      const name = formatPersonName(person)
+      if (!webhookUrl) {
+        console.log(`Anniversary scheduler: webhookUrl not set, skipping ${type} reminder for ${name}`)
+        continue
+      }
+
       const message = `Reminder - ${n} days till ${name}'s anniversary!`
 
       try {
-        await send(myContact.phoneNumber, message)
+        await sendWebhook(webhookUrl, {type: 'pre_notification', personName: name, message, daysUntil: n})
         recordSent(person.id, type, currentYear)
         recordMessageInHistory(person.id, message)
-        console.log(`Anniversary scheduler: sent ${type} reminder for ${name}`)
+        console.log(`Anniversary scheduler: sent ${type} reminder for ${name} via webhook`)
       } catch (error) {
         console.error(`Anniversary scheduler: failed to send ${type} for ${name}:`, error)
       }
@@ -233,31 +234,38 @@ export async function checkAnniversaries() {
     if (days === 0 || (aMonth === todayMonth && aDay === todayDay)) {
       if (wasSent(person.id, 'anniversary', currentYear)) continue
 
-      const name = formatPersonName(person)
       let yearStr = ''
       if (person.anniversaryYear) {
         const years = currentYear - person.anniversaryYear
         if (years > 0) yearStr = ` ${ordinal(years)}`
       }
 
-      let message: string
-      let targetPhone: string
-
       if (sendTo === 'person' && person.phoneNumber) {
-        targetPhone = person.phoneNumber
-        message = `Happy${yearStr} anniversary!`
+        // Send directly to the person via AppleScript
+        const message = `Happy${yearStr} anniversary!`
+        try {
+          await send(person.phoneNumber, message)
+          recordSent(person.id, 'anniversary', currentYear)
+          recordMessageInHistory(person.id, message)
+          console.log(`Anniversary scheduler: sent anniversary message to ${name}`)
+        } catch (error) {
+          console.error(`Anniversary scheduler: failed to send anniversary message to ${name}:`, error)
+        }
       } else {
-        targetPhone = myContact.phoneNumber
-        message = `Happy${yearStr} anniversary to ${name}`
-      }
-
-      try {
-        await send(targetPhone, message)
-        recordSent(person.id, 'anniversary', currentYear)
-        recordMessageInHistory(person.id, message)
-        console.log(`Anniversary scheduler: sent anniversary message for ${name}`)
-      } catch (error) {
-        console.error(`Anniversary scheduler: failed to send anniversary message for ${name}:`, error)
+        // Send to self via webhook
+        if (!webhookUrl) {
+          console.log(`Anniversary scheduler: webhookUrl not set, skipping self-send for ${name}`)
+          continue
+        }
+        const message = `Happy${yearStr} anniversary to ${name}`
+        try {
+          await sendWebhook(webhookUrl, {type: 'anniversary', personName: name, message})
+          recordSent(person.id, 'anniversary', currentYear)
+          recordMessageInHistory(person.id, message)
+          console.log(`Anniversary scheduler: sent anniversary message for ${name} via webhook`)
+        } catch (error) {
+          console.error(`Anniversary scheduler: failed to send anniversary webhook for ${name}:`, error)
+        }
       }
     }
   }

@@ -1,5 +1,7 @@
+import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Checkbox} from '@/components/ui/checkbox'
+import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
@@ -9,6 +11,7 @@ import {type ThemeMode, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Monitor, Moon, Settings, Sun} from 'lucide-react'
+import {useState} from 'react'
 import {toast} from 'sonner'
 
 export function SettingsPage() {
@@ -34,7 +37,30 @@ export function SettingsPage() {
     queryFn: () => fetchPeople({limit: 1000}),
   })
 
+  const [testingWebhook, setTestingWebhook] = useState(false)
+
+  const testWebhook = async () => {
+    setTestingWebhook(true)
+    try {
+      const res = await fetch('/api/settings/test-webhook', {method: 'POST'})
+      const text = await res.text()
+      let data: {error?: string; success?: boolean} = {}
+      try {
+        data = JSON.parse(text)
+      } catch {
+        throw new Error(text || `Server returned ${res.status}`)
+      }
+      if (!res.ok) throw new Error(data.error || 'Test failed')
+      toast.success('Webhook test successful')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Webhook test failed')
+    } finally {
+      setTestingWebhook(false)
+    }
+  }
+
   const sendMethod = settings?.sendMethod ?? 'api'
+  const webhookUrl = settings?.webhookUrl ?? ''
   const birthdaySendTime = settings?.birthdaySendTime ?? '07:00'
   const birthdayPreNotifyDays = settings?.birthdayPreNotifyDays ?? ''
   const birthdaySendTo = settings?.birthdaySendTo ?? 'self'
@@ -123,7 +149,7 @@ export function SettingsPage() {
                     key={key}
                     onClick={() => setMode(key)}
                     className={cn(
-                      'flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-medium transition-colors cursor-pointer',
+                      'flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors cursor-pointer',
                       mode === key
                         ? 'border-primary bg-primary/5 text-primary'
                         : 'border-border bg-card hover:bg-muted/50',
@@ -179,6 +205,33 @@ export function SettingsPage() {
         <div className="space-y-4">
           <Card>
             <CardHeader>
+              <CardTitle>Webhook</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Webhook URL</Label>
+                <Input
+                  type="url"
+                  placeholder="https://..."
+                  value={webhookUrl}
+                  onChange={(e) => mutation.mutate({key: 'webhookUrl', value: e.target.value})}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used for birthday/anniversary reminders and &quot;send to myself&quot; notifications. Receives a POST
+                  with JSON body containing type, personName, message, and daysUntil.
+                </p>
+              </div>
+              {webhookUrl && (
+                <Button variant="outline" size="sm" onClick={testWebhook} disabled={testingWebhook}>
+                  {testingWebhook ? 'Testing...' : 'Test Webhook'}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Birthdays</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -200,33 +253,45 @@ export function SettingsPage() {
               <div className="space-y-2">
                 <Label>Send Time</Label>
                 <div className="flex gap-2">
-                  <SearchableSelect
+                  <Select
                     value={String(displayHour)}
                     onValueChange={(v) => updateSendTime(Number(v), sendTimeMinute, displayAmPm)}
-                    options={Array.from({length: 12}, (_, i) => ({value: String(i + 1), label: String(i + 1)}))}
-                    searchable={false}
-                    className="w-20"
-                  />
-                  <SearchableSelect
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({length: 12}, (_, i) => (
+                        <SelectItem key={i + 1} value={String(i + 1)}>
+                          {i + 1}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
                     value={String(sendTimeMinute)}
                     onValueChange={(v) => updateSendTime(displayHour, Number(v), displayAmPm)}
-                    options={Array.from({length: 12}, (_, i) => ({
-                      value: String(i * 5),
-                      label: String(i * 5).padStart(2, '0'),
-                    }))}
-                    searchable={false}
-                    className="w-20"
-                  />
-                  <SearchableSelect
-                    value={displayAmPm}
-                    onValueChange={(v) => updateSendTime(displayHour, sendTimeMinute, v)}
-                    options={[
-                      {value: 'AM', label: 'AM'},
-                      {value: 'PM', label: 'PM'},
-                    ]}
-                    searchable={false}
-                    className="w-20"
-                  />
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({length: 12}, (_, i) => (
+                        <SelectItem key={i * 5} value={String(i * 5)}>
+                          {String(i * 5).padStart(2, '0')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={displayAmPm} onValueChange={(v) => updateSendTime(displayHour, sendTimeMinute, v)}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AM">AM</SelectItem>
+                      <SelectItem value="PM">PM</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -258,17 +323,17 @@ export function SettingsPage() {
                 </Select>
                 {birthdaySendTo === 'person' && (
                   <p className="text-xs text-muted-foreground">
-                    People without a phone number will receive the text to your contact instead.
+                    People without a phone number will be sent via webhook instead.
                   </p>
                 )}
               </div>
 
               <div className="space-y-2">
                 <Label>Example Messages</Label>
-                <div className="rounded-md border bg-muted/50 p-3 space-y-2 text-sm">
+                <div className="rounded-lg border bg-muted/50 p-3 space-y-2 text-sm">
                   {preNotifySet.size > 0 && (
                     <div>
-                      <span className="text-muted-foreground">Pre-notification (to you):</span>
+                      <span className="text-muted-foreground">Pre-notification (via webhook):</span>
                       <p className="font-mono text-xs mt-0.5">
                         &quot;Reminder - {[...preNotifySet][0]} days till John Smith&apos;s birthday!&quot;
                       </p>
@@ -276,7 +341,7 @@ export function SettingsPage() {
                   )}
                   <div>
                     <span className="text-muted-foreground">
-                      With year ({birthdaySendTo === 'person' ? 'to person' : 'to you'}):
+                      With year ({birthdaySendTo === 'person' ? 'to person' : 'via webhook'}):
                     </span>
                     <p className="font-mono text-xs mt-0.5">
                       {birthdaySendTo === 'person'
@@ -286,7 +351,7 @@ export function SettingsPage() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">
-                      Without year ({birthdaySendTo === 'person' ? 'to person' : 'to you'}):
+                      Without year ({birthdaySendTo === 'person' ? 'to person' : 'via webhook'}):
                     </span>
                     <p className="font-mono text-xs mt-0.5">
                       {birthdaySendTo === 'person' ? '"Happy birthday to you!"' : '"Happy birthday to John Smith"'}
@@ -305,33 +370,48 @@ export function SettingsPage() {
               <div className="space-y-2">
                 <Label>Send Time</Label>
                 <div className="flex gap-2">
-                  <SearchableSelect
+                  <Select
                     value={String(annivDisplayHour)}
                     onValueChange={(v) => updateAnnivSendTime(Number(v), annivSendTimeMinute, annivDisplayAmPm)}
-                    options={Array.from({length: 12}, (_, i) => ({value: String(i + 1), label: String(i + 1)}))}
-                    searchable={false}
-                    className="w-20"
-                  />
-                  <SearchableSelect
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({length: 12}, (_, i) => (
+                        <SelectItem key={i + 1} value={String(i + 1)}>
+                          {i + 1}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
                     value={String(annivSendTimeMinute)}
                     onValueChange={(v) => updateAnnivSendTime(annivDisplayHour, Number(v), annivDisplayAmPm)}
-                    options={Array.from({length: 12}, (_, i) => ({
-                      value: String(i * 5),
-                      label: String(i * 5).padStart(2, '0'),
-                    }))}
-                    searchable={false}
-                    className="w-20"
-                  />
-                  <SearchableSelect
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({length: 12}, (_, i) => (
+                        <SelectItem key={i * 5} value={String(i * 5)}>
+                          {String(i * 5).padStart(2, '0')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
                     value={annivDisplayAmPm}
                     onValueChange={(v) => updateAnnivSendTime(annivDisplayHour, annivSendTimeMinute, v)}
-                    options={[
-                      {value: 'AM', label: 'AM'},
-                      {value: 'PM', label: 'PM'},
-                    ]}
-                    searchable={false}
-                    className="w-20"
-                  />
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AM">AM</SelectItem>
+                      <SelectItem value="PM">PM</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -366,17 +446,17 @@ export function SettingsPage() {
                 </Select>
                 {anniversarySendTo === 'person' && (
                   <p className="text-xs text-muted-foreground">
-                    People without a phone number will receive the text to your contact instead.
+                    People without a phone number will be sent via webhook instead.
                   </p>
                 )}
               </div>
 
               <div className="space-y-2">
                 <Label>Example Messages</Label>
-                <div className="rounded-md border bg-muted/50 p-3 space-y-2 text-sm">
+                <div className="rounded-lg border bg-muted/50 p-3 space-y-2 text-sm">
                   {annivPreNotifySet.size > 0 && (
                     <div>
-                      <span className="text-muted-foreground">Pre-notification (to you):</span>
+                      <span className="text-muted-foreground">Pre-notification (via webhook):</span>
                       <p className="font-mono text-xs mt-0.5">
                         &quot;Reminder - {[...annivPreNotifySet][0]} days till John Smith&apos;s anniversary!&quot;
                       </p>
@@ -384,7 +464,7 @@ export function SettingsPage() {
                   )}
                   <div>
                     <span className="text-muted-foreground">
-                      With year ({anniversarySendTo === 'person' ? 'to person' : 'to you'}):
+                      With year ({anniversarySendTo === 'person' ? 'to person' : 'via webhook'}):
                     </span>
                     <p className="font-mono text-xs mt-0.5">
                       {anniversarySendTo === 'person'
@@ -394,7 +474,7 @@ export function SettingsPage() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">
-                      Without year ({anniversarySendTo === 'person' ? 'to person' : 'to you'}):
+                      Without year ({anniversarySendTo === 'person' ? 'to person' : 'via webhook'}):
                     </span>
                     <p className="font-mono text-xs mt-0.5">
                       {anniversarySendTo === 'person' ? '"Happy anniversary!"' : '"Happy anniversary to John Smith"'}

@@ -1,14 +1,14 @@
 import {Badge} from '@/components/ui/badge'
-import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
+import {Pagination} from '@/components/ui/pagination'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {youtubeSearchUrl} from '@/lib/devotion-api'
 import {useQuery} from '@tanstack/react-query'
-import {BookOpen, ChevronLeft, ChevronRight, ExternalLink, Search} from 'lucide-react'
+import {BookOpen, ExternalLink, Search} from 'lucide-react'
 import {useState} from 'react'
 import {Link} from 'react-router-dom'
 
@@ -132,7 +132,7 @@ export function DevotionScripturesPage() {
               </p>
             ) : (
               <>
-                <div className="border rounded-md overflow-x-auto">
+                <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -156,33 +156,15 @@ export function DevotionScripturesPage() {
                     </TableBody>
                   </Table>
                 </div>
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
-                    <p className="text-sm text-muted-foreground">
-                      {(safePage - 1) * perPage + 1}&ndash;{Math.min(safePage * perPage, totalItems)} of {totalItems}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={safePage <= 1}
-                        onClick={() => setPage((p) => p - 1)}
-                      >
-                        <ChevronLeft className="h-4 w-4 mr-1" />
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={safePage >= totalPages}
-                        onClick={() => setPage((p) => p + 1)}
-                      >
-                        Next
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <div className="mt-4">
+                  <Pagination
+                    page={safePage}
+                    pageSize={perPage}
+                    total={totalItems}
+                    onPageChange={setPage}
+                    noun="scriptures"
+                  />
+                </div>
               </>
             )}
           </CardContent>
@@ -206,7 +188,11 @@ export function DevotionScripturesPage() {
                   #{String(d.number).padStart(3, '0')}
                 </Link>
                 <span className="text-sm text-muted-foreground">
-                  {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}
+                  {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
                 </span>
                 <Badge
                   variant="outline"

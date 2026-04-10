@@ -6,6 +6,7 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
@@ -25,18 +26,7 @@ import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  MessageSquare,
-  Save,
-  Trash2,
-  UserMinus,
-  UserPlus,
-  UserX,
-} from 'lucide-react'
+import {ArrowLeft, Download, MessageSquare, Save, Trash2, UserMinus, UserPlus, UserX} from 'lucide-react'
 import {useCallback, useMemo, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -229,7 +219,7 @@ export function GroupDetailPage() {
               Export CSV
             </Button>
             <Link to={`/messages/compose?groupId=${group.id}`}>
-              <Button variant="outline" size="sm">
+              <Button size="sm">
                 <MessageSquare className="h-4 w-4 mr-1" />
                 Send Message
               </Button>
@@ -270,129 +260,110 @@ export function GroupDetailPage() {
       <Card>
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <CardTitle>Members</CardTitle>
-          <div className="flex flex-wrap gap-2 self-end sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+            <SearchInput
+              placeholder="Search members..."
+              value={membersSearch}
+              onChange={(v) => {
+                setMembersSearch(v)
+                setMembersPage(1)
+              }}
+              containerClassName="w-48"
+            />
             {inactiveMembers.length > 0 && (
               <Button variant="outline" size="sm" onClick={() => setRemoveInactiveOpen(true)}>
                 <UserX className="h-4 w-4 mr-1" />
                 Remove Inactive/DNC ({inactiveMembers.length})
               </Button>
             )}
-            <Button size="sm" onClick={() => setAddMembersOpen(true)}>
+            <Button variant="outline" size="sm" onClick={() => setAddMembersOpen(true)}>
               <UserPlus className="h-4 w-4 mr-1" />
               Add Members
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <SearchInput
-            placeholder="Search members..."
-            value={membersSearch}
-            onChange={(v) => {
-              setMembersSearch(v)
-              setMembersPage(1)
-            }}
-            containerClassName="sm:max-w-sm"
-          />
-          {(() => {
-            const filteredMembers = debouncedMembersSearch
-              ? group.members.filter((m: Person) => {
-                  const q = debouncedMembersSearch.toLowerCase()
-                  return (
-                    formatFullName(m).toLowerCase().includes(q) || (m.phoneDisplay || m.phoneNumber || '').includes(q)
-                  )
-                })
-              : group.members
-            return (
-              <>
-                <div className="border rounded-md bg-card overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-16"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredMembers
-                        .slice((membersPage - 1) * membersPageSize, membersPage * membersPageSize)
-                        .map((m: Person) => (
-                          <TableRow
-                            key={m.id}
-                            className="cursor-pointer hover:bg-muted/50"
-                            onClick={() => navigate(`/people/${m.id}`)}
-                          >
-                            <TableCell className="font-medium">{formatFullName(m)}</TableCell>
-                            <TableCell className="text-muted-foreground">{m.phoneDisplay || m.phoneNumber}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  m.status === 'active'
-                                    ? 'default'
-                                    : m.status === 'do_not_contact'
-                                      ? 'destructive'
-                                      : 'secondary'
-                                }
-                              >
-                                {m.status === 'do_not_contact' ? 'do not contact' : m.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  removeMemberMutation.mutate(m.id)
-                                }}
-                                title="Remove from group"
-                              >
-                                <UserMinus className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      {filteredMembers.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
-                            {group.members.length === 0 ? 'No members' : 'No members match your search.'}
+        {(() => {
+          const filteredMembers = debouncedMembersSearch
+            ? group.members.filter((m: Person) => {
+                const q = debouncedMembersSearch.toLowerCase()
+                return (
+                  formatFullName(m).toLowerCase().includes(q) || (m.phoneDisplay || m.phoneNumber || '').includes(q)
+                )
+              })
+            : group.members
+          return (
+            <>
+              <div className="overflow-x-auto border-t">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-16"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredMembers
+                      .slice((membersPage - 1) * membersPageSize, membersPage * membersPageSize)
+                      .map((m: Person) => (
+                        <TableRow
+                          key={m.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => navigate(`/people/${m.id}`)}
+                        >
+                          <TableCell className="font-medium">{formatFullName(m)}</TableCell>
+                          <TableCell className="text-muted-foreground">{m.phoneDisplay || m.phoneNumber}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                m.status === 'active'
+                                  ? 'default'
+                                  : m.status === 'do_not_contact'
+                                    ? 'destructive'
+                                    : 'secondary'
+                              }
+                            >
+                              {m.status === 'do_not_contact' ? 'do not contact' : m.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeMemberMutation.mutate(m.id)
+                              }}
+                              title="Remove from group"
+                            >
+                              <UserMinus className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                {filteredMembers.length > membersPageSize && (
-                  <div className="flex items-center justify-between pt-4">
-                    <span className="text-sm text-muted-foreground">
-                      Showing {(membersPage - 1) * membersPageSize + 1}–
-                      {Math.min(membersPage * membersPageSize, filteredMembers.length)} of {filteredMembers.length}
-                    </span>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={membersPage <= 1}
-                        onClick={() => setMembersPage((p) => p - 1)}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={membersPage * membersPageSize >= filteredMembers.length}
-                        onClick={() => setMembersPage((p) => p + 1)}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )
-          })()}
-        </CardContent>
+                      ))}
+                    {filteredMembers.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                          {group.members.length === 0 ? 'No members' : 'No members match your search.'}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              <CardContent>
+                <Pagination
+                  page={membersPage}
+                  pageSize={membersPageSize}
+                  total={filteredMembers.length}
+                  onPageChange={setMembersPage}
+                  noun="members"
+                />
+              </CardContent>
+            </>
+          )
+        })()}
       </Card>
 
       {/* Delete */}

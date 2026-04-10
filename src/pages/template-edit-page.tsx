@@ -438,7 +438,7 @@ function VariableDropdown({
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <div className="border rounded-md bg-card">
+    <div className="border rounded-lg bg-card">
       <button
         type="button"
         className={`flex items-center gap-2 w-full px-3 py-2 text-sm font-medium hover:bg-accent/50 transition-colors cursor-pointer rounded-t-md ${!open ? 'rounded-b-md' : ''}`}

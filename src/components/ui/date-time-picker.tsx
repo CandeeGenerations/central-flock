@@ -163,7 +163,7 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
           <select
             value={hours}
             onChange={(e) => handleTimeChange(e.target.value, minutes)}
-            className="flex-1 h-9 rounded-md border border-input bg-background px-2 text-sm cursor-pointer"
+            className="flex-1 h-9 rounded-lg border border-input bg-background px-2 text-sm cursor-pointer"
           >
             {hourOptions.map((o) => (
               <option key={o.value} value={o.value}>
@@ -174,7 +174,7 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
           <select
             value={minutes}
             onChange={(e) => handleTimeChange(hours, e.target.value)}
-            className="flex-1 h-9 rounded-md border border-input bg-background px-2 text-sm cursor-pointer"
+            className="flex-1 h-9 rounded-lg border border-input bg-background px-2 text-sm cursor-pointer"
           >
             {minuteOptions.map((o) => (
               <option key={o.value} value={o.value}>

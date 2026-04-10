@@ -1,5 +1,6 @@
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
+import {Card, CardContent} from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -75,7 +76,7 @@ function TypeBadge({devotion}: {devotion: Devotion}) {
 function CheckboxCell({checked, onClick}: {checked: boolean; onClick: (e: React.MouseEvent) => void}) {
   return (
     <div
-      className="flex items-center justify-center cursor-pointer h-7 w-7 rounded-md border border-border hover:bg-muted/50 mx-auto"
+      className="flex items-center justify-center cursor-pointer h-7 w-7 rounded-lg border border-border hover:bg-muted/50 mx-auto"
       onClick={onClick}
     >
       {checked ? <Check className="h-4 w-4 text-green-600" /> : <X className="h-4 w-4 text-red-500" />}
@@ -249,79 +250,83 @@ export function DevotionListPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-        <SearchInput
-          placeholder="Search..."
-          value={search}
-          onChange={(v) => {
-            setSearch(v)
-            setPage(1)
-          }}
-          onClear={() => setPage(1)}
-          containerClassName="sm:max-w-sm"
-        />
-        <SearchableSelect
-          value={typeFilter}
-          onValueChange={(v) => {
-            setTypeFilter(v)
-            setPage(1)
-          }}
-          options={[
-            {value: 'all', label: 'All Types'},
-            {value: 'original', label: 'Original'},
-            {value: 'favorite', label: 'Favorite'},
-            {value: 'guest', label: 'Guest'},
-            {value: 'revisit', label: 'Revisit'},
-          ]}
-          className="w-full sm:w-40"
-          searchable={false}
-        />
-        <SearchableSelect
-          value={guestFilter}
-          onValueChange={(v) => {
-            setGuestFilter(v)
-            setPage(1)
-          }}
-          options={[
-            {value: 'all', label: 'All Speakers'},
-            {value: 'Tyler', label: 'Tyler'},
-            {value: 'Gabe', label: 'Gabe'},
-            {value: 'Ed', label: 'Ed'},
-          ]}
-          className="w-full sm:w-44"
-          searchable={false}
-        />
-        <SearchableSelect
-          value={statusFilter}
-          onValueChange={(v) => {
-            setStatusFilter(v)
-            setPage(1)
-          }}
-          options={[
-            {value: 'all', label: 'All'},
-            {value: 'complete', label: 'Complete'},
-            {value: 'incomplete', label: 'Incomplete'},
-          ]}
-          className="w-full sm:w-40"
-          searchable={false}
-        />
-        <SearchableSelect
-          value={monthFilter}
-          onValueChange={(v) => {
-            setMonthFilter(v)
-            setPage(1)
-          }}
-          options={monthOptions}
-          className="w-full sm:w-52"
-        />
-      </div>
+      <Card size="sm">
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+            <SearchInput
+              placeholder="Search..."
+              value={search}
+              onChange={(v) => {
+                setSearch(v)
+                setPage(1)
+              }}
+              onClear={() => setPage(1)}
+              containerClassName="sm:max-w-sm"
+            />
+            <SearchableSelect
+              value={typeFilter}
+              onValueChange={(v) => {
+                setTypeFilter(v)
+                setPage(1)
+              }}
+              options={[
+                {value: 'all', label: 'All Types'},
+                {value: 'original', label: 'Original'},
+                {value: 'favorite', label: 'Favorite'},
+                {value: 'guest', label: 'Guest'},
+                {value: 'revisit', label: 'Revisit'},
+              ]}
+              className="w-full sm:w-40"
+              searchable={false}
+            />
+            <SearchableSelect
+              value={guestFilter}
+              onValueChange={(v) => {
+                setGuestFilter(v)
+                setPage(1)
+              }}
+              options={[
+                {value: 'all', label: 'All Speakers'},
+                {value: 'Tyler', label: 'Tyler'},
+                {value: 'Gabe', label: 'Gabe'},
+                {value: 'Ed', label: 'Ed'},
+              ]}
+              className="w-full sm:w-44"
+              searchable={false}
+            />
+            <SearchableSelect
+              value={statusFilter}
+              onValueChange={(v) => {
+                setStatusFilter(v)
+                setPage(1)
+              }}
+              options={[
+                {value: 'all', label: 'All'},
+                {value: 'complete', label: 'Complete'},
+                {value: 'incomplete', label: 'Incomplete'},
+              ]}
+              className="w-full sm:w-40"
+              searchable={false}
+            />
+            <SearchableSelect
+              value={monthFilter}
+              onValueChange={(v) => {
+                setMonthFilter(v)
+                setPage(1)
+              }}
+              options={monthOptions}
+              className="w-full sm:w-52"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Table */}
       {isLoading ? (
         <PageSpinner />
       ) : (
         <>
-          <div className="border rounded-md overflow-x-auto bg-card">
+          <div className="border rounded-lg overflow-x-auto bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -435,11 +440,11 @@ export function DevotionListPage() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, data?.total || 0)} of {data?.total} devotions
-              </p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, data?.total || 0)} of {data?.total} devotions
+            </p>
+            {totalPages > 1 && (
               <div className="flex items-center gap-1">
                 <Button
                   variant="outline"
@@ -495,8 +500,8 @@ export function DevotionListPage() {
                   <ChevronsRight className="h-4 w-4" />
                 </Button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
     </div>

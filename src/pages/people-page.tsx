@@ -1,12 +1,15 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
+import {Card, CardContent} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Pagination} from '@/components/ui/pagination'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {SearchInput} from '@/components/ui/search-input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
@@ -175,8 +178,6 @@ export function PeoplePage() {
     })
   }
 
-  const totalPages = data ? Math.ceil(data.total / data.limit) : 1
-
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -188,9 +189,12 @@ export function PeoplePage() {
                 <EllipsisVertical className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-2 space-y-0.5" align="end">
+            <PopoverContent
+              className="w-auto gap-0 p-1.5 space-y-0.5 bg-popover/70 backdrop-blur-2xl backdrop-saturate-150"
+              align="end"
+            >
               <button
-                className="flex w-full items-center gap-2 text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+                className="flex w-full items-center gap-2.5 text-left text-sm font-medium px-3 py-2 rounded-2xl hover:bg-foreground/10 transition-colors cursor-pointer"
                 onClick={async () => {
                   try {
                     await exportPeopleCSV()
@@ -204,21 +208,21 @@ export function PeoplePage() {
                 Export CSV
               </button>
               <button
-                className="flex w-full items-center gap-2 text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+                className="flex w-full items-center gap-2.5 text-left text-sm font-medium px-3 py-2 rounded-2xl hover:bg-foreground/10 transition-colors cursor-pointer"
                 onClick={() => navigate('/import')}
               >
                 <Upload className="h-4 w-4" />
                 Import CSV
               </button>
               <button
-                className="flex w-full items-center gap-2 text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+                className="flex w-full items-center gap-2.5 text-left text-sm font-medium px-3 py-2 rounded-2xl hover:bg-foreground/10 transition-colors cursor-pointer"
                 onClick={() => navigate('/import/contacts')}
               >
                 <BookUser className="h-4 w-4" />
                 Import from Contacts
               </button>
               <button
-                className="flex w-full items-center gap-2 text-left text-sm px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+                className="flex w-full items-center gap-2.5 text-left text-sm font-medium px-3 py-2 rounded-2xl hover:bg-foreground/10 transition-colors cursor-pointer"
                 onClick={() => setDuplicatesOpen(true)}
               >
                 <Users className="h-4 w-4" />
@@ -250,7 +254,7 @@ export function PeoplePage() {
                         Name Duplicates ({duplicatesData.nameDuplicates.length})
                       </h3>
                       {duplicatesData.nameDuplicates.map((group, i) => (
-                        <div key={i} className="border rounded-md p-3 space-y-2">
+                        <div key={i} className="border rounded-lg p-3 space-y-2">
                           <p className="font-medium">{group.name}</p>
                           <Table>
                             <TableHeader>
@@ -302,7 +306,7 @@ export function PeoplePage() {
                         Similar Phone Numbers ({duplicatesData.phoneDuplicates.length})
                       </h3>
                       {duplicatesData.phoneDuplicates.map((group, i) => (
-                        <div key={i} className="border rounded-md p-3">
+                        <div key={i} className="border rounded-lg p-3">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -499,255 +503,245 @@ export function PeoplePage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <SearchInput
-          placeholder="Search name or phone..."
-          value={search}
-          onChange={(v) => {
-            setSearch(v)
-            setPage(1)
-          }}
-          onClear={() => setPage(1)}
-          containerClassName="sm:max-w-sm"
-        />
-        <SearchableSelect
-          value={statusFilter}
-          onValueChange={(v) => {
-            setStatusFilter(v)
-            setPage(1)
-          }}
-          options={[
-            {value: 'all', label: 'All Status'},
-            {value: 'active', label: 'Active'},
-            {value: 'inactive', label: 'Inactive'},
-            {value: 'do_not_contact', label: 'Do Not Contact'},
-          ]}
-          className="w-full sm:w-48"
-          searchable={false}
-        />
-      </div>
-
-      {/* Table */}
+      {/* Filters + Table */}
       {isLoading ? (
         <PageSpinner />
       ) : (
         <>
-          <div className="border rounded-md overflow-x-auto bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <button
-                      className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
-                      onClick={() => {
-                        if (sort === 'firstName') setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-                        else {
-                          setSort('firstName')
-                          setSortDir('asc')
-                        }
-                      }}
-                    >
-                      First Name
-                      {sort === 'firstName' ? (
-                        sortDir === 'asc' ? (
-                          <ArrowUp className="h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="h-3 w-3" />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-50" />
-                      )}
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button
-                      className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
-                      onClick={() => {
-                        if (sort === 'lastName') setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-                        else {
-                          setSort('lastName')
-                          setSortDir('asc')
-                        }
-                      }}
-                    >
-                      Last Name
-                      {sort === 'lastName' ? (
-                        sortDir === 'asc' ? (
-                          <ArrowUp className="h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="h-3 w-3" />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-50" />
-                      )}
-                    </button>
-                  </TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Groups</TableHead>
-                  <TableHead>Birthday</TableHead>
-                  <TableHead>Age</TableHead>
-                  <TableHead>Anniversary</TableHead>
-                  <TableHead>
-                    <button
-                      className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
-                      onClick={() => {
-                        if (sort === 'createdAt') setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-                        else {
-                          setSort('createdAt')
-                          setSortDir('desc')
-                        }
-                      }}
-                    >
-                      Date Added
-                      {sort === 'createdAt' ? (
-                        sortDir === 'asc' ? (
-                          <ArrowUp className="h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="h-3 w-3" />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-50" />
-                      )}
-                    </button>
-                  </TableHead>
-                  <TableHead className="w-24">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data?.data.map((person) => (
-                  <TableRow
-                    key={person.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/people/${person.id}`)}
-                  >
-                    <TableCell className="font-medium">
-                      {person.firstName || <em className="text-muted-foreground">—</em>}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {person.lastName || <em className="text-muted-foreground">—</em>}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {person.phoneDisplay || person.phoneNumber || <em>No phone</em>}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          person.status === 'active'
-                            ? 'default'
-                            : person.status === 'do_not_contact'
-                              ? 'destructive'
-                              : 'secondary'
-                        }
+          <Card size="sm">
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <SearchInput
+                  placeholder="Search name or phone..."
+                  value={search}
+                  onChange={(v) => {
+                    setSearch(v)
+                    setPage(1)
+                  }}
+                  onClear={() => setPage(1)}
+                  containerClassName="sm:max-w-sm"
+                />
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) => {
+                    setStatusFilter(v)
+                    setPage(1)
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="do_not_contact">Do Not Contact</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+            <div className="overflow-x-auto border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      <button
+                        className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
+                        onClick={() => {
+                          if (sort === 'firstName') setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                          else {
+                            setSort('firstName')
+                            setSortDir('asc')
+                          }
+                        }}
                       >
-                        {person.status === 'do_not_contact' ? 'do not contact' : person.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {person.groups?.slice(0, 3).map((g) => (
-                          <Badge key={g.id} variant="outline" className="text-xs">
-                            {g.name}
-                          </Badge>
-                        ))}
-                        {(person.groups?.length || 0) > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{person.groups!.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                      {person.birthMonth && person.birthDay
-                        ? `${new Date(2000, person.birthMonth - 1).toLocaleString('default', {month: 'short'})} ${person.birthDay}${person.birthYear ? `, ${person.birthYear}` : ''}`
-                        : '—'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                      {person.birthMonth && person.birthDay && person.birthYear
-                        ? (() => {
-                            const today = new Date()
-                            let age = today.getFullYear() - person.birthYear
-                            const hadBirthday =
-                              today.getMonth() + 1 > person.birthMonth ||
-                              (today.getMonth() + 1 === person.birthMonth && today.getDate() >= person.birthDay)
-                            if (!hadBirthday) age--
-                            return age
-                          })()
-                        : '—'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                      {person.anniversaryMonth && person.anniversaryDay
-                        ? `${new Date(2000, person.anniversaryMonth - 1).toLocaleString('default', {month: 'short'})} ${person.anniversaryDay}${person.anniversaryYear ? `, ${person.anniversaryYear}` : ''}`
-                        : '—'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                      {formatDate(person.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {person.status === 'do_not_contact' ? (
-                          <Button variant="ghost" size="icon" disabled title="Do Not Contact">
-                            <Ban className="h-4 w-4 text-destructive" />
-                          </Button>
+                        First Name
+                        {sort === 'firstName' ? (
+                          sortDir === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
                         ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-50" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
+                        onClick={() => {
+                          if (sort === 'lastName') setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                          else {
+                            setSort('lastName')
+                            setSortDir('asc')
+                          }
+                        }}
+                      >
+                        Last Name
+                        {sort === 'lastName' ? (
+                          sortDir === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-50" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Groups</TableHead>
+                    <TableHead>Birthday</TableHead>
+                    <TableHead>Age</TableHead>
+                    <TableHead>Anniversary</TableHead>
+                    <TableHead>
+                      <button
+                        className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
+                        onClick={() => {
+                          if (sort === 'createdAt') setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                          else {
+                            setSort('createdAt')
+                            setSortDir('desc')
+                          }
+                        }}
+                      >
+                        Date Added
+                        {sort === 'createdAt' ? (
+                          sortDir === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-50" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead className="w-24">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data?.data.map((person) => (
+                    <TableRow
+                      key={person.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/people/${person.id}`)}
+                    >
+                      <TableCell className="font-medium">
+                        {person.firstName || <em className="text-muted-foreground">—</em>}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {person.lastName || <em className="text-muted-foreground">—</em>}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {person.phoneDisplay || person.phoneNumber || <em>No phone</em>}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            person.status === 'active'
+                              ? 'default'
+                              : person.status === 'do_not_contact'
+                                ? 'destructive'
+                                : 'secondary'
+                          }
+                        >
+                          {person.status === 'do_not_contact' ? 'do not contact' : person.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {person.groups?.slice(0, 3).map((g) => (
+                            <Badge key={g.id} variant="outline" className="text-xs">
+                              {g.name}
+                            </Badge>
+                          ))}
+                          {(person.groups?.length || 0) > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{person.groups!.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {person.birthMonth && person.birthDay
+                          ? `${new Date(2000, person.birthMonth - 1).toLocaleString('default', {month: 'short'})} ${person.birthDay}${person.birthYear ? `, ${person.birthYear}` : ''}`
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {person.birthMonth && person.birthDay && person.birthYear
+                          ? (() => {
+                              const today = new Date()
+                              let age = today.getFullYear() - person.birthYear
+                              const hadBirthday =
+                                today.getMonth() + 1 > person.birthMonth ||
+                                (today.getMonth() + 1 === person.birthMonth && today.getDate() >= person.birthDay)
+                              if (!hadBirthday) age--
+                              return age
+                            })()
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {person.anniversaryMonth && person.anniversaryDay
+                          ? `${new Date(2000, person.anniversaryMonth - 1).toLocaleString('default', {month: 'short'})} ${person.anniversaryDay}${person.anniversaryYear ? `, ${person.anniversaryYear}` : ''}`
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {formatDate(person.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {person.status === 'do_not_contact' ? (
+                            <Button variant="ghost" size="icon" disabled title="Do Not Contact">
+                              <Ban className="h-4 w-4 text-destructive" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleMutation.mutate(person.id)
+                              }}
+                              title={person.status === 'active' ? 'Deactivate' : 'Activate'}
+                            >
+                              {person.status === 'active' ? (
+                                <ToggleRight className="h-4 w-4" />
+                              ) : (
+                                <ToggleLeft className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={(e) => {
                               e.stopPropagation()
-                              toggleMutation.mutate(person.id)
+                              setDeleteTarget(person.id)
                             }}
-                            title={person.status === 'active' ? 'Deactivate' : 'Activate'}
                           >
-                            {person.status === 'active' ? (
-                              <ToggleRight className="h-4 w-4" />
-                            ) : (
-                              <ToggleLeft className="h-4 w-4" />
-                            )}
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDeleteTarget(person.id)
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {data?.data.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                      No people found. Try importing from CSV or adding one manually.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, data?.total || 0)} of {data?.total} people
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                  Previous
-                </Button>
-                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                  Next
-                </Button>
-              </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {data?.data.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                        No people found. Try importing from CSV or adding one manually.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          )}
+            <CardContent>
+              <Pagination page={page} pageSize={50} total={data?.total || 0} onPageChange={setPage} noun="people" />
+            </CardContent>
+          </Card>
         </>
       )}
       <ConfirmDialog

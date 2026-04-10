@@ -324,7 +324,7 @@ export function ContactsImportPage() {
       )}
 
       {/* Contacts table */}
-      <div className="border rounded-md overflow-auto max-h-[60vh] bg-card">
+      <div className="border rounded-lg overflow-auto max-h-[60vh] bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -465,7 +465,7 @@ export function ContactsImportPage() {
         </button>
 
         {showDismissed && dismissedData && (
-          <div className="mt-3 border rounded-md overflow-auto max-h-64 bg-card">
+          <div className="mt-3 border rounded-lg overflow-auto max-h-64 bg-card">
             <Table>
               <TableHeader>
                 <TableRow>

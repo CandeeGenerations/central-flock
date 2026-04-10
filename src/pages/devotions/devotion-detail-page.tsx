@@ -426,7 +426,7 @@ export function DevotionDetailPage() {
                     {copiedField === key ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
-                <p className="text-sm bg-muted rounded-md p-3 font-mono whitespace-pre-wrap">{value}</p>
+                <p className="text-sm bg-muted rounded-lg p-3 font-mono whitespace-pre-wrap">{value}</p>
               </div>
             ))}
           </CardContent>
@@ -453,7 +453,7 @@ export function DevotionDetailPage() {
                   {copiedField === 'songTitle' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 </Button>
               </div>
-              <p className="text-sm bg-muted rounded-md p-3 font-mono">{songTitle || '—'}</p>
+              <p className="text-sm bg-muted rounded-lg p-3 font-mono">{songTitle || '—'}</p>
             </div>
 
             <div>
@@ -473,7 +473,7 @@ export function DevotionDetailPage() {
                   )}
                 </Button>
               </div>
-              <p className="text-sm bg-muted rounded-md p-3 font-mono whitespace-pre-wrap">{songDescription || '—'}</p>
+              <p className="text-sm bg-muted rounded-lg p-3 font-mono whitespace-pre-wrap">{songDescription || '—'}</p>
             </div>
           </CardContent>
         </Card>

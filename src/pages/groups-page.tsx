@@ -1,8 +1,10 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Button} from '@/components/ui/button'
+import {Card, CardContent} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
@@ -42,6 +44,8 @@ export function GroupsPage() {
   const [newGroup, setNewGroup] = useState({name: '', description: ''})
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 250)
+  const [page, setPage] = usePersistedState('groups.page', 1)
+  const pageSize = 25
   const [sortKey, setSortKey] = usePersistedState<SortKey>('groups.sortKey', 'name')
   const [sortDir, setSortDir] = usePersistedState<SortDir>('groups.sortDir', 'asc')
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -110,6 +114,8 @@ export function GroupsPage() {
     onError: (err: Error) => toast.error(err.message),
   })
 
+  const paginatedGroups = filteredGroups.slice((page - 1) * pageSize, page * pageSize)
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -159,95 +165,109 @@ export function GroupsPage() {
         </Dialog>
       </div>
 
-      {/* Search */}
-      <SearchInput
-        placeholder="Search groups..."
-        value={search}
-        onChange={setSearch}
-        containerClassName="sm:max-w-sm"
-      />
-
       {isLoading ? (
         <PageSpinner />
       ) : (
-        <div className="border rounded-md overflow-x-auto bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <button className="flex items-center font-bold cursor-pointer" onClick={() => toggleSort('name')}>
-                    Name {sortIcon('name')}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button
-                    className="flex items-center font-bold cursor-pointer"
-                    onClick={() => toggleSort('memberCount')}
-                  >
-                    Members {sortIcon('memberCount')}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button
-                    className="flex items-center font-bold cursor-pointer"
-                    onClick={() => toggleSort('createdAt')}
-                  >
-                    Created {sortIcon('createdAt')}
-                  </button>
-                </TableHead>
-                <TableHead className="w-24">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredGroups.map((group) => (
-                <TableRow
-                  key={group.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/groups/${group.id}`)}
-                >
-                  <TableCell className="font-medium">
-                    {group.name}
-                    {group.description && (
-                      <span className="text-muted-foreground font-normal"> ({group.description})</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{group.memberCount}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                    {formatDate(group.createdAt)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Link to={`/messages/compose?groupId=${group.id}`} onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" title="Send message to group">
-                          <MessageSquare className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setDeleteTarget({id: group.id, name: group.name})
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredGroups.length === 0 && (
+        <Card size="sm">
+          <CardContent>
+            <SearchInput
+              placeholder="Search groups..."
+              value={search}
+              onChange={(v) => {
+                setSearch(v)
+                setPage(1)
+              }}
+              containerClassName="sm:max-w-sm"
+            />
+          </CardContent>
+          <div className="overflow-x-auto border-t">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                    {groups?.length === 0
-                      ? 'No groups yet. Create one or import from CSV.'
-                      : 'No groups match your search.'}
-                  </TableCell>
+                  <TableHead>
+                    <button className="flex items-center font-bold cursor-pointer" onClick={() => toggleSort('name')}>
+                      Name {sortIcon('name')}
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button
+                      className="flex items-center font-bold cursor-pointer"
+                      onClick={() => toggleSort('memberCount')}
+                    >
+                      Members {sortIcon('memberCount')}
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button
+                      className="flex items-center font-bold cursor-pointer"
+                      onClick={() => toggleSort('createdAt')}
+                    >
+                      Created {sortIcon('createdAt')}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {paginatedGroups.map((group) => (
+                  <TableRow
+                    key={group.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/groups/${group.id}`)}
+                  >
+                    <TableCell className="font-medium">
+                      {group.name}
+                      {group.description && (
+                        <span className="text-muted-foreground font-normal"> ({group.description})</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{group.memberCount}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                      {formatDate(group.createdAt)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Link to={`/messages/compose?groupId=${group.id}`} onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" title="Send message to group">
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeleteTarget({id: group.id, name: group.name})
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredGroups.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      {groups?.length === 0
+                        ? 'No groups yet. Create one or import from CSV.'
+                        : 'No groups match your search.'}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <CardContent>
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={filteredGroups.length}
+              onPageChange={setPage}
+              noun="groups"
+            />
+          </CardContent>
+        </Card>
       )}
       <ConfirmDialog
         open={!!deleteTarget}

@@ -325,22 +325,24 @@ function StatCard({
   alert?: boolean
 }) {
   return (
-    <Card className="bg-card shadow-none hover:bg-muted/50 transition-colors">
-      <div className="px-4 pt-3 pb-3 md:px-5 md:pt-4 md:pb-4 space-y-1">
-        <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+    <Card size="sm" className="hover:bg-muted/50 transition-colors">
+      <CardHeader>
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
           {icon}
           {label}
-        </p>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
         <span className={`text-3xl md:text-[28px] font-bold leading-none block ${alert ? 'text-amber-500' : ''}`}>
           {value}
         </span>
         {sublabel && (
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
             {sublabel}
             <ArrowRight className="h-3 w-3" />
           </p>
         )}
-      </div>
+      </CardContent>
     </Card>
   )
 }

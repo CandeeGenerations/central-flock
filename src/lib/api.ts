@@ -101,7 +101,7 @@ export function fetchPerson(id: number) {
   return request<Person>(`/people/${id}`)
 }
 
-export function createPerson(data: Partial<Person>) {
+export function createPerson(data: Partial<Person> & {groupIds?: number[]}) {
   return request<Person>('/people', {
     method: 'POST',
     body: JSON.stringify(data),

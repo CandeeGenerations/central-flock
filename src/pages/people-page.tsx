@@ -21,12 +21,13 @@ import {
   deletePerson,
   exportPeopleCSV,
   fetchDuplicates,
+  fetchGroups,
   fetchPeople,
   togglePersonStatus,
 } from '@/lib/api'
 import {formatDate} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
-import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
+import {cn, maskPhoneDisplay, phoneToE164} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {
   ArrowDown,
@@ -42,8 +43,9 @@ import {
   Trash2,
   Upload,
   Users,
+  X,
 } from 'lucide-react'
-import {useState} from 'react'
+import {useMemo, useRef, useState} from 'react'
 import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -59,6 +61,11 @@ export function PeoplePage() {
   const [addOpenLocal, setAddOpenLocal] = useState(false)
   const addOpen = addFromParam || addOpenLocal
   const setAddOpen = (open: boolean) => {
+    if (open) {
+      setSelectedGroupIds(new Set())
+      setGroupSearch('')
+      setGroupHighlight(-1)
+    }
     setAddOpenLocal(open)
     if (!open && addFromParam) {
       setSearchParams(
@@ -74,6 +81,11 @@ export function PeoplePage() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [sort, setSort] = usePersistedState<'createdAt' | 'firstName' | 'lastName'>('people.sort', 'createdAt')
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('people.sortDir', 'desc')
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(new Set())
+  const [groupSearch, setGroupSearch] = useState('')
+  const debouncedGroupSearch = useDebouncedValue(groupSearch, 200)
+  const [groupHighlight, setGroupHighlight] = useState(-1)
+  const groupSearchRef = useRef<HTMLInputElement>(null)
   const [newPerson, setNewPerson] = useState({
     firstName: '',
     lastName: '',
@@ -106,13 +118,40 @@ export function PeoplePage() {
     enabled: duplicatesOpen,
   })
 
+  const {data: groups} = useQuery({
+    queryKey: queryKeys.groups,
+    queryFn: fetchGroups,
+  })
+
+  const groupResults = useMemo(() => {
+    if (!groups) return []
+    const q = debouncedGroupSearch?.toLowerCase()
+    return groups.filter((g) => !selectedGroupIds.has(g.id) && (!q || g.name.toLowerCase().includes(q)))
+  }, [debouncedGroupSearch, groups, selectedGroupIds])
+
+  const handleGroupKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setGroupHighlight((h) => Math.min(h + 1, groupResults.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setGroupHighlight((h) => Math.max(h - 1, 0))
+    } else if (e.key === 'Enter' && groupHighlight >= 0 && groupResults[groupHighlight]) {
+      e.preventDefault()
+      setSelectedGroupIds((prev) => new Set([...prev, groupResults[groupHighlight].id]))
+      setGroupSearch('')
+      setGroupHighlight(-1)
+    }
+  }
+
   const totalDuplicateGroups =
     (duplicatesData?.nameDuplicates.length || 0) + (duplicatesData?.phoneDuplicates.length || 0)
 
   const createMutation = useMutation({
-    mutationFn: (data: Partial<Person>) => createPerson(data),
+    mutationFn: (data: Partial<Person> & {groupIds?: number[]}) => createPerson(data),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.people})
+      queryClient.invalidateQueries({queryKey: queryKeys.groups})
       setAddOpen(false)
       setNewPerson({
         firstName: '',
@@ -126,6 +165,8 @@ export function PeoplePage() {
         anniversaryDay: null,
         anniversaryYear: null,
       })
+      setSelectedGroupIds(new Set())
+      setGroupSearch('')
       toast.success('Person created')
     },
     onError: (err: Error) => toast.error(err.message),
@@ -176,6 +217,7 @@ export function PeoplePage() {
       anniversaryMonth: newPerson.anniversaryMonth,
       anniversaryDay: newPerson.anniversaryDay,
       anniversaryYear: newPerson.anniversaryYear,
+      groupIds: selectedGroupIds.size > 0 ? [...selectedGroupIds] : undefined,
     })
   }
 
@@ -490,6 +532,78 @@ export function PeoplePage() {
                     />
                   </div>
                 </div>
+                {groups && groups.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Groups</Label>
+                    <SearchInput
+                      ref={groupSearchRef}
+                      placeholder="Search groups to add..."
+                      value={groupSearch}
+                      onChange={(v) => {
+                        setGroupSearch(v)
+                        setGroupHighlight(-1)
+                      }}
+                      onKeyDown={handleGroupKeyDown}
+                      hideShortcut
+                    />
+                    <div className="rounded-xl overflow-hidden bg-popover/70 backdrop-blur-2xl backdrop-saturate-150 shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10">
+                      <div className="max-h-36 overflow-auto p-1.5">
+                        {groupResults.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-3">
+                            {debouncedGroupSearch ? 'No matching groups found' : 'All groups selected'}
+                          </p>
+                        ) : (
+                          groupResults.map((g, i) => (
+                            <button
+                              key={g.id}
+                              ref={i === groupHighlight ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
+                              type="button"
+                              className={cn(
+                                'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg cursor-pointer text-sm font-medium text-left',
+                                i === groupHighlight ? 'bg-foreground/10' : 'hover:bg-foreground/10',
+                              )}
+                              onClick={() => {
+                                setSelectedGroupIds((prev) => new Set([...prev, g.id]))
+                                setGroupSearch('')
+                                setGroupHighlight(-1)
+                                groupSearchRef.current?.focus()
+                              }}
+                            >
+                              <span>{g.name}</span>
+                              {g.memberCount != null && (
+                                <span className="text-muted-foreground ml-auto">
+                                  {g.memberCount} member{g.memberCount !== 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    {selectedGroupIds.size > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {groups
+                          .filter((g) => selectedGroupIds.has(g.id))
+                          .map((g) => (
+                            <Badge
+                              key={g.id}
+                              className="gap-1 cursor-pointer bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:hover:bg-teal-800 border-0"
+                              onClick={() =>
+                                setSelectedGroupIds((prev) => {
+                                  const next = new Set(prev)
+                                  next.delete(g.id)
+                                  return next
+                                })
+                              }
+                            >
+                              {g.name}
+                              <X className="h-3 w-3 ml-0.5" />
+                            </Badge>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setAddOpen(false)}>

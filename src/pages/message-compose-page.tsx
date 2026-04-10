@@ -375,10 +375,11 @@ export function MessageComposePage() {
   }, [recipientMode, groupDetail, selectedIndividualIds, groupMemberIds])
 
   const excludeResults = useMemo(() => {
-    if (!debouncedExcludeSearch || !groupDetail) return []
-    const q = debouncedExcludeSearch.toLowerCase()
+    if (!groupDetail) return []
+    const q = debouncedExcludeSearch?.toLowerCase()
     return groupDetail.members.filter((m) => {
       if (excludeIds.has(m.id)) return false
+      if (!q) return true
       const name = formatFullName(m, '').toLowerCase()
       const phone = (m.phoneDisplay || m.phoneNumber || '').toLowerCase()
       return name.includes(q) || phone.includes(q)
@@ -390,28 +391,29 @@ export function MessageComposePage() {
       if (!excludeResults.length) return
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setExcludeHighlight((i) => (i < excludeResults.length - 1 ? i + 1 : 0))
+        setExcludeHighlight((i) => Math.min(i + 1, excludeResults.length - 1))
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setExcludeHighlight((i) => (i > 0 ? i - 1 : excludeResults.length - 1))
+        setExcludeHighlight((i) => Math.max(i - 1, 0))
       } else if (e.key === 'Enter' && excludeHighlight >= 0 && excludeHighlight < excludeResults.length) {
         e.preventDefault()
-        toggleExclude(excludeResults[excludeHighlight].id)
+        setExcludeIds((prev) => new Set([...prev, excludeResults[excludeHighlight].id]))
         setExcludeSearch('')
         setExcludeHighlight(-1)
         excludeSearchRef.current?.focus()
       }
     },
-    [excludeResults, excludeHighlight, toggleExclude],
+    [excludeResults, excludeHighlight],
   )
 
   const individualResults = useMemo(() => {
-    if (!debouncedIndividualSearch || !allPeople) return []
-    const q = debouncedIndividualSearch.toLowerCase()
+    if (!allPeople) return []
+    const q = debouncedIndividualSearch?.toLowerCase()
     return allPeople.data.filter((p) => {
       if (!p.phoneNumber) return false
       if (selectedIndividualIds.has(p.id)) return false
       if (recipientMode === 'group' && groupMemberIds.has(p.id)) return false
+      if (!q) return true
       const name = formatFullName(p, '').toLowerCase()
       const phone = (p.phoneDisplay || p.phoneNumber || '').toLowerCase()
       return name.includes(q) || phone.includes(q)
@@ -423,19 +425,19 @@ export function MessageComposePage() {
       if (!individualResults.length) return
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setIndividualHighlight((i) => (i < individualResults.length - 1 ? i + 1 : 0))
+        setIndividualHighlight((i) => Math.min(i + 1, individualResults.length - 1))
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setIndividualHighlight((i) => (i > 0 ? i - 1 : individualResults.length - 1))
+        setIndividualHighlight((i) => Math.max(i - 1, 0))
       } else if (e.key === 'Enter' && individualHighlight >= 0 && individualHighlight < individualResults.length) {
         e.preventDefault()
-        toggleIndividual(individualResults[individualHighlight].id)
+        setSelectedIndividualIds((prev) => new Set([...prev, individualResults[individualHighlight].id]))
         setIndividualSearch('')
         setIndividualHighlight(-1)
         individualSearchRef.current?.focus()
       }
     },
-    [individualResults, individualHighlight, toggleIndividual],
+    [individualResults, individualHighlight],
   )
 
   // Build resolved custom var values for preview and send
@@ -659,51 +661,79 @@ export function MessageComposePage() {
 
                 {/* Add individuals search */}
                 {allPeople && (
-                  <div className="space-y-2">
-                    {recipientMode === 'group' && (
-                      <Label className="text-xs text-muted-foreground">Add people outside this group (optional)</Label>
-                    )}
-                    <SearchInput
-                      ref={individualSearchRef}
-                      placeholder="Search people to add..."
-                      value={individualSearch}
-                      onChange={(v) => {
-                        setIndividualSearch(v)
-                        setIndividualHighlight(-1)
-                      }}
-                      onKeyDown={handleIndividualKeyDown}
-                    />
-                    {debouncedIndividualSearch && (
-                      <div className="rounded-3xl max-h-36 overflow-auto p-1.5 bg-popover/70 backdrop-blur-2xl backdrop-saturate-150 shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10">
-                        {individualResults.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-3">No matching people found</p>
-                        ) : (
-                          individualResults.map((p, i) => (
-                            <button
-                              key={p.id}
-                              ref={
-                                i === individualHighlight ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined
-                              }
-                              type="button"
-                              className={cn(
-                                'flex items-center gap-2.5 w-full px-3 py-2 rounded-2xl cursor-pointer text-sm font-medium text-left',
-                                i === individualHighlight ? 'bg-foreground/10' : 'hover:bg-foreground/10',
-                              )}
-                              onClick={() => {
-                                toggleIndividual(p.id)
-                                setIndividualSearch('')
-                                setIndividualHighlight(-1)
-                                individualSearchRef.current?.focus()
-                              }}
-                            >
-                              <span>{formatFullName(p, '') || <em className="opacity-50">Unnamed</em>}</span>
-                              <span className="text-muted-foreground ml-auto">{p.phoneDisplay}</span>
-                            </button>
-                          ))
-                        )}
+                  <VariableDropdown
+                    label={recipientMode === 'group' ? 'Add people outside this group' : 'Add people'}
+                    count={selectedIndividualIds.size}
+                  >
+                    <div className="space-y-2">
+                      <SearchInput
+                        ref={individualSearchRef}
+                        placeholder="Search people to add..."
+                        value={individualSearch}
+                        onChange={(v) => {
+                          setIndividualSearch(v)
+                          setIndividualHighlight(-1)
+                        }}
+                        onKeyDown={handleIndividualKeyDown}
+                        hideShortcut
+                      />
+                      <div className="rounded-xl overflow-hidden bg-popover/70 backdrop-blur-2xl backdrop-saturate-150 shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10">
+                        <div className="max-h-48 overflow-auto p-1.5">
+                          {individualResults.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-3">
+                              {debouncedIndividualSearch ? 'No matching people found' : 'All people selected'}
+                            </p>
+                          ) : (
+                            individualResults.map((p, i) => (
+                              <button
+                                key={p.id}
+                                ref={
+                                  i === individualHighlight ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined
+                                }
+                                type="button"
+                                className={cn(
+                                  'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg cursor-pointer text-sm font-medium text-left',
+                                  i === individualHighlight ? 'bg-foreground/10' : 'hover:bg-foreground/10',
+                                )}
+                                onClick={() => {
+                                  setSelectedIndividualIds((prev) => new Set([...prev, p.id]))
+                                  setIndividualSearch('')
+                                  setIndividualHighlight(-1)
+                                  individualSearchRef.current?.focus()
+                                }}
+                              >
+                                <span>{formatFullName(p, '') || <em className="opacity-50">Unnamed</em>}</span>
+                                <span className="text-muted-foreground ml-auto">{p.phoneDisplay}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
+                      {selectedIndividualIds.size > 0 && allPeople && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {allPeople.data
+                            .filter(
+                              (p) =>
+                                selectedIndividualIds.has(p.id) &&
+                                (recipientMode === 'individual' || !groupMemberIds.has(p.id)),
+                            )
+                            .map((p) => (
+                              <Badge
+                                key={p.id}
+                                className="gap-1 cursor-pointer bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:hover:bg-teal-800 border-0"
+                                onClick={() => toggleIndividual(p.id)}
+                              >
+                                {formatFullName(p)}
+                                {p.phoneDisplay && (
+                                  <span className="text-teal-600 dark:text-teal-400">- {p.phoneDisplay}</span>
+                                )}
+                                <X className="h-3 w-3 ml-0.5" />
+                              </Badge>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </VariableDropdown>
                 )}
 
                 {/* Recipient tags */}
@@ -714,26 +744,6 @@ export function MessageComposePage() {
                       {groupDetail.name} ({groupDetail.members.filter((m) => !excludeIds.has(m.id)).length})
                     </Badge>
                   )}
-                  {allPeople &&
-                    allPeople.data
-                      .filter(
-                        (p) =>
-                          selectedIndividualIds.has(p.id) &&
-                          (recipientMode === 'individual' || !groupMemberIds.has(p.id)),
-                      )
-                      .map((p) => (
-                        <Badge
-                          key={p.id}
-                          className="gap-1 cursor-pointer bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:hover:bg-teal-800 border-0"
-                          onClick={() => toggleIndividual(p.id)}
-                        >
-                          {formatFullName(p)}
-                          {p.phoneDisplay && (
-                            <span className="text-teal-600 dark:text-teal-400">- {p.phoneDisplay}</span>
-                          )}
-                          <X className="h-3 w-3 ml-0.5" />
-                        </Badge>
-                      ))}
                   {excludeIds.size > 0 && (
                     <Badge variant="outline" className="text-muted-foreground">
                       {excludeIds.size} excluded
@@ -743,64 +753,69 @@ export function MessageComposePage() {
 
                 {/* Exclusion list for group mode */}
                 {recipientMode === 'group' && groupDetail && groupDetail.members.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Exclude from send (optional)</Label>
-                    <SearchInput
-                      ref={excludeSearchRef}
-                      placeholder="Search members to exclude..."
-                      value={excludeSearch}
-                      onChange={(v) => {
-                        setExcludeSearch(v)
-                        setExcludeHighlight(-1)
-                      }}
-                      onKeyDown={handleExcludeKeyDown}
-                      hideShortcut
-                    />
-                    {debouncedExcludeSearch && (
-                      <div className="rounded-3xl max-h-36 overflow-auto p-1.5 bg-popover/70 backdrop-blur-2xl backdrop-saturate-150 shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10">
-                        {excludeResults.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-3">No matching members found</p>
-                        ) : (
-                          excludeResults.map((m, i) => (
-                            <button
-                              key={m.id}
-                              ref={i === excludeHighlight ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
-                              type="button"
-                              className={cn(
-                                'flex items-center gap-2.5 w-full px-3 py-2 rounded-2xl cursor-pointer text-sm font-medium text-left',
-                                i === excludeHighlight ? 'bg-foreground/10' : 'hover:bg-foreground/10',
-                              )}
-                              onClick={() => {
-                                toggleExclude(m.id)
-                                setExcludeSearch('')
-                                setExcludeHighlight(-1)
-                                excludeSearchRef.current?.focus()
-                              }}
-                            >
-                              <span>{formatFullName(m, '') || <em className="opacity-50">Unnamed</em>}</span>
-                              <span className="text-muted-foreground ml-auto">{m.phoneDisplay}</span>
-                            </button>
-                          ))
-                        )}
+                  <VariableDropdown label="Exclude from send" count={excludeIds.size}>
+                    <div className="space-y-2">
+                      <SearchInput
+                        ref={excludeSearchRef}
+                        placeholder="Search members to exclude..."
+                        value={excludeSearch}
+                        onChange={(v) => {
+                          setExcludeSearch(v)
+                          setExcludeHighlight(-1)
+                        }}
+                        onKeyDown={handleExcludeKeyDown}
+                        hideShortcut
+                      />
+                      <div className="rounded-xl overflow-hidden bg-popover/70 backdrop-blur-2xl backdrop-saturate-150 shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10">
+                        <div className="max-h-48 overflow-auto p-1.5">
+                          {excludeResults.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-3">
+                              {debouncedExcludeSearch ? 'No matching members found' : 'All members excluded'}
+                            </p>
+                          ) : (
+                            excludeResults.map((m, i) => (
+                              <button
+                                key={m.id}
+                                ref={
+                                  i === excludeHighlight ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined
+                                }
+                                type="button"
+                                className={cn(
+                                  'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg cursor-pointer text-sm font-medium text-left',
+                                  i === excludeHighlight ? 'bg-foreground/10' : 'hover:bg-foreground/10',
+                                )}
+                                onClick={() => {
+                                  setExcludeIds((prev) => new Set([...prev, m.id]))
+                                  setExcludeSearch('')
+                                  setExcludeHighlight(-1)
+                                  excludeSearchRef.current?.focus()
+                                }}
+                              >
+                                <span>{formatFullName(m, '') || <em className="opacity-50">Unnamed</em>}</span>
+                                <span className="text-muted-foreground ml-auto">{m.phoneDisplay}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
                       </div>
-                    )}
-                    {excludeIds.size > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {groupDetail.members
-                          .filter((m) => excludeIds.has(m.id))
-                          .map((m) => (
-                            <Badge
-                              key={m.id}
-                              className="gap-1 cursor-pointer bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900 dark:text-red-200 dark:hover:bg-red-800 border-0"
-                              onClick={() => toggleExclude(m.id)}
-                            >
-                              {formatFullName(m)}
-                              <X className="h-3 w-3 ml-0.5" />
-                            </Badge>
-                          ))}
-                      </div>
-                    )}
-                  </div>
+                      {excludeIds.size > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {groupDetail.members
+                            .filter((m) => excludeIds.has(m.id))
+                            .map((m) => (
+                              <Badge
+                                key={m.id}
+                                className="gap-1 cursor-pointer bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900 dark:text-red-200 dark:hover:bg-red-800 border-0"
+                                onClick={() => toggleExclude(m.id)}
+                              >
+                                {formatFullName(m)}
+                                <X className="h-3 w-3 ml-0.5" />
+                              </Badge>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </VariableDropdown>
                 )}
               </div>
             </CardContent>

@@ -2,7 +2,6 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Checkbox} from '@/components/ui/checkbox'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
@@ -12,7 +11,6 @@ import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
-import {useSetToggle} from '@/hooks/use-set-toggle'
 import {
   type Person,
   addGroupMembers,
@@ -27,7 +25,7 @@ import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Download, MessageSquare, Save, Trash2, UserMinus, UserPlus, UserX} from 'lucide-react'
+import {ArrowLeft, Download, MessageSquare, Save, Trash2, UserMinus, UserPlus, UserX, X} from 'lucide-react'
 import {useCallback, useMemo, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -81,23 +79,34 @@ export function GroupDetailPage() {
   })
 
   const nonMembers = useMemo(() => nonMembersData?.pages.flatMap((p) => p.data) || [], [nonMembersData])
-  const toggleSelected = useSetToggle(setSelectedIds)
+
+  const [selectedPeople, setSelectedPeople] = useState<Person[]>([])
+  const visibleNonMembers = useMemo(() => nonMembers.filter((p) => !selectedIds.has(p.id)), [nonMembers, selectedIds])
+  const memberSearchRef = useRef<HTMLInputElement>(null)
+
+  const addSelectedPerson = (person: Person) => {
+    setSelectedIds((prev) => new Set([...prev, person.id]))
+    setSelectedPeople((prev) => [...prev, person])
+    setMemberSearch('')
+    setHighlightIndex(-1)
+    memberSearchRef.current?.focus()
+  }
 
   const handleMemberSearchKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (nonMembers.length === 0) return
+      if (visibleNonMembers.length === 0) return
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setHighlightIndex((i) => (i < nonMembers.length - 1 ? i + 1 : 0))
+        setHighlightIndex((i) => Math.min(i + 1, visibleNonMembers.length - 1))
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setHighlightIndex((i) => (i > 0 ? i - 1 : nonMembers.length - 1))
-      } else if (e.key === 'Enter' && highlightIndex >= 0 && highlightIndex < nonMembers.length) {
+        setHighlightIndex((i) => Math.max(i - 1, 0))
+      } else if (e.key === 'Enter' && highlightIndex >= 0 && visibleNonMembers[highlightIndex]) {
         e.preventDefault()
-        toggleSelected(nonMembers[highlightIndex].id)
+        addSelectedPerson(visibleNonMembers[highlightIndex])
       }
     },
-    [nonMembers, highlightIndex, toggleSelected],
+    [visibleNonMembers, highlightIndex],
   )
 
   const observerRef = useRef<IntersectionObserver | null>(null)
@@ -146,6 +155,8 @@ export function GroupDetailPage() {
       invalidateGroupMembership()
       queryClient.invalidateQueries({queryKey: ['nonMembers']})
       setSelectedIds(new Set())
+      setSelectedPeople([])
+      setMemberSearch('')
       setAddMembersOpen(false)
       toast.success('Members added')
     },
@@ -277,7 +288,17 @@ export function GroupDetailPage() {
                 Remove Inactive/DNC ({inactiveMembers.length})
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setAddMembersOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedIds(new Set())
+                setSelectedPeople([])
+                setMemberSearch('')
+                setHighlightIndex(-1)
+                setAddMembersOpen(true)
+              }}
+            >
               <UserPlus className="h-4 w-4 mr-1" />
               Add Members
             </Button>
@@ -385,35 +406,66 @@ export function GroupDetailPage() {
           <DialogHeader>
             <DialogTitle>Add Members to {group.name}</DialogTitle>
           </DialogHeader>
-          <SearchInput
-            placeholder="Search people..."
-            value={memberSearch}
-            onChange={(v) => {
-              setMemberSearch(v)
-              setHighlightIndex(-1)
-            }}
-            onKeyDown={handleMemberSearchKeyDown}
-          />
-          <div className="flex-1 overflow-auto space-y-1 min-h-0 max-h-64">
-            {nonMembers.map((p, i) => (
-              <label
-                key={p.id}
-                ref={i === highlightIndex ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
-                className={cn(
-                  'group flex items-center gap-3 px-3 py-2 rounded cursor-pointer',
-                  i === highlightIndex
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent hover:text-accent-foreground',
+          <div className="space-y-2">
+            <SearchInput
+              ref={memberSearchRef}
+              placeholder="Search people..."
+              value={memberSearch}
+              onChange={(v) => {
+                setMemberSearch(v)
+                setHighlightIndex(-1)
+              }}
+              onKeyDown={handleMemberSearchKeyDown}
+              hideShortcut
+            />
+            <div className="rounded-xl overflow-hidden bg-popover/70 backdrop-blur-2xl backdrop-saturate-150 shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10">
+              <div className="max-h-48 overflow-auto p-1.5">
+                {visibleNonMembers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-3">No people to add</p>
+                ) : (
+                  visibleNonMembers.map((p, i) => (
+                    <button
+                      key={p.id}
+                      ref={i === highlightIndex ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
+                      type="button"
+                      className={cn(
+                        'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg cursor-pointer text-sm font-medium text-left',
+                        i === highlightIndex ? 'bg-foreground/10' : 'hover:bg-foreground/10',
+                      )}
+                      onClick={() => addSelectedPerson(p)}
+                    >
+                      <span>{formatFullName(p)}</span>
+                      <span className="text-muted-foreground ml-auto">{p.phoneDisplay}</span>
+                    </button>
+                  ))
                 )}
-              >
-                <Checkbox checked={selectedIds.has(p.id)} onCheckedChange={() => toggleSelected(p.id)} />
-                <span className="flex-1">{formatFullName(p)}</span>
-                <span className="text-sm group-hover:text-inherit">{p.phoneDisplay}</span>
-              </label>
-            ))}
-            {nonMembers.length === 0 && <p className="text-center text-muted-foreground py-4">No people to add</p>}
-            <div ref={sentinelRef} className="h-1" />
-            {isFetchingNextPage && <p className="text-center text-muted-foreground text-sm py-2">Loading more...</p>}
+                <div ref={sentinelRef} className="h-1" />
+                {isFetchingNextPage && (
+                  <p className="text-center text-muted-foreground text-sm py-2">Loading more...</p>
+                )}
+              </div>
+            </div>
+            {selectedIds.size > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {selectedPeople.map((p) => (
+                  <Badge
+                    key={p.id}
+                    className="gap-1 cursor-pointer bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:hover:bg-teal-800 border-0"
+                    onClick={() => {
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev)
+                        next.delete(p.id)
+                        return next
+                      })
+                      setSelectedPeople((prev) => prev.filter((sp) => sp.id !== p.id))
+                    }}
+                  >
+                    {formatFullName(p)}
+                    <X className="h-3 w-3 ml-0.5" />
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddMembersOpen(false)}>

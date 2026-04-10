@@ -318,6 +318,7 @@ peopleRouter.post(
       anniversaryMonth,
       anniversaryDay,
       anniversaryYear,
+      groupIds,
     } = req.body
 
     const bdayError = validateMonthDay(birthMonth ?? null, birthDay ?? null, 'Birth')
@@ -352,7 +353,21 @@ peopleRouter.post(
         .returning()
         .get()
 
-      res.status(201).json(result)
+      // Add to groups if specified
+      const groups: {id: number; name: string}[] = []
+      if (Array.isArray(groupIds) && groupIds.length > 0 && result.phoneNumber) {
+        const validGroups = db
+          .select({id: schema.groups.id, name: schema.groups.name})
+          .from(schema.groups)
+          .where(inArray(schema.groups.id, groupIds))
+          .all()
+        for (const g of validGroups) {
+          db.insert(schema.peopleGroups).values({personId: result.id, groupId: g.id}).run()
+          groups.push(g)
+        }
+      }
+
+      res.status(201).json({...result, groups})
     } catch (error: unknown) {
       if (isUniqueConstraintError(error)) {
         res.status(409).json({error: 'A person with this phone number already exists'})

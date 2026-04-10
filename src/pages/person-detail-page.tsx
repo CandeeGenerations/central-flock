@@ -2,15 +2,16 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Checkbox} from '@/components/ui/checkbox'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {SearchInput} from '@/components/ui/search-input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Textarea} from '@/components/ui/textarea'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {
   type Person,
   addGroupMembers,
@@ -23,10 +24,10 @@ import {
 } from '@/lib/api'
 import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
-import {maskPhoneDisplay, phoneToE164} from '@/lib/utils'
+import {cn, maskPhoneDisplay, phoneToE164} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Contact, MessageSquare, Save, Trash2, UserMinus, UserPlus} from 'lucide-react'
-import {useState} from 'react'
+import {ArrowLeft, Contact, MessageSquare, Save, Trash2, UserMinus, UserPlus, X} from 'lucide-react'
+import {useMemo, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -39,6 +40,10 @@ export function PersonDetailPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [addGroupOpen, setAddGroupOpen] = useState(false)
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(new Set())
+  const [groupSearch, setGroupSearch] = useState('')
+  const debouncedGroupSearch = useDebouncedValue(groupSearch, 200)
+  const [groupHighlight, setGroupHighlight] = useState(-1)
+  const groupSearchRef = useRef<HTMLInputElement>(null)
   const [removeAllConfirmOpen, setRemoveAllConfirmOpen] = useState(false)
 
   const {data: person, isLoading} = useQuery({
@@ -79,8 +84,31 @@ export function PersonDetailPage() {
     enabled: addGroupOpen,
   })
 
-  const currentGroupIds = new Set(person?.groups?.map((g) => g.id) || [])
-  const availableGroups = allGroups?.filter((g) => !currentGroupIds.has(g.id)) || []
+  const currentGroupIds = useMemo(() => new Set(person?.groups?.map((g) => g.id) || []), [person?.groups])
+  const availableGroups = useMemo(
+    () => allGroups?.filter((g) => !currentGroupIds.has(g.id)) || [],
+    [allGroups, currentGroupIds],
+  )
+
+  const groupResults = useMemo(() => {
+    const q = debouncedGroupSearch?.toLowerCase()
+    return availableGroups.filter((g) => !selectedGroupIds.has(g.id) && (!q || g.name.toLowerCase().includes(q)))
+  }, [debouncedGroupSearch, availableGroups, selectedGroupIds])
+
+  const handleGroupKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setGroupHighlight((h) => Math.min(h + 1, groupResults.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setGroupHighlight((h) => Math.max(h - 1, 0))
+    } else if (e.key === 'Enter' && groupHighlight >= 0 && groupResults[groupHighlight]) {
+      e.preventDefault()
+      setSelectedGroupIds((prev) => new Set([...prev, groupResults[groupHighlight].id]))
+      setGroupSearch('')
+      setGroupHighlight(-1)
+    }
+  }
 
   const invalidatePersonMembership = () => {
     queryClient.invalidateQueries({queryKey: queryKeys.person(id!)})
@@ -94,6 +122,7 @@ export function PersonDetailPage() {
       invalidatePersonMembership()
       setAddGroupOpen(false)
       setSelectedGroupIds(new Set())
+      setGroupSearch('')
       toast.success('Added to groups')
     },
   })
@@ -450,7 +479,12 @@ export function PersonDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setAddGroupOpen(true)}
+              onClick={() => {
+                setSelectedGroupIds(new Set())
+                setGroupSearch('')
+                setGroupHighlight(-1)
+                setAddGroupOpen(true)
+              }}
               disabled={!person.phoneNumber}
               title={!person.phoneNumber ? 'No phone number' : undefined}
             >
@@ -504,31 +538,75 @@ export function PersonDetailPage() {
           <DialogHeader>
             <DialogTitle>Add to Groups</DialogTitle>
           </DialogHeader>
-          {availableGroups.length > 0 ? (
-            <div className="space-y-2 max-h-64 overflow-auto">
-              {availableGroups.map((g) => (
-                <label
-                  key={g.id}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                >
-                  <Checkbox
-                    checked={selectedGroupIds.has(g.id)}
-                    onCheckedChange={(checked) => {
-                      setSelectedGroupIds((prev) => {
-                        const next = new Set(prev)
-                        if (checked) next.add(g.id)
-                        else next.delete(g.id)
-                        return next
-                      })
-                    }}
-                  />
-                  <span>{g.name}</span>
-                </label>
-              ))}
+          <div className="space-y-2">
+            <SearchInput
+              ref={groupSearchRef}
+              placeholder="Search groups to add..."
+              value={groupSearch}
+              onChange={(v) => {
+                setGroupSearch(v)
+                setGroupHighlight(-1)
+              }}
+              onKeyDown={handleGroupKeyDown}
+              hideShortcut
+            />
+            <div className="rounded-xl overflow-hidden bg-popover/70 backdrop-blur-2xl backdrop-saturate-150 shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10">
+              <div className="max-h-36 overflow-auto p-1.5">
+                {groupResults.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-3">
+                    {debouncedGroupSearch ? 'No matching groups found' : 'All groups selected'}
+                  </p>
+                ) : (
+                  groupResults.map((g, i) => (
+                    <button
+                      key={g.id}
+                      ref={i === groupHighlight ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
+                      type="button"
+                      className={cn(
+                        'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg cursor-pointer text-sm font-medium text-left',
+                        i === groupHighlight ? 'bg-foreground/10' : 'hover:bg-foreground/10',
+                      )}
+                      onClick={() => {
+                        setSelectedGroupIds((prev) => new Set([...prev, g.id]))
+                        setGroupSearch('')
+                        setGroupHighlight(-1)
+                        groupSearchRef.current?.focus()
+                      }}
+                    >
+                      <span>{g.name}</span>
+                      {g.memberCount != null && (
+                        <span className="text-muted-foreground ml-auto">
+                          {g.memberCount} member{g.memberCount !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Already a member of all groups.</p>
-          )}
+            {selectedGroupIds.size > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {availableGroups
+                  .filter((g) => selectedGroupIds.has(g.id))
+                  .map((g) => (
+                    <Badge
+                      key={g.id}
+                      className="gap-1 cursor-pointer bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:hover:bg-teal-800 border-0"
+                      onClick={() =>
+                        setSelectedGroupIds((prev) => {
+                          const next = new Set(prev)
+                          next.delete(g.id)
+                          return next
+                        })
+                      }
+                    >
+                      {g.name}
+                      <X className="h-3 w-3 ml-0.5" />
+                    </Badge>
+                  ))}
+              </div>
+            )}
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddGroupOpen(false)}>
               Cancel

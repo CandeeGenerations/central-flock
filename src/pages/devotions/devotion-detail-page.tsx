@@ -5,7 +5,7 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {DatePicker} from '@/components/ui/date-time-picker'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import {SearchableSelect} from '@/components/ui/searchable-select'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
 import {
@@ -280,35 +280,32 @@ export function DevotionDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={form.devotionType !== 'guest' && form.devotionType !== 'revisit' ? 'md:col-span-3' : ''}>
               <Label>Type</Label>
-              <SearchableSelect
-                value={form.devotionType}
-                onValueChange={(v) => update({devotionType: v as DevotionType})}
-                options={[
-                  {value: 'original', label: 'Original'},
-                  {value: 'favorite', label: 'Favorite'},
-                  {value: 'guest', label: 'Guest'},
-                  {value: 'revisit', label: 'Revisit'},
-                ]}
-                className="w-full"
-                searchable={false}
-              />
+              <Select value={form.devotionType} onValueChange={(v) => update({devotionType: v as DevotionType})}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="original">Original</SelectItem>
+                  <SelectItem value="favorite">Favorite</SelectItem>
+                  <SelectItem value="guest">Guest</SelectItem>
+                  <SelectItem value="revisit">Revisit</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {form.devotionType === 'guest' && (
               <>
                 <div>
                   <Label>Speaker</Label>
-                  <SearchableSelect
-                    value={form.guestSpeaker}
-                    onValueChange={(v) => update({guestSpeaker: v})}
-                    options={[
-                      {value: 'Tyler', label: 'Tyler'},
-                      {value: 'Gabe', label: 'Gabe'},
-                      {value: 'Ed', label: 'Ed'},
-                    ]}
-                    placeholder="Select speaker"
-                    className="w-full"
-                    searchable={false}
-                  />
+                  <Select value={form.guestSpeaker} onValueChange={(v) => update({guestSpeaker: v})}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select speaker" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Tyler">Tyler</SelectItem>
+                      <SelectItem value="Gabe">Gabe</SelectItem>
+                      <SelectItem value="Ed">Ed</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label>Guest Number</Label>
@@ -334,17 +331,15 @@ export function DevotionDetailPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(form.devotionType === 'original' || form.devotionType === 'guest') && (
-              <div>
-                <Label>Subcode</Label>
-                <Input
-                  value={form.subcode}
-                  onChange={(e) => update({subcode: e.target.value})}
-                  placeholder={form.devotionType === 'guest' ? 'e.g. 001 - R-G' : 'e.g. E-14'}
-                />
-              </div>
-            )}
-            <div className={form.devotionType !== 'original' && form.devotionType !== 'guest' ? 'md:col-span-2' : ''}>
+            <div>
+              <Label>Subcode</Label>
+              <Input
+                value={form.subcode}
+                onChange={(e) => update({subcode: e.target.value})}
+                placeholder={form.devotionType === 'guest' ? 'e.g. 001 - R-G' : 'e.g. E-14'}
+              />
+            </div>
+            <div>
               <Label>Bible Reference</Label>
               <Input
                 value={form.bibleReference}
@@ -403,38 +398,40 @@ export function DevotionDetailPage() {
       </Card>
 
       {/* Publishing Section (collapsible) */}
-      <Card>
-        <CardHeader
-          className="cursor-pointer select-none flex flex-row items-center justify-between"
-          onClick={() => setPublishingOpen((o) => !o)}
-        >
-          <CardTitle>Publishing</CardTitle>
-          {publishingOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </CardHeader>
-        {publishingOpen && (
-          <CardContent className="space-y-4">
-            {[
-              {label: 'Title', value: podTitle, key: 'podcastTitle'},
-              {label: 'YouTube Description', value: ytDescription, key: 'youtubeDescription'},
-              {label: 'Facebook / Instagram Description', value: fbDescription, key: 'facebookDescription'},
-              {label: 'Podcast Description', value: podDescription, key: 'podcastDescription'},
-            ].map(({label, value, key}) => (
-              <div key={key}>
-                <div className="flex items-center justify-between mb-1">
-                  <Label>{label}</Label>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(value, key)}>
-                    {copiedField === key ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  </Button>
+      {!isNew && (
+        <Card>
+          <CardHeader
+            className="cursor-pointer select-none flex flex-row items-center justify-between"
+            onClick={() => setPublishingOpen((o) => !o)}
+          >
+            <CardTitle>Publishing</CardTitle>
+            {publishingOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </CardHeader>
+          {publishingOpen && (
+            <CardContent className="space-y-4">
+              {[
+                {label: 'Title', value: podTitle, key: 'podcastTitle'},
+                {label: 'YouTube Description', value: ytDescription, key: 'youtubeDescription'},
+                {label: 'Facebook / Instagram Description', value: fbDescription, key: 'facebookDescription'},
+                {label: 'Podcast Description', value: podDescription, key: 'podcastDescription'},
+              ].map(({label, value, key}) => (
+                <div key={key}>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label>{label}</Label>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(value, key)}>
+                      {copiedField === key ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                  <p className="text-sm bg-muted rounded-lg p-3 font-mono whitespace-pre-wrap">{value}</p>
                 </div>
-                <p className="text-sm bg-muted rounded-lg p-3 font-mono whitespace-pre-wrap">{value}</p>
-              </div>
-            ))}
-          </CardContent>
-        )}
-      </Card>
+              ))}
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Song Upload Section */}
-      {showSongUpload && (
+      {!isNew && showSongUpload && (
         <Card>
           <CardHeader>
             <CardTitle>Song Upload</CardTitle>
@@ -482,12 +479,7 @@ export function DevotionDetailPage() {
       {/* Actions */}
       <div className="flex items-center justify-end gap-2">
         {!isNew && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setDeleteConfirmOpen(true)}
-          >
+          <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
             <Trash2 className="h-4 w-4 mr-1.5" />
             Delete
           </Button>

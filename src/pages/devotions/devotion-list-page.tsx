@@ -9,8 +9,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
@@ -29,20 +31,7 @@ import {
   youtubeSearchUrl,
 } from '@/lib/devotion-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Camera,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  EllipsisVertical,
-  Plus,
-  X,
-} from 'lucide-react'
+import {ArrowDown, ArrowUp, ArrowUpDown, Camera, Check, EllipsisVertical, Plus, X} from 'lucide-react'
 import {Link, useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -140,18 +129,6 @@ function getMonthRange(ym: string): {from: string; to: string} {
   }
 }
 
-function getPageNumbers(current: number, total: number): (number | '...')[] {
-  if (total <= 7) return Array.from({length: total}, (_, i) => i + 1)
-  const pages: (number | '...')[] = [1]
-  const start = Math.max(2, current - 1)
-  const end = Math.min(total - 1, current + 1)
-  if (start > 2) pages.push('...')
-  for (let i = start; i <= end; i++) pages.push(i)
-  if (end < total - 1) pages.push('...')
-  pages.push(total)
-  return pages
-}
-
 export function DevotionListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -222,8 +199,6 @@ export function DevotionListPage() {
     return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
   }
 
-  const totalPages = data ? Math.ceil(data.total / data.limit) : 1
-
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -263,51 +238,57 @@ export function DevotionListPage() {
               onClear={() => setPage(1)}
               containerClassName="sm:max-w-sm"
             />
-            <SearchableSelect
+            <Select
               value={typeFilter}
               onValueChange={(v) => {
                 setTypeFilter(v)
                 setPage(1)
               }}
-              options={[
-                {value: 'all', label: 'All Types'},
-                {value: 'original', label: 'Original'},
-                {value: 'favorite', label: 'Favorite'},
-                {value: 'guest', label: 'Guest'},
-                {value: 'revisit', label: 'Revisit'},
-              ]}
-              className="w-full sm:w-40"
-              searchable={false}
-            />
-            <SearchableSelect
+            >
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="original">Original</SelectItem>
+                <SelectItem value="favorite">Favorite</SelectItem>
+                <SelectItem value="guest">Guest</SelectItem>
+                <SelectItem value="revisit">Revisit</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
               value={guestFilter}
               onValueChange={(v) => {
                 setGuestFilter(v)
                 setPage(1)
               }}
-              options={[
-                {value: 'all', label: 'All Speakers'},
-                {value: 'Tyler', label: 'Tyler'},
-                {value: 'Gabe', label: 'Gabe'},
-                {value: 'Ed', label: 'Ed'},
-              ]}
-              className="w-full sm:w-44"
-              searchable={false}
-            />
-            <SearchableSelect
+            >
+              <SelectTrigger className="w-full sm:w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Speakers</SelectItem>
+                <SelectItem value="Tyler">Tyler</SelectItem>
+                <SelectItem value="Gabe">Gabe</SelectItem>
+                <SelectItem value="Ed">Ed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
               value={statusFilter}
               onValueChange={(v) => {
                 setStatusFilter(v)
                 setPage(1)
               }}
-              options={[
-                {value: 'all', label: 'All'},
-                {value: 'complete', label: 'Complete'},
-                {value: 'incomplete', label: 'Incomplete'},
-              ]}
-              className="w-full sm:w-40"
-              searchable={false}
-            />
+            >
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="complete">Complete</SelectItem>
+                <SelectItem value="incomplete">Incomplete</SelectItem>
+              </SelectContent>
+            </Select>
             <SearchableSelect
               value={monthFilter}
               onValueChange={(v) => {
@@ -319,191 +300,132 @@ export function DevotionListPage() {
             />
           </div>
         </CardContent>
-      </Card>
 
-      {/* Table */}
-      {isLoading ? (
-        <PageSpinner />
-      ) : (
-        <>
-          <div className="border rounded-lg overflow-x-auto bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <button
-                      className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
-                      onClick={() => handleSort('date')}
-                    >
-                      Date
-                      {sortIcon('date')}
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button
-                      className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
-                      onClick={() => handleSort('number')}
-                    >
-                      #{sortIcon('number')}
-                    </button>
-                  </TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead>Song</TableHead>
-                  <TableHead className="text-center">Produced</TableHead>
-                  <TableHead className="text-center">R/V</TableHead>
-                  <TableHead className="text-center">YouTube</TableHead>
-                  <TableHead className="text-center">FB/IG</TableHead>
-                  <TableHead className="text-center">Podcast</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data?.data.map((devotion) => (
-                  <TableRow
-                    key={devotion.id}
-                    className="cursor-pointer hover:bg-muted"
-                    onClick={() => navigate(`/devotions/${devotion.id}`)}
-                  >
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                      {formatDate(devotion.date)}
-                    </TableCell>
-                    <TableCell className="font-medium tabular-nums">
-                      #{String(devotion.number).padStart(3, '0')}
-                    </TableCell>
-                    <TableCell>
-                      <TypeBadge devotion={devotion} />
-                    </TableCell>
-                    <TableCell className="max-w-48 truncate">{devotion.bibleReference || '—'}</TableCell>
-                    <TableCell className="max-w-48 truncate text-muted-foreground">
-                      {devotion.songName || '—'}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <CheckboxCell
-                        checked={devotion.produced}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleMutation.mutate({id: devotion.id, field: 'produced'})
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <CheckboxCell
-                        checked={devotion.rendered}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleMutation.mutate({id: devotion.id, field: 'rendered'})
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <CheckboxCell
-                        checked={devotion.youtube}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleMutation.mutate({id: devotion.id, field: 'youtube'})
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <CheckboxCell
-                        checked={devotion.facebookInstagram}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleMutation.mutate({id: devotion.id, field: 'facebookInstagram'})
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <CheckboxCell
-                        checked={devotion.podcast}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleMutation.mutate({id: devotion.id, field: 'podcast'})
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <CopyMenu devotion={devotion} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {data?.data.length === 0 && (
+        {/* Table */}
+        {isLoading ? (
+          <CardContent>
+            <PageSpinner />
+          </CardContent>
+        ) : (
+          <>
+            <div className="overflow-x-auto border-t">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
-                      No devotions found.
-                    </TableCell>
+                    <TableHead>
+                      <button
+                        className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
+                        onClick={() => handleSort('date')}
+                      >
+                        Date
+                        {sortIcon('date')}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
+                        onClick={() => handleSort('number')}
+                      >
+                        #{sortIcon('number')}
+                      </button>
+                    </TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>Song</TableHead>
+                    <TableHead className="text-center">Produced</TableHead>
+                    <TableHead className="text-center">R/V</TableHead>
+                    <TableHead className="text-center">YouTube</TableHead>
+                    <TableHead className="text-center">FB/IG</TableHead>
+                    <TableHead className="text-center">Podcast</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, data?.total || 0)} of {data?.total} devotions
-            </p>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={page <= 1}
-                  onClick={() => setPage(1)}
-                >
-                  <ChevronsLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                {getPageNumbers(page, totalPages).map((p, i) =>
-                  p === '...' ? (
-                    <span key={`ellipsis-${i}`} className="px-1 text-sm text-muted-foreground">
-                      ...
-                    </span>
-                  ) : (
-                    <Button
-                      key={p}
-                      variant={p === page ? 'default' : 'outline'}
-                      size="icon"
-                      className="h-8 w-8 text-xs"
-                      onClick={() => setPage(p as number)}
+                </TableHeader>
+                <TableBody>
+                  {data?.data.map((devotion) => (
+                    <TableRow
+                      key={devotion.id}
+                      className="cursor-pointer hover:bg-muted"
+                      onClick={() => navigate(`/devotions/${devotion.id}`)}
                     >
-                      {p}
-                    </Button>
-                  ),
-                )}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(totalPages)}
-                >
-                  <ChevronsRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {formatDate(devotion.date)}
+                      </TableCell>
+                      <TableCell className="font-medium tabular-nums">
+                        #{String(devotion.number).padStart(3, '0')}
+                      </TableCell>
+                      <TableCell>
+                        <TypeBadge devotion={devotion} />
+                      </TableCell>
+                      <TableCell className="max-w-48 truncate">{devotion.bibleReference || '—'}</TableCell>
+                      <TableCell className="max-w-48 truncate text-muted-foreground">
+                        {devotion.songName || '—'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <CheckboxCell
+                          checked={devotion.produced}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleMutation.mutate({id: devotion.id, field: 'produced'})
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <CheckboxCell
+                          checked={devotion.rendered}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleMutation.mutate({id: devotion.id, field: 'rendered'})
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <CheckboxCell
+                          checked={devotion.youtube}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleMutation.mutate({id: devotion.id, field: 'youtube'})
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <CheckboxCell
+                          checked={devotion.facebookInstagram}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleMutation.mutate({id: devotion.id, field: 'facebookInstagram'})
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <CheckboxCell
+                          checked={devotion.podcast}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleMutation.mutate({id: devotion.id, field: 'podcast'})
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <CopyMenu devotion={devotion} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {data?.data.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                        No devotions found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <CardContent>
+              <Pagination page={page} pageSize={50} total={data?.total || 0} onPageChange={setPage} noun="devotions" />
+            </CardContent>
+          </>
+        )}
+      </Card>
     </div>
   )
 }

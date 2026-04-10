@@ -1,5 +1,5 @@
 import {Badge} from '@/components/ui/badge'
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Card, CardContent} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Pagination} from '@/components/ui/pagination'
@@ -8,7 +8,7 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {youtubeSearchUrl} from '@/lib/devotion-api'
 import {useQuery} from '@tanstack/react-query'
-import {BookOpen, ExternalLink, Search} from 'lucide-react'
+import {ExternalLink} from 'lucide-react'
 import {useState} from 'react'
 import {Link} from 'react-router-dom'
 
@@ -85,91 +85,73 @@ export function DevotionScripturesPage() {
         <h2 className="text-2xl font-bold">Scripture Lookup</h2>
       </div>
 
-      {/* Search */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-4 w-4" />
-            Check if a verse has been used
-          </CardTitle>
-        </CardHeader>
+      <Card size="sm">
         <CardContent>
-          <Input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
-            placeholder="Type a verse to search, e.g. John 3:16, Romans 8, Psalm 23..."
-            className="text-base"
-          />
-          {isSearching && !searchLoading && searchResults?.length === 0 && (
-            <p className="text-sm font-medium text-green-600 mt-2">This verse hasn't been used yet!</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Table */}
-      {loading ? (
-        <PageSpinner />
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4" />
-              {isSearching ? 'Search Results' : 'Duplicate References'}
-              {showData && (
-                <Badge variant="secondary" className="ml-1">
-                  {showData.length}
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!showData?.length ? (
-              <p className="text-center text-muted-foreground py-8">
-                {isSearching ? 'No matches found.' : 'No duplicate references found.'}
-              </p>
-            ) : (
-              <>
-                <div className="border rounded-lg overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Reference</TableHead>
-                        <TableHead className="text-right">Times Used</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {showData?.map((group) => (
-                        <TableRow
-                          key={group.reference}
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => setSelected(group)}
-                        >
-                          <TableCell className="font-medium">{group.reference}</TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant={group.count > 2 ? 'destructive' : 'secondary'}>{group.count}</Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="mt-4">
-                  <Pagination
-                    page={safePage}
-                    pageSize={perPage}
-                    total={totalItems}
-                    onPageChange={setPage}
-                    noun="scriptures"
-                  />
-                </div>
-              </>
+          <div className="space-y-2">
+            <Input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+              placeholder="Type a verse to search, e.g. John 3:16, Romans 8, Psalm 23..."
+              className="text-base"
+            />
+            {isSearching && !searchLoading && searchResults?.length === 0 && (
+              <p className="text-sm font-medium text-green-600">This verse hasn't been used yet!</p>
             )}
+          </div>
+        </CardContent>
+
+        {/* Table */}
+        {loading ? (
+          <CardContent>
+            <PageSpinner />
           </CardContent>
-        </Card>
-      )}
+        ) : !showData?.length ? (
+          <CardContent>
+            <p className="text-center text-muted-foreground py-8">
+              {isSearching ? 'No matches found.' : 'No duplicate references found.'}
+            </p>
+          </CardContent>
+        ) : (
+          <>
+            <div className="overflow-x-auto border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Reference</TableHead>
+                    <TableHead className="text-right">Times Used</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {showData?.map((group) => (
+                    <TableRow
+                      key={group.reference}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelected(group)}
+                    >
+                      <TableCell className="font-medium">{group.reference}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={group.count > 2 ? 'destructive' : 'secondary'}>{group.count}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <CardContent>
+              <Pagination
+                page={safePage}
+                pageSize={perPage}
+                total={totalItems}
+                onPageChange={setPage}
+                noun="scriptures"
+              />
+            </CardContent>
+          </>
+        )}
+      </Card>
 
       {/* Detail Modal */}
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>

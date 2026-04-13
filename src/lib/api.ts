@@ -227,6 +227,7 @@ export interface Message {
   templateState: string | null
   createdAt: string
   completedAt: string | null
+  source: 'manual' | 'birthday_scheduler'
   extraNames?: string[]
   recipientNames?: string[]
 }

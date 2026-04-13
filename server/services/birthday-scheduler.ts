@@ -78,6 +78,7 @@ function recordMessageInHistory(personId: number, content: string) {
       sentCount: 1,
       status: 'completed',
       completedAt: sql`(datetime('now'))`,
+      source: 'birthday_scheduler',
     })
     .returning()
     .get()

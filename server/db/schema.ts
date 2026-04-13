@@ -70,6 +70,7 @@ export const messages = sqliteTable('messages', {
     .default(sql`(datetime('now'))`)
     .notNull(),
   completedAt: text('completed_at'),
+  source: text('source', {enum: ['manual', 'birthday_scheduler']}).default('manual').notNull(),
 })
 
 export const drafts = sqliteTable('drafts', {

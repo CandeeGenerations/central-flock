@@ -133,7 +133,8 @@ export function MessageHistoryPage() {
       messages
         ?.filter(
           (m) =>
-            m.status === 'pending' || m.status === 'sending' || m.status === 'completed' || m.status === 'cancelled',
+            m.source !== 'birthday_scheduler' &&
+            (m.status === 'pending' || m.status === 'sending' || m.status === 'completed' || m.status === 'cancelled'),
         )
         .sort((a, b) => (b.completedAt ?? b.createdAt).localeCompare(a.completedAt ?? a.createdAt)),
     [messages],

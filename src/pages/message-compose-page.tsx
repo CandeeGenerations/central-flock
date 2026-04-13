@@ -95,6 +95,7 @@ export function MessageComposePage() {
   const [recipientMode, setRecipientMode] = useState<'group' | 'individual'>(presetRecipientId ? 'individual' : 'group')
   const [selectedGroupId, setSelectedGroupId] = useState(presetGroupId || '')
   const [content, setContent] = useState(dupState?.content || '')
+  const [messageTab, setMessageTab] = useState<'edit' | 'preview'>('edit')
   const [excludeIds, setExcludeIds] = useState<Set<number>>(() => new Set(dupState?.excludeIds || []))
   const [excludeSearch, setExcludeSearch] = useState('')
   const debouncedExcludeSearch = useDebouncedValue(excludeSearch, 250)
@@ -824,167 +825,229 @@ export function MessageComposePage() {
           {/* === MESSAGE Section === */}
           <Card>
             <CardHeader>
-              <CardTitle>Message</CardTitle>
-              <p className="text-sm text-muted-foreground">Compose your message content.</p>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Message</CardTitle>
+                  <p className="text-sm text-muted-foreground">Compose your message content.</p>
+                </div>
+                <div className="flex lg:hidden bg-muted rounded-full p-1 shrink-0">
+                  <button
+                    type="button"
+                    className={cn(
+                      'px-3 py-1 text-sm font-medium rounded-full transition-colors',
+                      messageTab === 'edit' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground',
+                    )}
+                    onClick={() => setMessageTab('edit')}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      'px-3 py-1 text-sm font-medium rounded-full transition-colors',
+                      messageTab === 'preview' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground',
+                    )}
+                    onClick={() => setMessageTab('preview')}
+                  >
+                    Preview
+                  </button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {/* Template selector */}
-              {templatesList && templatesList.length > 0 && (
-                <div className="mb-3">
-                  <SearchableSelect
-                    value={selectedTemplateId}
-                    onValueChange={handleTemplateSelect}
-                    options={[
-                      {value: 'none', label: 'No template'},
-                      ...[...templatesList]
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((t) => ({
-                          value: String(t.id),
-                          label: t.name,
-                        })),
-                    ]}
-                    placeholder="Choose a template..."
-                    className="w-full"
-                  />
+              {/* Mobile preview */}
+              {messageTab === 'preview' && (
+                <div className="lg:hidden space-y-3">
+                  <div className="text-sm text-muted-foreground">
+                    Previewing for:{' '}
+                    <span className="font-medium text-foreground">
+                      {previewPerson ? formatFullName(previewPerson, 'First recipient') : 'Recipient'}
+                    </span>
+                  </div>
+                  {content ? (
+                    <div className="rounded-2xl bg-muted/30 p-4">
+                      <div className="flex justify-start">
+                        <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-4 py-3">
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{renderedPreview}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-32 rounded-2xl bg-muted/30 text-sm text-muted-foreground">
+                      Write a message to see a preview
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{charCount} characters</span>
+                    {charCount > 160 && (
+                      <span className="text-orange-500">{Math.ceil(charCount / 160)} SMS segments</span>
+                    )}
+                  </div>
                 </div>
               )}
 
-              <Textarea
-                ref={textareaRef}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={8}
-                placeholder="Type your message here. Use template variables for personalization..."
-                className="min-h-48 md:min-h-0 mb-2"
-              />
-
-              <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
-                <span>{charCount} characters</span>
-                {charCount > 160 && <span className="text-orange-500">{Math.ceil(charCount / 160)} SMS segments</span>}
-              </div>
-
-              {/* Variable insertion */}
-              <div className="space-y-2">
-                <VariableDropdown label="Person Variables">
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{firstName}}')}>
-                      {'{{firstName}}'}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{lastName}}')}>
-                      {'{{lastName}}'}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{fullName}}')}>
-                      {'{{fullName}}'}
-                    </Button>
+              {/* Edit content: always visible on desktop, hidden on mobile when preview tab active */}
+              <div className={cn(messageTab === 'preview' && 'hidden lg:block')}>
+                {/* Template selector */}
+                {templatesList && templatesList.length > 0 && (
+                  <div className="mb-3">
+                    <SearchableSelect
+                      value={selectedTemplateId}
+                      onValueChange={handleTemplateSelect}
+                      options={[
+                        {value: 'none', label: 'No template'},
+                        ...[...templatesList]
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((t) => ({
+                            value: String(t.id),
+                            label: t.name,
+                          })),
+                      ]}
+                      placeholder="Choose a template..."
+                      className="w-full"
+                    />
                   </div>
-                </VariableDropdown>
-                {activeTemplateVars.length > 0 && (
-                  <VariableDropdown label="Template Variables" count={activeTemplateVars.length} defaultOpen>
-                    <div className="space-y-3 mt-2">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="text-xs text-muted-foreground self-center mr-1">Insert:</span>
-                        {activeTemplateVars.map((v) => (
+                )}
+
+                <Textarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  rows={8}
+                  placeholder="Type your message here. Use template variables for personalization..."
+                  className="min-h-48 md:min-h-0 mb-2"
+                />
+
+                <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
+                  <span>{charCount} characters</span>
+                  {charCount > 160 && (
+                    <span className="text-orange-500">{Math.ceil(charCount / 160)} SMS segments</span>
+                  )}
+                </div>
+
+                {/* Variable insertion */}
+                <div className="space-y-2">
+                  <VariableDropdown label="Person Variables">
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{firstName}}')}>
+                        {'{{firstName}}'}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{lastName}}')}>
+                        {'{{lastName}}'}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{fullName}}')}>
+                        {'{{fullName}}'}
+                      </Button>
+                    </div>
+                  </VariableDropdown>
+                  {activeTemplateVars.length > 0 && (
+                    <VariableDropdown label="Template Variables" count={activeTemplateVars.length} defaultOpen>
+                      <div className="space-y-3 mt-2">
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs text-muted-foreground self-center mr-1">Insert:</span>
+                          {activeTemplateVars.map((v) => (
+                            <Button
+                              key={v.name}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => insertAtCursor(`{{${v.name}}}`)}
+                            >
+                              {v.type === 'date' ? (
+                                <CalendarIcon className="h-3 w-3 mr-1" />
+                              ) : (
+                                <Type className="h-3 w-3 mr-1" />
+                              )}
+                              {`{{${v.name}}}`}
+                            </Button>
+                          ))}
+                        </div>
+                        <Separator />
+                        <div className="grid gap-3">
+                          {activeTemplateVars.map((v) => (
+                            <div key={v.name} className="space-y-1">
+                              <label className="text-sm font-medium flex items-center gap-1.5">
+                                {v.type === 'date' ? (
+                                  <CalendarIcon className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Type className="h-3.5 w-3.5" />
+                                )}
+                                {v.name}
+                              </label>
+                              {v.type === 'text' ? (
+                                <Input
+                                  value={customVarValues[v.name] || ''}
+                                  onChange={(e) => setCustomVarValues((prev) => ({...prev, [v.name]: e.target.value}))}
+                                  placeholder={`Enter ${v.name}...`}
+                                />
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className={cn(
+                                          'flex w-full items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer',
+                                          !dateValues[v.name] && 'text-muted-foreground',
+                                        )}
+                                      >
+                                        <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                                        {dateValues[v.name]
+                                          ? format(dateValues[v.name]!, dateFormats[v.name] || 'MMMM d, yyyy')
+                                          : 'Pick a date'}
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                      <Calendar
+                                        mode="single"
+                                        defaultMonth={dateValues[v.name]}
+                                        selected={dateValues[v.name]}
+                                        onSelect={(date) =>
+                                          setDateValues((prev) => ({...prev, [v.name]: date ?? undefined}))
+                                        }
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                  <Select
+                                    value={dateFormats[v.name] || 'MMMM d, yyyy'}
+                                    onValueChange={(fmt) => setDateFormats((prev) => ({...prev, [v.name]: fmt}))}
+                                  >
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {getDateFormatOptions(dateValues[v.name] || new Date()).map((opt) => (
+                                        <SelectItem key={opt.format} value={opt.format}>
+                                          {opt.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </VariableDropdown>
+                  )}
+                  {globalVariables && globalVariables.length > 0 && (
+                    <VariableDropdown label="Global Variables" count={globalVariables.length} defaultOpen>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {globalVariables.map((v) => (
                           <Button
                             key={v.name}
                             variant="outline"
                             size="sm"
                             onClick={() => insertAtCursor(`{{${v.name}}}`)}
                           >
-                            {v.type === 'date' ? (
-                              <CalendarIcon className="h-3 w-3 mr-1" />
-                            ) : (
-                              <Type className="h-3 w-3 mr-1" />
-                            )}
+                            <Globe className="h-3 w-3 mr-1" />
                             {`{{${v.name}}}`}
                           </Button>
                         ))}
                       </div>
-                      <Separator />
-                      <div className="grid gap-3">
-                        {activeTemplateVars.map((v) => (
-                          <div key={v.name} className="space-y-1">
-                            <label className="text-sm font-medium flex items-center gap-1.5">
-                              {v.type === 'date' ? (
-                                <CalendarIcon className="h-3.5 w-3.5" />
-                              ) : (
-                                <Type className="h-3.5 w-3.5" />
-                              )}
-                              {v.name}
-                            </label>
-                            {v.type === 'text' ? (
-                              <Input
-                                value={customVarValues[v.name] || ''}
-                                onChange={(e) => setCustomVarValues((prev) => ({...prev, [v.name]: e.target.value}))}
-                                placeholder={`Enter ${v.name}...`}
-                              />
-                            ) : (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className={cn(
-                                        'flex w-full items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer',
-                                        !dateValues[v.name] && 'text-muted-foreground',
-                                      )}
-                                    >
-                                      <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                                      {dateValues[v.name]
-                                        ? format(dateValues[v.name]!, dateFormats[v.name] || 'MMMM d, yyyy')
-                                        : 'Pick a date'}
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                      mode="single"
-                                      defaultMonth={dateValues[v.name]}
-                                      selected={dateValues[v.name]}
-                                      onSelect={(date) =>
-                                        setDateValues((prev) => ({...prev, [v.name]: date ?? undefined}))
-                                      }
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                                <Select
-                                  value={dateFormats[v.name] || 'MMMM d, yyyy'}
-                                  onValueChange={(fmt) => setDateFormats((prev) => ({...prev, [v.name]: fmt}))}
-                                >
-                                  <SelectTrigger className="w-full">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getDateFormatOptions(dateValues[v.name] || new Date()).map((opt) => (
-                                      <SelectItem key={opt.format} value={opt.format}>
-                                        {opt.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </VariableDropdown>
-                )}
-                {globalVariables && globalVariables.length > 0 && (
-                  <VariableDropdown label="Global Variables" count={globalVariables.length} defaultOpen>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {globalVariables.map((v) => (
-                        <Button
-                          key={v.name}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => insertAtCursor(`{{${v.name}}}`)}
-                        >
-                          <Globe className="h-3 w-3 mr-1" />
-                          {`{{${v.name}}}`}
-                        </Button>
-                      ))}
-                    </div>
-                  </VariableDropdown>
-                )}
+                    </VariableDropdown>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

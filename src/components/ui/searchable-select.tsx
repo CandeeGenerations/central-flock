@@ -1,7 +1,7 @@
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {cn} from '@/lib/utils'
 import {CheckIcon, ChevronDownIcon} from 'lucide-react'
-import {useCallback, useRef, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 
 interface SearchableSelectProps {
   value: string
@@ -30,6 +30,17 @@ export function SearchableSelect({
   const filtered = search ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase())) : options
 
   const selectedLabel = options.find((o) => o.value === value)?.label
+
+  // Lock page scroll while popover is open so mobile touch doesn't scroll the body behind
+  useEffect(() => {
+    if (open) {
+      const original = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = original
+      }
+    }
+  }, [open])
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen)
@@ -93,7 +104,7 @@ export function SearchableSelect({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-(--radix-popover-trigger-width) gap-0 p-0 bg-popover/70 backdrop-blur-2xl backdrop-saturate-150"
+        className="w-(--radix-popover-trigger-width) gap-0 overflow-hidden p-0 relative bg-popover/70 before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {searchable && (
@@ -108,7 +119,7 @@ export function SearchableSelect({
             />
           </div>
         )}
-        <div ref={listRef} className="max-h-60 overflow-auto overscroll-contain touch-pan-y p-1.5">
+        <div ref={listRef} className="max-h-60 overflow-y-auto overscroll-contain p-1.5">
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">No results</p>
           ) : (

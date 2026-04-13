@@ -136,10 +136,7 @@ function normalizeReference(ref: string): string {
 
 export type ProgressCallback = (step: string, message: string, progress: number) => void
 
-export async function generateDevotionPassage(
-  count = 1,
-  onProgress?: ProgressCallback,
-): Promise<GeneratedPassage[]> {
+export async function generateDevotionPassage(count = 1, onProgress?: ProgressCallback): Promise<GeneratedPassage[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY environment variable is not set')
@@ -172,7 +169,11 @@ export async function generateDevotionPassage(
       throw new Error('No text response from Claude')
     }
 
-    onProgress?.('parsing', `Processing response${count > 1 ? ` ${i + 1}/${count}` : ''}\u2026`, 80 + Math.round((i / count) * 15))
+    onProgress?.(
+      'parsing',
+      `Processing response${count > 1 ? ` ${i + 1}/${count}` : ''}\u2026`,
+      80 + Math.round((i / count) * 15),
+    )
 
     const passage = parseResponse(textBlock.text)
     results.push(passage)

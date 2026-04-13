@@ -3,6 +3,8 @@ import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
 import {Checkbox} from '@/components/ui/checkbox'
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {Input} from '@/components/ui/input'
 import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {PageSpinner} from '@/components/ui/spinner'
@@ -11,6 +13,7 @@ import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/compon
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {
+  createTemplate,
   deleteDrafts,
   deleteMessages,
   duplicateDraft,
@@ -19,12 +22,12 @@ import {
   fetchMessages,
   fetchPeople,
 } from '@/lib/api'
-import type {Draft, Message, Person} from '@/lib/api'
+import type {Draft, Message, Person, TemplateVariable} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Copy, Pencil, Plus, Trash2} from 'lucide-react'
+import {Copy, FileText, Pencil, Plus, Trash2} from 'lucide-react'
 import {useEffect, useMemo, useState} from 'react'
 import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -265,6 +268,49 @@ export function MessageHistoryPage() {
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : 'Failed to duplicate message')
     },
+  })
+
+  const [saveTemplateMsg, setSaveTemplateMsg] = useState<Message | null>(null)
+  const [templateName, setTemplateName] = useState('')
+
+  const saveAsTemplateMutation = useMutation({
+    mutationFn: () => {
+      const msg = saveTemplateMsg!
+      const builtIn = new Set(['firstName', 'lastName', 'fullName'])
+      const varNames = new Set<string>()
+      for (const m of msg.content.matchAll(/\{\{(\w+)\}\}/g)) {
+        if (!builtIn.has(m[1])) varNames.add(m[1])
+      }
+
+      let dateVarNames = new Set<string>()
+      if (msg.templateState) {
+        try {
+          const ts = JSON.parse(msg.templateState) as {dateValues?: Record<string, string>}
+          if (ts.dateValues) dateVarNames = new Set(Object.keys(ts.dateValues))
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const customVariables: TemplateVariable[] = []
+      for (const name of varNames) {
+        customVariables.push({name, type: dateVarNames.has(name) ? 'date' : 'text'})
+      }
+
+      return createTemplate({
+        name: templateName.trim(),
+        content: msg.content,
+        customVariables: customVariables.length > 0 ? JSON.stringify(customVariables) : null,
+      })
+    },
+    onSuccess: (template) => {
+      queryClient.invalidateQueries({queryKey: queryKeys.templates()})
+      setSaveTemplateMsg(null)
+      setTemplateName('')
+      toast.success('Template created')
+      navigate(`/templates/${template.id}/edit`)
+    },
+    onError: (err: Error) => toast.error(err.message),
   })
 
   const toggleSelect = useSetToggle(setSelectedIds)
@@ -520,20 +566,32 @@ export function MessageHistoryPage() {
                             <MessageRecipientsCell msg={msg} />
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => duplicateMessageMutation.mutate(msg.id)}
-                                  >
-                                    <Copy className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Duplicate as draft</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                            <div className="flex">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => duplicateMessageMutation.mutate(msg.id)}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Duplicate as draft</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" onClick={() => setSaveTemplateMsg(msg)}>
+                                      <FileText className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Save as template</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -902,6 +960,43 @@ export function MessageHistoryPage() {
         loading={deleteDraftsMutation.isPending}
         onConfirm={() => deleteDraftsMutation.mutate()}
       />
+
+      <Dialog
+        open={!!saveTemplateMsg}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSaveTemplateMsg(null)
+            setTemplateName('')
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save as Template</DialogTitle>
+            <DialogDescription>Create a reusable template from this message.</DialogDescription>
+          </DialogHeader>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Template Name</label>
+            <Input
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="e.g. Event Invitation"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && templateName.trim()) saveAsTemplateMutation.mutate()
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => saveAsTemplateMutation.mutate()}
+              disabled={!templateName.trim() || saveAsTemplateMutation.isPending}
+            >
+              {saveAsTemplateMutation.isPending ? 'Creating...' : 'Create Template'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

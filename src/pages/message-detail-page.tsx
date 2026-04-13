@@ -1,7 +1,8 @@
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {Input} from '@/components/ui/input'
 import {Pagination} from '@/components/ui/pagination'
 import {Progress} from '@/components/ui/progress'
 import {SearchInput} from '@/components/ui/search-input'
@@ -9,12 +10,13 @@ import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
-import {cancelMessage, fetchMessage, resumeMessage, sendNowMessage} from '@/lib/api'
+import {cancelMessage, createTemplate, fetchMessage, resumeMessage, sendNowMessage} from '@/lib/api'
+import type {TemplateVariable} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertCircle, ArrowLeft, Copy, ExternalLink, Pencil, Play, XCircle} from 'lucide-react'
+import {AlertCircle, ArrowLeft, Copy, ExternalLink, FileText, Pencil, Play, XCircle} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -242,6 +244,48 @@ export function MessageDetailPage() {
     },
   })
 
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+
+  const saveAsTemplateMutation = useMutation({
+    mutationFn: () => {
+      const builtIn = new Set(['firstName', 'lastName', 'fullName'])
+      const varNames = new Set<string>()
+      for (const m of message!.content.matchAll(/\{\{(\w+)\}\}/g)) {
+        if (!builtIn.has(m[1])) varNames.add(m[1])
+      }
+
+      let dateVarNames = new Set<string>()
+      if (message!.templateState) {
+        try {
+          const ts = JSON.parse(message!.templateState) as {dateValues?: Record<string, string>}
+          if (ts.dateValues) dateVarNames = new Set(Object.keys(ts.dateValues))
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const customVariables: TemplateVariable[] = []
+      for (const name of varNames) {
+        customVariables.push({name, type: dateVarNames.has(name) ? 'date' : 'text'})
+      }
+
+      return createTemplate({
+        name: templateName.trim(),
+        content: message!.content,
+        customVariables: customVariables.length > 0 ? JSON.stringify(customVariables) : null,
+      })
+    },
+    onSuccess: (template) => {
+      queryClient.invalidateQueries({queryKey: queryKeys.templates()})
+      setSaveTemplateOpen(false)
+      setTemplateName('')
+      toast.success('Template created')
+      navigate(`/templates/${template.id}/edit`)
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
   if (isLoading) return <InlineSpinner />
   if (!message) return <div className="p-6">Message not found</div>
 
@@ -293,6 +337,10 @@ export function MessageDetailPage() {
           >
             <Copy className="h-4 w-4 mr-1" />
             Duplicate
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setSaveTemplateOpen(true)}>
+            <FileText className="h-4 w-4 mr-1" />
+            Save as Template
           </Button>
         </div>
       </div>
@@ -415,6 +463,41 @@ export function MessageDetailPage() {
           <pre className="text-sm text-red-500 whitespace-pre-wrap break-all bg-muted rounded-lg p-3 overflow-auto max-h-64 font-mono">
             <code>{errorInfo?.error}</code>
           </pre>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={saveTemplateOpen}
+        onOpenChange={(open) => {
+          setSaveTemplateOpen(open)
+          if (!open) setTemplateName('')
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save as Template</DialogTitle>
+            <DialogDescription>Create a reusable template from this message.</DialogDescription>
+          </DialogHeader>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Template Name</label>
+            <Input
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="e.g. Event Invitation"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && templateName.trim()) saveAsTemplateMutation.mutate()
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => saveAsTemplateMutation.mutate()}
+              disabled={!templateName.trim() || saveAsTemplateMutation.isPending}
+            >
+              {saveAsTemplateMutation.isPending ? 'Creating...' : 'Create Template'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

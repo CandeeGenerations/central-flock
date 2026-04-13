@@ -108,7 +108,7 @@ export function SearchableSelect({
             />
           </div>
         )}
-        <div ref={listRef} className="max-h-60 overflow-auto p-1.5">
+        <div ref={listRef} className="max-h-60 overflow-auto overscroll-contain touch-pan-y p-1.5">
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">No results</p>
           ) : (

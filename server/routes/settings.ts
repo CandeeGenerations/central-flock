@@ -7,7 +7,6 @@ import {asyncHandler} from '../lib/route-helpers.js'
 export const settingsRouter = Router()
 
 const DEFAULTS: Record<string, string> = {
-  sendMethod: 'api',
   birthdaySendTime: '07:00',
   birthdayPreNotifyDays: '',
   birthdaySendTo: 'self',
@@ -20,7 +19,6 @@ const DEFAULTS: Record<string, string> = {
 }
 
 const VALID_VALUES: Record<string, string[]> = {
-  sendMethod: ['api', 'ui'],
   birthdaySendTo: ['self', 'person'],
   anniversarySendTo: ['self', 'person'],
   devotionAiModel: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],

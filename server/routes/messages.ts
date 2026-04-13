@@ -2,12 +2,10 @@ import {desc, eq, inArray, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
-import {BATCH_DEFAULTS} from '../lib/constants.js'
 import {renderTemplate} from '../lib/format.js'
 import {asyncHandler, getGroupName} from '../lib/route-helpers.js'
-import {sendMessage, sendMessageViaUI} from '../services/applescript.js'
+import {sendMessageViaUI} from '../services/applescript.js'
 import {type SendJob, cancelJob, createJob, getJob} from '../services/message-queue.js'
-import {getSetting} from './settings.js'
 
 export const messagesRouter = Router()
 
@@ -20,8 +18,6 @@ messagesRouter.post(
       recipientIds,
       excludeIds = [],
       groupId,
-      batchSize = BATCH_DEFAULTS.batchSize,
-      batchDelayMs = BATCH_DEFAULTS.batchDelayMs,
       customVarValues,
       scheduledAt,
       templateState,
@@ -30,8 +26,6 @@ messagesRouter.post(
       recipientIds: number[]
       excludeIds?: number[]
       groupId?: number
-      batchSize?: number
-      batchDelayMs?: number
       customVarValues?: Record<string, string>
       scheduledAt?: string
       templateState?: string
@@ -81,8 +75,6 @@ messagesRouter.post(
         totalRecipients: activeRecipients.length,
         skippedCount: skippedRecipients.length,
         status: isScheduled ? 'scheduled' : 'pending',
-        batchSize,
-        batchDelayMs,
         scheduledAt: scheduledAtUtc,
         templateState: templateState || null,
       })
@@ -117,7 +109,7 @@ messagesRouter.post(
       res.status(201).json({messageId: message.id, scheduled: true})
     } else {
       // Immediate send
-      const job = createJob(message.id, batchSize, batchDelayMs)
+      const job = createJob(message.id)
       processSendJob(job)
       res.status(201).json({messageId: message.id, jobId: job.id})
     }
@@ -293,8 +285,6 @@ messagesRouter.put(
       recipientIds,
       excludeIds = [],
       groupId,
-      batchSize = BATCH_DEFAULTS.batchSize,
-      batchDelayMs = BATCH_DEFAULTS.batchDelayMs,
       customVarValues,
       scheduledAt,
       templateState,
@@ -303,8 +293,6 @@ messagesRouter.put(
       recipientIds: number[]
       excludeIds?: number[]
       groupId?: number
-      batchSize?: number
-      batchDelayMs?: number
       customVarValues?: Record<string, string>
       scheduledAt?: string
       templateState?: string
@@ -355,8 +343,6 @@ messagesRouter.put(
         sentCount: 0,
         failedCount: 0,
         status: isScheduled ? 'scheduled' : 'pending',
-        batchSize,
-        batchDelayMs,
         scheduledAt: scheduledAtUtc,
         templateState: templateState || null,
         completedAt: null,
@@ -391,7 +377,7 @@ messagesRouter.put(
 
     if (!isScheduled) {
       // Immediate send
-      const job = createJob(messageId, batchSize, batchDelayMs)
+      const job = createJob(messageId)
       processSendJob(job)
       res.json({messageId, jobId: job.id})
     } else {
@@ -486,7 +472,7 @@ messagesRouter.post(
 
     db.update(schema.messages).set({status: 'pending'}).where(eq(schema.messages.id, messageId)).run()
 
-    const job = createJob(messageId, message.batchSize, message.batchDelayMs)
+    const job = createJob(messageId)
     processSendJob(job)
 
     res.json({success: true, jobId: job.id})
@@ -516,7 +502,7 @@ messagesRouter.post(
       return
     }
 
-    const job = createJob(messageId, message.batchSize, message.batchDelayMs)
+    const job = createJob(messageId)
     processSendJob(job)
 
     res.json({success: true, jobId: job.id})
@@ -552,8 +538,6 @@ messagesRouter.post(
         groupId: message.groupId,
         selectedIndividualIds: message.groupId ? null : JSON.stringify(selectedIndividualIds),
         excludeIds: excludeIds.length > 0 ? JSON.stringify(excludeIds) : null,
-        batchSize: message.batchSize,
-        batchDelayMs: message.batchDelayMs,
         templateState: message.templateState,
       })
       .returning()
@@ -578,10 +562,6 @@ export async function processSendJob(job: SendJob) {
     )
     .all()
 
-  // Read send method setting before starting
-  const sendMethod = getSetting('sendMethod')
-  const send = sendMethod === 'ui' ? sendMessageViaUI : sendMessage
-
   // Update message status to sending
   db.update(schema.messages).set({status: 'sending'}).where(eq(schema.messages.id, job.messageId)).run()
 
@@ -605,7 +585,7 @@ export async function processSendJob(job: SendJob) {
     }
 
     try {
-      await send(recipient.phoneNumber, recipient.renderedContent || '')
+      await sendMessageViaUI(recipient.phoneNumber, recipient.renderedContent || '')
 
       db.update(schema.messageRecipients)
         .set({
@@ -633,11 +613,6 @@ export async function processSendJob(job: SendJob) {
         .set({failedCount: sql`failed_count + 1`})
         .where(eq(schema.messages.id, job.messageId))
         .run()
-    }
-
-    // Delay between batches
-    if (i < pendingRecipients.length - 1 && (i + 1) % job.batchSize === 0) {
-      await new Promise((resolve) => setTimeout(resolve, job.batchDelayMs))
     }
   }
 

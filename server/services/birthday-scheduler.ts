@@ -2,7 +2,7 @@ import {and, eq, sql} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
 import {getSetting} from '../routes/settings.js'
-import {sendMessage, sendMessageViaUI} from './applescript.js'
+import {sendMessageViaUI} from './applescript.js'
 
 let timeoutId: ReturnType<typeof setTimeout> | null = null
 
@@ -100,8 +100,7 @@ export async function checkBirthdays() {
   const preNotifyDays = getSetting('birthdayPreNotifyDays')
   const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',').map((d) => Number(d.trim())) : [])
 
-  const sendMethod = getSetting('sendMethod')
-  const send = sendMethod === 'ui' ? sendMessageViaUI : sendMessage
+  const send = sendMessageViaUI
 
   const now = new Date()
   const todayMonth = now.getMonth() + 1
@@ -189,8 +188,7 @@ export async function checkAnniversaries() {
   const preNotifyDays = getSetting('anniversaryPreNotifyDays')
   const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',').map((d) => Number(d.trim())) : [])
 
-  const sendMethod = getSetting('sendMethod')
-  const send = sendMethod === 'ui' ? sendMessageViaUI : sendMessage
+  const send = sendMessageViaUI
 
   const now = new Date()
   const todayMonth = now.getMonth() + 1

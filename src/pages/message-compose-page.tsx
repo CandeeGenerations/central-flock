@@ -23,7 +23,6 @@ import {
   fetchGroups,
   fetchMessage,
   fetchPeople,
-  fetchSettings,
   fetchTemplates,
   sendMessage,
   updateDraft,
@@ -36,20 +35,7 @@ import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {format} from 'date-fns'
-import {
-  CalendarIcon,
-  ChevronDown,
-  ChevronRight,
-  Globe,
-  Info,
-  Save,
-  Send,
-  Trash2,
-  Type,
-  Users,
-  X,
-  Zap,
-} from 'lucide-react'
+import {CalendarIcon, ChevronDown, ChevronRight, Globe, Save, Send, Trash2, Type, Users, X, Zap} from 'lucide-react'
 import {type ReactNode, useCallback, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -101,10 +87,10 @@ export function MessageComposePage() {
   const debouncedExcludeSearch = useDebouncedValue(excludeSearch, 250)
   const [excludeHighlight, setExcludeHighlight] = useState(-1)
   const excludeSearchRef = useRef<HTMLInputElement>(null)
-  const [batchSize, setBatchSize] = useState<number>(BATCH_DEFAULTS.batchSize)
+  const [batchSize] = useState<number>(BATCH_DEFAULTS.batchSize)
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [batchDelayMs, setBatchDelayMs] = useState<number>(BATCH_DEFAULTS.batchDelayMs)
+  const [batchDelayMs] = useState<number>(BATCH_DEFAULTS.batchDelayMs)
   const [scheduledAt, setScheduledAt] = useState('')
   const [sendTimeMode, setSendTimeMode] = useState<'now' | 'schedule'>('now')
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(draftIdParam ? Number(draftIdParam) : null)
@@ -162,8 +148,6 @@ export function MessageComposePage() {
     setContent(draftData.content || '')
     setRecipientMode(draftData.recipientMode || 'group')
     setSelectedGroupId(draftData.groupId ? String(draftData.groupId) : '')
-    setBatchSize(draftData.batchSize ?? BATCH_DEFAULTS.batchSize)
-    setBatchDelayMs(draftData.batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs)
     setScheduledAt(draftData.scheduledAt || '')
     if (draftData.scheduledAt) setSendTimeMode('schedule')
     if (draftData.excludeIds) {
@@ -230,8 +214,6 @@ export function MessageComposePage() {
     setContent(editMessageData.content || '')
     setSelectedGroupId(editMessageData.groupId ? String(editMessageData.groupId) : '')
     setRecipientMode(editMessageData.groupId ? 'group' : 'individual')
-    setBatchSize(editMessageData.batchSize ?? BATCH_DEFAULTS.batchSize)
-    setBatchDelayMs(editMessageData.batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs)
     // Convert scheduledAt UTC back to local datetime-local format
     if (editMessageData.scheduledAt) {
       const d = new Date(editMessageData.scheduledAt + (editMessageData.scheduledAt.endsWith('Z') ? '' : 'Z'))
@@ -301,19 +283,6 @@ export function MessageComposePage() {
     queryKey: queryKeys.globalVariables(),
     queryFn: () => fetchGlobalVariables(),
   })
-  const {data: settings} = useQuery({
-    queryKey: queryKeys.settings,
-    queryFn: fetchSettings,
-  })
-
-  // Set default batch delay based on send method (only for new composes, not loaded drafts/edits)
-  const [appliedSendMethodDefault, setAppliedSendMethodDefault] = useState(false)
-  if (settings && !appliedSendMethodDefault && !loadedDraftId && !loadedEditMessageId) {
-    setAppliedSendMethodDefault(true)
-    if (settings.sendMethod === 'ui') {
-      setBatchDelayMs(1000)
-    }
-  }
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplateId(templateId)
@@ -1109,39 +1078,6 @@ export function MessageComposePage() {
             </CardContent>
           </Card>
 
-          {/* === BATCH SETTINGS Section === */}
-          {settings?.sendMethod !== 'ui' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Batch Settings</CardTitle>
-                <p className="text-sm text-muted-foreground">Configure how messages are sent in batches.</p>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Batch Size</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={batchSize}
-                      onChange={(e) => setBatchSize(Number(e.target.value))}
-                    />
-                  </div>
-                  <div>
-                    <Label>Delay Between Batches (ms)</Label>
-                    <Input
-                      type="number"
-                      min={1000}
-                      step={1000}
-                      value={batchDelayMs}
-                      onChange={(e) => setBatchDelayMs(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Bottom actions */}
           <div className="py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="space-y-1">
@@ -1310,27 +1246,6 @@ export function MessageComposePage() {
               <span className="font-medium text-orange-500">{Math.ceil(charCount / 160)}</span>
             </div>
           )}
-          <div
-            className={cn(
-              'flex items-start gap-2 rounded-lg p-2.5 text-xs',
-              settings?.sendMethod === 'ui'
-                ? 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                : 'bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
-            )}
-          >
-            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            {settings?.sendMethod === 'ui' ? (
-              <span>
-                Sending via <strong>UI Scripting</strong> — Messages app will handle routing (iMessage/RCS/SMS). Do not
-                interact with the computer during sends.
-              </span>
-            ) : (
-              <span>
-                Sending via <strong>API (AppleScript)</strong> — SMS only. Change to UI Scripting in Settings for
-                iMessage/RCS support.
-              </span>
-            )}
-          </div>
           <Separator />
           <div>
             <span className="text-muted-foreground">Preview</span>

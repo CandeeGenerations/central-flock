@@ -49,30 +49,6 @@ function straightenQuotes(text: string): string {
     .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
 }
 
-export async function sendMessage(phoneNumber: string, message: string): Promise<void> {
-  const release = await acquireSendLock()
-  try {
-    const escapedMessage = straightenQuotes(message).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    const escapedPhone = phoneNumber.replace(/"/g, '')
-
-    const script = `
-tell application "Messages"
-  set targetService to 1st account whose service type = SMS
-  set targetBuddy to participant "${escapedPhone}" of targetService
-  send "${escapedMessage}" to targetBuddy
-end tell`
-
-    await runAppleScript(script)
-  } catch (error) {
-    throw new Error(
-      `Failed to send message to ${phoneNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      {cause: error},
-    )
-  } finally {
-    release()
-  }
-}
-
 export async function sendMessageViaUI(phoneNumber: string, message: string): Promise<void> {
   const release = await acquireSendLock()
   try {

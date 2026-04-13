@@ -1,8 +1,6 @@
 export interface SendJob {
   id: string
   messageId: number
-  batchSize: number
-  batchDelayMs: number
   status: 'pending' | 'processing' | 'completed' | 'cancelled'
   cancelled: boolean
 }
@@ -10,12 +8,10 @@ export interface SendJob {
 const activeJobs = new Map<number, SendJob>()
 let jobCounter = 0
 
-export function createJob(messageId: number, batchSize: number, batchDelayMs: number): SendJob {
+export function createJob(messageId: number): SendJob {
   const job: SendJob = {
     id: `job_${++jobCounter}`,
     messageId,
-    batchSize,
-    batchDelayMs,
     status: 'pending',
     cancelled: false,
   }

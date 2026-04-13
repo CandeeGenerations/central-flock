@@ -36,7 +36,7 @@ function checkScheduledMessages(processSendJob: ProcessSendJobFn) {
       // On time — transition to pending and send
       db.update(schema.messages).set({status: 'pending'}).where(eq(schema.messages.id, msg.id)).run()
 
-      const job = createJob(msg.id, msg.batchSize, msg.batchDelayMs)
+      const job = createJob(msg.id)
       processSendJob(job)
       console.log(`Scheduler: message ${msg.id} triggered for sending`)
     } else {

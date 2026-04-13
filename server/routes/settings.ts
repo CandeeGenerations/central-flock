@@ -9,18 +9,13 @@ export const settingsRouter = Router()
 const DEFAULTS: Record<string, string> = {
   birthdaySendTime: '07:00',
   birthdayPreNotifyDays: '',
-  birthdaySendTo: 'self',
-  birthdayMyContactId: '',
   webhookUrl: '',
   anniversarySendTime: '07:00',
   anniversaryPreNotifyDays: '',
-  anniversarySendTo: 'self',
   devotionAiModel: 'claude-sonnet-4-20250514',
 }
 
 const VALID_VALUES: Record<string, string[]> = {
-  birthdaySendTo: ['self', 'person'],
-  anniversarySendTo: ['self', 'person'],
   devotionAiModel: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
 }
 
@@ -88,7 +83,6 @@ settingsRouter.put(
     if (
       !value &&
       key !== 'birthdayPreNotifyDays' &&
-      key !== 'birthdayMyContactId' &&
       key !== 'webhookUrl' &&
       key !== 'anniversaryPreNotifyDays'
     ) {

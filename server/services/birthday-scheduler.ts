@@ -96,11 +96,8 @@ function recordMessageInHistory(personId: number, content: string) {
 
 export async function checkBirthdays() {
   const webhookUrl = getSetting('webhookUrl')
-  const sendTo = getSetting('birthdaySendTo') || 'self'
   const preNotifyDays = getSetting('birthdayPreNotifyDays')
   const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',').map((d) => Number(d.trim())) : [])
-
-  const send = sendMessageViaUI
 
   const now = new Date()
   const todayMonth = now.getMonth() + 1
@@ -116,7 +113,7 @@ export async function checkBirthdays() {
     const days = daysUntilBirthday(bMonth, bDay, todayMonth, todayDay)
     const name = formatPersonName(person)
 
-    // Check pre-notifications (always via webhook)
+    // Check pre-notifications (via webhook)
     for (const n of [3, 7, 10]) {
       if (!preNotifySet.has(n)) continue
       if (days !== n) continue
@@ -145,38 +142,25 @@ export async function checkBirthdays() {
     if (days === 0 || (bMonth === todayMonth && bDay === todayDay)) {
       if (wasSent(person.id, 'birthday', currentYear)) continue
 
+      if (!person.phoneNumber) {
+        console.log(`Birthday scheduler: no phone number for ${name}, skipping`)
+        continue
+      }
+
       let ageStr = ''
       if (person.birthYear) {
         const age = currentYear - person.birthYear
         if (age > 0) ageStr = ` ${ordinal(age)}`
       }
 
-      if (sendTo === 'person' && person.phoneNumber) {
-        // Send directly to the person via AppleScript
-        const message = `Happy${ageStr} birthday to you!`
-        try {
-          await send(person.phoneNumber, message)
-          recordSent(person.id, 'birthday', currentYear)
-          recordMessageInHistory(person.id, message)
-          console.log(`Birthday scheduler: sent birthday message to ${name}`)
-        } catch (error) {
-          console.error(`Birthday scheduler: failed to send birthday message to ${name}:`, error)
-        }
-      } else {
-        // Send to self via webhook
-        if (!webhookUrl) {
-          console.log(`Birthday scheduler: webhookUrl not set, skipping self-send for ${name}`)
-          continue
-        }
-        const message = `Happy${ageStr} birthday to ${name}`
-        try {
-          await sendWebhook(webhookUrl, {type: 'birthday', personName: name, message})
-          recordSent(person.id, 'birthday', currentYear)
-          recordMessageInHistory(person.id, message)
-          console.log(`Birthday scheduler: sent birthday message for ${name} via webhook`)
-        } catch (error) {
-          console.error(`Birthday scheduler: failed to send birthday webhook for ${name}:`, error)
-        }
+      const message = `Happy${ageStr} birthday to you!`
+      try {
+        await sendMessageViaUI(person.phoneNumber, message)
+        recordSent(person.id, 'birthday', currentYear)
+        recordMessageInHistory(person.id, message)
+        console.log(`Birthday scheduler: sent birthday message to ${name}`)
+      } catch (error) {
+        console.error(`Birthday scheduler: failed to send birthday message to ${name}:`, error)
       }
     }
   }
@@ -184,11 +168,8 @@ export async function checkBirthdays() {
 
 export async function checkAnniversaries() {
   const webhookUrl = getSetting('webhookUrl')
-  const sendTo = getSetting('anniversarySendTo') || 'self'
   const preNotifyDays = getSetting('anniversaryPreNotifyDays')
   const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',').map((d) => Number(d.trim())) : [])
-
-  const send = sendMessageViaUI
 
   const now = new Date()
   const todayMonth = now.getMonth() + 1
@@ -204,7 +185,7 @@ export async function checkAnniversaries() {
     const days = daysUntilBirthday(aMonth, aDay, todayMonth, todayDay)
     const name = formatPersonName(person)
 
-    // Check pre-notifications (always via webhook)
+    // Check pre-notifications (via webhook)
     for (const n of [3, 7, 10]) {
       if (!preNotifySet.has(n)) continue
       if (days !== n) continue
@@ -233,38 +214,25 @@ export async function checkAnniversaries() {
     if (days === 0 || (aMonth === todayMonth && aDay === todayDay)) {
       if (wasSent(person.id, 'anniversary', currentYear)) continue
 
+      if (!person.phoneNumber) {
+        console.log(`Anniversary scheduler: no phone number for ${name}, skipping`)
+        continue
+      }
+
       let yearStr = ''
       if (person.anniversaryYear) {
         const years = currentYear - person.anniversaryYear
         if (years > 0) yearStr = ` ${ordinal(years)}`
       }
 
-      if (sendTo === 'person' && person.phoneNumber) {
-        // Send directly to the person via AppleScript
-        const message = `Happy${yearStr} anniversary!`
-        try {
-          await send(person.phoneNumber, message)
-          recordSent(person.id, 'anniversary', currentYear)
-          recordMessageInHistory(person.id, message)
-          console.log(`Anniversary scheduler: sent anniversary message to ${name}`)
-        } catch (error) {
-          console.error(`Anniversary scheduler: failed to send anniversary message to ${name}:`, error)
-        }
-      } else {
-        // Send to self via webhook
-        if (!webhookUrl) {
-          console.log(`Anniversary scheduler: webhookUrl not set, skipping self-send for ${name}`)
-          continue
-        }
-        const message = `Happy${yearStr} anniversary to ${name}`
-        try {
-          await sendWebhook(webhookUrl, {type: 'anniversary', personName: name, message})
-          recordSent(person.id, 'anniversary', currentYear)
-          recordMessageInHistory(person.id, message)
-          console.log(`Anniversary scheduler: sent anniversary message for ${name} via webhook`)
-        } catch (error) {
-          console.error(`Anniversary scheduler: failed to send anniversary webhook for ${name}:`, error)
-        }
+      const message = `Happy${yearStr} anniversary!`
+      try {
+        await sendMessageViaUI(person.phoneNumber, message)
+        recordSent(person.id, 'anniversary', currentYear)
+        recordMessageInHistory(person.id, message)
+        console.log(`Anniversary scheduler: sent anniversary message to ${name}`)
+      } catch (error) {
+        console.error(`Anniversary scheduler: failed to send anniversary message to ${name}:`, error)
       }
     }
   }

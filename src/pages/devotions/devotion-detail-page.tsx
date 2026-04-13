@@ -1,4 +1,6 @@
+import {AIProgress} from '@/components/ai-progress'
 import {ConfirmDialog} from '@/components/confirm-dialog'
+import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Checkbox} from '@/components/ui/checkbox'
@@ -8,6 +10,8 @@ import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
+import {useProgressOperation} from '@/hooks/use-sse'
 import {
   type Devotion,
   createDevotion,
@@ -15,6 +19,7 @@ import {
   fetchDevotion,
   fetchNextDevotionNumber,
   generateFacebookDescription,
+  generatePassage,
   generatePodcastDescription,
   generatePodcastTitle,
   generateSongDescription,
@@ -24,12 +29,56 @@ import {
   youtubeSearchUrl,
 } from '@/lib/devotion-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Check, ChevronDown, ChevronUp, Copy, ExternalLink, Save, Trash2} from 'lucide-react'
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  ExternalLink,
+  Loader2,
+  Save,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import {useState} from 'react'
-import {useNavigate, useParams} from 'react-router-dom'
+import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 type DevotionType = 'original' | 'favorite' | 'guest' | 'revisit'
+
+const TYPE_COLORS: Record<string, string> = {
+  original: '#ef4444',
+  favorite: '#a855f7',
+  guest: '#3b82f6',
+  revisit: '#22c55e',
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  original: 'Original',
+  favorite: 'Favorite',
+  guest: 'Guest',
+  revisit: 'Revisit',
+}
+
+interface ScriptureMatch {
+  reference: string
+  count: number
+  devotions: {
+    id: number
+    number: number
+    date: string
+    devotionType: string
+    guestSpeaker: string | null
+    bibleReference: string
+  }[]
+}
+
+function fetchScriptureLookup(search: string) {
+  return fetch(`/api/devotions/scriptures/lookup?search=${encodeURIComponent(search)}`, {credentials: 'include'}).then(
+    (r) => r.json(),
+  ) as Promise<ScriptureMatch[]>
+}
 
 interface DevotionForm {
   date: string
@@ -40,6 +89,8 @@ interface DevotionForm {
   guestNumber: string
   referencedDevotions: string
   bibleReference: string
+  title: string
+  talkingPoints: string
   songName: string
   notes: string
   produced: boolean
@@ -58,6 +109,8 @@ const emptyForm: DevotionForm = {
   guestNumber: '',
   referencedDevotions: '',
   bibleReference: '',
+  title: '',
+  talkingPoints: '',
   songName: '',
   notes: '',
   produced: false,
@@ -77,6 +130,8 @@ function devotionToForm(d: Devotion): DevotionForm {
     guestNumber: d.guestNumber != null ? String(d.guestNumber) : '',
     referencedDevotions: d.referencedDevotions ? JSON.parse(d.referencedDevotions).join(', ') : '',
     bibleReference: d.bibleReference ?? '',
+    title: d.title ?? '',
+    talkingPoints: d.talkingPoints ?? '',
     songName: d.songName ?? '',
     notes: d.notes ?? '',
     produced: d.produced ?? false,
@@ -104,6 +159,8 @@ function formToPayload(form: DevotionForm): Partial<Devotion> {
         )
       : null,
     bibleReference: form.bibleReference || null,
+    title: form.title || null,
+    talkingPoints: form.talkingPoints || null,
     songName: form.songName || null,
     notes: form.notes || null,
     produced: form.produced,
@@ -124,6 +181,13 @@ export function DevotionDetailPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [publishingOpen, setPublishingOpen] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const {state: genState, start: startGenerate} = useProgressOperation([
+    {message: 'Checking previous passages\u2026', progress: 10},
+    {message: 'Generating with Claude\u2026', progress: 30},
+    {message: 'Still generating\u2026', progress: 55},
+    {message: 'Processing response\u2026', progress: 80},
+  ])
+  const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false)
 
   const {data: devotion, isLoading} = useQuery({
     queryKey: ['devotion', id],
@@ -148,6 +212,17 @@ export function DevotionDetailPage() {
     setLoadedNextNumber(nextNumber.next)
     setForm((f) => ({...f, number: nextNumber.next}))
   }
+
+  const debouncedRef = useDebouncedValue(form.bibleReference, 500)
+  const {data: scriptureMatches} = useQuery({
+    queryKey: ['scripture-lookup', debouncedRef],
+    queryFn: () => fetchScriptureLookup(debouncedRef),
+    enabled: debouncedRef.length >= 2,
+  })
+  // Flatten and exclude current devotion from matches
+  const scriptureDevotions = (scriptureMatches?.flatMap((m) => m.devotions) ?? []).filter(
+    (d) => !devotion || d.id !== devotion.id,
+  )
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<Devotion>) => createDevotion(data),
@@ -199,6 +274,32 @@ export function DevotionDetailPage() {
   const update = (patch: Partial<DevotionForm>) => setForm((f) => ({...f, ...patch}))
 
   const isSaving = createMutation.isPending || updateMutation.isPending
+
+  const isTylerDevotion = form.devotionType === 'guest' && form.guestSpeaker === 'Tyler'
+
+  const hasExistingPassage = !!(form.talkingPoints || form.title || form.bibleReference)
+
+  const doGenerate = async () => {
+    try {
+      const passage = await startGenerate(() => generatePassage())
+      update({
+        title: passage.title,
+        bibleReference: passage.bibleReference,
+        talkingPoints: passage.talkingPoints,
+      })
+      toast.success('Passage generated')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Generation failed')
+    }
+  }
+
+  const handleGenerate = () => {
+    if (hasExistingPassage) {
+      setGenerateConfirmOpen(true)
+    } else {
+      doGenerate()
+    }
+  }
 
   const showSongUpload =
     form.songName.trim() !== '' && (form.devotionType === 'original' || form.devotionType === 'favorite')
@@ -280,7 +381,14 @@ export function DevotionDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={form.devotionType !== 'guest' && form.devotionType !== 'revisit' ? 'md:col-span-3' : ''}>
               <Label>Type</Label>
-              <Select value={form.devotionType} onValueChange={(v) => update({devotionType: v as DevotionType})}>
+              <Select
+                value={form.devotionType}
+                onValueChange={(v) => {
+                  const patch: Partial<DevotionForm> = {devotionType: v as DevotionType}
+                  if (v === 'guest' && !form.guestSpeaker) patch.guestSpeaker = 'Tyler'
+                  update(patch)
+                }}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -359,6 +467,45 @@ export function DevotionDetailPage() {
             </div>
           </div>
 
+          {isTylerDevotion && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Devotion Passage</Label>
+                <Button variant="outline" size="sm" onClick={handleGenerate} disabled={genState.isRunning}>
+                  {genState.isRunning ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-1.5" />
+                      {form.talkingPoints ? 'Regenerate' : 'Generate Passage'}
+                    </>
+                  )}
+                </Button>
+              </div>
+              {genState.isRunning && <AIProgress message={genState.message} progress={genState.progress} />}
+              <div>
+                <Label className="text-xs text-muted-foreground">Title</Label>
+                <Input
+                  value={form.title}
+                  onChange={(e) => update({title: e.target.value})}
+                  placeholder="e.g. The Power of a Clean Conscience"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Talking Points</Label>
+                <Textarea
+                  value={form.talkingPoints}
+                  onChange={(e) => update({talkingPoints: e.target.value})}
+                  rows={5}
+                  placeholder="AI-generated talking points will appear here, or type manually"
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <Label>Song Name</Label>
             <Input value={form.songName} onChange={(e) => update({songName: e.target.value})} placeholder="Optional" />
@@ -396,6 +543,55 @@ export function DevotionDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Scripture Usage */}
+      {scriptureDevotions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Scripture Usage
+              <Badge variant={scriptureDevotions.length > 2 ? 'destructive' : 'secondary'}>
+                {scriptureDevotions.length}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {scriptureDevotions.map((d) => (
+                <div key={d.id} className="flex items-center gap-3 py-2 border-b last:border-0">
+                  <Link to={`/devotions/${d.id}`} className="text-primary hover:underline font-medium">
+                    #{String(d.number).padStart(3, '0')}
+                  </Link>
+                  <span className="text-sm text-muted-foreground">
+                    {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="text-xs"
+                    style={{borderColor: TYPE_COLORS[d.devotionType], color: TYPE_COLORS[d.devotionType]}}
+                  >
+                    {TYPE_LABELS[d.devotionType] || d.devotionType}
+                    {d.guestSpeaker ? ` - ${d.guestSpeaker}` : ''}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground truncate flex-1">{d.bibleReference}</span>
+                  <a
+                    href={youtubeSearchUrl(d.number)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Publishing Section (collapsible) */}
       {!isNew && (
@@ -503,6 +699,18 @@ export function DevotionDetailPage() {
         variant="destructive"
         loading={deleteMutation.isPending}
         onConfirm={() => deleteMutation.mutate()}
+      />
+
+      <ConfirmDialog
+        open={generateConfirmOpen}
+        onOpenChange={setGenerateConfirmOpen}
+        title="Regenerate passage?"
+        description="This will replace the current title, bible reference, and talking points with a new AI-generated passage."
+        confirmLabel="Regenerate"
+        onConfirm={() => {
+          setGenerateConfirmOpen(false)
+          doGenerate()
+        }}
       />
     </div>
   )

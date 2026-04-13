@@ -24,6 +24,7 @@ export const devotions = sqliteTable('devotions', {
   bibleReference: text('bible_reference'),
   songName: text('song_name'),
   title: text('title'),
+  talkingPoints: text('talking_points'),
   youtubeDescription: text('youtube_description'),
   facebookDescription: text('facebook_description'),
   podcastDescription: text('podcast_description'),
@@ -39,4 +40,17 @@ export const devotions = sqliteTable('devotions', {
   updatedAt: text('updated_at')
     .default(sql`(datetime('now'))`)
     .notNull(),
+})
+
+export const generatedPassages = sqliteTable('generated_passages', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  title: text('title').notNull(),
+  bibleReference: text('bible_reference').notNull(),
+  talkingPoints: text('talking_points').notNull(),
+  used: integer('used', {mode: 'boolean'}).default(false).notNull(),
+  devotionId: integer('devotion_id').references(() => devotions.id, {onDelete: 'set null'}),
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+  usedAt: text('used_at'),
 })

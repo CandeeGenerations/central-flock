@@ -1,3 +1,4 @@
+import {AIProgress} from '@/components/ai-progress'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -8,8 +9,10 @@ import {Input} from '@/components/ui/input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
+import {useProgressOperation} from '@/hooks/use-sse'
+import {pullPassagesForScan} from '@/lib/devotion-api'
 import {useQuery} from '@tanstack/react-query'
-import {AlertTriangle, Camera, Check, CircleX, Loader2, Save, Trash2, Upload, ZoomIn} from 'lucide-react'
+import {AlertTriangle, Camera, Check, CircleX, Loader2, Save, Sparkles, Trash2, Upload, ZoomIn} from 'lucide-react'
 import {useRef, useState} from 'react'
 import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -24,6 +27,10 @@ interface ParsedDevotion {
   referencedDevotions: number[]
   bibleReference: string | null
   songName: string | null
+  generatedTitle?: string
+  generatedBibleReference?: string
+  generatedTalkingPoints?: string
+  generatedPassageId?: number
 }
 
 interface EnrichResult {
@@ -126,7 +133,12 @@ export function DevotionScanPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [imageData, setImageData] = useState<{base64: string; mediaType: string} | null>(null)
-  const [parsing, setParsing] = useState(false)
+  const {state: parseState, start: startParse} = useProgressOperation([
+    {message: 'Analyzing handwritten sheet\u2026', progress: 15},
+    {message: 'Reading entries with Claude\u2026', progress: 35},
+    {message: 'Still reading\u2026', progress: 55},
+    {message: 'Extracting devotion data\u2026', progress: 75},
+  ])
   const [enriching, setEnriching] = useState(false)
   const [resultMeta, setResultMeta] = useState<{month: string; year: number} | null>(null)
   const [rows, setRows] = useState<RowState[]>([])
@@ -239,13 +251,46 @@ export function DevotionScanPage() {
 
     const enrichMap = new Map(enrichments.map((e) => [e.number, e]))
 
+    // Pull or generate passages for Tyler devotions
+    const tylerIndices: number[] = []
+    devotions.forEach((d, i) => {
+      if (d.devotionType === 'guest' && d.guestSpeaker === 'Tyler') tylerIndices.push(i)
+    })
+
+    const passageMap = new Map<number, {id: number; title: string; bibleReference: string; talkingPoints: string}>()
+    if (tylerIndices.length > 0) {
+      try {
+        const pullResult = await pullPassagesForScan(tylerIndices.length)
+        tylerIndices.forEach((idx, j) => {
+          if (j < pullResult.passages.length) {
+            passageMap.set(idx, pullResult.passages[j])
+          }
+        })
+        const fromPoolMsg = pullResult.fromPool > 0 ? `${pullResult.fromPool} from pool` : ''
+        const generatedMsg = pullResult.generated > 0 ? `${pullResult.generated} freshly generated` : ''
+        const parts = [fromPoolMsg, generatedMsg].filter(Boolean).join(', ')
+        toast.success(`Assigned ${tylerIndices.length} passages to Tyler devotions (${parts})`)
+      } catch (err) {
+        console.error('Passage pull failed:', err)
+        toast.error('Failed to generate passages for Tyler devotions')
+      }
+    }
+
     setRows(
-      devotions.map((d) => {
+      devotions.map((d, i) => {
         const enrichment = enrichMap.get(d.number)
         // If enrichment found the full chain, update referencedDevotions
         const updatedDevotion = {...d}
         if (enrichment?.fullChain.length) {
           updatedDevotion.referencedDevotions = enrichment.fullChain
+        }
+        // Attach generated passage data to Tyler devotions
+        const passage = passageMap.get(i)
+        if (passage) {
+          updatedDevotion.generatedTitle = passage.title
+          updatedDevotion.generatedBibleReference = passage.bibleReference
+          updatedDevotion.generatedTalkingPoints = passage.talkingPoints
+          updatedDevotion.generatedPassageId = passage.id
         }
         // If verse doesn't match and we have the original's reference, flag it
         return {
@@ -266,21 +311,17 @@ export function DevotionScanPage() {
 
   const handleParse = async () => {
     if (!imageData) return
-    setParsing(true)
     try {
-      const data = await apiPost<{month: string; year: number; devotions: ParsedDevotion[]}>(
-        '/api/devotions/parse-image',
-        {
+      const data = await startParse(() =>
+        apiPost<{month: string; year: number; devotions: ParsedDevotion[]}>('/api/devotions/parse-image', {
           image: imageData.base64,
           mediaType: imageData.mediaType,
-        },
+        }),
       )
       setResultMeta({month: data.month, year: data.year})
       await loadParsedData(data.devotions, data.month, data.year)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to parse image')
-    } finally {
-      setParsing(false)
     }
   }
 
@@ -544,8 +585,8 @@ export function DevotionScanPage() {
                     Replace
                   </Button>
                   {imageData && (
-                    <Button size="sm" onClick={handleParse} disabled={parsing}>
-                      {parsing ? (
+                    <Button size="sm" onClick={handleParse} disabled={parseState.isRunning}>
+                      {parseState.isRunning ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
                           Parsing with AI...
@@ -559,6 +600,9 @@ export function DevotionScanPage() {
                     </Button>
                   )}
                 </div>
+                {parseState.isRunning && (
+                  <AIProgress message={parseState.message} progress={parseState.progress} className="mt-3" />
+                )}
               </div>
             ) : (
               <div className="space-y-2 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
@@ -679,6 +723,23 @@ export function DevotionScanPage() {
                           <SelectItem value="guest-Ed">Guest - Ed</SelectItem>
                         </SelectContent>
                       </Select>
+                      {row.devotion.generatedTitle && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1 mt-1 text-xs text-emerald-600">
+                                <Sparkles className="h-3 w-3" />
+                                <span className="truncate max-w-28">{row.devotion.generatedTitle}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
+                              <p className="font-medium">{row.devotion.generatedTitle}</p>
+                              <p className="text-xs mt-1">{row.devotion.generatedBibleReference}</p>
+                              <p className="text-xs mt-1">{row.devotion.generatedTalkingPoints}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </TableCell>
                     <TableCell className="!align-top">
                       <div className="space-y-1">

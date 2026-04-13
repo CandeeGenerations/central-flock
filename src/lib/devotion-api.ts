@@ -40,6 +40,7 @@ export interface Devotion {
   bibleReference: string | null
   songName: string | null
   title: string | null
+  talkingPoints: string | null
   youtubeDescription: string | null
   facebookDescription: string | null
   podcastDescription: string | null
@@ -279,4 +280,47 @@ export function generatePodcastDescription(devotion: Devotion): string {
 
 export function generatePodcastTitle(devotion: Devotion): string {
   return `From the Shepherd to the Sheep - #${String(devotion.number).padStart(3, '0')} - CBC`
+}
+
+// AI Passage Generation
+
+export interface GeneratedPassage {
+  title: string
+  bibleReference: string
+  talkingPoints: string
+}
+
+export interface PoolPassage extends GeneratedPassage {
+  id: number
+  used: boolean
+  devotionId: number | null
+  createdAt: string
+  usedAt: string | null
+  scriptureUsageCount: number
+}
+
+export function generatePassage() {
+  return request<GeneratedPassage>('/devotions/generate-passage', {method: 'POST'})
+}
+
+export function generatePoolPassages(count: number) {
+  return request<{generated: number; passages: GeneratedPassage[]}>('/devotions/pool/generate', {
+    method: 'POST',
+    body: JSON.stringify({count}),
+  })
+}
+
+export function fetchPool(params?: {used?: string; limit?: number}) {
+  return request<PoolPassage[]>(`/devotions/pool${buildQueryString(params)}`)
+}
+
+export function deletePoolPassage(id: number) {
+  return request<{success: boolean}>(`/devotions/pool/${id}`, {method: 'DELETE'})
+}
+
+export function pullPassagesForScan(count: number) {
+  return request<{passages: Array<GeneratedPassage & {id: number}>; generated: number; fromPool: number}>(
+    '/devotions/pool/pull-for-scan',
+    {method: 'POST', body: JSON.stringify({count})},
+  )
 }

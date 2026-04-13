@@ -10,6 +10,8 @@ import {DashboardPage} from '@/pages/dashboard-page'
 import {DevotionAuditPage} from '@/pages/devotions/devotion-audit-page'
 import {DevotionDetailPage} from '@/pages/devotions/devotion-detail-page'
 import {DevotionListPage} from '@/pages/devotions/devotion-list-page'
+import {DevotionPassageDetailPage} from '@/pages/devotions/devotion-passage-detail-page'
+import {DevotionPassagesPage} from '@/pages/devotions/devotion-passages-page'
 import {DevotionScanPage} from '@/pages/devotions/devotion-scan-page'
 import {DevotionScripturesPage} from '@/pages/devotions/devotion-scriptures-page'
 import {DevotionStatsPage} from '@/pages/devotions/devotion-stats-page'
@@ -40,6 +42,7 @@ import {
   Moon,
   Plus,
   Settings,
+  Sparkles,
   Sun,
   Users,
 } from 'lucide-react'
@@ -83,7 +86,8 @@ const devotionNavItems = [
   {to: '/devotions/stats', label: 'Stats', icon: BarChart3, shortcut: `${mod}6`},
   {to: '/devotions', label: 'Devotions', icon: List, shortcut: `${mod}7`},
   {to: '/devotions/scriptures', label: 'Scriptures', icon: BookOpen, shortcut: `${mod}8`},
-  {to: '/devotions/audit', label: 'Audit', icon: AlertTriangle, shortcut: `${mod}9`},
+  {to: '/devotions/passages', label: 'Passages', icon: Sparkles, shortcut: `${mod}9`},
+  {to: '/devotions/audit', label: 'Audit', icon: AlertTriangle, shortcut: `${mod}0`},
 ]
 
 function SidebarNav({onNavClick}: {onNavClick?: () => void}) {
@@ -324,6 +328,8 @@ function AppLayout() {
             <Route path="/devotions/stats" element={<DevotionStatsPage />} />
             <Route path="/devotions/scan" element={<DevotionScanPage />} />
             <Route path="/devotions/scriptures" element={<DevotionScripturesPage />} />
+            <Route path="/devotions/passages" element={<DevotionPassagesPage />} />
+            <Route path="/devotions/passages/:id" element={<DevotionPassageDetailPage />} />
             <Route path="/devotions/audit" element={<DevotionAuditPage />} />
             <Route path="/devotions/new" element={<DevotionDetailPage />} />
             <Route path="/devotions/:id" element={<DevotionDetailPage />} />

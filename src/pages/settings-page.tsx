@@ -59,6 +59,7 @@ export function SettingsPage() {
     }
   }
 
+  const devotionAiModel = settings?.devotionAiModel ?? 'claude-sonnet-4-20250514'
   const sendMethod = settings?.sendMethod ?? 'api'
   const webhookUrl = settings?.webhookUrl ?? ''
   const birthdaySendTime = settings?.birthdaySendTime ?? '07:00'
@@ -198,6 +199,33 @@ export function SettingsPage() {
                   </p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>AI / Devotions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Generation Model</Label>
+                <Select
+                  value={devotionAiModel}
+                  onValueChange={(value) => mutation.mutate({key: 'devotionAiModel', value})}
+                >
+                  <SelectTrigger className="w-64">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claude-sonnet-4-20250514">Claude Sonnet 4 (Recommended)</SelectItem>
+                    <SelectItem value="claude-opus-4-20250514">Claude Opus 4</SelectItem>
+                    <SelectItem value="claude-haiku-4-5-20251001">Claude Haiku 4.5</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Model used for generating devotion passages. Sonnet is fast and capable, Opus is the most capable, and
+                  Haiku is the fastest and cheapest.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>

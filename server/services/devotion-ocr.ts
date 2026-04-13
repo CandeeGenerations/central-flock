@@ -56,9 +56,12 @@ Return ONLY a JSON object with this shape:
 
 Be precise with the numbers. If you can't read a value clearly, use your best judgment based on context (sequential numbering, etc.). Do not skip any rows.`
 
+export type ProgressCallback = (step: string, message: string, progress: number) => void
+
 export async function parseDevotionImage(
   imageBase64: string,
   mediaType: string,
+  onProgress?: ProgressCallback,
 ): Promise<{
   month: string
   year: number
@@ -68,6 +71,8 @@ export async function parseDevotionImage(
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY environment variable is not set')
   }
+
+  onProgress?.('calling_ai', 'Analyzing handwritten sheet\u2026', 20)
 
   const client = new Anthropic({apiKey})
 
@@ -100,6 +105,8 @@ export async function parseDevotionImage(
   if (!textBlock || textBlock.type !== 'text') {
     throw new Error('No text response from Claude')
   }
+
+  onProgress?.('parsing', 'Extracting devotion entries\u2026', 80)
 
   // Extract JSON from the response (may be wrapped in markdown code block)
   let jsonStr = textBlock.text

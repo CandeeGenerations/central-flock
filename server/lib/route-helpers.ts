@@ -9,9 +9,26 @@ export function asyncHandler(
   return (req, res) => {
     fn(req, res).catch((error) => {
       console.error('Unhandled route error:', error)
-      res.status(500).json({error: 'Internal server error'})
+      const message = parseErrorMessage(error)
+      res.status(500).json({error: message})
     })
   }
+}
+
+function parseErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return 'Internal server error'
+  const msg = error.message
+  // Anthropic SDK errors: "529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"},...}"
+  const jsonStart = msg.indexOf('{')
+  if (jsonStart !== -1) {
+    try {
+      const parsed = JSON.parse(msg.slice(jsonStart))
+      if (parsed?.error?.message) return parsed.error.message
+    } catch {
+      /* not JSON, fall through */
+    }
+  }
+  return msg
 }
 
 export function getGroupName(groupId: number): string | null {

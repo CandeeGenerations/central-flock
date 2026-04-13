@@ -16,12 +16,14 @@ const DEFAULTS: Record<string, string> = {
   anniversarySendTime: '07:00',
   anniversaryPreNotifyDays: '',
   anniversarySendTo: 'self',
+  devotionAiModel: 'claude-sonnet-4-20250514',
 }
 
 const VALID_VALUES: Record<string, string[]> = {
   sendMethod: ['api', 'ui'],
   birthdaySendTo: ['self', 'person'],
   anniversarySendTo: ['self', 'person'],
+  devotionAiModel: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
 }
 
 // GET /api/settings - Get all settings

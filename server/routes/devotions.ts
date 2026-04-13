@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx'
 import {devotionsDb, devotionsSchema} from '../db-devotions/index.js'
 import {parseReference, referenceKeys} from '../lib/bible-reference.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
+import {generateDevotionPassage} from '../services/devotion-generation.js'
 import {importDevotions, parseSheetRows} from '../services/devotion-import.js'
 import {parseDevotionImage} from '../services/devotion-ocr.js'
 
@@ -806,6 +807,262 @@ devotionsRouter.post(
   }),
 )
 
+// POST /api/devotions/generate-passage - Generate one passage on demand
+devotionsRouter.post(
+  '/generate-passage',
+  asyncHandler(async (_req, res) => {
+    const passages = await generateDevotionPassage(1)
+    res.json(passages[0])
+  }),
+)
+
+// POST /api/devotions/pool/generate - Batch generate N passages into pool
+devotionsRouter.post(
+  '/pool/generate',
+  asyncHandler(async (req, res) => {
+    const count = Math.min(Math.max(Number(req.body.count) || 1, 1), 20)
+    const passages = await generateDevotionPassage(count)
+
+    for (const p of passages) {
+      devotionsDb
+        .insert(devotionsSchema.generatedPassages)
+        .values({
+          title: p.title,
+          bibleReference: p.bibleReference,
+          talkingPoints: p.talkingPoints,
+        })
+        .run()
+    }
+
+    res.json({generated: passages.length, passages})
+  }),
+)
+
+// GET /api/devotions/pool - List pool passages
+devotionsRouter.get(
+  '/pool',
+  asyncHandler(async (req, res) => {
+    const usedFilter = req.query.used
+    const limit = Number(req.query.limit) || 100
+
+    let query = devotionsDb
+      .select()
+      .from(devotionsSchema.generatedPassages)
+      .orderBy(desc(devotionsSchema.generatedPassages.createdAt))
+      .limit(limit)
+
+    if (usedFilter === 'true') {
+      query = query.where(eq(devotionsSchema.generatedPassages.used, true)) as typeof query
+    } else if (usedFilter === 'false') {
+      query = query.where(eq(devotionsSchema.generatedPassages.used, false)) as typeof query
+    }
+
+    const rows = query.all()
+
+    // Enrich with scripture usage counts
+    const uniqueRefs = [...new Set(rows.map((r) => r.bibleReference).filter(Boolean))]
+    const usageCounts = new Map<string, number>()
+
+    if (uniqueRefs.length > 0) {
+      const allDevotions = devotionsDb
+        .select({bibleReference: devotionsSchema.devotions.bibleReference})
+        .from(devotionsSchema.devotions)
+        .where(
+          and(
+            sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`,
+            sql`${devotionsSchema.devotions.devotionType} != 'revisit'`,
+          ),
+        )
+        .all()
+
+      for (const ref of uniqueRefs) {
+        const refParsed = parseReference(ref)
+        const refKeys = new Set(refParsed.flatMap((r) => referenceKeys(r)))
+        let count = 0
+        for (const d of allDevotions) {
+          if (!d.bibleReference) continue
+          const dParsed = parseReference(d.bibleReference)
+          const dKeys = dParsed.flatMap((r) => referenceKeys(r))
+          if (dKeys.some((k) => refKeys.has(k))) count++
+        }
+        usageCounts.set(ref, count)
+      }
+    }
+
+    const enriched = rows.map((r) => ({
+      ...r,
+      scriptureUsageCount: usageCounts.get(r.bibleReference) ?? 0,
+    }))
+
+    res.json(enriched)
+  }),
+)
+
+// POST /api/devotions/pool/assign - Assign pool passage to a devotion
+devotionsRouter.post(
+  '/pool/assign',
+  asyncHandler(async (req, res) => {
+    const {passageId, devotionId} = req.body as {passageId: number; devotionId: number}
+
+    const passage = devotionsDb
+      .select()
+      .from(devotionsSchema.generatedPassages)
+      .where(eq(devotionsSchema.generatedPassages.id, passageId))
+      .get()
+
+    if (!passage) {
+      res.status(404).json({error: 'Passage not found'})
+      return
+    }
+
+    // Update devotion with passage content
+    devotionsDb
+      .update(devotionsSchema.devotions)
+      .set({
+        title: passage.title,
+        bibleReference: passage.bibleReference,
+        talkingPoints: passage.talkingPoints,
+        updatedAt: sql`datetime('now')`,
+      })
+      .where(eq(devotionsSchema.devotions.id, devotionId))
+      .run()
+
+    // Mark passage as used
+    devotionsDb
+      .update(devotionsSchema.generatedPassages)
+      .set({
+        used: true,
+        devotionId,
+        usedAt: sql`datetime('now')`,
+      })
+      .where(eq(devotionsSchema.generatedPassages.id, passageId))
+      .run()
+
+    const updatedPassage = devotionsDb
+      .select()
+      .from(devotionsSchema.generatedPassages)
+      .where(eq(devotionsSchema.generatedPassages.id, passageId))
+      .get()
+
+    const updatedDevotion = devotionsDb
+      .select()
+      .from(devotionsSchema.devotions)
+      .where(eq(devotionsSchema.devotions.id, devotionId))
+      .get()
+
+    res.json({passage: updatedPassage, devotion: updatedDevotion})
+  }),
+)
+
+// POST /api/devotions/pool/pull-for-scan - Pull passages from pool for scan auto-assign
+devotionsRouter.post(
+  '/pool/pull-for-scan',
+  asyncHandler(async (req, res) => {
+    const count = Math.min(Math.max(Number(req.body.count) || 1, 1), 30)
+
+    // Pull available passages from pool
+    const available = devotionsDb
+      .select()
+      .from(devotionsSchema.generatedPassages)
+      .where(eq(devotionsSchema.generatedPassages.used, false))
+      .orderBy(asc(devotionsSchema.generatedPassages.createdAt))
+      .limit(count)
+      .all()
+
+    const fromPool = available.map((p) => ({
+      id: p.id,
+      title: p.title,
+      bibleReference: p.bibleReference,
+      talkingPoints: p.talkingPoints,
+    }))
+
+    // If not enough in pool, generate the remainder
+    const shortage = count - fromPool.length
+    const generated: typeof fromPool = []
+    if (shortage > 0) {
+      const newPassages = await generateDevotionPassage(shortage)
+      for (const p of newPassages) {
+        const inserted = devotionsDb
+          .insert(devotionsSchema.generatedPassages)
+          .values({
+            title: p.title,
+            bibleReference: p.bibleReference,
+            talkingPoints: p.talkingPoints,
+          })
+          .returning()
+          .get()
+        generated.push({
+          id: inserted.id,
+          title: inserted.title,
+          bibleReference: inserted.bibleReference,
+          talkingPoints: inserted.talkingPoints,
+        })
+      }
+    }
+
+    const passages = [...fromPool, ...generated]
+    res.json({passages, fromPool: fromPool.length, generated: generated.length})
+  }),
+)
+
+// PUT /api/devotions/pool/:id - Update a pool passage
+devotionsRouter.put(
+  '/pool/:id',
+  asyncHandler(async (req, res) => {
+    const passage = devotionsDb
+      .select()
+      .from(devotionsSchema.generatedPassages)
+      .where(eq(devotionsSchema.generatedPassages.id, Number(req.params.id)))
+      .get()
+
+    if (!passage) {
+      res.status(404).json({error: 'Passage not found'})
+      return
+    }
+
+    const result = devotionsDb
+      .update(devotionsSchema.generatedPassages)
+      .set({
+        title: req.body.title ?? passage.title,
+        bibleReference: req.body.bibleReference ?? passage.bibleReference,
+        talkingPoints: req.body.talkingPoints ?? passage.talkingPoints,
+      })
+      .where(eq(devotionsSchema.generatedPassages.id, passage.id))
+      .returning()
+      .get()
+
+    res.json(result)
+  }),
+)
+
+// DELETE /api/devotions/pool/:id - Delete an unused pool passage
+devotionsRouter.delete(
+  '/pool/:id',
+  asyncHandler(async (req, res) => {
+    const passage = devotionsDb
+      .select()
+      .from(devotionsSchema.generatedPassages)
+      .where(eq(devotionsSchema.generatedPassages.id, Number(req.params.id)))
+      .get()
+
+    if (!passage) {
+      res.status(404).json({error: 'Passage not found'})
+      return
+    }
+    if (passage.used) {
+      res.status(409).json({error: 'Cannot delete a used passage'})
+      return
+    }
+
+    devotionsDb
+      .delete(devotionsSchema.generatedPassages)
+      .where(eq(devotionsSchema.generatedPassages.id, passage.id))
+      .run()
+
+    res.json({success: true})
+  }),
+)
+
 // GET /api/devotions/:id - Single devotion
 devotionsRouter.get(
   '/:id',
@@ -842,6 +1099,7 @@ devotionsRouter.post(
           bibleReference: req.body.bibleReference || null,
           songName: req.body.songName || null,
           title: req.body.title || null,
+          talkingPoints: req.body.talkingPoints || null,
           youtubeDescription: req.body.youtubeDescription || null,
           facebookDescription: req.body.facebookDescription || null,
           podcastDescription: req.body.podcastDescription || null,
@@ -884,6 +1142,7 @@ devotionsRouter.put(
         bibleReference: req.body.bibleReference !== undefined ? req.body.bibleReference || null : undefined,
         songName: req.body.songName !== undefined ? req.body.songName || null : undefined,
         title: req.body.title !== undefined ? req.body.title || null : undefined,
+        talkingPoints: req.body.talkingPoints !== undefined ? req.body.talkingPoints || null : undefined,
         youtubeDescription: req.body.youtubeDescription !== undefined ? req.body.youtubeDescription || null : undefined,
         facebookDescription:
           req.body.facebookDescription !== undefined ? req.body.facebookDescription || null : undefined,
@@ -1184,6 +1443,10 @@ devotionsRouter.post(
         referencedDevotions?: number[]
         bibleReference?: string | null
         songName?: string | null
+        generatedTitle?: string | null
+        generatedBibleReference?: string | null
+        generatedTalkingPoints?: string | null
+        generatedPassageId?: number | null
       }>
     }
 
@@ -1195,9 +1458,11 @@ devotionsRouter.post(
     let inserted = 0
     let updated = 0
     const errors: string[] = []
+    const importedDevotions: Array<{number: number; id: number; passageId: number | null}> = []
 
     for (const d of devotions) {
       const refsJson = d.referencedDevotions?.length ? JSON.stringify(d.referencedDevotions) : null
+      const hasGenerated = d.generatedTitle || d.generatedTalkingPoints
 
       try {
         const existing = devotionsDb
@@ -1216,15 +1481,22 @@ devotionsRouter.post(
               guestSpeaker: d.guestSpeaker || null,
               guestNumber: d.guestNumber ?? null,
               referencedDevotions: refsJson,
-              bibleReference: d.bibleReference || null,
+              bibleReference: d.bibleReference || d.generatedBibleReference || null,
               songName: d.songName || null,
+              ...(hasGenerated
+                ? {
+                    title: d.generatedTitle || null,
+                    talkingPoints: d.generatedTalkingPoints || null,
+                  }
+                : {}),
               updatedAt: sql`datetime('now')`,
             })
             .where(eq(devotionsSchema.devotions.id, existing.id))
             .run()
           updated++
+          importedDevotions.push({number: d.number, id: existing.id, passageId: d.generatedPassageId ?? null})
         } else {
-          devotionsDb
+          const result = devotionsDb
             .insert(devotionsSchema.devotions)
             .values({
               date: d.date,
@@ -1234,14 +1506,37 @@ devotionsRouter.post(
               guestSpeaker: d.guestSpeaker || null,
               guestNumber: d.guestNumber ?? null,
               referencedDevotions: refsJson,
-              bibleReference: d.bibleReference || null,
+              bibleReference: d.bibleReference || d.generatedBibleReference || null,
               songName: d.songName || null,
+              ...(hasGenerated
+                ? {
+                    title: d.generatedTitle || null,
+                    talkingPoints: d.generatedTalkingPoints || null,
+                  }
+                : {}),
             })
-            .run()
+            .returning()
+            .get()
           inserted++
+          importedDevotions.push({number: d.number, id: result.id, passageId: d.generatedPassageId ?? null})
         }
       } catch (error: unknown) {
         errors.push(`#${d.number}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+
+    // Mark pool passages as used
+    for (const imp of importedDevotions) {
+      if (imp.passageId) {
+        devotionsDb
+          .update(devotionsSchema.generatedPassages)
+          .set({
+            used: true,
+            devotionId: imp.id,
+            usedAt: sql`datetime('now')`,
+          })
+          .where(eq(devotionsSchema.generatedPassages.id, imp.passageId))
+          .run()
       }
     }
 

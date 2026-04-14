@@ -7,7 +7,19 @@ import {fetchStats, fetchStatsOverTime} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useQuery} from '@tanstack/react-query'
-import {CalendarIcon, MessageSquare, Plus} from 'lucide-react'
+import {
+  BarChart2,
+  CalendarClock,
+  CalendarIcon,
+  FileText,
+  FolderOpen,
+  MessageSquare,
+  Plus,
+  Send,
+  TrendingUp,
+  Users,
+} from 'lucide-react'
+import type {LucideIcon} from 'lucide-react'
 import {useEffect, useMemo, useState} from 'react'
 import type {DateRange} from 'react-day-picker'
 import {Link} from 'react-router-dom'
@@ -188,18 +200,26 @@ export function DashboardPage() {
 
       {/* Row 1 — Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatCard label="People" value={people.total} to="/people" />
-        <StatCard label="Groups" value={groups.total} to="/groups" />
-        <StatCard label="Messages Sent" value={messages.totalSent} to="/messages" />
-        <StatCard label="Scheduled Messages" value={messages.scheduledMessages.length} to="/messages?tab=scheduled" />
-        <StatCard label="Draft Messages" value={drafts.total} to="/messages?tab=drafts" />
+        <StatCard label="People" value={people.total} to="/people" icon={Users} />
+        <StatCard label="Groups" value={groups.total} to="/groups" icon={FolderOpen} />
+        <StatCard label="Messages Sent" value={messages.totalSent} to="/messages" icon={Send} />
+        <StatCard
+          label="Scheduled"
+          value={messages.scheduledMessages.length}
+          to="/messages?tab=scheduled"
+          icon={CalendarClock}
+        />
+        <StatCard label="Drafts" value={drafts.total} to="/messages?tab=drafts" icon={FileText} />
       </div>
 
       {/* Row 2 — Donut charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Delivery Overview</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart2 className="h-4 w-4 text-muted-foreground" />
+              Delivery Overview
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {totalProcessed === 0 ? (
@@ -255,7 +275,10 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>People Overview</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              People Overview
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {people.total === 0 ? (
@@ -313,7 +336,10 @@ export function DashboardPage() {
       {/* Row 3 — Messages Over Time (area chart with date picker) */}
       <Card>
         <CardHeader className="flex-col sm:flex-row items-start sm:items-center justify-between gap-2 space-y-0">
-          <CardTitle>Messages Over Time</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            Messages Over Time
+          </CardTitle>
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
               <button className="flex items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer">
@@ -446,12 +472,15 @@ export function DashboardPage() {
   )
 }
 
-function StatCard({label, value, to}: {label: string; value: number; to: string}) {
+function StatCard({label, value, to, icon: Icon}: {label: string; value: number; to: string; icon: LucideIcon}) {
   return (
     <Link to={to}>
       <Card size="sm" className="hover:bg-muted/50 transition-colors h-full">
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+          <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <Icon className="h-4 w-4 shrink-0" />
+            {label}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <span className="text-3xl md:text-[28px] font-bold leading-none">{value.toLocaleString()}</span>

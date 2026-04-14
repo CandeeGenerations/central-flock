@@ -1,6 +1,26 @@
 import {sql} from 'drizzle-orm'
 import {integer, sqliteTable, text} from 'drizzle-orm/sqlite-core'
 
+export const gwendolynDevotions = sqliteTable('gwendolyn_devotions', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  date: text('date').notNull(),
+  title: text('title').notNull(),
+  blocks: text('blocks').notNull(),
+  hashtags: text('hashtags').notNull().default(''),
+  rawInput: text('raw_input'),
+  status: text('status', {
+    enum: ['received', 'producing', 'waiting_for_approval', 'ready_to_upload', 'done'],
+  })
+    .notNull()
+    .default('received'),
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+  updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})
+
 export const scanDrafts = sqliteTable('scan_drafts', {
   id: integer('id').primaryKey({autoIncrement: true}),
   month: text('month').notNull(),

@@ -26,16 +26,19 @@ import {
   Calendar,
   FileText,
   FolderOpen,
+  Hash,
   Heart,
   LogOut,
   MessageSquare,
   Pin,
   PinOff,
   Plus,
+  Quote,
   ScrollText,
   Settings,
   Users,
 } from 'lucide-react'
+import type {LucideIcon} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -109,9 +112,11 @@ export function HomePage() {
                 <div className="space-y-1">
                   <h3 className="font-semibold">Messaging</h3>
                   <p className="text-sm text-muted-foreground">
-                    {stats.people} people &middot; {stats.groups} groups
+                    {stats.people.toLocaleString()} people &middot; {stats.groups.toLocaleString()} groups
                   </p>
-                  <p className="text-sm text-muted-foreground">{stats.messagesSentThisMonth} sent this month</p>
+                  <p className="text-sm text-muted-foreground">
+                    {stats.messagesSentThisMonth.toLocaleString()} sent this month
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -125,7 +130,8 @@ export function HomePage() {
                 <div className="space-y-1">
                   <h3 className="font-semibold">Devotions</h3>
                   <p className="text-sm text-muted-foreground">
-                    {stats.devotionsTotal} total &middot; Latest #{stats.devotionsLatestNumber}
+                    {stats.devotionsTotal.toLocaleString()} total &middot; Latest #
+                    {stats.devotionsLatestNumber.toLocaleString()}
                   </p>
                   <p className="text-sm text-muted-foreground">{stats.devotionsCompletionRate}% pipeline completion</p>
                 </div>
@@ -153,7 +159,7 @@ export function HomePage() {
                 </div>
                 <div className="space-y-1">
                   <h3 className="font-semibold">Sermon Prep</h3>
-                  <p className="text-sm text-muted-foreground">{stats.quotesTotal} quotes</p>
+                  <p className="text-sm text-muted-foreground">{stats.quotesTotal.toLocaleString()} quotes</p>
                   <p className="text-sm text-muted-foreground">AI-powered topic research</p>
                 </div>
               </CardContent>
@@ -168,7 +174,7 @@ export function HomePage() {
                 <div className="space-y-1">
                   <h3 className="font-semibold">Calendar</h3>
                   <p className="text-sm text-muted-foreground">
-                    {stats.upcomingChurchEventsTotal} events in next 30 days
+                    {stats.upcomingChurchEventsTotal.toLocaleString()} events in next 30 days
                   </p>
                 </div>
               </CardContent>
@@ -187,7 +193,10 @@ export function HomePage() {
         {/* Upcoming Celebrations */}
         <Card>
           <CardHeader>
-            <CardTitle>Upcoming Celebrations</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Cake className="h-4 w-4 text-muted-foreground" />
+              Upcoming Celebrations
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {events.length === 0 ? (
@@ -240,14 +249,24 @@ export function HomePage() {
 
       {/* At-a-Glance Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        <StatCard label="People" value={stats.people} to="/people" />
-        <StatCard label="Groups" value={stats.groups} to="/groups" />
-        <StatCard label="Messages (month)" value={stats.messagesSentThisMonth} to="/messages" />
-        <StatCard label="Templates" value={stats.templates} to="/templates" />
-        <StatCard label="Devotions" value={stats.devotionsTotal} to="/devotions" />
-        <StatCard label="Latest Devotion #" value={stats.devotionsLatestNumber} to="/devotions" />
-        <StatCard label="Quotes" value={stats.quotesTotal} to="/sermons/quotes" />
-        <StatCard label="Events (30d)" value={stats.upcomingChurchEventsTotal} to="/calendar" />
+        <StatCard label="People" value={stats.people} to="/people" icon={Users} />
+        <StatCard label="Groups" value={stats.groups} to="/groups" icon={FolderOpen} />
+        <StatCard
+          label="Messages (this month)"
+          value={stats.messagesSentThisMonth}
+          to="/messages"
+          icon={MessageSquare}
+        />
+        <StatCard label="Templates" value={stats.templates} to="/templates" icon={FileText} />
+        <StatCard label="Devotions" value={stats.devotionsTotal} to="/devotions" icon={BookOpen} />
+        <StatCard label="Latest Devotion" value={stats.devotionsLatestNumber} to="/devotions" icon={Hash} />
+        <StatCard label="Quotes" value={stats.quotesTotal} to="/sermons/quotes" icon={Quote} />
+        <StatCard
+          label="Events (next 30 days)"
+          value={stats.upcomingChurchEventsTotal}
+          to="/calendar"
+          icon={Calendar}
+        />
       </div>
 
       {/* Pinned Items */}
@@ -392,12 +411,15 @@ function UpcomingChurchEventsCard({
   )
 }
 
-function StatCard({label, value, to}: {label: string; value: number; to: string}) {
+function StatCard({label, value, to, icon: Icon}: {label: string; value: number; to: string; icon: LucideIcon}) {
   return (
     <Link to={to}>
       <Card size="sm" className="hover:bg-muted/50 transition-colors h-full">
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+          <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <Icon className="h-4 w-4 shrink-0" />
+            {label}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <span className="text-2xl font-bold">{value.toLocaleString()}</span>

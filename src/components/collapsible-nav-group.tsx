@@ -49,7 +49,7 @@ export function CollapsibleNavGroup({group, onNavClick}: CollapsibleNavGroupProp
           <ChevronRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', isOpen && 'rotate-90')} />
         </button>
       </CollapsiblePrimitive.Trigger>
-      <CollapsiblePrimitive.Content className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
+      <CollapsiblePrimitive.Content>
         <div className="pl-4 space-y-1 mt-1">
           {group.children.map((child) => {
             const active = isChildActive(child.to, location.pathname, group.children)

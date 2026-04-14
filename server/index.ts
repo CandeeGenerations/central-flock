@@ -13,6 +13,7 @@ import {cleanupOrphanedScanImages, devotionsRouter} from './routes/devotions.js'
 import {draftsRouter} from './routes/drafts.js'
 import {globalVariablesRouter} from './routes/global-variables.js'
 import {groupsRouter} from './routes/groups.js'
+import {gwendolynDevotionsRouter} from './routes/gwendolyn-devotions.js'
 import {homeRouter} from './routes/home.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter, processSendJob} from './routes/messages.js'
@@ -58,6 +59,7 @@ app.use('/api/calendar', calendarRouter)
 app.use('/api/stats', statsRouter)
 app.use('/api/home', homeRouter)
 app.use('/api/devotions', devotionsRouter)
+app.use('/api/gwendolyn-devotions', gwendolynDevotionsRouter)
 app.use('/api/nursery/schedules', nurserySchedulesRouter)
 app.use('/api/nursery', nurseryRouter)
 app.use('/api/quotes', quotesRouter)

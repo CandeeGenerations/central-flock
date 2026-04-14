@@ -18,6 +18,9 @@ import {DevotionPassagesPage} from '@/pages/devotions/devotion-passages-page'
 import {DevotionScanPage} from '@/pages/devotions/devotion-scan-page'
 import {DevotionScripturesPage} from '@/pages/devotions/devotion-scriptures-page'
 import {DevotionStatsPage} from '@/pages/devotions/devotion-stats-page'
+import {GwendolynDetailPage} from '@/pages/devotions/gwendolyn-detail-page'
+import {GwendolynListPage} from '@/pages/devotions/gwendolyn-list-page'
+import {GwendolynNewPage} from '@/pages/devotions/gwendolyn-new-page'
 import {GroupDetailPage} from '@/pages/group-detail-page'
 import {GroupsPage} from '@/pages/groups-page'
 import {HomePage} from '@/pages/home-page'
@@ -251,6 +254,9 @@ function AppLayout() {
             <Route path="/devotions/passages" element={<DevotionPassagesPage />} />
             <Route path="/devotions/passages/:id" element={<DevotionPassageDetailPage />} />
             <Route path="/devotions/audit" element={<DevotionAuditPage />} />
+            <Route path="/devotions/gwendolyn" element={<GwendolynListPage />} />
+            <Route path="/devotions/gwendolyn/new" element={<GwendolynNewPage />} />
+            <Route path="/devotions/gwendolyn/:id" element={<GwendolynDetailPage />} />
             <Route path="/devotions/new" element={<DevotionDetailPage />} />
             <Route path="/devotions/:id" element={<DevotionDetailPage />} />
             <Route path="/nursery" element={<NurserySchedulesPage />} />

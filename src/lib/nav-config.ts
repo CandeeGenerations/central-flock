@@ -12,6 +12,7 @@ import {
   Quote,
   ScrollText,
   Settings,
+  Smartphone,
   Sparkles,
   Users,
 } from 'lucide-react'
@@ -28,7 +29,10 @@ export type NavGroup = {id: string; label: string; icon: LucideIcon; children: N
 export function isChildActive(childTo: string, pathname: string, siblings: {to: string}[]): boolean {
   if (pathname === childTo) return true
   if (!pathname.startsWith(childTo + '/')) return false
-  return !siblings.some((s) => s.to !== childTo && (pathname === s.to || pathname.startsWith(s.to + '/')))
+  // Only a sibling that is more specific (longer path) than childTo can "win"
+  return !siblings.some(
+    (s) => s.to !== childTo && s.to.length > childTo.length && (pathname === s.to || pathname.startsWith(s.to + '/')),
+  )
 }
 
 /** Returns the nav group whose children match the current pathname, or null if none. */
@@ -56,9 +60,10 @@ export const navGroups: NavGroup[] = [
     children: [
       {to: '/devotions/stats', label: 'Dashboard', icon: LayoutDashboard},
       {to: '/devotions', label: 'Devotions', icon: List, end: true},
-      {to: '/devotions/scriptures', label: 'Scripture Lookup', icon: BookOpen},
+      {to: '/devotions/scriptures', label: 'Scripture', icon: BookOpen},
       {to: '/devotions/passages', label: 'Passages', icon: Sparkles},
       {to: '/devotions/audit', label: 'Audit', icon: AlertTriangle},
+      {to: '/devotions/gwendolyn', label: 'Gwendolyn', icon: Smartphone},
     ],
   },
   {

@@ -32,4 +32,9 @@ export const queryKeys = {
     if (search !== undefined) return ['nonMembers', String(groupId), search] as const
     return ['nonMembers', String(groupId)] as const
   },
+  gwendolynDevotions: (search?: string, status?: string) => {
+    if (search !== undefined || status !== undefined) return ['gwendolynDevotions', search ?? '', status ?? ''] as const
+    return ['gwendolynDevotions'] as const
+  },
+  gwendolynDevotional: (id: number) => ['gwendolynDevotional', id] as const,
 }

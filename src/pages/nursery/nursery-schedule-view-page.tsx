@@ -251,11 +251,16 @@ export function NurseryScheduleViewPage() {
       <div className="flex items-center gap-2 flex-wrap">
         {isDraft && (
           <>
-            <Button variant="outline" size="sm" onClick={() => setEditMode(!editMode)}>
+            <Button variant="outline" size="sm" className="hidden md:flex" onClick={() => setEditMode(!editMode)}>
               <Pencil className="h-4 w-4 mr-1" />
               {editMode ? 'Preview' : 'Edit'}
             </Button>
-            <Button size="sm" onClick={() => finalizeMutation.mutate()} disabled={finalizeMutation.isPending}>
+            <Button
+              size="sm"
+              className="hidden md:flex"
+              onClick={() => finalizeMutation.mutate()}
+              disabled={finalizeMutation.isPending}
+            >
               <Check className="h-4 w-4 mr-1" />
               Finalize
             </Button>
@@ -265,6 +270,7 @@ export function NurseryScheduleViewPage() {
           <Button
             variant="outline"
             size="sm"
+            className="hidden md:flex"
             onClick={() => reopenMutation.mutate()}
             disabled={reopenMutation.isPending}
           >
@@ -274,6 +280,7 @@ export function NurseryScheduleViewPage() {
         <Button
           variant="outline"
           size="sm"
+          className="hidden md:flex"
           onClick={() => exportAs('pdf')}
           disabled={isDraft}
           title={isDraft ? 'Finalize the schedule to export' : undefined}
@@ -284,6 +291,7 @@ export function NurseryScheduleViewPage() {
         <Button
           variant="outline"
           size="sm"
+          className="hidden md:flex"
           onClick={() => exportAs('jpg')}
           disabled={isDraft}
           title={isDraft ? 'Finalize the schedule to export' : undefined}

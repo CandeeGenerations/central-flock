@@ -36,7 +36,7 @@ function getConfiguredModel(): string {
   const row = db
     .select({value: schema.settings.value})
     .from(schema.settings)
-    .where(eq(schema.settings.key, 'devotionAiModel'))
+    .where(eq(schema.settings.key, 'defaultAiModel'))
     .get()
   return row?.value ?? 'claude-sonnet-4-20250514'
 }

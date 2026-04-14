@@ -4,13 +4,13 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {fetchSettings, updateSetting} from '@/lib/api'
+import {fetchAvailableCalendars, fetchSettings, updateSetting} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
 import {type ThemeMode, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Monitor, Moon, Settings, Sun} from 'lucide-react'
-import {useState} from 'react'
+import {Monitor, Moon, RefreshCw, Settings, Sun} from 'lucide-react'
+import {useMemo, useState} from 'react'
 import {toast} from 'sonner'
 
 export function SettingsPage() {
@@ -53,11 +53,21 @@ export function SettingsPage() {
     }
   }
 
-  const devotionAiModel = settings?.devotionAiModel ?? 'claude-sonnet-4-20250514'
+  const defaultAiModel = settings?.defaultAiModel ?? 'claude-sonnet-4-20250514'
   const webhookUrl = settings?.webhookUrl ?? ''
   const sendTime = settings?.birthdaySendTime ?? '07:00'
   const preNotifyDays = settings?.birthdayPreNotifyDays ?? ''
   const {mode, setMode} = useTheme()
+
+  const churchCalendarNames: string[] = useMemo(() => {
+    const raw = settings?.churchCalendarNames
+    if (!raw) return []
+    try {
+      return JSON.parse(raw) as string[]
+    } catch {
+      return []
+    }
+  }, [settings])
 
   const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',') : [])
 
@@ -133,10 +143,7 @@ export function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Generation Model</Label>
-              <Select
-                value={devotionAiModel}
-                onValueChange={(value) => mutation.mutate({key: 'devotionAiModel', value})}
-              >
+              <Select value={defaultAiModel} onValueChange={(value) => mutation.mutate({key: 'defaultAiModel', value})}>
                 <SelectTrigger className="w-64">
                   <SelectValue />
                 </SelectTrigger>
@@ -147,12 +154,17 @@ export function SettingsPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Model used for generating devotion passages. Sonnet is fast and capable, Opus is the most capable, and
-                Haiku is the fastest and cheapest.
+                Default model used for AI features (devotions, quote research). Sonnet is fast and capable, Opus is the
+                most capable, and Haiku is the fastest and cheapest.
               </p>
             </div>
           </CardContent>
         </Card>
+
+        <ChurchCalendarsCard
+          selectedNames={churchCalendarNames}
+          onSave={(names) => mutation.mutate({key: 'churchCalendarNames', value: JSON.stringify(names)})}
+        />
 
         <Card>
           <CardHeader>
@@ -264,5 +276,59 @@ export function SettingsPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+function ChurchCalendarsCard({selectedNames, onSave}: {selectedNames: string[]; onSave: (names: string[]) => void}) {
+  const {data, isLoading, error, refetch, isFetching} = useQuery({
+    queryKey: ['available-calendars'],
+    queryFn: fetchAvailableCalendars,
+    retry: false,
+    staleTime: 60_000,
+  })
+
+  const selectedSet = useMemo(() => new Set(selectedNames), [selectedNames])
+
+  const toggle = (name: string) => {
+    const next = new Set(selectedSet)
+    if (next.has(name)) next.delete(name)
+    else next.add(name)
+    onSave([...next])
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle>Church Calendars</CardTitle>
+        <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching}>
+          <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Select which Apple Calendar calendars to show in the Calendar section and on the Home page.
+        </p>
+        {isLoading && <p className="text-sm text-muted-foreground">Loading calendars…</p>}
+        {error && (
+          <p className="text-sm text-destructive">
+            {error instanceof Error ? error.message : 'Failed to load calendars'}
+          </p>
+        )}
+        {data?.calendars && data.calendars.length === 0 && (
+          <p className="text-sm text-muted-foreground">No calendars found in Calendar.app.</p>
+        )}
+        {data?.calendars && data.calendars.length > 0 && (
+          <div className="space-y-2">
+            {data.calendars.map((cal) => (
+              <label key={cal.name} className="flex items-center gap-3 cursor-pointer">
+                <Checkbox checked={selectedSet.has(cal.name)} onCheckedChange={() => toggle(cal.name)} />
+                <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{backgroundColor: cal.color}} />
+                <span className="text-sm">{cal.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

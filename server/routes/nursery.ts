@@ -5,9 +5,9 @@ import os from 'os'
 import path from 'path'
 import {fileURLToPath} from 'url'
 
-import {db, schema} from '../db/index.js'
 import {nurseryDb, nurserySchema} from '../db-nursery/index.js'
 import {serviceTypes} from '../db-nursery/schema.js'
+import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {sendImageViaUI} from '../services/applescript.js'
 

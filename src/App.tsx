@@ -7,6 +7,7 @@ import {checkAuthStatus, logout} from '@/lib/api'
 import {findActiveGroup, isChildActive, navGroups} from '@/lib/nav-config'
 import {ThemeProvider, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
+import {CalendarPage} from '@/pages/calendar-page'
 import {ContactsImportPage} from '@/pages/contacts-import-page'
 import {DashboardPage} from '@/pages/dashboard-page'
 import {DevotionAuditPage} from '@/pages/devotions/devotion-audit-page'
@@ -31,6 +32,11 @@ import {NurserySettingsPage} from '@/pages/nursery/nursery-settings-page'
 import {NurseryWorkersPage} from '@/pages/nursery/nursery-workers-page'
 import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
+import {QuoteDetailPage} from '@/pages/sermons/quote-detail-page'
+import {QuoteSearchDetailPage} from '@/pages/sermons/quote-search-detail-page'
+import {QuoteSearchesPage} from '@/pages/sermons/quote-searches-page'
+import {QuotesPage} from '@/pages/sermons/quotes-page'
+import {QuotesResearchPage} from '@/pages/sermons/quotes-research-page'
 import {SettingsPage} from '@/pages/settings-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
@@ -251,6 +257,12 @@ function AppLayout() {
             <Route path="/nursery/workers" element={<NurseryWorkersPage />} />
             <Route path="/nursery/settings" element={<NurserySettingsPage />} />
             <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
+            <Route path="/sermons/quotes" element={<QuotesPage />} />
+            <Route path="/sermons/quotes/:id" element={<QuoteDetailPage />} />
+            <Route path="/sermons/research" element={<QuotesResearchPage />} />
+            <Route path="/sermons/searches" element={<QuoteSearchesPage />} />
+            <Route path="/sermons/searches/:id" element={<QuoteSearchDetailPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>

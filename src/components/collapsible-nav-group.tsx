@@ -1,4 +1,4 @@
-import {isChildActive, type NavGroup} from '@/lib/nav-config'
+import {type NavGroup, isChildActive} from '@/lib/nav-config'
 import {cn} from '@/lib/utils'
 import {ChevronRight} from 'lucide-react'
 import {Collapsible as CollapsiblePrimitive} from 'radix-ui'
@@ -20,11 +20,20 @@ const navLinkClass = ({isActive}: {isActive: boolean}) =>
 
 export function CollapsibleNavGroup({group, onNavClick}: CollapsibleNavGroupProps) {
   const location = useLocation()
-  const hasActiveChild = group.children.some((child) =>
-    isChildActive(child.to, location.pathname, group.children),
-  )
+  const hasActiveChild = group.children.some((child) => isChildActive(child.to, location.pathname, group.children))
   const [open, setOpen] = useState(false)
   const isOpen = hasActiveChild || open
+
+  // Single-child groups render as a direct link — no dropdown needed
+  if (group.children.length === 1) {
+    const child = group.children[0]
+    return (
+      <NavLink to={child.to} onClick={onNavClick} end={child.end} className={navLinkClass}>
+        <group.icon className="h-5 w-5 md:h-4 md:w-4 shrink-0" />
+        <span className="flex-1">{group.label}</span>
+      </NavLink>
+    )
+  }
 
   return (
     <CollapsiblePrimitive.Root open={isOpen} onOpenChange={setOpen}>

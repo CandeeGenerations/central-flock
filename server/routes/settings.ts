@@ -3,6 +3,7 @@ import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
+import {syncCalendarEvents} from '../services/calendar-sync.js'
 
 export const settingsRouter = Router()
 
@@ -12,11 +13,11 @@ const DEFAULTS: Record<string, string> = {
   webhookUrl: '',
   anniversarySendTime: '07:00',
   anniversaryPreNotifyDays: '',
-  devotionAiModel: 'claude-sonnet-4-20250514',
+  defaultAiModel: 'claude-sonnet-4-20250514',
 }
 
 const VALID_VALUES: Record<string, string[]> = {
-  devotionAiModel: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
+  defaultAiModel: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
 }
 
 // GET /api/settings - Get all settings
@@ -80,7 +81,13 @@ settingsRouter.put(
     }
 
     // Allow empty string for settings that support it
-    if (!value && key !== 'birthdayPreNotifyDays' && key !== 'webhookUrl' && key !== 'anniversaryPreNotifyDays') {
+    if (
+      !value &&
+      key !== 'birthdayPreNotifyDays' &&
+      key !== 'webhookUrl' &&
+      key !== 'anniversaryPreNotifyDays' &&
+      key !== 'churchCalendarNames'
+    ) {
       res.status(400).json({error: 'value is required'})
       return
     }
@@ -110,6 +117,10 @@ settingsRouter.put(
       .onConflictDoUpdate({target: schema.settings.key, set: {value, updatedAt: sql`datetime('now')`}})
       .run()
 
+    if (key === 'churchCalendarNames') {
+      syncCalendarEvents().catch((err) => console.error('[settings] Calendar sync after update failed:', err))
+    }
+
     res.json({key, value})
   }),
 )
@@ -117,4 +128,11 @@ settingsRouter.put(
 export function getSetting(key: string): string {
   const row = db.select().from(schema.settings).where(eq(schema.settings.key, key)).get()
   return row?.value ?? DEFAULTS[key] ?? ''
+}
+
+export function setSetting(key: string, value: string): void {
+  db.insert(schema.settings)
+    .values({key, value})
+    .onConflictDoUpdate({target: schema.settings.key, set: {value, updatedAt: sql`datetime('now')`}})
+    .run()
 }

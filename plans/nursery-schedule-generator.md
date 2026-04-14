@@ -32,10 +32,10 @@ Following the Devotions pattern (`server/db-devotions/`), nursery gets its own S
 | Column | Type | Notes |
 |---|---|---|
 | id | integer PK auto | |
-| workerId | integer FK → nursery_workers (cascade) | |
+| workerId | integer FK → nursery*workers (cascade) | |
 | serviceType | text enum | `sunday_school`, `morning`, `evening`, `wednesday_evening` |
 | maxPerMonth | integer nullable | Per-service cap; null = no per-service limit |
-| _unique_ | (workerId, serviceType) | |
+| \_unique* | (workerId, serviceType) | |
 
 **`nursery_service_config`** — How many workers each service needs
 | Column | Type | Notes |
@@ -65,12 +65,12 @@ Seeded at startup via INSERT OR IGNORE in `db-nursery/index.ts` with defaults fr
 | Column | Type | Notes |
 |---|---|---|
 | id | integer PK auto | |
-| scheduleId | integer FK → nursery_schedules (cascade) | |
+| scheduleId | integer FK → nursery*schedules (cascade) | |
 | date | text NOT NULL | YYYY-MM-DD (actual date, may cross month boundary) |
 | serviceType | text enum | |
 | slot | integer NOT NULL | 1 or 2 |
 | workerId | integer FK → nursery_workers (set null on delete) | nullable for unassigned slots |
-| _unique_ | (scheduleId, date, serviceType, slot) | |
+| \_unique* | (scheduleId, date, serviceType, slot) | |
 
 **`nursery_settings`** — Key-value store for logo path, etc.
 | Column | Type | Notes |

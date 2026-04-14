@@ -669,9 +669,22 @@ export interface HomePinnedItem {
   subtitle: string
 }
 
+export interface HomeUpcomingChurchEvent {
+  id: string
+  title: string
+  startDate: string
+  endDate: string
+  allDay: boolean
+  location: string | null
+  calendarName: string
+  recurring: boolean
+}
+
 export interface HomeResponse {
   upcomingBirthdays: HomeUpcomingBirthday[]
   upcomingAnniversaries: HomeUpcomingAnniversary[]
+  upcomingChurchEvents: HomeUpcomingChurchEvent[]
+  calendarColors: Record<string, string>
   stats: {
     people: number
     groups: number
@@ -680,6 +693,8 @@ export interface HomeResponse {
     devotionsTotal: number
     devotionsLatestNumber: number
     devotionsCompletionRate: number
+    quotesTotal: number
+    upcomingChurchEventsTotal: number
   }
   pinnedItems: HomePinnedItem[]
 }
@@ -697,4 +712,50 @@ export function pinHomeItem(type: string, itemId: number) {
 
 export function unpinHomeItem(id: number) {
   return request<{success: boolean}>(`/home/pin/${id}`, {method: 'DELETE'})
+}
+
+// Calendar
+export interface CalendarInfo {
+  name: string
+  color: string
+}
+
+export interface CalendarEvent {
+  id: string
+  title: string
+  startDate: string
+  endDate: string
+  allDay: boolean
+  location: string | null
+  calendarName: string
+  recurring: boolean
+}
+
+export interface CalendarEventsResponse {
+  events: CalendarEvent[]
+  calendarNames: string[]
+  missing: string[]
+  calendarColors: Record<string, string>
+  lastSyncedAt: string | null
+  lastSyncError: string | null
+}
+
+export interface CalendarSyncResponse {
+  ok: boolean
+  events: number
+  missing: string[]
+  error?: string
+  lastSyncedAt: string | null
+}
+
+export function fetchAvailableCalendars() {
+  return request<{calendars: CalendarInfo[]}>('/calendar/calendars')
+}
+
+export function fetchCalendarEvents(days: number) {
+  return request<CalendarEventsResponse>(`/calendar/events${buildQueryString({days})}`)
+}
+
+export function triggerCalendarSync() {
+  return request<CalendarSyncResponse>('/calendar/sync', {method: 'POST'})
 }

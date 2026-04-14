@@ -203,7 +203,11 @@ export const NurserySchedulePreview = forwardRef<HTMLDivElement, SchedulePreview
                     }
                     if (slotNum > svc.workerCount) {
                       return (
-                        <td key={slotNum} className="px-3 py-2 text-sm text-center" style={{...cellStyle, color: '#9ca3af'}}>
+                        <td
+                          key={slotNum}
+                          className="px-3 py-2 text-sm text-center"
+                          style={{...cellStyle, color: '#9ca3af'}}
+                        >
                           -
                         </td>
                       )
@@ -225,7 +229,10 @@ export const NurserySchedulePreview = forwardRef<HTMLDivElement, SchedulePreview
                       <td
                         key={slotNum}
                         className="px-3 py-2 text-sm font-semibold"
-                        style={{...cellStyle, ...(!slotAssignment?.workerName ? {color: '#ef4444', fontStyle: 'italic'} : {})}}
+                        style={{
+                          ...cellStyle,
+                          ...(!slotAssignment?.workerName ? {color: '#ef4444', fontStyle: 'italic'} : {}),
+                        }}
                       >
                         {slotAssignment?.workerName || (slotAssignment?.workerId ? 'Unknown' : 'Unassigned')}
                       </td>

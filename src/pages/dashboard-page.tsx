@@ -442,7 +442,6 @@ export function DashboardPage() {
           )}
         </CardContent>
       </Card>
-
     </div>
   )
 }

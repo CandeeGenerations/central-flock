@@ -188,3 +188,15 @@ export const pinnedItems = sqliteTable('pinned_items', {
     .default(sql`(datetime('now'))`)
     .notNull(),
 })
+
+export const calendarEvents = sqliteTable('calendar_events', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  eventUid: text('event_uid').notNull(),
+  title: text('title').notNull(),
+  startDate: text('start_date').notNull(),
+  endDate: text('end_date').notNull(),
+  allDay: integer('all_day', {mode: 'boolean'}).default(false).notNull(),
+  location: text('location'),
+  calendarName: text('calendar_name').notNull(),
+  recurring: integer('recurring', {mode: 'boolean'}).default(false).notNull(),
+})

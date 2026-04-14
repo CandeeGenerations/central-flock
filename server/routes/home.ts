@@ -1,9 +1,11 @@
-import {and, eq, sql} from 'drizzle-orm'
+import {and, eq, gte, inArray, lte, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {devotionsDb, devotionsSchema} from '../db-devotions/index.js'
+import {quotesSqlite} from '../db-quotes/index.js'
 import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
+import {getSetting} from './settings.js'
 
 export const homeRouter = Router()
 
@@ -94,6 +96,9 @@ homeRouter.get(
       .where(and(sql`${schema.messages.status} != 'cancelled'`, sql`${schema.messages.createdAt} >= ${monthStart}`))
       .get()!.total
 
+    // Quotes stats (from separate DB)
+    const quotesTotal = (quotesSqlite.prepare(`SELECT count(*) AS count FROM quotes`).get() as {count: number}).count
+
     // Devotion stats (from separate DB)
     const devotionsTotal = devotionsDb
       .select({count: sql<number>`count(*)`})
@@ -130,6 +135,69 @@ homeRouter.get(
               100,
           )
         : 0
+
+    // Upcoming church events (next 14 days, max 6) — served from synced cache
+    let upcomingChurchEvents: {
+      id: string
+      title: string
+      startDate: string
+      endDate: string
+      allDay: boolean
+      location: string | null
+      calendarName: string
+      recurring: boolean
+    }[] = []
+    let upcomingChurchEventsTotal = 0
+    let calendarColors: Record<string, string> = {}
+    try {
+      const rawNames = getSetting('churchCalendarNames')
+      const calendarNames: string[] = rawNames ? JSON.parse(rawNames) : []
+      if (calendarNames.length > 0) {
+        const nowIso = new Date().toISOString()
+        const futureIso = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+        const rows = db
+          .select()
+          .from(schema.calendarEvents)
+          .where(
+            and(
+              inArray(schema.calendarEvents.calendarName, calendarNames),
+              gte(schema.calendarEvents.startDate, nowIso),
+              lte(schema.calendarEvents.startDate, futureIso),
+            ),
+          )
+          .orderBy(schema.calendarEvents.startDate)
+          .limit(6)
+          .all()
+        upcomingChurchEvents = rows.map((r) => ({
+          id: r.eventUid,
+          title: r.title,
+          startDate: r.startDate,
+          endDate: r.endDate,
+          allDay: r.allDay,
+          location: r.location,
+          calendarName: r.calendarName,
+          recurring: r.recurring,
+        }))
+
+        const thirtyDayIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        upcomingChurchEventsTotal = db
+          .select({total: sql<number>`count(*)`})
+          .from(schema.calendarEvents)
+          .where(
+            and(
+              inArray(schema.calendarEvents.calendarName, calendarNames),
+              gte(schema.calendarEvents.startDate, nowIso),
+              lte(schema.calendarEvents.startDate, thirtyDayIso),
+            ),
+          )
+          .get()!.total
+      }
+
+      const rawColors = getSetting('calendarColors')
+      calendarColors = rawColors ? JSON.parse(rawColors) : {}
+    } catch {
+      // Never break the home page if anything goes wrong
+    }
 
     // Pinned items
     const pins = db.select().from(schema.pinnedItems).orderBy(schema.pinnedItems.position).all()
@@ -179,6 +247,8 @@ homeRouter.get(
     res.json({
       upcomingBirthdays,
       upcomingAnniversaries,
+      upcomingChurchEvents,
+      calendarColors,
       stats: {
         people: peopleTotal,
         groups: groupsTotal,
@@ -187,6 +257,8 @@ homeRouter.get(
         devotionsTotal,
         devotionsLatestNumber,
         devotionsCompletionRate,
+        quotesTotal,
+        upcomingChurchEventsTotal,
       },
       pinnedItems,
     })

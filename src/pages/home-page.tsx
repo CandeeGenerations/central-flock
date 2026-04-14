@@ -6,6 +6,7 @@ import {Input} from '@/components/ui/input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {
   type HomePinnedItem,
+  type HomeUpcomingChurchEvent,
   checkAuthStatus,
   fetchGroups,
   fetchHome,
@@ -22,6 +23,7 @@ import {
   Baby,
   BookOpen,
   Cake,
+  Calendar,
   FileText,
   FolderOpen,
   Heart,
@@ -30,6 +32,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  ScrollText,
   Settings,
   Users,
 } from 'lucide-react'
@@ -81,7 +84,7 @@ export function HomePage() {
 
   if (isLoading || !data) return <PageSpinner />
 
-  const {upcomingBirthdays, upcomingAnniversaries, stats, pinnedItems} = data
+  const {upcomingBirthdays, upcomingAnniversaries, upcomingChurchEvents, calendarColors, stats, pinnedItems} = data
 
   // Merge and sort upcoming events
   const events = [
@@ -142,15 +145,49 @@ export function HomePage() {
               </CardContent>
             </Card>
           </Link>
+          <Link to="/sermons/research">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardContent className="flex items-start gap-4 p-5">
+                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
+                  <ScrollText className="h-6 w-6 text-primary" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-semibold">Sermon Prep</h3>
+                  <p className="text-sm text-muted-foreground">{stats.quotesTotal} quotes</p>
+                  <p className="text-sm text-muted-foreground">AI-powered topic research</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link to="/calendar">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardContent className="flex items-start gap-4 p-5">
+                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
+                  <Calendar className="h-6 w-6 text-primary" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-semibold">Calendar</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {stats.upcomingChurchEventsTotal} events in next 30 days
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
       </section>
 
       {/* Upcoming Events + Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Upcoming Events */}
+        {/* Upcoming Church Events */}
+        {upcomingChurchEvents && upcomingChurchEvents.length > 0 && (
+          <UpcomingChurchEventsCard events={upcomingChurchEvents} calendarColors={calendarColors} />
+        )}
+
+        {/* Upcoming Celebrations */}
         <Card>
           <CardHeader>
-            <CardTitle>Upcoming Events</CardTitle>
+            <CardTitle>Upcoming Celebrations</CardTitle>
           </CardHeader>
           <CardContent>
             {events.length === 0 ? (
@@ -199,16 +236,18 @@ export function HomePage() {
             )}
           </CardContent>
         </Card>
+      </div>
 
-        {/* At-a-Glance Stats */}
-        <div className="grid grid-cols-2 gap-3 content-start">
-          <StatCard label="People" value={stats.people} to="/people" />
-          <StatCard label="Groups" value={stats.groups} to="/groups" />
-          <StatCard label="Messages (month)" value={stats.messagesSentThisMonth} to="/messages" />
-          <StatCard label="Templates" value={stats.templates} to="/templates" />
-          <StatCard label="Devotions" value={stats.devotionsTotal} to="/devotions" />
-          <StatCard label="Latest #" value={stats.devotionsLatestNumber} to="/devotions" />
-        </div>
+      {/* At-a-Glance Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <StatCard label="People" value={stats.people} to="/people" />
+        <StatCard label="Groups" value={stats.groups} to="/groups" />
+        <StatCard label="Messages (month)" value={stats.messagesSentThisMonth} to="/messages" />
+        <StatCard label="Templates" value={stats.templates} to="/templates" />
+        <StatCard label="Devotions" value={stats.devotionsTotal} to="/devotions" />
+        <StatCard label="Latest Devotion #" value={stats.devotionsLatestNumber} to="/devotions" />
+        <StatCard label="Quotes" value={stats.quotesTotal} to="/sermons/quotes" />
+        <StatCard label="Events (30d)" value={stats.upcomingChurchEventsTotal} to="/calendar" />
       </div>
 
       {/* Pinned Items */}
@@ -280,6 +319,76 @@ export function HomePage() {
 
       <PinDialog open={pinDialogOpen} onOpenChange={setPinDialogOpen} existingPins={pinnedItems} />
     </div>
+  )
+}
+
+function formatChurchEventTime(event: HomeUpcomingChurchEvent): string {
+  if (event.allDay) return 'All day'
+  const d = new Date(event.startDate)
+  const h = d.getHours()
+  const m = d.getMinutes()
+  const ampm = h < 12 ? 'AM' : 'PM'
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+  const mm = m > 0 ? `:${String(m).padStart(2, '0')}` : ''
+  return `${h12}${mm} ${ampm}`
+}
+
+function formatChurchEventDate(event: HomeUpcomingChurchEvent): string {
+  const d = new Date(event.startDate)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const diff = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Tomorrow'
+  return `${diff} days`
+}
+
+function UpcomingChurchEventsCard({
+  events,
+  calendarColors,
+}: {
+  events: HomeUpcomingChurchEvent[]
+  calendarColors: Record<string, string>
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          Upcoming Events
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-1">
+          {events.map((event, idx) => {
+            const calendarColor = calendarColors[event.calendarName] ?? '#6B7280'
+            const color = event.recurring ? '#9CA3AF' : calendarColor
+            return (
+              <Link
+                key={`${event.id}-${idx}`}
+                to="/calendar"
+                className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{backgroundColor: color}} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{event.title || '(No title)'}</p>
+                  {event.location && (
+                    <p className="text-xs text-muted-foreground truncate">{event.location.split('\n')[0]}</p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <Badge variant="secondary" className="text-xs">
+                    {formatChurchEventDate(event)}
+                  </Badge>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{formatChurchEventTime(event)}</p>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

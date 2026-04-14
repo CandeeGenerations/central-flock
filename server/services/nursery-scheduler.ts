@@ -141,8 +141,7 @@ export function assignWorkers(slots: ScheduleSlot[], workers: WorkerWithEligibil
       return (serviceAssignments.get(w.id)?.get(slot.serviceType) || 0) >= svcConfig.maxPerMonth
     }
     // "Oversaturated" = already assigned 2+ services on this date. Near-disqualifier.
-    const isOversaturatedToday = (w: WorkerWithEligibility) =>
-      (dayAssignments.get(w.id)?.get(slot.date) || 0) >= 2
+    const isOversaturatedToday = (w: WorkerWithEligibility) => (dayAssignments.get(w.id)?.get(slot.date) || 0) >= 2
 
     // Hard blocks (always): service eligibility, no double-booking same service/date, no day conflict
     const passesHardBlocks = (w: WorkerWithEligibility) =>
@@ -163,8 +162,7 @@ export function assignWorkers(slots: ScheduleSlot[], workers: WorkerWithEligibil
     if (eligible.length === 0)
       eligible = activeWorkers.filter((w) => passesHardBlocks(w) && !isOversaturatedToday(w) && !hitsServiceMax(w))
     if (eligible.length === 0) eligible = activeWorkers.filter((w) => passesHardBlocks(w) && !hitsServiceMax(w))
-    if (eligible.length === 0)
-      eligible = activeWorkers.filter((w) => passesHardBlocks(w) && !isOversaturatedToday(w))
+    if (eligible.length === 0) eligible = activeWorkers.filter((w) => passesHardBlocks(w) && !isOversaturatedToday(w))
     if (eligible.length === 0) eligible = activeWorkers.filter(passesHardBlocks)
 
     if (eligible.length === 0) continue

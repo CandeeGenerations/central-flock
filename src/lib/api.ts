@@ -625,15 +625,76 @@ export interface StatsResponse {
       groupName: string | null
       scheduledAt: string | null
     }[]
-    overTime: {
-      data: {label: string; sent: number; failed: number; skipped: number}[]
-    }
   }
   drafts: {total: number}
   templates: {total: number}
-  previous: {people: number; groups: number; messagesSent: number; scheduled: number; drafts: number} | null
 }
 
-export function fetchStats(params?: {from?: string; to?: string}) {
-  return request<StatsResponse>(`/stats${buildQueryString(params)}`)
+export interface StatsOverTimeResponse {
+  data: {label: string; sent: number; failed: number; skipped: number}[]
+}
+
+export function fetchStats() {
+  return request<StatsResponse>('/stats')
+}
+
+export function fetchStatsOverTime(params?: {from?: string; to?: string}) {
+  return request<StatsOverTimeResponse>(`/stats/over-time${buildQueryString(params)}`)
+}
+
+// Home
+export interface HomeUpcomingBirthday {
+  personId: number
+  name: string
+  daysUntil: number
+  month: number
+  day: number
+  turningAge: number | null
+}
+
+export interface HomeUpcomingAnniversary {
+  personId: number
+  name: string
+  daysUntil: number
+  month: number
+  day: number
+  years: number | null
+}
+
+export interface HomePinnedItem {
+  id: number
+  type: 'person' | 'group' | 'template'
+  itemId: number
+  name: string
+  subtitle: string
+}
+
+export interface HomeResponse {
+  upcomingBirthdays: HomeUpcomingBirthday[]
+  upcomingAnniversaries: HomeUpcomingAnniversary[]
+  stats: {
+    people: number
+    groups: number
+    templates: number
+    messagesSentThisMonth: number
+    devotionsTotal: number
+    devotionsLatestNumber: number
+    devotionsCompletionRate: number
+  }
+  pinnedItems: HomePinnedItem[]
+}
+
+export function fetchHome() {
+  return request<HomeResponse>('/home')
+}
+
+export function pinHomeItem(type: string, itemId: number) {
+  return request<{id: number}>('/home/pin', {
+    method: 'POST',
+    body: JSON.stringify({type, itemId}),
+  })
+}
+
+export function unpinHomeItem(id: number) {
+  return request<{success: boolean}>(`/home/pin/${id}`, {method: 'DELETE'})
 }

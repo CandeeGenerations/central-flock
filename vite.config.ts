@@ -16,6 +16,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:5172',
       '/data/scan-images': 'http://localhost:5172',
+      '/data/nursery-logos': 'http://localhost:5172',
     },
   },
 })

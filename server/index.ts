@@ -11,8 +11,11 @@ import {cleanupOrphanedScanImages, devotionsRouter} from './routes/devotions.js'
 import {draftsRouter} from './routes/drafts.js'
 import {globalVariablesRouter} from './routes/global-variables.js'
 import {groupsRouter} from './routes/groups.js'
+import {homeRouter} from './routes/home.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter, processSendJob} from './routes/messages.js'
+import {nurserySchedulesRouter} from './routes/nursery-schedules.js'
+import {nurseryRouter} from './routes/nursery.js'
 import {peopleRouter} from './routes/people.js'
 import {settingsRouter} from './routes/settings.js'
 import {statsRouter} from './routes/stats.js'
@@ -44,11 +47,15 @@ app.use('/api/global-variables', globalVariablesRouter)
 app.use('/api/import', importRouter)
 app.use('/api/contacts', contactsRouter)
 app.use('/api/stats', statsRouter)
+app.use('/api/home', homeRouter)
 app.use('/api/devotions', devotionsRouter)
+app.use('/api/nursery/schedules', nurserySchedulesRouter)
+app.use('/api/nursery', nurseryRouter)
 app.use('/api/settings', settingsRouter)
 
-// Serve scan images
+// Serve scan images and nursery logos
 app.use('/data/scan-images', express.static(path.join(__dirname, '..', 'data', 'scan-images')))
+app.use('/data/nursery-logos', express.static(path.join(__dirname, '..', 'data', 'nursery-logos')))
 
 // In production, serve the built Vite static files
 const distPath = path.join(__dirname, '..', 'dist')

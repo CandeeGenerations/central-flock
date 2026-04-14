@@ -82,6 +82,48 @@ delay 1.5`
   }
 }
 
+export async function sendImageViaUI(phoneNumber: string, imagePath: string, caption?: string): Promise<void> {
+  const release = await acquireSendLock()
+  try {
+    const escapedPhone = phoneNumber.replace(/"/g, '')
+    const escapedPath = imagePath.replace(/"/g, '\\"')
+
+    // Copy the image to clipboard, paste into Messages, then optionally type a caption and send
+    const captionScript = caption
+      ? `
+    delay 0.5
+    keystroke ${JSON.stringify(straightenQuotes(caption))}
+    delay 0.3`
+      : ''
+
+    const script = `
+set the clipboard to (read (POSIX file "${escapedPath}") as JPEG picture)
+delay 0.3
+open location "imessage://${escapedPhone}"
+delay 1.5
+
+tell application "System Events"
+  tell process "Messages"
+    set frontmost to true
+    delay 0.3
+    keystroke "v" using command down
+    delay 0.8${captionScript}
+    key code 36
+  end tell
+end tell
+delay 2`
+
+    await runAppleScript(script)
+  } catch (error) {
+    throw new Error(
+      `Failed to send image via UI to ${phoneNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      {cause: error},
+    )
+  } finally {
+    release()
+  }
+}
+
 export interface MacContact {
   id: string
   firstName: string

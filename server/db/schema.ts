@@ -178,3 +178,13 @@ export const messageRecipients = sqliteTable('message_recipients', {
   errorMessage: text('error_message'),
   sentAt: text('sent_at'),
 })
+
+export const pinnedItems = sqliteTable('pinned_items', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  type: text('type', {enum: ['person', 'group', 'template']}).notNull(),
+  itemId: integer('item_id').notNull(),
+  position: integer('position').notNull(),
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})

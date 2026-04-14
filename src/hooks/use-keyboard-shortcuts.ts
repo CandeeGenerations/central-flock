@@ -1,17 +1,8 @@
+import {navGroups} from '@/lib/nav-config'
 import {useEffect} from 'react'
 import {useNavigate} from 'react-router-dom'
 
-const NAV_ROUTES = [
-  '/',
-  '/people',
-  '/groups',
-  '/messages',
-  '/templates',
-  '/devotions/stats',
-  '/devotions',
-  '/devotions/scriptures',
-  '/devotions/audit',
-]
+const NAV_ROUTES = navGroups.flatMap((g) => g.children.map((c) => c.to))
 
 export function useKeyboardShortcuts(onShowHelp: () => void, onToggleDark: () => void) {
   const navigate = useNavigate()

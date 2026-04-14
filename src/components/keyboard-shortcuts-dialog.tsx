@@ -1,28 +1,20 @@
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {navGroups} from '@/lib/nav-config'
 
 const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC')
 const mod = isMac ? '⌘' : 'Ctrl'
 
+const navShortcuts = navGroups.map((group) => ({
+  category: group.label,
+  items: group.children.map((child, i) => {
+    const groupIndex = navGroups.indexOf(group)
+    const globalIndex = navGroups.slice(0, groupIndex).reduce((acc, g) => acc + g.children.length, 0) + i + 1
+    return {keys: [`${mod} ${globalIndex}`], description: `Go to ${child.label}`}
+  }),
+}))
+
 const shortcuts = [
-  {
-    category: 'Navigation',
-    items: [
-      {keys: [`${mod} 1`], description: 'Go to Dashboard'},
-      {keys: [`${mod} 2`], description: 'Go to People'},
-      {keys: [`${mod} 3`], description: 'Go to Groups'},
-      {keys: [`${mod} 4`], description: 'Go to Messages'},
-      {keys: [`${mod} 5`], description: 'Go to Templates'},
-    ],
-  },
-  {
-    category: 'Devotions',
-    items: [
-      {keys: [`${mod} 6`], description: 'Go to Devotion Stats'},
-      {keys: [`${mod} 7`], description: 'Go to Devotions'},
-      {keys: [`${mod} 8`], description: 'Go to Scriptures'},
-      {keys: [`${mod} 9`], description: 'Go to Audit'},
-    ],
-  },
+  ...navShortcuts,
   {
     category: 'Actions',
     items: [

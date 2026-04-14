@@ -3,7 +3,7 @@ import {Calendar} from '@/components/ui/calendar'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {PageSpinner} from '@/components/ui/spinner'
-import {checkAuthStatus, fetchStats, logout} from '@/lib/api'
+import {checkAuthStatus, fetchStats, fetchStatsOverTime, logout} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useQuery, useQueryClient} from '@tanstack/react-query'
@@ -41,7 +41,6 @@ const PRESETS: {key: RangePreset; label: string}[] = [
 function getPresetRange(preset: RangePreset): {from?: string; to?: string} {
   if (preset === 'all') return {}
   const now = new Date()
-  // Use UTC to match DB timestamps (stored via SQLite datetime('now') which is UTC)
   const y = now.getUTCFullYear()
   const m = now.getUTCMonth()
   const d = now.getUTCDate()
@@ -73,13 +72,6 @@ function formatRangeLabel(preset: RangePreset, customRange?: DateRange): string 
   const fmt = (d: Date) => d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})
   if (!customRange.to) return fmt(customRange.from)
   return `${fmt(customRange.from)} – ${fmt(customRange.to)}`
-}
-
-function calcChange(current: number, previous: number): {pct: number; positive: boolean} | null {
-  if (previous === 0 && current === 0) return null
-  if (previous === 0) return {pct: 100, positive: true}
-  const pct = Math.round(((current - previous) / previous) * 100)
-  return {pct, positive: pct >= 0}
 }
 
 export function DashboardPage() {
@@ -117,7 +109,7 @@ export function DashboardPage() {
     }
   }, [customRange])
 
-  const queryParams = useMemo(() => {
+  const chartParams = useMemo(() => {
     if (preset === 'custom' && customRange?.from) {
       const from = customRange.from.toISOString().slice(0, 10)
       const to = customRange.to
@@ -133,13 +125,18 @@ export function DashboardPage() {
   }, [preset, customRange])
 
   const {data: stats, isLoading} = useQuery({
-    queryKey: [...queryKeys.stats, queryParams.from, queryParams.to],
-    queryFn: () => fetchStats(queryParams),
+    queryKey: queryKeys.stats,
+    queryFn: fetchStats,
+  })
+
+  const {data: overTime} = useQuery({
+    queryKey: [...queryKeys.statsOverTime, chartParams.from, chartParams.to],
+    queryFn: () => fetchStatsOverTime(chartParams),
   })
 
   if (isLoading || !stats) return <PageSpinner />
 
-  const {people, groups, messages, drafts, previous} = stats
+  const {people, groups, messages, drafts} = stats
   const totalProcessed = messages.totalSent + messages.totalFailed + messages.totalSkipped
   const successRate = totalProcessed > 0 ? Math.round((messages.totalSent / totalProcessed) * 100) : 0
   const failedPct = totalProcessed > 0 ? Math.round((messages.totalFailed / totalProcessed) * 100) : 0
@@ -162,63 +159,15 @@ export function DashboardPage() {
     pct: people.total > 0 ? Math.round((d.value / people.total) * 100) : 0,
   }))
 
+  const overTimeData = overTime?.data ?? []
+
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Dashboard</h2>
-        <Card size="sm" className="w-full sm:w-auto flex-row items-center gap-2 px-3 py-2">
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger asChild>
-              <button className="flex w-full sm:w-auto items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer">
-                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                {formatRangeLabel(preset, customRange)}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-auto gap-0 p-0 bg-popover/70 backdrop-blur-2xl backdrop-saturate-150"
-              align="end"
-            >
-              <div className="flex">
-                <div className={cn('p-1.5 space-y-0.5', preset === 'custom' && 'border-r')}>
-                  {PRESETS.map((p) => (
-                    <button
-                      key={p.key}
-                      className={cn(
-                        'block w-full text-left text-sm px-3 py-2 rounded-2xl font-medium transition-colors cursor-pointer',
-                        preset === p.key ? 'bg-foreground/10' : 'hover:bg-foreground/10',
-                      )}
-                      onClick={() => {
-                        setPreset(p.key)
-                        if (p.key !== 'custom') {
-                          setPickerOpen(false)
-                        }
-                      }}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-                {preset === 'custom' && (
-                  <div className="p-2">
-                    <Calendar
-                      mode="range"
-                      selected={customRange}
-                      onSelect={(range) => {
-                        setCustomRange(range)
-                        if (range?.from && range?.to) {
-                          setPickerOpen(false)
-                        }
-                      }}
-                      numberOfMonths={2}
-                      disabled={{after: new Date()}}
-                    />
-                  </div>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-          <Link to="/messages/compose" className="hidden md:block">
+        <div className="hidden md:flex items-center gap-2">
+          <Link to="/messages/compose">
             <Button size="sm">
               <MessageSquare className="h-4 w-4 mr-2" />
               Compose
@@ -227,7 +176,7 @@ export function DashboardPage() {
               </kbd>
             </Button>
           </Link>
-          <Link to="/people?add=1" className="hidden md:block">
+          <Link to="/people?add=1">
             <Button size="sm" variant="outline">
               <Plus className="h-4 w-4 mr-2" />
               Add Person
@@ -236,32 +185,14 @@ export function DashboardPage() {
               </kbd>
             </Button>
           </Link>
-        </Card>
+        </div>
       </div>
 
       {/* Row 1 — Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatCard
-          label="People"
-          value={people.total}
-          to="/people"
-          change={previous ? calcChange(people.total, previous.people) : null}
-          previousValue={previous?.people}
-        />
-        <StatCard
-          label="Groups"
-          value={groups.total}
-          to="/groups"
-          change={previous ? calcChange(groups.total, previous.groups) : null}
-          previousValue={previous?.groups}
-        />
-        <StatCard
-          label="Messages Sent"
-          value={messages.totalSent}
-          to="/messages"
-          change={previous ? calcChange(messages.totalSent, previous.messagesSent) : null}
-          previousValue={previous?.messagesSent}
-        />
+        <StatCard label="People" value={people.total} to="/people" />
+        <StatCard label="Groups" value={groups.total} to="/groups" />
+        <StatCard label="Messages Sent" value={messages.totalSent} to="/messages" />
         <StatCard label="Scheduled Messages" value={messages.scheduledMessages.length} to="/messages?tab=scheduled" />
         <StatCard label="Draft Messages" value={drafts.total} to="/messages?tab=drafts" />
       </div>
@@ -381,17 +312,67 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* Row 3 — Messages Over Time (area chart) */}
+      {/* Row 3 — Messages Over Time (area chart with date picker) */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-col sm:flex-row items-start sm:items-center justify-between gap-2 space-y-0">
           <CardTitle>Messages Over Time</CardTitle>
+          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-1.5 rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow,background-color] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 h-9 cursor-pointer">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                {formatRangeLabel(preset, customRange)}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-auto gap-0 p-0 bg-popover/70 backdrop-blur-2xl backdrop-saturate-150"
+              align="end"
+            >
+              <div className="flex">
+                <div className={cn('p-1.5 space-y-0.5', preset === 'custom' && 'border-r')}>
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p.key}
+                      className={cn(
+                        'block w-full text-left text-sm px-3 py-2 rounded-2xl font-medium transition-colors cursor-pointer',
+                        preset === p.key ? 'bg-foreground/10' : 'hover:bg-foreground/10',
+                      )}
+                      onClick={() => {
+                        setPreset(p.key)
+                        if (p.key !== 'custom') {
+                          setPickerOpen(false)
+                        }
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                {preset === 'custom' && (
+                  <div className="p-2">
+                    <Calendar
+                      mode="range"
+                      selected={customRange}
+                      onSelect={(range) => {
+                        setCustomRange(range)
+                        if (range?.from && range?.to) {
+                          setPickerOpen(false)
+                        }
+                      }}
+                      numberOfMonths={window.innerWidth < 640 ? 1 : 2}
+                      disabled={{after: new Date()}}
+                    />
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
         </CardHeader>
         <CardContent>
-          {messages.overTime.data.length === 0 ? (
+          {overTimeData.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">No message data for this period.</p>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={messages.overTime.data}>
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={overTimeData}>
                 <defs>
                   <linearGradient id="sentGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.2} />
@@ -401,16 +382,18 @@ export function DashboardPage() {
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="label"
-                  tick={{fontSize: 12, fill: 'var(--muted-foreground)'}}
+                  tick={{fontSize: 11, fill: 'var(--muted-foreground)'}}
                   axisLine={{stroke: 'var(--border)'}}
                   tickLine={false}
-                  padding={{left: 20, right: 20}}
+                  padding={{left: 10, right: 10}}
+                  interval="preserveStartEnd"
                 />
                 <YAxis
                   allowDecimals={false}
                   tick={{fontSize: 12, fill: 'var(--muted-foreground)'}}
                   axisLine={false}
                   tickLine={false}
+                  width={35}
                 />
                 <Tooltip
                   content={({active, payload, label}) => {
@@ -496,19 +479,7 @@ export function DashboardPage() {
   )
 }
 
-function StatCard({
-  label,
-  value,
-  to,
-  change,
-  previousValue,
-}: {
-  label: string
-  value: number
-  to: string
-  change?: {pct: number; positive: boolean} | null
-  previousValue?: number
-}) {
+function StatCard({label, value, to}: {label: string; value: number; to: string}) {
   return (
     <Link to={to}>
       <Card size="sm" className="hover:bg-muted/50 transition-colors h-full">
@@ -516,24 +487,7 @@ function StatCard({
           <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl md:text-[28px] font-bold leading-none">{value.toLocaleString()}</span>
-            {change && (
-              <span
-                className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
-                  change.positive
-                    ? 'text-green-600 bg-green-100 dark:bg-green-950/40 dark:text-green-400'
-                    : 'text-red-500 bg-red-100 dark:bg-red-950/40 dark:text-red-400'
-                }`}
-              >
-                {change.positive ? '+' : ''}
-                {change.pct}%
-              </span>
-            )}
-          </div>
-          {previousValue !== undefined && (
-            <p className="text-xs text-muted-foreground mt-1">Previously: {previousValue.toLocaleString()}</p>
-          )}
+          <span className="text-3xl md:text-[28px] font-bold leading-none">{value.toLocaleString()}</span>
         </CardContent>
       </Card>
     </Link>

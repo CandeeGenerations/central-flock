@@ -1,10 +1,12 @@
+import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {PageSpinner} from '@/components/ui/spinner'
-import {getSearch, runResearch} from '@/lib/quotes-api'
-import {useMutation, useQuery} from '@tanstack/react-query'
-import {ArrowLeft, ArrowRight, RefreshCw} from 'lucide-react'
+import {deleteSearch, getSearch, runResearch} from '@/lib/quotes-api'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {ArrowLeft, ArrowRight, RefreshCw, Trash2} from 'lucide-react'
+import {useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {Link} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -26,6 +28,8 @@ function RelevanceBadge({relevance}: {relevance: string}) {
 export function QuoteSearchDetailPage() {
   const {id} = useParams<{id: string}>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const {data, isLoading} = useQuery({
     queryKey: ['quotes', 'search', Number(id)],
@@ -42,14 +46,27 @@ export function QuoteSearchDetailPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Research failed'),
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteSearch(Number(id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: ['quotes', 'searches']})
+      toast.success('Search deleted')
+      navigate('/sermons/searches')
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Delete failed'),
+  })
+
   if (isLoading) return <PageSpinner />
   if (!data) return <div className="p-6 text-muted-foreground">Search not found.</div>
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={() => navigate('/sermons/searches')}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>
+          <Trash2 className="h-4 w-4 mr-1 text-destructive" /> Delete
         </Button>
       </div>
 
@@ -129,6 +146,17 @@ export function QuoteSearchDetailPage() {
           ),
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete search?"
+        description={`This will permanently remove the saved search for "${data.topic}".`}
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+      />
     </div>
   )
 }

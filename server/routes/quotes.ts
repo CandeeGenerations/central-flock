@@ -97,6 +97,24 @@ quotesRouter.get(
   }),
 )
 
+// DELETE /api/quotes/searches/:id — remove a saved search
+quotesRouter.delete(
+  '/searches/:id',
+  asyncHandler(async (req, res) => {
+    const id = parseInt(String(req.params.id))
+    if (isNaN(id)) {
+      res.status(400).json({error: 'Invalid id'})
+      return
+    }
+    const result = quotesSqlite.prepare(`DELETE FROM quote_searches WHERE id = ?`).run(id)
+    if (result.changes === 0) {
+      res.status(404).json({error: 'Search not found'})
+      return
+    }
+    res.json({ok: true})
+  }),
+)
+
 // POST /api/quotes/research — run AI topic research
 quotesRouter.post(
   '/research',

@@ -175,3 +175,7 @@ export function listSearches(params?: {
 export function getSearch(id: number): Promise<QuoteSearchDetail> {
   return request<QuoteSearchDetail>(`/quotes/searches/${id}`)
 }
+
+export function deleteSearch(id: number): Promise<{ok: boolean}> {
+  return request<{ok: boolean}>(`/quotes/searches/${id}`, {method: 'DELETE'})
+}

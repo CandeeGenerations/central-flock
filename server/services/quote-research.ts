@@ -29,6 +29,8 @@ interface QuoteRow {
   tags: string
 }
 
+type PublicQuote = Omit<QuoteRow, 'tags'> & {tags: string[]}
+
 interface ResearchResult {
   searchId: number
   synthesis: string
@@ -36,7 +38,7 @@ interface ResearchResult {
     quoteId: number
     note: string
     relevance: string
-    quote: QuoteRow
+    quote: PublicQuote
   }>
   candidateCount: number
   durationMs: number
@@ -128,12 +130,12 @@ function buildCorpusText(quotes: QuoteRow[]): string {
 function parseAiResponse(
   text: string,
   quotesById: Map<number, QuoteRow>,
-): {synthesis: string; results: Array<{quoteId: number; note: string; relevance: string; quote: QuoteRow}>} {
+): {synthesis: string; results: Array<{quoteId: number; note: string; relevance: string; quote: PublicQuote}>} {
   const synthesisMatch = text.match(/<synthesis>([\s\S]*?)<\/synthesis>/)
   const synthesis = synthesisMatch ? synthesisMatch[1].trim() : ''
 
   const resultMatches = [...text.matchAll(/<result\s+id="(\d+)"\s+relevance="(\w+)"\s+note="([^"]*)"[^/]*/g)]
-  const results: Array<{quoteId: number; note: string; relevance: string; quote: QuoteRow}> = []
+  const results: Array<{quoteId: number; note: string; relevance: string; quote: PublicQuote}> = []
 
   for (const m of resultMatches) {
     const quoteId = parseInt(m[1])
@@ -141,11 +143,20 @@ function parseAiResponse(
     const note = m[3]
     const quote = quotesById.get(quoteId)
     if (quote) {
-      results.push({quoteId, note, relevance, quote})
+      results.push({quoteId, note, relevance, quote: {...quote, tags: parseTags(quote.tags)}})
     }
   }
 
   return {synthesis, results}
+}
+
+function parseTags(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((t): t is string => typeof t === 'string') : []
+  } catch {
+    return []
+  }
 }
 
 export async function runQuoteResearch(topic: string): Promise<ResearchResult> {
@@ -228,7 +239,12 @@ export function rehydrateSearch(searchRow: {
   synthesis: string
   model: string
   createdAt: string | null
-  results: Array<{quoteId: number; note: string; relevance: string; quote: QuoteRow | null}>
+  results: Array<{
+    quoteId: number
+    note: string
+    relevance: string
+    quote: PublicQuote | null
+  }>
 } {
   const stored = JSON.parse(searchRow.results) as Array<{quoteId: number; note: string; relevance: string}>
 
@@ -251,11 +267,14 @@ export function rehydrateSearch(searchRow: {
     synthesis: searchRow.synthesis,
     model: searchRow.model,
     createdAt: searchRow.createdAt,
-    results: stored.map((r) => ({
-      quoteId: r.quoteId,
-      note: r.note,
-      relevance: r.relevance,
-      quote: quotesById.get(r.quoteId) ?? null,
-    })),
+    results: stored.map((r) => {
+      const row = quotesById.get(r.quoteId)
+      return {
+        quoteId: r.quoteId,
+        note: r.note,
+        relevance: r.relevance,
+        quote: row ? {...row, tags: parseTags(row.tags)} : null,
+      }
+    }),
   }
 }

@@ -1,3 +1,5 @@
+import {ConfirmDialog} from '@/components/confirm-dialog'
+import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
 import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
@@ -5,9 +7,12 @@ import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
-import {listSearches} from '@/lib/quotes-api'
-import {useQuery} from '@tanstack/react-query'
+import {type QuoteSearch, deleteSearch, listSearches} from '@/lib/quotes-api'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {Trash2} from 'lucide-react'
+import {useState} from 'react'
 import {useNavigate} from 'react-router-dom'
+import {toast} from 'sonner'
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -16,13 +21,25 @@ function fmtDate(iso: string | null): string {
 
 export function QuoteSearchesPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [search, setSearch] = usePersistedState('qsearches.q', '')
   const debouncedSearch = useDebouncedValue(search, 250)
   const [page, setPage] = usePersistedState('qsearches.page', 1)
+  const [pendingDelete, setPendingDelete] = useState<QuoteSearch | null>(null)
 
   const {data, isLoading} = useQuery({
     queryKey: ['quotes', 'searches', 'list', debouncedSearch, page],
     queryFn: () => listSearches({q: debouncedSearch || undefined, page, pageSize: 20}),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => deleteSearch(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: ['quotes', 'searches']})
+      toast.success('Search deleted')
+      setPendingDelete(null)
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Delete failed'),
   })
 
   if (isLoading && !data) return <PageSpinner />
@@ -51,12 +68,13 @@ export function QuoteSearchesPage() {
                 <TableHead>Date</TableHead>
                 <TableHead>Results</TableHead>
                 <TableHead>Model</TableHead>
+                <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data?.searches.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-12">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-12">
                     No searches yet.
                   </TableCell>
                 </TableRow>
@@ -71,6 +89,18 @@ export function QuoteSearchesPage() {
                     <TableCell className="text-sm text-muted-foreground">{fmtDate(s.createdAt)}</TableCell>
                     <TableCell className="text-sm">{s.resultCount}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{s.model}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setPendingDelete(s)
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -83,6 +113,19 @@ export function QuoteSearchesPage() {
           </CardContent>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete search?"
+        description={
+          pendingDelete ? `This will permanently remove the saved search for "${pendingDelete.topic}".` : undefined
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete.id)}
+      />
     </div>
   )
 }

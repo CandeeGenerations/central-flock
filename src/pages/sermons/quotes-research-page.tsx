@@ -101,6 +101,7 @@ export function QuotesResearchPage() {
               onChange={(e) => setTopic(e.target.value)}
               placeholder="Enter a sermon topic…"
               onKeyDown={(e) => e.key === 'Enter' && submit()}
+              disabled={mutation.isPending}
               className="flex-1"
             />
             <Button onClick={() => submit()} disabled={mutation.isPending || !topic.trim()}>

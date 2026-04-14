@@ -17,6 +17,22 @@ import type {LucideIcon} from 'lucide-react'
 export type NavChild = {to: string; label: string; icon: LucideIcon; end?: boolean}
 export type NavGroup = {id: string; label: string; icon: LucideIcon; children: NavChild[]}
 
+/**
+ * Returns true when the given child's `to` is the best match for the current pathname.
+ * A sibling with a more specific prefix match "wins" — e.g. on /nursery/settings, only
+ * /nursery/settings is active (not /nursery).
+ */
+export function isChildActive(childTo: string, pathname: string, siblings: {to: string}[]): boolean {
+  if (pathname === childTo) return true
+  if (!pathname.startsWith(childTo + '/')) return false
+  return !siblings.some((s) => s.to !== childTo && (pathname === s.to || pathname.startsWith(s.to + '/')))
+}
+
+/** Returns the nav group whose children match the current pathname, or null if none. */
+export function findActiveGroup(pathname: string): NavGroup | null {
+  return navGroups.find((g) => g.children.some((c) => isChildActive(c.to, pathname, g.children))) || null
+}
+
 export const navGroups: NavGroup[] = [
   {
     id: 'messaging',

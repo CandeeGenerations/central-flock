@@ -6,10 +6,12 @@ import {Input} from '@/components/ui/input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {
   type HomePinnedItem,
+  checkAuthStatus,
   fetchGroups,
   fetchHome,
   fetchPeople,
   fetchTemplates,
+  logout,
   pinHomeItem,
   unpinHomeItem,
 } from '@/lib/api'
@@ -17,17 +19,18 @@ import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {
+  Baby,
   BookOpen,
   Cake,
   FileText,
   FolderOpen,
-  FolderPlus,
   Heart,
+  LogOut,
   MessageSquare,
   Pin,
   PinOff,
   Plus,
-  UserPlus,
+  Settings,
   Users,
 } from 'lucide-react'
 import {useMemo, useState} from 'react'
@@ -45,13 +48,6 @@ function daysLabel(days: number): string {
   if (days === 1) return 'Tomorrow'
   return `${days} days`
 }
-
-const quickActions = [
-  {icon: MessageSquare, label: 'Compose Message', to: '/messages/compose'},
-  {icon: UserPlus, label: 'Add Person', to: '/people?add=1'},
-  {icon: FolderPlus, label: 'Create Group', to: '/groups?add=1'},
-  {icon: FileText, label: 'New Template', to: '/templates/new'},
-]
 
 function pinRoute(pin: HomePinnedItem): string {
   if (pin.type === 'person') return `/people/${pin.itemId}`
@@ -71,6 +67,7 @@ export function HomePage() {
     queryKey: queryKeys.home,
     queryFn: fetchHome,
   })
+  const {data: authStatus} = useQuery({queryKey: ['auth-status'], queryFn: checkAuthStatus})
 
   const [pinDialogOpen, setPinDialogOpen] = useState(false)
 
@@ -96,21 +93,55 @@ export function HomePage() {
     <div className="p-4 md:p-6 space-y-6">
       <h1 className="text-2xl font-bold">Home</h1>
 
-      {/* Quick Actions */}
+      {/* Tool Launcher */}
       <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {quickActions.map(({icon: Icon, label, to}) => (
-            <Link key={to} to={to}>
-              <Card
-                size="sm"
-                className="hover:bg-muted/50 transition-colors cursor-pointer h-full flex flex-col items-center justify-center gap-2 py-4"
-              >
-                <Icon className="h-6 w-6 text-primary" />
-                <span className="text-sm font-medium text-center">{label}</span>
-              </Card>
-            </Link>
-          ))}
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Tools</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Link to="/dashboard">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardContent className="flex items-start gap-4 p-5">
+                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
+                  <MessageSquare className="h-6 w-6 text-primary" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-semibold">Messaging</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {stats.people} people &middot; {stats.groups} groups
+                  </p>
+                  <p className="text-sm text-muted-foreground">{stats.messagesSentThisMonth} sent this month</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link to="/devotions/stats">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardContent className="flex items-start gap-4 p-5">
+                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
+                  <BookOpen className="h-6 w-6 text-primary" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-semibold">Devotions</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {stats.devotionsTotal} total &middot; Latest #{stats.devotionsLatestNumber}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{stats.devotionsCompletionRate}% pipeline completion</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link to="/nursery">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardContent className="flex items-start gap-4 p-5">
+                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
+                  <Baby className="h-6 w-6 text-primary" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-semibold">Nursery Schedule</h3>
+                  <p className="text-sm text-muted-foreground">Generate and manage monthly nursery schedules</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
       </section>
 
@@ -180,45 +211,6 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* Tool Launcher */}
-      <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Tools</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Link to="/dashboard">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
-              <CardContent className="flex items-start gap-4 p-5">
-                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
-                  <MessageSquare className="h-6 w-6 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-semibold">Messaging</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {stats.people} people &middot; {stats.groups} groups
-                  </p>
-                  <p className="text-sm text-muted-foreground">{stats.messagesSentThisMonth} sent this month</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link to="/devotions/stats">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
-              <CardContent className="flex items-start gap-4 p-5">
-                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
-                  <BookOpen className="h-6 w-6 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-semibold">Devotions</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {stats.devotionsTotal} total &middot; Latest #{stats.devotionsLatestNumber}
-                  </p>
-                  <p className="text-sm text-muted-foreground">{stats.devotionsCompletionRate}% pipeline completion</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </section>
-
       {/* Pinned Items */}
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -262,6 +254,29 @@ export function HomePage() {
           </div>
         )}
       </section>
+
+      {/* Mobile settings & logout */}
+      <div className="md:hidden grid grid-cols-2 gap-3 pt-2">
+        <Link to="/settings">
+          <Button variant="outline" className="w-full">
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
+        </Link>
+        {authStatus?.authRequired && (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={async () => {
+              await logout()
+              queryClient.invalidateQueries({queryKey: ['auth-status']})
+            }}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        )}
+      </div>
 
       <PinDialog open={pinDialogOpen} onOpenChange={setPinDialogOpen} existingPins={pinnedItems} />
     </div>

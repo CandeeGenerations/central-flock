@@ -4,7 +4,7 @@ import {Toaster} from '@/components/ui/sonner'
 import {Spinner} from '@/components/ui/spinner'
 import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts'
 import {checkAuthStatus, logout} from '@/lib/api'
-import {navGroups} from '@/lib/nav-config'
+import {findActiveGroup, isChildActive, navGroups} from '@/lib/nav-config'
 import {ThemeProvider, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
 import {ContactsImportPage} from '@/pages/contacts-import-page'
@@ -35,7 +35,7 @@ import {SettingsPage} from '@/pages/settings-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
 import {QueryClient, QueryClientProvider, useQuery, useQueryClient} from '@tanstack/react-query'
-import {LogOut, Moon, Plus, Settings, Sun} from 'lucide-react'
+import {Home, LogOut, Moon, Plus, Settings, Sun} from 'lucide-react'
 import {useCallback, useState} from 'react'
 import {BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate} from 'react-router-dom'
 
@@ -149,50 +149,46 @@ function MobileFab() {
 
 function BottomTabBar() {
   const location = useLocation()
-  const primaryGroup = navGroups[0]
-  const secondaryGroup = navGroups.find(
-    (g, i) => i > 0 && g.children.some((c) => location.pathname === c.to || location.pathname.startsWith(c.to + '/')),
-  )
+  const activeGroup = findActiveGroup(location.pathname)
+  const isHome = location.pathname === '/'
+
+  // On any section page show [Home] + that section's children.
+  // On the home dashboard itself show [Home] + each section's top-level entry.
+  const items: {to: string; label: string; icon: typeof Home; isHome?: boolean}[] = [
+    {to: '/', label: 'Home', icon: Home, isHome: true},
+  ]
+
+  if (activeGroup) {
+    activeGroup.children.forEach((c) => items.push({to: c.to, label: c.label, icon: c.icon}))
+  } else {
+    navGroups.forEach((g) => items.push({to: g.children[0].to, label: g.label, icon: g.icon}))
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-sidebar text-sidebar-foreground border-t">
-      {secondaryGroup && (
-        <div className="flex items-center justify-around px-3 pt-2 pb-2">
-          {secondaryGroup.children.map(({to, label, icon: Icon, end}) => (
+      <div className="flex items-center justify-around px-3 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        {items.map(({to, label, icon: Icon, isHome: itemIsHome}) => {
+          const active = itemIsHome
+            ? isHome
+            : isChildActive(
+                to,
+                location.pathname,
+                items.filter((i) => !i.isHome),
+              )
+          return (
             <NavLink
               key={to}
               to={to}
-              end={end}
-              className={({isActive}) =>
-                cn(
-                  'flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors min-w-[4rem]',
-                  isActive ? 'text-sidebar-accent-foreground bg-sidebar-accent' : 'text-sidebar-foreground/60',
-                )
-              }
+              className={cn(
+                'flex flex-col items-center gap-1 px-2 py-2 rounded-lg text-[11px] font-medium transition-colors min-w-[3.5rem]',
+                active ? 'text-sidebar-accent-foreground bg-sidebar-accent' : 'text-sidebar-foreground/60',
+              )}
             >
               <Icon className="h-5 w-5" />
               <span>{label}</span>
             </NavLink>
-          ))}
-        </div>
-      )}
-      <div className="flex items-center justify-around px-3 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        {primaryGroup.children.map(({to, label, icon: Icon, end}) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({isActive}) =>
-              cn(
-                'flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors min-w-[4rem]',
-                isActive ? 'text-sidebar-accent-foreground bg-sidebar-accent' : 'text-sidebar-foreground/60',
-              )
-            }
-          >
-            <Icon className="h-6 w-6" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
+          )
+        })}
       </div>
     </nav>
   )

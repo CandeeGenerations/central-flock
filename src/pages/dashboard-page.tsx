@@ -3,11 +3,11 @@ import {Calendar} from '@/components/ui/calendar'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {PageSpinner} from '@/components/ui/spinner'
-import {checkAuthStatus, fetchStats, fetchStatsOverTime, logout} from '@/lib/api'
+import {fetchStats, fetchStatsOverTime} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
-import {useQuery, useQueryClient} from '@tanstack/react-query'
-import {BookOpen, CalendarIcon, LogOut, MessageSquare, Plus, Settings} from 'lucide-react'
+import {useQuery} from '@tanstack/react-query'
+import {CalendarIcon, MessageSquare, Plus} from 'lucide-react'
 import {useEffect, useMemo, useState} from 'react'
 import type {DateRange} from 'react-day-picker'
 import {Link} from 'react-router-dom'
@@ -75,8 +75,6 @@ function formatRangeLabel(preset: RangePreset, customRange?: DateRange): string 
 }
 
 export function DashboardPage() {
-  const {data: authStatus} = useQuery({queryKey: ['auth-status'], queryFn: checkAuthStatus})
-  const qc = useQueryClient()
   const [preset, setPreset] = useState<RangePreset>(() => {
     const saved = localStorage.getItem('dashboard-range-preset')
     return saved && PRESETS.some((p) => p.key === saved) ? (saved as RangePreset) : 'last12m'
@@ -445,36 +443,6 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Mobile settings & logout links */}
-      <div className="md:hidden flex flex-col gap-3 pt-4">
-        <Link to="/devotions/stats">
-          <Button variant="outline" className="w-full">
-            <BookOpen className="h-4 w-4 mr-2" />
-            Devotions
-          </Button>
-        </Link>
-        <div className="grid grid-cols-2 gap-3">
-          <Link to="/settings">
-            <Button variant="outline" className="w-full">
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
-          </Link>
-          {authStatus?.authRequired && (
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={async () => {
-                await logout()
-                qc.invalidateQueries({queryKey: ['auth-status']})
-              }}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          )}
-        </div>
-      </div>
     </div>
   )
 }

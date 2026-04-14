@@ -1,4 +1,4 @@
-import type {NavGroup} from '@/lib/nav-config'
+import {isChildActive, type NavGroup} from '@/lib/nav-config'
 import {cn} from '@/lib/utils'
 import {ChevronRight} from 'lucide-react'
 import {Collapsible as CollapsiblePrimitive} from 'radix-ui'
@@ -17,13 +17,6 @@ const navLinkClass = ({isActive}: {isActive: boolean}) =>
       ? 'bg-sidebar-accent text-sidebar-accent-foreground border border-border shadow-sm dark:border-transparent dark:shadow-none'
       : 'hover:bg-sidebar-accent/50 border border-transparent hover:border-border hover:shadow-sm dark:hover:border-transparent dark:hover:shadow-none',
   )
-
-function isChildActive(childTo: string, pathname: string, siblings: {to: string}[]): boolean {
-  if (pathname === childTo) return true
-  if (!pathname.startsWith(childTo + '/')) return false
-  // Only match if no sibling is a more specific match
-  return !siblings.some((s) => s.to !== childTo && (pathname === s.to || pathname.startsWith(s.to + '/')))
-}
 
 export function CollapsibleNavGroup({group, onNavClick}: CollapsibleNavGroupProps) {
   const location = useLocation()

@@ -13,11 +13,11 @@ const DEFAULTS: Record<string, string> = {
   webhookUrl: '',
   anniversarySendTime: '07:00',
   anniversaryPreNotifyDays: '',
-  defaultAiModel: 'claude-sonnet-4-20250514',
+  defaultAiModel: 'claude-sonnet-4-5-20250514',
 }
 
 const VALID_VALUES: Record<string, string[]> = {
-  defaultAiModel: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
+  defaultAiModel: ['claude-sonnet-4-5-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
 }
 
 // GET /api/settings - Get all settings

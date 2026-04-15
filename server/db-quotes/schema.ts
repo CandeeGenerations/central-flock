@@ -13,8 +13,8 @@ export const quotes = sqliteTable('quotes', {
   quoteText: text('quote_text').notNull(),
   tags: text('tags').notNull(), // JSON array of strings
   source: text('source').notNull(), // 'n8n' | 'import' | 'manual'
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(sql`(datetime('now', 'localtime'))`),
+  updatedAt: text('updated_at').default(sql`(datetime('now', 'localtime'))`),
 })
 
 export const quoteSearches = sqliteTable('quote_searches', {
@@ -25,5 +25,5 @@ export const quoteSearches = sqliteTable('quote_searches', {
   model: text('model').notNull(),
   candidateCount: integer('candidate_count').notNull(),
   durationMs: integer('duration_ms').notNull(),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(sql`(datetime('now', 'localtime'))`),
 })

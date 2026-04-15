@@ -321,7 +321,8 @@ quotesRouter.post(
     const capturedBy = body.capturedBy ?? body.author ?? 'Tyler Candee'
     const dateDisplay =
       body.dateDisplay ?? new Date().toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})
-    const capturedAt = new Date().toISOString()
+    const now = new Date()
+    const capturedAt = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19)
 
     // Generate a unique externalId for manual quotes
     const externalId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -410,7 +411,7 @@ quotesRouter.patch(
       return
     }
 
-    updates.push(`updated_at = datetime('now')`)
+    updates.push(`updated_at = datetime('now', 'localtime')`)
     params.push(id)
 
     quotesSqlite.prepare(`UPDATE quotes SET ${updates.join(', ')} WHERE id = ?`).run(...params)

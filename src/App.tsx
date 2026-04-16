@@ -1,5 +1,4 @@
 import {CollapsibleNavGroup} from '@/components/collapsible-nav-group'
-import {KeyboardShortcutsDialog} from '@/components/keyboard-shortcuts-dialog'
 import {Toaster} from '@/components/ui/sonner'
 import {Spinner} from '@/components/ui/spinner'
 import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts'
@@ -45,7 +44,6 @@ import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
 import {QueryClient, QueryClientProvider, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Home, LogOut, Moon, Plus, Settings, Sun} from 'lucide-react'
-import {useCallback, useState} from 'react'
 import {BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate} from 'react-router-dom'
 
 const queryClient = new QueryClient({
@@ -205,9 +203,7 @@ function BottomTabBar() {
 
 function AppLayout() {
   const {toggleDark} = useTheme()
-  const [shortcutsOpen, setShortcutsOpen] = useState(false)
-  const showShortcuts = useCallback(() => setShortcutsOpen(true), [])
-  useKeyboardShortcuts(showShortcuts, toggleDark)
+  useKeyboardShortcuts(toggleDark)
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -279,7 +275,6 @@ function AppLayout() {
       <BottomTabBar />
 
       <Toaster />
-      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   )
 }

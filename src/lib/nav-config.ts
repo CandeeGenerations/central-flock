@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   List,
   MessageSquare,
+  Music,
   Quote,
   ScrollText,
   Settings,
@@ -84,6 +85,8 @@ export const navGroups: NavGroup[] = [
       {to: '/sermons/quotes', label: 'Quotes', icon: Quote, end: true},
       {to: '/sermons/research', label: 'Research', icon: Sparkles},
       {to: '/sermons/searches', label: 'Search History', icon: History},
+      {to: '/sermons/hymns', label: 'Hymns', icon: Music},
+      {to: '/sermons/hymns/searches', label: 'Hymn History', icon: History},
     ],
   },
   {

@@ -15,6 +15,7 @@ import {globalVariablesRouter} from './routes/global-variables.js'
 import {groupsRouter} from './routes/groups.js'
 import {gwendolynDevotionsRouter} from './routes/gwendolyn-devotions.js'
 import {homeRouter} from './routes/home.js'
+import {hymnsRouter} from './routes/hymns.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter, processSendJob} from './routes/messages.js'
 import {nurserySchedulesRouter} from './routes/nursery-schedules.js'
@@ -63,6 +64,7 @@ app.use('/api/gwendolyn-devotions', gwendolynDevotionsRouter)
 app.use('/api/nursery/schedules', nurserySchedulesRouter)
 app.use('/api/nursery', nurseryRouter)
 app.use('/api/quotes', quotesRouter)
+app.use('/api/hymns', hymnsRouter)
 app.use('/api/settings', settingsRouter)
 
 // Serve scan images and nursery logos

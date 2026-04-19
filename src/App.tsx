@@ -34,6 +34,9 @@ import {NurserySettingsPage} from '@/pages/nursery/nursery-settings-page'
 import {NurseryWorkersPage} from '@/pages/nursery/nursery-workers-page'
 import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
+import {HymnSearchDetailPage} from '@/pages/sermons/hymn-search-detail-page'
+import {HymnSearchesPage} from '@/pages/sermons/hymn-searches-page'
+import {HymnsPrepPage} from '@/pages/sermons/hymns-prep-page'
 import {QuoteDetailPage} from '@/pages/sermons/quote-detail-page'
 import {QuoteSearchDetailPage} from '@/pages/sermons/quote-search-detail-page'
 import {QuoteSearchesPage} from '@/pages/sermons/quote-searches-page'
@@ -264,6 +267,9 @@ function AppLayout() {
             <Route path="/sermons/research" element={<QuotesResearchPage />} />
             <Route path="/sermons/searches" element={<QuoteSearchesPage />} />
             <Route path="/sermons/searches/:id" element={<QuoteSearchDetailPage />} />
+            <Route path="/sermons/hymns" element={<HymnsPrepPage />} />
+            <Route path="/sermons/hymns/searches" element={<HymnSearchesPage />} />
+            <Route path="/sermons/hymns/searches/:id" element={<HymnSearchDetailPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

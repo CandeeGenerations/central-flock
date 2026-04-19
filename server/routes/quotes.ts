@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import {Router} from 'express'
 
 import {quotesDb, quotesSchema, quotesSqlite} from '../db-quotes/index.js'
+import {AI_MODELS} from '../lib/ai-models.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {extractCitedAuthor} from '../services/quote-parser.js'
 import {rehydrateSearch, runQuoteResearch} from '../services/quote-research.js'
@@ -141,7 +142,7 @@ quotesRouter.post(
     }
 
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: AI_MODELS.haiku,
       max_tokens: 512,
       messages: [
         {

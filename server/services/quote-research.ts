@@ -3,6 +3,7 @@ import {eq} from 'drizzle-orm'
 
 import {quotesDb, quotesSchema, quotesSqlite} from '../db-quotes/index.js'
 import {db, schema} from '../db/index.js'
+import {resolveModel} from '../lib/ai-models.js'
 
 const PREFILTER_THRESHOLD = 300
 
@@ -50,7 +51,7 @@ function getConfiguredModel(): string {
     .from(schema.settings)
     .where(eq(schema.settings.key, 'defaultAiModel'))
     .get()
-  return row?.value ?? 'claude-sonnet-4-20250514'
+  return resolveModel(row?.value)
 }
 
 const STOPWORDS = new Set(['the', 'of', 'and', 'on', 'to', 'a', 'is', 'in', 'for', 'that', 'it', 'with', 'as'])

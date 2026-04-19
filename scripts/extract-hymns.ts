@@ -21,6 +21,8 @@ import fs from 'fs'
 import path from 'path'
 import {fileURLToPath} from 'url'
 
+import {AI_MODELS} from '../server/lib/ai-models.js'
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = path.join(__dirname, '..', 'data')
 const SEED_PATH = path.join(DATA_DIR, 'hymns-seed.json')
@@ -283,7 +285,7 @@ async function main(): Promise<void> {
   if (fs.existsSync(ERROR_LOG_PATH)) fs.unlinkSync(ERROR_LOG_PATH)
 
   const client = new Anthropic({apiKey})
-  const model = process.env.HYMN_EXTRACT_MODEL ?? 'claude-sonnet-4-20250514'
+  const model = process.env.HYMN_EXTRACT_MODEL ?? AI_MODELS.sonnet
   console.log(`Using model: ${model}`)
 
   const all: SeedEntry[] = []

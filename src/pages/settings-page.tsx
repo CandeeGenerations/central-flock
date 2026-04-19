@@ -53,7 +53,7 @@ export function SettingsPage() {
     }
   }
 
-  const defaultAiModel = settings?.defaultAiModel ?? 'claude-sonnet-4-5-20250514'
+  const defaultAiModel = settings?.defaultAiModel ?? 'sonnet'
   const webhookUrl = settings?.webhookUrl ?? ''
   const sendTime = settings?.birthdaySendTime ?? '07:00'
   const preNotifyDays = settings?.birthdayPreNotifyDays ?? ''
@@ -148,9 +148,9 @@ export function SettingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="claude-sonnet-4-5-20250514">Claude Sonnet 4.5 (Recommended)</SelectItem>
-                  <SelectItem value="claude-opus-4-20250514">Claude Opus 4</SelectItem>
-                  <SelectItem value="claude-haiku-4-5-20251001">Claude Haiku 4.5</SelectItem>
+                  <SelectItem value="sonnet">Claude Sonnet (Recommended)</SelectItem>
+                  <SelectItem value="opus">Claude Opus</SelectItem>
+                  <SelectItem value="haiku">Claude Haiku</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">

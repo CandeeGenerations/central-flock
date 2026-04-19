@@ -3,6 +3,7 @@ import {eq} from 'drizzle-orm'
 
 import {hymnsDb, hymnsSchema, hymnsSqlite} from '../db-hymns/index.js'
 import {db, schema} from '../db/index.js'
+import {resolveModel} from '../lib/ai-models.js'
 
 export type HymnBook = 'burgundy' | 'silver'
 export type HymnalFilter = 'burgundy' | 'silver' | 'both'
@@ -130,7 +131,7 @@ function getConfiguredModel(): string {
     .from(schema.settings)
     .where(eq(schema.settings.key, 'defaultAiModel'))
     .get()
-  return row?.value ?? 'claude-sonnet-4-20250514'
+  return resolveModel(row?.value)
 }
 
 function loadHymns(filter: HymnalFilter): HymnRow[] {

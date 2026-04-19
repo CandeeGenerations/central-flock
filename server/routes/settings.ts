@@ -2,6 +2,7 @@ import {eq, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
+import {AI_MODEL_KEYS, DEFAULT_AI_MODEL_KEY, LEGACY_MODEL_TO_KEY} from '../lib/ai-models.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {syncCalendarEvents} from '../services/calendar-sync.js'
 
@@ -13,11 +14,19 @@ const DEFAULTS: Record<string, string> = {
   webhookUrl: '',
   anniversarySendTime: '07:00',
   anniversaryPreNotifyDays: '',
-  defaultAiModel: 'claude-sonnet-4-5-20250514',
+  defaultAiModel: DEFAULT_AI_MODEL_KEY,
 }
 
 const VALID_VALUES: Record<string, string[]> = {
-  defaultAiModel: ['claude-sonnet-4-5-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
+  defaultAiModel: [...AI_MODEL_KEYS],
+}
+
+const existing = db.select().from(schema.settings).where(eq(schema.settings.key, 'defaultAiModel')).get()
+if (existing && LEGACY_MODEL_TO_KEY[existing.value]) {
+  db.update(schema.settings)
+    .set({value: LEGACY_MODEL_TO_KEY[existing.value], updatedAt: sql`datetime('now')`})
+    .where(eq(schema.settings.key, 'defaultAiModel'))
+    .run()
 }
 
 // GET /api/settings - Get all settings

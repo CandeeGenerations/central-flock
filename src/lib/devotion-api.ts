@@ -112,6 +112,7 @@ export function fetchDevotions(params?: {
   devotionType?: string
   guestSpeaker?: string
   status?: string
+  pipelineMissing?: string
   flagged?: string
   months?: string
   page?: number

@@ -675,6 +675,7 @@ devotionsRouter.get(
       devotionType,
       guestSpeaker,
       status,
+      pipelineMissing,
       flagged,
       page = '1',
       limit = '50',
@@ -764,6 +765,17 @@ devotionsRouter.get(
             eq(devotionsSchema.devotions.podcast, false),
           ),
         )
+      }
+    }
+
+    if (pipelineMissing && typeof pipelineMissing === 'string') {
+      const allowed = ['produced', 'rendered', 'youtube', 'facebookInstagram', 'podcast'] as const
+      const steps = pipelineMissing
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s): s is (typeof allowed)[number] => (allowed as readonly string[]).includes(s))
+      if (steps.length > 0) {
+        for (const s of steps) conditions.push(eq(devotionsSchema.devotions[s], false))
       }
     }
 

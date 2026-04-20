@@ -139,6 +139,7 @@ export function DevotionListPage() {
   const [typeFilters, setTypeFilters] = usePersistedState<string[]>('devotions.typeFilters', [])
   const [guestFilters, setGuestFilters] = usePersistedState<string[]>('devotions.guestFilters', [])
   const [statusFilter, setStatusFilter] = usePersistedState('devotions.statusFilter', 'all')
+  const [pipelineFilters, setPipelineFilters] = usePersistedState<string[]>('devotions.pipelineFilters', [])
   const [flaggedFilter, setFlaggedFilter] = usePersistedState('devotions.flaggedFilter', 'all')
   const [monthFilters, setMonthFilters] = usePersistedState<string[]>('devotions.monthFilters', [])
   const [page, setPage] = usePersistedState('devotions.page', 1)
@@ -165,6 +166,7 @@ export function DevotionListPage() {
       typeFilters.join(','),
       guestFilters.join(','),
       statusFilter,
+      pipelineFilters.join(','),
       flaggedFilter,
       monthFilters.join(','),
       page,
@@ -177,6 +179,7 @@ export function DevotionListPage() {
         devotionType: typeFilters.length > 0 ? typeFilters.join(',') : undefined,
         guestSpeaker: guestFilters.length > 0 ? guestFilters.join(',') : undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
+        pipelineMissing: pipelineFilters.length > 0 ? pipelineFilters.join(',') : undefined,
         flagged: flaggedFilter === 'flagged' ? 'true' : undefined,
         months: monthFilters.length > 0 ? monthFilters.join(',') : undefined,
         page,
@@ -294,6 +297,24 @@ export function DevotionListPage() {
                 <SelectItem value="incomplete">Incomplete</SelectItem>
               </SelectContent>
             </Select>
+            <MultiSelect
+              value={pipelineFilters}
+              onValueChange={(v) => {
+                setPipelineFilters(v)
+                setPage(1)
+              }}
+              options={[
+                {value: 'produced', label: 'Produced'},
+                {value: 'rendered', label: 'Rendered'},
+                {value: 'youtube', label: 'YouTube'},
+                {value: 'facebookInstagram', label: 'FB/IG'},
+                {value: 'podcast', label: 'Podcast'},
+              ]}
+              allLabel="All Pipeline"
+              placeholder="Missing Step"
+              searchable={false}
+              className="w-full sm:w-44"
+            />
             <Select
               value={flaggedFilter}
               onValueChange={(v) => {

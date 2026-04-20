@@ -50,6 +50,7 @@ export interface Devotion {
   facebookInstagram: boolean
   podcast: boolean
   notes: string | null
+  flagged: boolean
   createdAt: string
   updatedAt: string
 }
@@ -71,6 +72,8 @@ export interface DevotionStats {
     youtube: number
     facebookInstagram: number
     podcast: number
+    windowStart: string
+    windowTotal: number
   }
   byYear: {year: string; count: number}[]
   latestNumber: number
@@ -109,6 +112,8 @@ export function fetchDevotions(params?: {
   devotionType?: string
   guestSpeaker?: string
   status?: string
+  flagged?: string
+  months?: string
   page?: number
   limit?: number
   sort?: string

@@ -18,6 +18,14 @@ interface AuditResult {
   guestsNoNumber: {id: number; number: number; date: string; guestSpeaker: string | null}[]
   guestsNoSpeaker: {id: number; number: number; date: string}[]
   speakerGaps: {speaker: string; missing: number[]; duplicates: number[]; range: string}[]
+  brokenChains: {
+    id: number
+    number: number
+    date: string
+    bibleReference: string | null
+    referencedDevotions: number[]
+    missing: {number: number; date: string; type: string}[]
+  }[]
   totalDevotions: number
   numberRange: {min: number; max: number}
   issueCount: number
@@ -193,6 +201,58 @@ export function DevotionAuditPage() {
                     </Link>
                   </td>
                   <td className="py-2 px-3 text-muted-foreground">{fmtDate(d.date)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </AuditSection>
+
+      {/* Broken Revisit Chains */}
+      <AuditSection title="Broken Revisit Chains" count={audit.brokenChains.length}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Revisit</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Date</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Scripture</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Current Chain</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Missing</th>
+              </tr>
+            </thead>
+            <tbody>
+              {audit.brokenChains.map((bc) => (
+                <tr key={bc.id} className="border-b last:border-0 align-top">
+                  <td className="py-2 px-3">
+                    <Link to={`/devotions/${bc.id}`} className="text-primary hover:underline font-medium">
+                      #{String(bc.number).padStart(3, '0')}
+                    </Link>
+                  </td>
+                  <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">{fmtDate(bc.date)}</td>
+                  <td className="py-2 px-3 text-muted-foreground">{bc.bibleReference || '—'}</td>
+                  <td className="py-2 px-3">
+                    <div className="flex flex-wrap gap-1">
+                      {bc.referencedDevotions.length === 0 ? (
+                        <span className="text-xs text-muted-foreground">empty</span>
+                      ) : (
+                        bc.referencedDevotions.map((n) => (
+                          <Badge key={n} variant="outline" className="text-xs">
+                            #{String(n).padStart(3, '0')}
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-2 px-3">
+                    <div className="flex flex-wrap gap-1">
+                      {bc.missing.map((m) => (
+                        <Badge key={m.number} variant="destructive" className="text-xs">
+                          #{String(m.number).padStart(3, '0')} ({m.type})
+                        </Badge>
+                      ))}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

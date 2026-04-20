@@ -54,6 +54,8 @@ export const devotions = sqliteTable('devotions', {
   facebookInstagram: integer('facebook_instagram', {mode: 'boolean'}).default(false).notNull(),
   podcast: integer('podcast', {mode: 'boolean'}).default(false).notNull(),
   notes: text('notes'),
+  flagged: integer('flagged', {mode: 'boolean'}).default(false).notNull(),
+  chainIgnores: text('chain_ignores'),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

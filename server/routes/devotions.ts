@@ -1,4 +1,4 @@
-import {and, asc, desc, eq, like, or, sql} from 'drizzle-orm'
+import {and, asc, desc, eq, inArray, like, or, sql} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'fs'
 import path from 'path'
@@ -48,7 +48,7 @@ export function cleanupOrphanedScanImages(): {deleted: number; kept: number} {
   return {deleted, kept}
 }
 
-const TOGGLE_FIELDS = ['produced', 'rendered', 'youtube', 'facebookInstagram', 'podcast'] as const
+const TOGGLE_FIELDS = ['produced', 'rendered', 'youtube', 'facebookInstagram', 'podcast', 'flagged'] as const
 type ToggleField = (typeof TOGGLE_FIELDS)[number]
 
 // GET /api/devotions/audit - Data quality report
@@ -187,6 +187,80 @@ devotionsRouter.get(
       .filter((d) => d.count > 1)
       .sort((a, b) => b.count - a.count)
 
+    // Broken revisit chains: revisits whose referencedDevotions doesn't include all
+    // prior devotions (original + earlier revisits) sharing any verse key.
+    // Index: verseKey -> list of {number, date} sorted by date.
+    // Guest devotions are excluded — they're not part of the revisit chain model.
+    const verseIndex = new Map<string, {number: number; date: string; type: string}[]>()
+    for (const d of all) {
+      if (!d.bibleReference || d.devotionType === 'guest') continue
+      const parsed = parseReference(d.bibleReference)
+      const keys = new Set(parsed.flatMap((r) => referenceKeys(r)))
+      for (const k of keys) {
+        if (!verseIndex.has(k)) verseIndex.set(k, [])
+        verseIndex.get(k)!.push({number: d.number, date: d.date, type: d.devotionType})
+      }
+    }
+    for (const arr of verseIndex.values()) arr.sort((a, b) => a.date.localeCompare(b.date))
+
+    const brokenChains: {
+      id: number
+      number: number
+      date: string
+      bibleReference: string | null
+      referencedDevotions: number[]
+      missing: {number: number; date: string; type: string}[]
+    }[] = []
+
+    for (const d of all) {
+      if (d.devotionType !== 'revisit' || !d.bibleReference) continue
+      const parsed = parseReference(d.bibleReference)
+      const keys = new Set(parsed.flatMap((r) => referenceKeys(r)))
+      if (keys.size === 0) continue
+
+      // Gather all prior devotions (by date) that share any verse key
+      const priorMap = new Map<number, {number: number; date: string; type: string}>()
+      for (const k of keys) {
+        const entries = verseIndex.get(k) || []
+        for (const e of entries) {
+          if (e.number === d.number) continue
+          if (e.date > d.date) continue
+          if (e.date === d.date && e.number >= d.number) continue
+          priorMap.set(e.number, e)
+        }
+      }
+
+      const chain: number[] = (() => {
+        try {
+          return d.referencedDevotions ? (JSON.parse(d.referencedDevotions) as number[]) : []
+        } catch {
+          return []
+        }
+      })()
+      const ignores: number[] = (() => {
+        try {
+          return d.chainIgnores ? (JSON.parse(d.chainIgnores) as number[]) : []
+        } catch {
+          return []
+        }
+      })()
+      const ignoreSet = new Set(ignores)
+      const chainSet = new Set(chain)
+      const missing = [...priorMap.values()].filter((e) => !chainSet.has(e.number) && !ignoreSet.has(e.number))
+      if (missing.length > 0) {
+        missing.sort((a, b) => a.date.localeCompare(b.date))
+        brokenChains.push({
+          id: d.id,
+          number: d.number,
+          date: d.date,
+          bibleReference: d.bibleReference,
+          referencedDevotions: chain,
+          missing,
+        })
+      }
+    }
+    brokenChains.sort((a, b) => b.number - a.number)
+
     const issueCount =
       missingNumbers.length +
       missingDates.length +
@@ -194,7 +268,8 @@ devotionsRouter.get(
       noReference.length +
       guestsNoNumber.length +
       guestsNoSpeaker.length +
-      speakerGaps.reduce((sum, s) => sum + s.missing.length + s.duplicates.length, 0)
+      speakerGaps.reduce((sum, s) => sum + s.missing.length + s.duplicates.length, 0) +
+      brokenChains.length
 
     res.json({
       missingNumbers,
@@ -205,6 +280,7 @@ devotionsRouter.get(
       guestsNoSpeaker,
       speakerGaps,
       duplicateScriptures,
+      brokenChains,
       totalDevotions: all.length,
       numberRange: {min: minNum, max: maxNum},
       issueCount,
@@ -240,6 +316,12 @@ devotionsRouter.get(
       .groupBy(devotionsSchema.devotions.guestSpeaker)
       .all()
 
+    // Completion rate window: from the first of the current month onward.
+    // Past devotions are considered "shipped" and don't affect the rate; this-month-and-future
+    // shows in-flight progress without letting old completed backlog dilute it.
+    const now = new Date()
+    const windowStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+
     const completionRates = devotionsDb
       .select({
         total: sql<number>`count(*)`,
@@ -250,6 +332,7 @@ devotionsRouter.get(
         podcast: sql<number>`sum(case when ${devotionsSchema.devotions.podcast} = 1 then 1 else 0 end)`,
       })
       .from(devotionsSchema.devotions)
+      .where(sql`${devotionsSchema.devotions.date} >= ${windowStart}`)
       .get()!
 
     const byYear = devotionsDb
@@ -268,32 +351,40 @@ devotionsRouter.get(
         .from(devotionsSchema.devotions)
         .get()?.max || 0
 
+    // Next-up incomplete devotions: sort by date ascending from window start,
+    // so the soonest upcoming work appears first.
     const recentIncomplete = devotionsDb
       .select()
       .from(devotionsSchema.devotions)
       .where(
-        or(
-          eq(devotionsSchema.devotions.produced, false),
-          eq(devotionsSchema.devotions.rendered, false),
-          eq(devotionsSchema.devotions.youtube, false),
-          eq(devotionsSchema.devotions.facebookInstagram, false),
-          eq(devotionsSchema.devotions.podcast, false),
+        and(
+          sql`${devotionsSchema.devotions.date} >= ${windowStart}`,
+          or(
+            eq(devotionsSchema.devotions.produced, false),
+            eq(devotionsSchema.devotions.rendered, false),
+            eq(devotionsSchema.devotions.youtube, false),
+            eq(devotionsSchema.devotions.facebookInstagram, false),
+            eq(devotionsSchema.devotions.podcast, false),
+          ),
         ),
       )
-      .orderBy(desc(devotionsSchema.devotions.date))
+      .orderBy(asc(devotionsSchema.devotions.date))
       .limit(10)
       .all()
 
+    const windowTotal = completionRates.total
     res.json({
       total,
       byType,
       bySpeaker,
       completionRates: {
-        produced: total > 0 ? Math.round((completionRates.produced / total) * 100) : 0,
-        rendered: total > 0 ? Math.round((completionRates.rendered / total) * 100) : 0,
-        youtube: total > 0 ? Math.round((completionRates.youtube / total) * 100) : 0,
-        facebookInstagram: total > 0 ? Math.round((completionRates.facebookInstagram / total) * 100) : 0,
-        podcast: total > 0 ? Math.round((completionRates.podcast / total) * 100) : 0,
+        produced: windowTotal > 0 ? Math.round((completionRates.produced / windowTotal) * 100) : 0,
+        rendered: windowTotal > 0 ? Math.round((completionRates.rendered / windowTotal) * 100) : 0,
+        youtube: windowTotal > 0 ? Math.round((completionRates.youtube / windowTotal) * 100) : 0,
+        facebookInstagram: windowTotal > 0 ? Math.round((completionRates.facebookInstagram / windowTotal) * 100) : 0,
+        podcast: windowTotal > 0 ? Math.round((completionRates.podcast / windowTotal) * 100) : 0,
+        windowStart,
+        windowTotal,
       },
       byYear,
       latestNumber,
@@ -404,24 +495,51 @@ devotionsRouter.get(
   }),
 )
 
+// GET /api/devotions/by-numbers?numbers=1,2,3 - Fetch multiple devotions by their number
+devotionsRouter.get(
+  '/by-numbers',
+  asyncHandler(async (req, res) => {
+    const {numbers} = req.query
+    if (!numbers || typeof numbers !== 'string') {
+      res.json([])
+      return
+    }
+    const nums = numbers
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0)
+    if (nums.length === 0) {
+      res.json([])
+      return
+    }
+    const result = devotionsDb
+      .select()
+      .from(devotionsSchema.devotions)
+      .where(inArray(devotionsSchema.devotions.number, nums))
+      .all()
+    res.json(result)
+  }),
+)
+
 // GET /api/devotions/scriptures/lookup - Search for verse usage with parsed matching
 devotionsRouter.get(
   '/scriptures/lookup',
   asyncHandler(async (req, res) => {
-    const {search} = req.query
+    const {search, includeRevisits} = req.query
     if (!search || typeof search !== 'string' || search.length < 2) {
       res.json([])
       return
     }
 
-    // Get all non-revisit devotions with references
+    const includeRev = includeRevisits === 'true'
+
     const all = devotionsDb
       .select()
       .from(devotionsSchema.devotions)
       .where(
         and(
           sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`,
-          sql`${devotionsSchema.devotions.devotionType} != 'revisit'`,
+          ...(includeRev ? [] : [sql`${devotionsSchema.devotions.devotionType} != 'revisit'`]),
         ),
       )
       .orderBy(asc(devotionsSchema.devotions.number))
@@ -553,9 +671,11 @@ devotionsRouter.get(
       search,
       dateFrom,
       dateTo,
+      months,
       devotionType,
       guestSpeaker,
       status,
+      flagged,
       page = '1',
       limit = '50',
       sort = 'date',
@@ -584,13 +704,44 @@ devotionsRouter.get(
     if (dateTo && typeof dateTo === 'string') {
       conditions.push(sql`${devotionsSchema.devotions.date} <= ${dateTo}`)
     }
+    if (months && typeof months === 'string') {
+      const monthList = months
+        .split(',')
+        .map((m) => m.trim())
+        .filter((m) => /^\d{4}-\d{2}$/.test(m))
+      if (monthList.length > 0) {
+        const monthConditions = monthList.map((ym) => {
+          const [y, m] = ym.split('-').map(Number)
+          const lastDay = new Date(y, m, 0).getDate()
+          const from = `${ym}-01`
+          const to = `${ym}-${String(lastDay).padStart(2, '0')}`
+          return and(sql`${devotionsSchema.devotions.date} >= ${from}`, sql`${devotionsSchema.devotions.date} <= ${to}`)
+        })
+        const monthOr = monthConditions.length === 1 ? monthConditions[0] : or(...monthConditions)
+        if (monthOr) conditions.push(monthOr)
+      }
+    }
     if (devotionType && typeof devotionType === 'string') {
-      conditions.push(
-        eq(devotionsSchema.devotions.devotionType, devotionType as 'original' | 'favorite' | 'guest' | 'revisit'),
-      )
+      const types = devotionType
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean) as ('original' | 'favorite' | 'guest' | 'revisit')[]
+      if (types.length === 1) {
+        conditions.push(eq(devotionsSchema.devotions.devotionType, types[0]))
+      } else if (types.length > 1) {
+        conditions.push(inArray(devotionsSchema.devotions.devotionType, types))
+      }
     }
     if (guestSpeaker && typeof guestSpeaker === 'string') {
-      conditions.push(eq(devotionsSchema.devotions.guestSpeaker, guestSpeaker))
+      const speakers = guestSpeaker
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      if (speakers.length === 1) {
+        conditions.push(eq(devotionsSchema.devotions.guestSpeaker, speakers[0]))
+      } else if (speakers.length > 1) {
+        conditions.push(inArray(devotionsSchema.devotions.guestSpeaker, speakers))
+      }
     }
     if (status && typeof status === 'string') {
       if (status === 'complete') {
@@ -614,6 +765,10 @@ devotionsRouter.get(
           ),
         )
       }
+    }
+
+    if (flagged === 'true') {
+      conditions.push(eq(devotionsSchema.devotions.flagged, true))
     }
 
     const where = conditions.length > 0 ? and(...conditions) : undefined
@@ -1063,6 +1218,273 @@ devotionsRouter.delete(
   }),
 )
 
+// GET /api/devotions/:id/chain-audit - Compute expected revisit chain based on verse overlap
+devotionsRouter.get(
+  '/:id/chain-audit',
+  asyncHandler(async (req, res) => {
+    const devotion = devotionsDb
+      .select()
+      .from(devotionsSchema.devotions)
+      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+      .get()
+
+    if (!devotion) {
+      res.status(404).json({error: 'Devotion not found'})
+      return
+    }
+
+    if (devotion.devotionType !== 'revisit' || !devotion.bibleReference) {
+      res.json({currentChain: [], proposedChain: [], missing: []})
+      return
+    }
+
+    const parsed = parseReference(devotion.bibleReference)
+    const keys = new Set(parsed.flatMap((r) => referenceKeys(r)))
+    if (keys.size === 0) {
+      res.json({currentChain: [], proposedChain: [], missing: []})
+      return
+    }
+
+    // Find all prior devotions (originals + revisits, excluding guests) that share
+    // any verse key with this devotion
+    const all = devotionsDb
+      .select()
+      .from(devotionsSchema.devotions)
+      .where(sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`)
+      .all()
+
+    const priorMap = new Map<
+      number,
+      {number: number; id: number; date: string; type: string; bibleReference: string | null; songName: string | null}
+    >()
+    for (const d of all) {
+      if (d.number === devotion.number) continue
+      if (d.devotionType === 'guest') continue
+      if (d.date > devotion.date) continue
+      if (d.date === devotion.date && d.number >= devotion.number) continue
+      if (!d.bibleReference) continue
+      const dParsed = parseReference(d.bibleReference)
+      const dKeys = dParsed.flatMap((r) => referenceKeys(r))
+      if (!dKeys.some((k) => keys.has(k))) continue
+      priorMap.set(d.number, {
+        number: d.number,
+        id: d.id,
+        date: d.date,
+        type: d.devotionType,
+        bibleReference: d.bibleReference,
+        songName: d.songName,
+      })
+    }
+
+    const currentChain: number[] = (() => {
+      try {
+        return devotion.referencedDevotions ? (JSON.parse(devotion.referencedDevotions) as number[]) : []
+      } catch {
+        return []
+      }
+    })()
+    const ignores: number[] = (() => {
+      try {
+        return devotion.chainIgnores ? (JSON.parse(devotion.chainIgnores) as number[]) : []
+      } catch {
+        return []
+      }
+    })()
+    const ignoreSet = new Set(ignores)
+
+    // Proposed chain: all matching prior devotions (minus ignored) sorted by date DESC,
+    // matching the existing chain convention (nearest parent first, original last)
+    const sortedPriors = [...priorMap.values()]
+      .filter((p) => !ignoreSet.has(p.number))
+      .sort((a, b) => b.date.localeCompare(a.date) || b.number - a.number)
+    const proposedChain = sortedPriors.map((p) => p.number)
+
+    const currentSet = new Set(currentChain)
+    const missing = sortedPriors.filter((p) => !currentSet.has(p.number))
+
+    res.json({currentChain, proposedChain, missing, ignored: ignores})
+  }),
+)
+
+// POST /api/devotions/:id/chain-insert - Insert a devotion number into this revisit's chain
+// and cascade the insert into any ancestor revisit whose date is AFTER the target's date.
+devotionsRouter.post(
+  '/:id/chain-insert',
+  asyncHandler(async (req, res) => {
+    const bodyNumbers: number[] = Array.isArray(req.body?.numbers)
+      ? req.body.numbers.map((n: unknown) => Number(n))
+      : req.body?.number != null
+        ? [Number(req.body.number)]
+        : []
+    const targets = [...new Set(bodyNumbers.filter((n) => Number.isFinite(n) && n > 0))]
+    if (targets.length === 0) {
+      res.status(400).json({error: 'Provide at least one valid number'})
+      return
+    }
+
+    const current = devotionsDb
+      .select()
+      .from(devotionsSchema.devotions)
+      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+      .get()
+    if (!current) {
+      res.status(404).json({error: 'Devotion not found'})
+      return
+    }
+    if (current.devotionType !== 'revisit') {
+      res.status(400).json({error: 'Only revisits can have a chain'})
+      return
+    }
+
+    const targetDevos = devotionsDb
+      .select()
+      .from(devotionsSchema.devotions)
+      .where(inArray(devotionsSchema.devotions.number, targets))
+      .all()
+    if (targetDevos.length !== targets.length) {
+      const found = new Set(targetDevos.map((d) => d.number))
+      const missing = targets.filter((n) => !found.has(n))
+      res.status(404).json({error: `Devotion(s) not found: ${missing.join(', ')}`})
+      return
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    const future = targetDevos.find((d) => d.date > today)
+    if (future) {
+      res.status(400).json({error: `Devotion #${future.number} is a future devotion`})
+      return
+    }
+
+    const parseChain = (raw: string | null): number[] => {
+      if (!raw) return []
+      try {
+        return JSON.parse(raw) as number[]
+      } catch {
+        return []
+      }
+    }
+
+    const originalChain = parseChain(current.referencedDevotions)
+
+    // Collect all numbers we need dates for: original chain, targets, and every ancestor's chain
+    const ancestorRevisits = originalChain.length
+      ? devotionsDb
+          .select()
+          .from(devotionsSchema.devotions)
+          .where(inArray(devotionsSchema.devotions.number, originalChain))
+          .all()
+      : []
+
+    const allNumbers = new Set<number>([...targets, ...originalChain])
+    for (const a of ancestorRevisits) {
+      for (const n of parseChain(a.referencedDevotions)) allNumbers.add(n)
+    }
+
+    const allDevos = devotionsDb
+      .select()
+      .from(devotionsSchema.devotions)
+      .where(inArray(devotionsSchema.devotions.number, [...allNumbers]))
+      .all()
+    const byNumber = new Map(allDevos.map((d) => [d.number, d]))
+    const targetsByNumber = new Map(targetDevos.map((d) => [d.number, d]))
+
+    // Insert a set of target numbers into a chain at date-sorted positions (newest first)
+    const insertSorted = (chain: number[], toAdd: number[]): number[] => {
+      const combined = new Set(chain)
+      for (const n of toAdd) combined.add(n)
+      const entries = [...combined].map((n) => ({
+        num: n,
+        date: byNumber.get(n)?.date ?? targetsByNumber.get(n)?.date ?? '',
+      }))
+      entries.sort((a, b) => b.date.localeCompare(a.date) || b.num - a.num)
+      return entries.map((e) => e.num)
+    }
+
+    const updates: {id: number; chain: number[]}[] = []
+
+    // Always update the current devotion with all targets
+    updates.push({id: current.id, chain: insertSorted(originalChain, targets)})
+
+    // Cascade into ancestor revisits: each ancestor only gets targets whose date < ancestor's date
+    for (const a of ancestorRevisits) {
+      if (a.devotionType !== 'revisit') continue
+      const applicable = targets.filter((t) => {
+        const td = targetsByNumber.get(t)!
+        return a.date > td.date
+      })
+      if (applicable.length === 0) continue
+      const aChain = parseChain(a.referencedDevotions)
+      const toAdd = applicable.filter((t) => !aChain.includes(t))
+      if (toAdd.length === 0) continue
+      updates.push({id: a.id, chain: insertSorted(aChain, toAdd)})
+    }
+
+    for (const u of updates) {
+      devotionsDb
+        .update(devotionsSchema.devotions)
+        .set({
+          referencedDevotions: JSON.stringify(u.chain),
+          updatedAt: sql`datetime('now')`,
+        })
+        .where(eq(devotionsSchema.devotions.id, u.id))
+        .run()
+    }
+
+    res.json({
+      updated: updates.length,
+      currentChain: updates.find((u) => u.id === current.id)?.chain ?? originalChain,
+    })
+  }),
+)
+
+// POST /api/devotions/:id/chain-ignore - toggle ignores for numbers on this devotion
+devotionsRouter.post(
+  '/:id/chain-ignore',
+  asyncHandler(async (req, res) => {
+    const add: number[] = Array.isArray(req.body?.add)
+      ? req.body.add.map((n: unknown) => Number(n)).filter((n: number) => Number.isFinite(n) && n > 0)
+      : []
+    const remove: number[] = Array.isArray(req.body?.remove)
+      ? req.body.remove.map((n: unknown) => Number(n)).filter((n: number) => Number.isFinite(n) && n > 0)
+      : []
+    if (add.length === 0 && remove.length === 0) {
+      res.status(400).json({error: 'Provide add and/or remove arrays'})
+      return
+    }
+
+    const devotion = devotionsDb
+      .select()
+      .from(devotionsSchema.devotions)
+      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+      .get()
+    if (!devotion) {
+      res.status(404).json({error: 'Devotion not found'})
+      return
+    }
+
+    let ignores: number[]
+    try {
+      ignores = devotion.chainIgnores ? (JSON.parse(devotion.chainIgnores) as number[]) : []
+    } catch {
+      ignores = []
+    }
+    const set = new Set(ignores)
+    for (const n of add) set.add(n)
+    for (const n of remove) set.delete(n)
+    const next = [...set].sort((a, b) => a - b)
+
+    devotionsDb
+      .update(devotionsSchema.devotions)
+      .set({
+        chainIgnores: next.length > 0 ? JSON.stringify(next) : null,
+        updatedAt: sql`datetime('now')`,
+      })
+      .where(eq(devotionsSchema.devotions.id, devotion.id))
+      .run()
+
+    res.json({ignored: next})
+  }),
+)
+
 // GET /api/devotions/:id - Single devotion
 devotionsRouter.get(
   '/:id',
@@ -1109,6 +1531,7 @@ devotionsRouter.post(
           facebookInstagram: req.body.facebookInstagram ?? false,
           podcast: req.body.podcast ?? false,
           notes: req.body.notes || null,
+          flagged: req.body.flagged ?? false,
         })
         .returning()
         .get()
@@ -1153,6 +1576,7 @@ devotionsRouter.put(
         facebookInstagram: req.body.facebookInstagram ?? undefined,
         podcast: req.body.podcast ?? undefined,
         notes: req.body.notes !== undefined ? req.body.notes || null : undefined,
+        flagged: req.body.flagged ?? undefined,
         updatedAt: sql`datetime('now')`,
       })
       .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
@@ -1447,6 +1871,8 @@ devotionsRouter.post(
         generatedBibleReference?: string | null
         generatedTalkingPoints?: string | null
         generatedPassageId?: number | null
+        notes?: string | null
+        flagged?: boolean
       }>
     }
 
@@ -1482,7 +1908,9 @@ devotionsRouter.post(
               guestNumber: d.guestNumber ?? null,
               referencedDevotions: refsJson,
               bibleReference: d.bibleReference || d.generatedBibleReference || null,
-              songName: d.songName || null,
+              songName: d.devotionType === 'original' ? d.songName || null : null,
+              notes: d.notes ?? null,
+              flagged: d.flagged ?? false,
               ...(hasGenerated
                 ? {
                     title: d.generatedTitle || null,
@@ -1507,7 +1935,9 @@ devotionsRouter.post(
               guestNumber: d.guestNumber ?? null,
               referencedDevotions: refsJson,
               bibleReference: d.bibleReference || d.generatedBibleReference || null,
-              songName: d.songName || null,
+              songName: d.devotionType === 'original' ? d.songName || null : null,
+              notes: d.notes ?? null,
+              flagged: d.flagged ?? false,
               ...(hasGenerated
                 ? {
                     title: d.generatedTitle || null,

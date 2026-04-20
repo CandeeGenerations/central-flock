@@ -8,11 +8,25 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/
 import {Input} from '@/components/ui/input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Textarea} from '@/components/ui/textarea'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useProgressOperation} from '@/hooks/use-sse'
 import {pullPassagesForScan} from '@/lib/devotion-api'
 import {useQuery} from '@tanstack/react-query'
-import {AlertTriangle, Camera, Check, CircleX, Loader2, Save, Sparkles, Trash2, Upload, ZoomIn} from 'lucide-react'
+import {
+  AlertTriangle,
+  Camera,
+  Check,
+  CircleX,
+  Flag,
+  Loader2,
+  Save,
+  Sparkles,
+  StickyNote,
+  Trash2,
+  Upload,
+  ZoomIn,
+} from 'lucide-react'
 import {useRef, useState} from 'react'
 import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -31,6 +45,8 @@ interface ParsedDevotion {
   generatedBibleReference?: string
   generatedTalkingPoints?: string
   generatedPassageId?: number
+  flagged?: boolean
+  notes?: string | null
 }
 
 interface EnrichResult {
@@ -75,6 +91,48 @@ async function apiPost<T>(url: string, body: unknown): Promise<T> {
     throw new Error(err.error || `Request failed: ${res.status}`)
   }
   return res.json()
+}
+
+function NotesModal({
+  open,
+  number,
+  initialValue,
+  onClose,
+  onSave,
+}: {
+  open: boolean
+  number: number | undefined
+  initialValue: string
+  onClose: () => void
+  onSave: (value: string) => void
+}) {
+  const [value, setValue] = useState(initialValue)
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Notes for #{number ?? ''}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Textarea
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            rows={5}
+            placeholder="Add notes for this devotion&hellip;"
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => onSave(value)}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function isVerseMatch(row: RowState): boolean | null {
@@ -150,6 +208,7 @@ export function DevotionScanPage() {
   const [editChainRow, setEditChainRow] = useState<number | null>(null)
   const [editChainValue, setEditChainValue] = useState('')
   const [editChainLoading, setEditChainLoading] = useState(false)
+  const [notesRow, setNotesRow] = useState<number | null>(null)
   const [devoDetail, setDevoDetail] = useState<{
     number: number
     date: string
@@ -291,6 +350,9 @@ export function DevotionScanPage() {
           updatedDevotion.generatedBibleReference = passage.bibleReference
           updatedDevotion.generatedTalkingPoints = passage.talkingPoints
           updatedDevotion.generatedPassageId = passage.id
+          if (!updatedDevotion.bibleReference) {
+            updatedDevotion.bibleReference = passage.bibleReference
+          }
         }
         // If verse doesn't match and we have the original's reference, flag it
         return {
@@ -419,6 +481,25 @@ export function DevotionScanPage() {
 
   const removeRow = (index: number) => {
     setRows((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const toggleFlag = (index: number) => {
+    setRows((prev) =>
+      prev.map((r, i) => (i === index ? {...r, devotion: {...r.devotion, flagged: !r.devotion.flagged}} : r)),
+    )
+  }
+
+  const openNotes = (index: number) => {
+    setNotesRow(index)
+  }
+
+  const saveNotes = (value: string) => {
+    if (notesRow === null) return
+    const trimmed = value.trim()
+    setRows((prev) =>
+      prev.map((r, i) => (i === notesRow ? {...r, devotion: {...r.devotion, notes: trimmed || null}} : r)),
+    )
+    setNotesRow(null)
   }
 
   const handleEditChainSave = async () => {
@@ -659,7 +740,7 @@ export function DevotionScanPage() {
                   <TableHead>Reference</TableHead>
                   <TableHead>Song</TableHead>
                   <TableHead>Chain</TableHead>
-                  <TableHead className="w-10" />
+                  <TableHead className="w-24" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -824,12 +905,44 @@ export function DevotionScanPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <button
-                        className="p-1 rounded hover:bg-destructive/10 cursor-pointer"
-                        onClick={() => removeRow(i)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="p-1 rounded hover:bg-muted cursor-pointer"
+                                onClick={() => toggleFlag(i)}
+                              >
+                                <Flag
+                                  className={`h-3.5 w-3.5 ${row.devotion.flagged ? 'text-red-500 fill-red-500' : 'text-muted-foreground'}`}
+                                />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>{row.devotion.flagged ? 'Unflag' : 'Flag'}</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="p-1 rounded hover:bg-muted cursor-pointer"
+                                onClick={() => openNotes(i)}
+                              >
+                                <StickyNote
+                                  className={`h-3.5 w-3.5 ${row.devotion.notes ? 'text-amber-500 fill-amber-100' : 'text-muted-foreground'}`}
+                                />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>{row.devotion.notes ? 'Edit notes' : 'Add notes'}</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <button
+                          className="p-1 rounded hover:bg-destructive/10 cursor-pointer"
+                          onClick={() => removeRow(i)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -933,6 +1046,16 @@ export function DevotionScanPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Notes Modal */}
+      <NotesModal
+        key={notesRow ?? 'closed'}
+        open={notesRow !== null}
+        number={notesRow !== null ? rows[notesRow]?.devotion.number : undefined}
+        initialValue={notesRow !== null ? (rows[notesRow]?.devotion.notes ?? '') : ''}
+        onClose={() => setNotesRow(null)}
+        onSave={saveNotes}
+      />
 
       {/* Devotion Detail Modal */}
       <Dialog open={!!devoDetail} onOpenChange={(open) => !open && setDevoDetail(null)}>

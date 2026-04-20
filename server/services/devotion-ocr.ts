@@ -46,7 +46,7 @@ For each row, output:
 - guestNumber: The guest's sequential number if present, otherwise null
 - referencedDevotions: Array of referenced devotion numbers for revisits, otherwise empty array
 - bibleReference: The scripture reference using FULL book names (e.g., "Romans" not "Rom", "2 Timothy" not "2 Tim", "Psalm" not "Ps", "Philippians" not "Phil", "1 Corinthians" not "1 Cor", "Revelation" not "Rev"), or null if not present
-- songName: The song title if it's an original with a song, otherwise null
+- songName: The song title if it's an original with a song. Always null for revisits, guests, and favorites — even if a song title appears near a revisit entry, do not associate it with that row.
 
 Return ONLY a JSON object with this shape:
 {

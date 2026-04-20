@@ -217,6 +217,15 @@ export function DevotionStatsPage() {
               <CheckCircle2 className="h-4 w-4" />
               Pipeline Completion Rates
             </CardTitle>
+            <p className="text-xs text-muted-foreground pt-1">
+              From{' '}
+              {new Date(stats.completionRates.windowStart + 'T00:00:00').toLocaleDateString('en-US', {
+                month: 'long',
+                year: 'numeric',
+              })}{' '}
+              onward &middot; {stats.completionRates.windowTotal} devotion
+              {stats.completionRates.windowTotal === 1 ? '' : 's'}
+            </p>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -250,7 +259,7 @@ export function DevotionStatsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
-            Recent Incomplete Devotions
+            Next Up: Incomplete Devotions
           </CardTitle>
         </CardHeader>
         <CardContent>

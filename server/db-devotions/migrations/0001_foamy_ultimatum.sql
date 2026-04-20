@@ -1,0 +1,1 @@
+ALTER TABLE `devotions` ADD `flagged` integer DEFAULT false NOT NULL;

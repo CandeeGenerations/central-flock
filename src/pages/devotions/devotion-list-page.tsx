@@ -9,9 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {MultiSelect} from '@/components/ui/multi-select'
 import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
-import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
@@ -31,7 +31,7 @@ import {
   youtubeSearchUrl,
 } from '@/lib/devotion-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ArrowUpDown, Camera, Check, EllipsisVertical, Plus, X} from 'lucide-react'
+import {ArrowDown, ArrowUp, ArrowUpDown, Camera, Check, EllipsisVertical, Flag, Plus, X} from 'lucide-react'
 import {Link, useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -69,6 +69,17 @@ function CheckboxCell({checked, onClick}: {checked: boolean; onClick: (e: React.
       onClick={onClick}
     >
       {checked ? <Check className="h-4 w-4 text-green-600" /> : <X className="h-4 w-4 text-red-500" />}
+    </div>
+  )
+}
+
+function FlagCell({flagged, onClick}: {flagged: boolean; onClick: (e: React.MouseEvent) => void}) {
+  return (
+    <div
+      className="flex items-center justify-center cursor-pointer h-7 w-7 rounded-lg border border-border hover:bg-muted/50 mx-auto"
+      onClick={onClick}
+    >
+      <Flag className={`h-4 w-4 ${flagged ? 'text-red-500 fill-red-500' : 'text-muted-foreground'}`} />
     </div>
   )
 }
@@ -120,24 +131,16 @@ function formatMonthLabel(ym: string): string {
   return new Date(y, m - 1).toLocaleDateString('en-US', {month: 'long', year: 'numeric'})
 }
 
-function getMonthRange(ym: string): {from: string; to: string} {
-  const [y, m] = ym.split('-').map(Number)
-  const lastDay = new Date(y, m, 0).getDate()
-  return {
-    from: `${y}-${String(m).padStart(2, '0')}-01`,
-    to: `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
-  }
-}
-
 export function DevotionListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [search, setSearch] = usePersistedState('devotions.search', '')
   const debouncedSearch = useDebouncedValue(search, 250)
-  const [typeFilter, setTypeFilter] = usePersistedState('devotions.typeFilter', 'all')
-  const [guestFilter, setGuestFilter] = usePersistedState('devotions.guestFilter', 'all')
+  const [typeFilters, setTypeFilters] = usePersistedState<string[]>('devotions.typeFilters', [])
+  const [guestFilters, setGuestFilters] = usePersistedState<string[]>('devotions.guestFilters', [])
   const [statusFilter, setStatusFilter] = usePersistedState('devotions.statusFilter', 'all')
-  const [monthFilter, setMonthFilter] = usePersistedState('devotions.monthFilter', 'all')
+  const [flaggedFilter, setFlaggedFilter] = usePersistedState('devotions.flaggedFilter', 'all')
+  const [monthFilters, setMonthFilters] = usePersistedState<string[]>('devotions.monthFilters', [])
   const [page, setPage] = usePersistedState('devotions.page', 1)
 
   const {data: draftCountData} = useQuery({
@@ -151,25 +154,31 @@ export function DevotionListPage() {
     queryKey: ['devotion-months'],
     queryFn: () => fetch('/api/devotions/months', {credentials: 'include'}).then((r) => r.json()) as Promise<string[]>,
   })
-  const monthOptions = [
-    {value: 'all', label: 'All Months'},
-    ...(availableMonths || []).map((ym: string) => ({value: ym, label: formatMonthLabel(ym)})),
-  ]
+  const monthOptions = (availableMonths || []).map((ym: string) => ({value: ym, label: formatMonthLabel(ym)}))
   const [sort, setSort] = usePersistedState<'date' | 'number'>('devotions.sort', 'date')
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('devotions.sortDir', 'desc')
 
-  const monthDates = monthFilter !== 'all' ? getMonthRange(monthFilter) : undefined
-
   const {data, isLoading} = useQuery({
-    queryKey: ['devotions', debouncedSearch, typeFilter, guestFilter, statusFilter, monthFilter, page, sort, sortDir],
+    queryKey: [
+      'devotions',
+      debouncedSearch,
+      typeFilters.join(','),
+      guestFilters.join(','),
+      statusFilter,
+      flaggedFilter,
+      monthFilters.join(','),
+      page,
+      sort,
+      sortDir,
+    ],
     queryFn: () =>
       fetchDevotions({
         search: debouncedSearch || undefined,
-        devotionType: typeFilter === 'all' ? undefined : typeFilter,
-        guestSpeaker: guestFilter === 'all' ? undefined : guestFilter,
+        devotionType: typeFilters.length > 0 ? typeFilters.join(',') : undefined,
+        guestSpeaker: guestFilters.length > 0 ? guestFilters.join(',') : undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
-        dateFrom: monthDates?.from,
-        dateTo: monthDates?.to,
+        flagged: flaggedFilter === 'flagged' ? 'true' : undefined,
+        months: monthFilters.length > 0 ? monthFilters.join(',') : undefined,
         page,
         limit: 50,
         sort,
@@ -238,41 +247,37 @@ export function DevotionListPage() {
               onClear={() => setPage(1)}
               containerClassName="sm:max-w-sm"
             />
-            <Select
-              value={typeFilter}
+            <MultiSelect
+              value={typeFilters}
               onValueChange={(v) => {
-                setTypeFilter(v)
+                setTypeFilters(v)
                 setPage(1)
               }}
-            >
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="original">Original</SelectItem>
-                <SelectItem value="favorite">Favorite</SelectItem>
-                <SelectItem value="guest">Guest</SelectItem>
-                <SelectItem value="revisit">Revisit</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={guestFilter}
+              options={[
+                {value: 'original', label: 'Original'},
+                {value: 'favorite', label: 'Favorite'},
+                {value: 'guest', label: 'Guest'},
+                {value: 'revisit', label: 'Revisit'},
+              ]}
+              allLabel="All Types"
+              searchable={false}
+              className="w-full sm:w-40"
+            />
+            <MultiSelect
+              value={guestFilters}
               onValueChange={(v) => {
-                setGuestFilter(v)
+                setGuestFilters(v)
                 setPage(1)
               }}
-            >
-              <SelectTrigger className="w-full sm:w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Speakers</SelectItem>
-                <SelectItem value="Tyler">Tyler</SelectItem>
-                <SelectItem value="Gabe">Gabe</SelectItem>
-                <SelectItem value="Ed">Ed</SelectItem>
-              </SelectContent>
-            </Select>
+              options={[
+                {value: 'Tyler', label: 'Tyler'},
+                {value: 'Gabe', label: 'Gabe'},
+                {value: 'Ed', label: 'Ed'},
+              ]}
+              allLabel="All Speakers"
+              searchable={false}
+              className="w-full sm:w-44"
+            />
             <Select
               value={statusFilter}
               onValueChange={(v) => {
@@ -289,13 +294,29 @@ export function DevotionListPage() {
                 <SelectItem value="incomplete">Incomplete</SelectItem>
               </SelectContent>
             </Select>
-            <SearchableSelect
-              value={monthFilter}
+            <Select
+              value={flaggedFilter}
               onValueChange={(v) => {
-                setMonthFilter(v)
+                setFlaggedFilter(v)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Flags</SelectItem>
+                <SelectItem value="flagged">Flagged only</SelectItem>
+              </SelectContent>
+            </Select>
+            <MultiSelect
+              value={monthFilters}
+              onValueChange={(v) => {
+                setMonthFilters(v)
                 setPage(1)
               }}
               options={monthOptions}
+              allLabel="All Months"
               className="w-full sm:w-52"
             />
           </div>
@@ -312,6 +333,9 @@ export function DevotionListPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10 text-center">
+                      <Flag className="h-3.5 w-3.5 text-muted-foreground mx-auto" />
+                    </TableHead>
                     <TableHead>
                       <button
                         className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
@@ -347,6 +371,15 @@ export function DevotionListPage() {
                       className="cursor-pointer hover:bg-muted"
                       onClick={() => navigate(`/devotions/${devotion.id}`)}
                     >
+                      <TableCell className="text-center">
+                        <FlagCell
+                          flagged={devotion.flagged}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleMutation.mutate({id: devotion.id, field: 'flagged'})
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {formatDate(devotion.date)}
                       </TableCell>
@@ -412,7 +445,7 @@ export function DevotionListPage() {
                   ))}
                   {data?.data.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                         No devotions found.
                       </TableCell>
                     </TableRow>

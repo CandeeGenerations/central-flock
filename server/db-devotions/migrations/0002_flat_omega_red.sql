@@ -1,0 +1,1 @@
+ALTER TABLE `devotions` ADD `chain_ignores` text;

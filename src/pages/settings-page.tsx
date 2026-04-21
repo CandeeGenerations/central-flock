@@ -3,6 +3,7 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {PersonPicker} from '@/components/ui/person-picker'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {fetchAvailableCalendars, fetchSettings, updateSetting} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
@@ -55,6 +56,7 @@ export function SettingsPage() {
 
   const defaultAiModel = settings?.defaultAiModel ?? 'sonnet'
   const webhookUrl = settings?.webhookUrl ?? ''
+  const gwendolynPersonId = settings?.gwendolynPersonId ? Number(settings.gwendolynPersonId) : null
   const sendTime = settings?.birthdaySendTime ?? '07:00'
   const preNotifyDays = settings?.birthdayPreNotifyDays ?? ''
   const {mode, setMode} = useTheme()
@@ -156,6 +158,27 @@ export function SettingsPage() {
               <p className="text-xs text-muted-foreground">
                 Default model used for AI features (devotions, quote research). Sonnet is fast and capable, Opus is the
                 most capable, and Haiku is the fastest and cheapest.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Devotions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Gwendolyn</Label>
+              <PersonPicker
+                value={gwendolynPersonId}
+                onChange={(personId) =>
+                  mutation.mutate({key: 'gwendolynPersonId', value: personId ? String(personId) : ''})
+                }
+                placeholder="Select person..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Used when scheduling a Gwendolyn clip text from a Gwendolyn devotional page.
               </p>
             </div>
           </CardContent>

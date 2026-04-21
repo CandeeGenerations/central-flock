@@ -15,6 +15,7 @@ const DEFAULTS: Record<string, string> = {
   anniversarySendTime: '07:00',
   anniversaryPreNotifyDays: '',
   defaultAiModel: DEFAULT_AI_MODEL_KEY,
+  gwendolynPersonId: '',
 }
 
 const VALID_VALUES: Record<string, string[]> = {
@@ -95,7 +96,8 @@ settingsRouter.put(
       key !== 'birthdayPreNotifyDays' &&
       key !== 'webhookUrl' &&
       key !== 'anniversaryPreNotifyDays' &&
-      key !== 'churchCalendarNames'
+      key !== 'churchCalendarNames' &&
+      key !== 'gwendolynPersonId'
     ) {
       res.status(400).json({error: 'value is required'})
       return

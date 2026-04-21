@@ -1,8 +1,12 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {DateTimePicker} from '@/components/ui/date-time-picker'
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner, Spinner} from '@/components/ui/spinner'
+import {Textarea} from '@/components/ui/textarea'
 import {formatDate} from '@/lib/date'
 import {
   type DevotionalBlock,
@@ -14,13 +18,14 @@ import {
   deleteGwendolynDevotional,
   fetchGwendolynDevotional,
   regenerateGwendolynHashtags,
+  scheduleGwendolynMessage,
   updateGwendolynDevotional,
   updateGwendolynStatus,
 } from '@/lib/gwendolyn-devotion-api'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Copy, Edit, Trash2} from 'lucide-react'
-import {useState} from 'react'
+import {ArrowLeft, Copy, Edit, MessageSquare, Trash2} from 'lucide-react'
+import {useMemo, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -70,6 +75,9 @@ export function GwendolynDetailPage() {
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [scheduleWhen, setScheduleWhen] = useState('')
+  const [scheduleContent, setScheduleContent] = useState('')
 
   const {data: devotional, isLoading} = useQuery({
     queryKey: queryKeys.gwendolynDevotional(Number(id)),
@@ -110,6 +118,30 @@ export function GwendolynDetailPage() {
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Regenerate failed'),
   })
+
+  const scheduleMutation = useMutation({
+    mutationFn: (data: {scheduledAt: string; content?: string}) => scheduleGwendolynMessage(Number(id), data),
+    onSuccess: () => {
+      qc.invalidateQueries({queryKey: ['messages']})
+      setScheduleOpen(false)
+      toast.success('Message scheduled')
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Schedule failed'),
+  })
+
+  const devoUrl = useMemo(() => {
+    if (!devotional) return ''
+    const [y, m, d] = devotional.date.split('-')
+    return `https://cbcwoodbridge-social.s3.us-east-1.amazonaws.com/${y}/${m}/devo-reels-${y}${m}${d}.mp4`
+  }, [devotional])
+
+  const openScheduleDialog = () => {
+    // Default to the devotional's date at 8 AM local
+    const local = devotional ? `${devotional.date}T08:00` : ''
+    setScheduleWhen(local)
+    setScheduleContent(devoUrl)
+    setScheduleOpen(true)
+  }
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteGwendolynDevotional(Number(id)),
@@ -233,11 +265,59 @@ export function GwendolynDetailPage() {
           <Trash2 className="h-4 w-4 mr-1" />
           Delete
         </Button>
-        <Button size="sm" onClick={() => setEditing(true)}>
-          <Edit className="h-4 w-4 mr-1" />
-          Edit
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={openScheduleDialog}>
+            <MessageSquare className="h-4 w-4 mr-1" />
+            Schedule text
+          </Button>
+          <Button size="sm" onClick={() => setEditing(true)}>
+            <Edit className="h-4 w-4 mr-1" />
+            Edit
+          </Button>
+        </div>
       </div>
+
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule text to Gwendolyn</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Send at</Label>
+              <DateTimePicker value={scheduleWhen} onChange={setScheduleWhen} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Message</Label>
+              <Textarea
+                value={scheduleContent}
+                onChange={(e) => setScheduleContent(e.target.value)}
+                rows={4}
+                placeholder={devoUrl}
+              />
+              <p className="text-xs text-muted-foreground break-all">Link: {devoUrl}</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setScheduleOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={!scheduleWhen || scheduleMutation.isPending}
+                onClick={() =>
+                  scheduleMutation.mutate({
+                    scheduledAt: new Date(scheduleWhen).toISOString(),
+                    content: scheduleContent || undefined,
+                  })
+                }
+              >
+                {scheduleMutation.isPending ? <Spinner size="sm" className="mr-1" /> : null}
+                Schedule
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={showDelete}

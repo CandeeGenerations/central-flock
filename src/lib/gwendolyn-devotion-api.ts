@@ -115,6 +115,13 @@ export function deleteGwendolynDevotional(id: number): Promise<void> {
   return request<void>(`/gwendolyn-devotions/${id}`, {method: 'DELETE'})
 }
 
+export function scheduleGwendolynMessage(
+  id: number,
+  data: {scheduledAt: string; content?: string},
+): Promise<{messageId: number; url: string; scheduledAt: string}> {
+  return request(`/gwendolyn-devotions/${id}/schedule-message`, {method: 'POST', body: JSON.stringify(data)})
+}
+
 // Copy builders
 
 // Per-block copy (single verse): quote then blank line then reference

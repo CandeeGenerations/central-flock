@@ -60,6 +60,7 @@ interface ScriptureMatch {
     devotionType: string
     guestSpeaker: string | null
     bibleReference: string
+    originalNumber: number | null
   }[]
 }
 
@@ -313,6 +314,9 @@ export function DevotionDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['devotion', id]})
       queryClient.invalidateQueries({queryKey: ['devotions']})
+      queryClient.invalidateQueries({queryKey: ['devotion-chain-audit', id]})
+      queryClient.invalidateQueries({queryKey: ['devotion-chain']})
+      queryClient.invalidateQueries({queryKey: ['scripture-lookup']})
       toast.success('Devotion updated')
     },
     onError: (err: Error) => toast.error(err.message),
@@ -969,7 +973,11 @@ export function DevotionDetailPage() {
                     const currentNumber = typeof form.number === 'number' ? form.number : 0
                     const isEarlier = d.number < currentNumber
                     const isIgnored = chainAudit?.ignored.includes(d.number) ?? false
-                    const canAddToChain = isRevisit && !inChain && isPastRevisit && isEarlier && !isIgnored && !!id
+                    const currentOriginal = chainNumbers.length > 0 ? chainNumbers[chainNumbers.length - 1] : null
+                    const sameLineage =
+                      currentOriginal == null || d.originalNumber == null || d.originalNumber === currentOriginal
+                    const canAddToChain =
+                      isRevisit && !inChain && isPastRevisit && isEarlier && !isIgnored && sameLineage && !!id
                     return (
                       <div
                         key={d.id}

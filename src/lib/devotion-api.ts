@@ -51,6 +51,7 @@ export interface Devotion {
   podcast: boolean
   notes: string | null
   flagged: boolean
+  chainAuditStatus?: 'ok' | 'issues' | null
   createdAt: string
   updatedAt: string
 }
@@ -114,6 +115,7 @@ export function fetchDevotions(params?: {
   status?: string
   pipelineMissing?: string
   flagged?: string
+  chainIssues?: string
   months?: string
   page?: number
   limit?: number

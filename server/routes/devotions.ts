@@ -51,6 +51,92 @@ export function cleanupOrphanedScanImages(): {deleted: number; kept: number} {
 const TOGGLE_FIELDS = ['produced', 'rendered', 'youtube', 'facebookInstagram', 'podcast', 'flagged'] as const
 type ToggleField = (typeof TOGGLE_FIELDS)[number]
 
+// Returns ids of revisits that currently have unresolved chain audit issues
+// (prior verse-matching devotions in the same lineage, not in the chain, not ignored).
+function computeRevisitsWithChainIssues(): number[] {
+  const all = devotionsDb
+    .select({
+      id: devotionsSchema.devotions.id,
+      number: devotionsSchema.devotions.number,
+      date: devotionsSchema.devotions.date,
+      devotionType: devotionsSchema.devotions.devotionType,
+      bibleReference: devotionsSchema.devotions.bibleReference,
+      referencedDevotions: devotionsSchema.devotions.referencedDevotions,
+      chainIgnores: devotionsSchema.devotions.chainIgnores,
+    })
+    .from(devotionsSchema.devotions)
+    .where(sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`)
+    .all()
+
+  const parseChainRaw = (raw: string | null): number[] => {
+    if (!raw) return []
+    try {
+      return JSON.parse(raw) as number[]
+    } catch {
+      return []
+    }
+  }
+  const byNum = new Map(all.map((d) => [d.number, d]))
+  const rootOriginalOf = (d: (typeof all)[number]): number | null => {
+    if (d.devotionType !== 'revisit') return d.number
+    const chain = parseChainRaw(d.referencedDevotions)
+    return chain.length > 0 ? chain[chain.length - 1] : null
+  }
+
+  const verseIndex = new Map<string, {number: number; date: string; type: string}[]>()
+  for (const d of all) {
+    if (!d.bibleReference || d.devotionType === 'guest') continue
+    const parsed = parseReference(d.bibleReference)
+    const keys = new Set(parsed.flatMap((r) => referenceKeys(r)))
+    for (const k of keys) {
+      if (!verseIndex.has(k)) verseIndex.set(k, [])
+      verseIndex.get(k)!.push({number: d.number, date: d.date, type: d.devotionType})
+    }
+  }
+
+  const issueIds: number[] = []
+  for (const d of all) {
+    if (d.devotionType !== 'revisit' || !d.bibleReference) continue
+    const parsed = parseReference(d.bibleReference)
+    const keys = new Set(parsed.flatMap((r) => referenceKeys(r)))
+    if (keys.size === 0) continue
+
+    const chain = parseChainRaw(d.referencedDevotions)
+    const currentOriginal = chain.length > 0 ? chain[chain.length - 1] : null
+    const originalInChain = chain.some((n) => {
+      const ancestor = byNum.get(n)
+      return ancestor ? ancestor.devotionType !== 'revisit' : false
+    })
+    const chainSet = new Set(chain)
+    const ignoreSet = new Set(parseChainRaw(d.chainIgnores))
+
+    for (const k of keys) {
+      const entries = verseIndex.get(k) || []
+      let flagged = false
+      for (const e of entries) {
+        if (e.number === d.number) continue
+        if (e.date > d.date) continue
+        if (e.date === d.date && e.number >= d.number) continue
+        if (chainSet.has(e.number)) continue
+        if (ignoreSet.has(e.number)) continue
+        if (currentOriginal != null) {
+          const candidate = byNum.get(e.number)
+          const cOriginal = candidate ? rootOriginalOf(candidate) : null
+          if (cOriginal != null && cOriginal !== currentOriginal) continue
+        }
+        if (originalInChain && e.type !== 'revisit') continue
+        flagged = true
+        break
+      }
+      if (flagged) {
+        issueIds.push(d.id)
+        break
+      }
+    }
+  }
+  return issueIds
+}
+
 // GET /api/devotions/audit - Data quality report
 devotionsRouter.get(
   '/audit',
@@ -212,13 +298,37 @@ devotionsRouter.get(
       missing: {number: number; date: string; type: string}[]
     }[] = []
 
+    const byNum = new Map(all.map((d) => [d.number, d]))
+    const parseChainRaw = (raw: string | null): number[] => {
+      if (!raw) return []
+      try {
+        return JSON.parse(raw) as number[]
+      } catch {
+        return []
+      }
+    }
+    const rootOriginalOfAudit = (d: (typeof all)[number]): number | null => {
+      if (d.devotionType !== 'revisit') return d.number
+      const chain = parseChainRaw(d.referencedDevotions)
+      return chain.length > 0 ? chain[chain.length - 1] : null
+    }
+
     for (const d of all) {
       if (d.devotionType !== 'revisit' || !d.bibleReference) continue
       const parsed = parseReference(d.bibleReference)
       const keys = new Set(parsed.flatMap((r) => referenceKeys(r)))
       if (keys.size === 0) continue
 
-      // Gather all prior devotions (by date) that share any verse key
+      const chain: number[] = parseChainRaw(d.referencedDevotions)
+      const currentOriginal = chain.length > 0 ? chain[chain.length - 1] : null
+      const originalInChain = chain.some((n) => {
+        const ancestor = byNum.get(n)
+        return ancestor ? ancestor.devotionType !== 'revisit' : false
+      })
+
+      // Gather all prior devotions (by date) that share any verse key.
+      // Filter to the same lineage (matching root-original) and suppress extra originals
+      // once an original is already in the chain.
       const priorMap = new Map<number, {number: number; date: string; type: string}>()
       for (const k of keys) {
         const entries = verseIndex.get(k) || []
@@ -226,17 +336,16 @@ devotionsRouter.get(
           if (e.number === d.number) continue
           if (e.date > d.date) continue
           if (e.date === d.date && e.number >= d.number) continue
+          if (currentOriginal != null) {
+            const candidate = byNum.get(e.number)
+            const cOriginal = candidate ? rootOriginalOfAudit(candidate) : null
+            if (cOriginal != null && cOriginal !== currentOriginal) continue
+          }
+          if (originalInChain && e.type !== 'revisit') continue
           priorMap.set(e.number, e)
         }
       }
 
-      const chain: number[] = (() => {
-        try {
-          return d.referencedDevotions ? (JSON.parse(d.referencedDevotions) as number[]) : []
-        } catch {
-          return []
-        }
-      })()
       const ignores: number[] = (() => {
         try {
           return d.chainIgnores ? (JSON.parse(d.chainIgnores) as number[]) : []
@@ -552,6 +661,19 @@ devotionsRouter.get(
     // Also do a simple text match as fallback
     const searchLower = search.toLowerCase()
 
+    // For each devotion, compute its "rootOriginal" = last entry of chain for revisits,
+    // else its own number. Used by callers to group by chain lineage.
+    const rootOriginalOf = (d: (typeof all)[number]): number | null => {
+      if (d.devotionType !== 'revisit') return d.number
+      if (!d.referencedDevotions) return null
+      try {
+        const chain = JSON.parse(d.referencedDevotions) as number[]
+        return chain.length > 0 ? chain[chain.length - 1] : null
+      } catch {
+        return null
+      }
+    }
+
     // Build matches: group by normalized verse key
     const groups = new Map<
       string,
@@ -562,6 +684,7 @@ devotionsRouter.get(
         devotionType: string
         guestSpeaker: string | null
         bibleReference: string
+        originalNumber: number | null
       }[]
     >()
 
@@ -585,6 +708,7 @@ devotionsRouter.get(
           devotionType: d.devotionType,
           guestSpeaker: d.guestSpeaker,
           bibleReference: d.bibleReference,
+          originalNumber: rootOriginalOf(d),
         }
         // Avoid duplicate entries in the same group
         const existing = groups.get(groupKey)!
@@ -677,6 +801,7 @@ devotionsRouter.get(
       status,
       pipelineMissing,
       flagged,
+      chainIssues,
       page = '1',
       limit = '50',
       sort = 'date',
@@ -783,6 +908,11 @@ devotionsRouter.get(
       conditions.push(eq(devotionsSchema.devotions.flagged, true))
     }
 
+    if (chainIssues === 'true') {
+      const issueIds = computeRevisitsWithChainIssues()
+      conditions.push(issueIds.length > 0 ? inArray(devotionsSchema.devotions.id, issueIds) : sql`1 = 0`)
+    }
+
     const where = conditions.length > 0 ? and(...conditions) : undefined
 
     const getOrderBy = () => {
@@ -813,8 +943,102 @@ devotionsRouter.get(
         .where(where),
     ])
 
+    // Annotate each revisit in the page with chainAuditStatus: 'ok' | 'issues' | null.
+    // Build a verse-key index once over the full table (cheap — a few thousand rows).
+    const pageHasRevisits = data.some((d) => d.devotionType === 'revisit')
+    const annotated = !pageHasRevisits
+      ? data.map((d) => ({...d, chainAuditStatus: null as 'ok' | 'issues' | null}))
+      : (() => {
+          const all = devotionsDb
+            .select({
+              id: devotionsSchema.devotions.id,
+              number: devotionsSchema.devotions.number,
+              date: devotionsSchema.devotions.date,
+              devotionType: devotionsSchema.devotions.devotionType,
+              bibleReference: devotionsSchema.devotions.bibleReference,
+              referencedDevotions: devotionsSchema.devotions.referencedDevotions,
+            })
+            .from(devotionsSchema.devotions)
+            .where(sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`)
+            .all()
+
+          const parseChainRaw = (raw: string | null): number[] => {
+            if (!raw) return []
+            try {
+              return JSON.parse(raw) as number[]
+            } catch {
+              return []
+            }
+          }
+          const byNum = new Map(all.map((d) => [d.number, d]))
+          const rootOriginalOf = (d: (typeof all)[number]): number | null => {
+            if (d.devotionType !== 'revisit') return d.number
+            const chain = parseChainRaw(d.referencedDevotions)
+            return chain.length > 0 ? chain[chain.length - 1] : null
+          }
+
+          // Verse index: key -> list of {number, date, type}, excluding guests.
+          const verseIndex = new Map<string, {number: number; date: string; type: string}[]>()
+          for (const d of all) {
+            if (!d.bibleReference || d.devotionType === 'guest') continue
+            const parsed = parseReference(d.bibleReference)
+            const keys = new Set(parsed.flatMap((r) => referenceKeys(r)))
+            for (const k of keys) {
+              if (!verseIndex.has(k)) verseIndex.set(k, [])
+              verseIndex.get(k)!.push({number: d.number, date: d.date, type: d.devotionType})
+            }
+          }
+
+          return data.map((d) => {
+            if (d.devotionType !== 'revisit' || !d.bibleReference) {
+              return {...d, chainAuditStatus: null as 'ok' | 'issues' | null}
+            }
+            const parsed = parseReference(d.bibleReference)
+            const keys = new Set(parsed.flatMap((r) => referenceKeys(r)))
+            if (keys.size === 0) return {...d, chainAuditStatus: 'ok' as 'ok' | 'issues' | null}
+
+            const chain = parseChainRaw(d.referencedDevotions)
+            const currentOriginal = chain.length > 0 ? chain[chain.length - 1] : null
+            const originalInChain = chain.some((n) => {
+              const ancestor = byNum.get(n)
+              return ancestor ? ancestor.devotionType !== 'revisit' : false
+            })
+            const chainSet = new Set(chain)
+            const ignores: number[] = (() => {
+              try {
+                return d.chainIgnores ? (JSON.parse(d.chainIgnores) as number[]) : []
+              } catch {
+                return []
+              }
+            })()
+            const ignoreSet = new Set(ignores)
+
+            let hasIssue = false
+            outer: for (const k of keys) {
+              const entries = verseIndex.get(k) || []
+              for (const e of entries) {
+                if (e.number === d.number) continue
+                if (e.date > d.date) continue
+                if (e.date === d.date && e.number >= d.number) continue
+                if (chainSet.has(e.number)) continue
+                if (ignoreSet.has(e.number)) continue
+                if (currentOriginal != null) {
+                  const candidate = byNum.get(e.number)
+                  const cOriginal = candidate ? rootOriginalOf(candidate) : null
+                  if (cOriginal != null && cOriginal !== currentOriginal) continue
+                }
+                if (originalInChain && e.type !== 'revisit') continue
+                hasIssue = true
+                break outer
+              }
+            }
+
+            return {...d, chainAuditStatus: (hasIssue ? 'issues' : 'ok') as 'ok' | 'issues' | null}
+          })
+        })()
+
     res.json({
-      data,
+      data: annotated,
       total: countResult[0].count,
       page: Number(page),
       limit: Number(limit),
@@ -1257,6 +1481,18 @@ devotionsRouter.get(
       return
     }
 
+    const currentChain: number[] = (() => {
+      try {
+        return devotion.referencedDevotions ? (JSON.parse(devotion.referencedDevotions) as number[]) : []
+      } catch {
+        return []
+      }
+    })()
+    // The current devotion's "root original" — the oldest devo in its chain.
+    // Used to filter out priors that belong to a different chain lineage.
+    const currentOriginal = currentChain.length > 0 ? currentChain[currentChain.length - 1] : null
+    const chainSet = new Set(currentChain)
+
     // Find all prior devotions (originals + revisits, excluding guests) that share
     // any verse key with this devotion
     const all = devotionsDb
@@ -1264,6 +1500,28 @@ devotionsRouter.get(
       .from(devotionsSchema.devotions)
       .where(sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`)
       .all()
+
+    const byNumber = new Map(all.map((d) => [d.number, d]))
+    const parseChain = (raw: string | null): number[] => {
+      if (!raw) return []
+      try {
+        return JSON.parse(raw) as number[]
+      } catch {
+        return []
+      }
+    }
+    const rootOriginalOf = (d: (typeof all)[number]): number | null => {
+      if (d.devotionType !== 'revisit') return d.number
+      const chain = parseChain(d.referencedDevotions)
+      return chain.length > 0 ? chain[chain.length - 1] : null
+    }
+
+    // If the chain already includes an original-type devo, skip flagging other originals
+    // as missing — the user has already asserted the correct original.
+    const originalInChain = currentChain.some((n) => {
+      const ancestor = byNumber.get(n)
+      return ancestor ? ancestor.devotionType !== 'revisit' : false
+    })
 
     const priorMap = new Map<
       number,
@@ -1278,6 +1536,16 @@ devotionsRouter.get(
       const dParsed = parseReference(d.bibleReference)
       const dKeys = dParsed.flatMap((r) => referenceKeys(r))
       if (!dKeys.some((k) => keys.has(k))) continue
+
+      // Lineage filter: only consider priors that share the same root-original as the current devo.
+      if (currentOriginal != null) {
+        const dOriginal = rootOriginalOf(d)
+        if (dOriginal != null && dOriginal !== currentOriginal) continue
+      }
+
+      // Suppress other originals once an original is already in this chain.
+      if (originalInChain && d.devotionType !== 'revisit') continue
+
       priorMap.set(d.number, {
         number: d.number,
         id: d.id,
@@ -1288,13 +1556,6 @@ devotionsRouter.get(
       })
     }
 
-    const currentChain: number[] = (() => {
-      try {
-        return devotion.referencedDevotions ? (JSON.parse(devotion.referencedDevotions) as number[]) : []
-      } catch {
-        return []
-      }
-    })()
     const ignores: number[] = (() => {
       try {
         return devotion.chainIgnores ? (JSON.parse(devotion.chainIgnores) as number[]) : []
@@ -1311,8 +1572,7 @@ devotionsRouter.get(
       .sort((a, b) => b.date.localeCompare(a.date) || b.number - a.number)
     const proposedChain = sortedPriors.map((p) => p.number)
 
-    const currentSet = new Set(currentChain)
-    const missing = sortedPriors.filter((p) => !currentSet.has(p.number))
+    const missing = sortedPriors.filter((p) => !chainSet.has(p.number))
 
     res.json({currentChain, proposedChain, missing, ignored: ignores})
   }),

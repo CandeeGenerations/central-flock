@@ -31,7 +31,18 @@ import {
   youtubeSearchUrl,
 } from '@/lib/devotion-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ArrowUpDown, Camera, Check, EllipsisVertical, Flag, Plus, X} from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Camera,
+  Check,
+  EllipsisVertical,
+  Flag,
+  Plus,
+  X,
+} from 'lucide-react'
 import {Link, useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -56,9 +67,21 @@ function TypeBadge({devotion}: {devotion: Devotion}) {
     }
   }
   return (
-    <Badge variant="outline" className={style.className}>
-      {label}
-    </Badge>
+    <div className="flex items-center gap-1.5">
+      <Badge variant="outline" className={style.className}>
+        {label}
+      </Badge>
+      {devotion.devotionType === 'revisit' && devotion.chainAuditStatus === 'issues' && (
+        <span title="Chain has potential issues">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+        </span>
+      )}
+      {devotion.devotionType === 'revisit' && devotion.chainAuditStatus === 'ok' && (
+        <span title="Chain is complete">
+          <Check className="h-3.5 w-3.5 text-green-600" />
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -181,6 +204,7 @@ export function DevotionListPage() {
         status: statusFilter === 'all' ? undefined : statusFilter,
         pipelineMissing: pipelineFilters.length > 0 ? pipelineFilters.join(',') : undefined,
         flagged: flaggedFilter === 'flagged' ? 'true' : undefined,
+        chainIssues: flaggedFilter === 'audit' ? 'true' : undefined,
         months: monthFilters.length > 0 ? monthFilters.join(',') : undefined,
         page,
         limit: 50,
@@ -322,12 +346,13 @@ export function DevotionListPage() {
                 setPage(1)
               }}
             >
-              <SelectTrigger className="w-full sm:w-36">
+              <SelectTrigger className="w-full sm:w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Flags</SelectItem>
                 <SelectItem value="flagged">Flagged only</SelectItem>
+                <SelectItem value="audit">Audit issues only</SelectItem>
               </SelectContent>
             </Select>
             <MultiSelect

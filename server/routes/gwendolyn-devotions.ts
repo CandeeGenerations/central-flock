@@ -2,9 +2,11 @@ import {and, asc, desc, eq, like, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {devotionsDb, devotionsSchema} from '../db-devotions/index.js'
+import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {generateHashtags} from '../services/gwendolyn-hashtags.js'
 import {parseDevotional} from '../services/gwendolyn-parse.js'
+import {getSetting} from './settings.js'
 
 export const gwendolynDevotionsRouter = Router()
 
@@ -209,6 +211,78 @@ gwendolynDevotionsRouter.post(
       .run()
 
     res.json({hashtags})
+  }),
+)
+
+function buildDevoVideoUrl(date: string): string {
+  // date = YYYY-MM-DD → https://cbcwoodbridge-social.s3.us-east-1.amazonaws.com/YYYY/MM/devo-reels-YYYYMMDD.mp4
+  const [y, m, d] = date.split('-')
+  return `https://cbcwoodbridge-social.s3.us-east-1.amazonaws.com/${y}/${m}/devo-reels-${y}${m}${d}.mp4`
+}
+
+// POST /:id/schedule-message — schedule a text to the configured Gwendolyn person with the devo URL
+gwendolynDevotionsRouter.post(
+  '/:id/schedule-message',
+  asyncHandler(async (req, res) => {
+    const id = parseInt(String(req.params.id))
+    const devotional = devotionsDb.select().from(table).where(eq(table.id, id)).get()
+    if (!devotional) return void res.status(404).json({error: 'Not found'})
+
+    const personIdStr = getSetting('gwendolynPersonId').trim()
+    const personId = Number(personIdStr)
+    if (!personId || !Number.isFinite(personId)) {
+      res.status(400).json({error: 'Gwendolyn person is not configured. Set it in Settings.'})
+      return
+    }
+    const person = db.select().from(schema.people).where(eq(schema.people.id, personId)).get()
+    if (!person) {
+      res.status(400).json({error: 'Configured Gwendolyn person no longer exists.'})
+      return
+    }
+    if (!person.phoneNumber) {
+      res.status(400).json({error: 'Configured Gwendolyn person has no phone number.'})
+      return
+    }
+
+    const {scheduledAt, content} = req.body as {scheduledAt?: string; content?: string}
+    if (!scheduledAt) {
+      res.status(400).json({error: 'scheduledAt is required'})
+      return
+    }
+    const scheduledDate = new Date(scheduledAt)
+    if (isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) {
+      res.status(400).json({error: 'Scheduled time must be in the future'})
+      return
+    }
+    const scheduledAtUtc = scheduledDate.toISOString().replace('T', ' ').slice(0, 19)
+
+    const url = buildDevoVideoUrl(devotional.date)
+    const messageContent = (content && content.trim()) || url
+
+    const message = db
+      .insert(schema.messages)
+      .values({
+        content: messageContent,
+        renderedPreview: messageContent,
+        groupId: null,
+        totalRecipients: 1,
+        skippedCount: 0,
+        status: 'scheduled',
+        scheduledAt: scheduledAtUtc,
+      })
+      .returning()
+      .get()
+
+    db.insert(schema.messageRecipients)
+      .values({
+        messageId: message.id,
+        personId: person.id,
+        renderedContent: messageContent,
+        status: 'pending',
+      })
+      .run()
+
+    res.status(201).json({messageId: message.id, url, scheduledAt: scheduledAtUtc})
   }),
 )
 

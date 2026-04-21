@@ -10,8 +10,8 @@ import {fileURLToPath} from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SEED_PATH = path.join(__dirname, '..', 'data', 'hymns-seed.json')
 
-// Side-effect import: creates hymns.db and tables if missing.
-const {hymnsSqlite} = await import(path.join(__dirname, '..', 'server', 'db-hymns', 'index.js'))
+// Side-effect import: ensures DB is initialized.
+const {sqlite} = await import(path.join(__dirname, '..', 'server', 'db', 'index.js'))
 
 interface SeedEntry {
   book: 'burgundy' | 'silver'
@@ -38,7 +38,7 @@ function main(): void {
   const entries = JSON.parse(fs.readFileSync(SEED_PATH, 'utf-8')) as SeedEntry[]
   console.log(`Loading ${entries.length} hymns from ${SEED_PATH}...`)
 
-  const upsert = hymnsSqlite.prepare(`
+  const upsert = sqlite.prepare(`
     INSERT INTO hymns (book, number, title, first_line, refrain_line, author, composer, tune, meter, topics, scripture_refs, notes)
     VALUES (@book, @number, @title, @firstLine, @refrainLine, @author, @composer, @tune, @meter, @topics, @scriptureRefs, @notes)
     ON CONFLICT(book, number) DO UPDATE SET
@@ -54,7 +54,7 @@ function main(): void {
       notes = excluded.notes
   `)
 
-  const tx = hymnsSqlite.transaction((rows: SeedEntry[]) => {
+  const tx = sqlite.transaction((rows: SeedEntry[]) => {
     for (const r of rows) {
       upsert.run({
         book: r.book,
@@ -75,7 +75,7 @@ function main(): void {
 
   tx(entries)
 
-  const counts = hymnsSqlite.prepare(`SELECT book, COUNT(*) AS count FROM hymns GROUP BY book ORDER BY book`).all() as {
+  const counts = sqlite.prepare(`SELECT book, COUNT(*) AS count FROM hymns GROUP BY book ORDER BY book`).all() as {
     book: string
     count: number
   }[]

@@ -1,7 +1,6 @@
 import {and, asc, desc, eq, like, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
-import {devotionsDb, devotionsSchema} from '../db-devotions/index.js'
 import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {generateHashtags} from '../services/gwendolyn-hashtags.js'
@@ -10,7 +9,7 @@ import {getSetting} from './settings.js'
 
 export const gwendolynDevotionsRouter = Router()
 
-const table = devotionsSchema.gwendolynDevotions
+const table = schema.gwendolynDevotions
 
 // GET / — list
 gwendolynDevotionsRouter.get(
@@ -34,8 +33,8 @@ gwendolynDevotionsRouter.get(
     const orderFn = sortDir === 'asc' ? asc : desc
 
     const [data, totalRow] = await Promise.all([
-      devotionsDb.select().from(table).where(where).orderBy(orderFn(orderCol)).limit(limit).offset(offset).all(),
-      devotionsDb
+      db.select().from(table).where(where).orderBy(orderFn(orderCol)).limit(limit).offset(offset).all(),
+      db
         .select({count: sql<number>`count(*)`})
         .from(table)
         .where(where)
@@ -58,7 +57,7 @@ gwendolynDevotionsRouter.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id))
-    const row = devotionsDb.select().from(table).where(eq(table.id, id)).get()
+    const row = db.select().from(table).where(eq(table.id, id)).get()
     if (!row) return void res.status(404).json({error: 'Not found'})
     res.json({...row, blocks: JSON.parse(row.blocks)})
   }),
@@ -114,7 +113,7 @@ gwendolynDevotionsRouter.post(
       return void res.status(400).json({error: 'title, date, and blocks are required'})
     }
 
-    const row = devotionsDb
+    const row = db
       .insert(table)
       .values({
         title,
@@ -136,7 +135,7 @@ gwendolynDevotionsRouter.put(
   '/:id',
   asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id))
-    const existing = devotionsDb.select().from(table).where(eq(table.id, id)).get()
+    const existing = db.select().from(table).where(eq(table.id, id)).get()
     if (!existing) return void res.status(404).json({error: 'Not found'})
 
     const {title, date, blocks, hashtags, rawInput, status} = req.body as {
@@ -148,7 +147,7 @@ gwendolynDevotionsRouter.put(
       status?: string
     }
 
-    const updated = devotionsDb
+    const updated = db
       .update(table)
       .set({
         ...(title !== undefined ? {title} : {}),
@@ -175,10 +174,10 @@ gwendolynDevotionsRouter.patch(
     const {status} = req.body as {status: string}
     if (!status) return void res.status(400).json({error: 'status is required'})
 
-    const existing = devotionsDb.select().from(table).where(eq(table.id, id)).get()
+    const existing = db.select().from(table).where(eq(table.id, id)).get()
     if (!existing) return void res.status(404).json({error: 'Not found'})
 
-    const updated = devotionsDb
+    const updated = db
       .update(table)
       .set({status: status as never, updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19)})
       .where(eq(table.id, id))
@@ -194,7 +193,7 @@ gwendolynDevotionsRouter.post(
   '/:id/regenerate-hashtags',
   asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id))
-    const existing = devotionsDb.select().from(table).where(eq(table.id, id)).get()
+    const existing = db.select().from(table).where(eq(table.id, id)).get()
     if (!existing) return void res.status(404).json({error: 'Not found'})
 
     const blocks = JSON.parse(existing.blocks) as Array<{type: string; text: string; reference?: string}>
@@ -204,8 +203,7 @@ gwendolynDevotionsRouter.post(
 
     const hashtags = await generateHashtags(deriveText)
 
-    devotionsDb
-      .update(table)
+    db.update(table)
       .set({hashtags, updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19)})
       .where(eq(table.id, id))
       .run()
@@ -225,7 +223,7 @@ gwendolynDevotionsRouter.post(
   '/:id/schedule-message',
   asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id))
-    const devotional = devotionsDb.select().from(table).where(eq(table.id, id)).get()
+    const devotional = db.select().from(table).where(eq(table.id, id)).get()
     if (!devotional) return void res.status(404).json({error: 'Not found'})
 
     const personIdStr = getSetting('gwendolynPersonId').trim()
@@ -291,10 +289,10 @@ gwendolynDevotionsRouter.delete(
   '/:id',
   asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id))
-    const existing = devotionsDb.select().from(table).where(eq(table.id, id)).get()
+    const existing = db.select().from(table).where(eq(table.id, id)).get()
     if (!existing) return void res.status(404).json({error: 'Not found'})
 
-    devotionsDb.delete(table).where(eq(table.id, id)).run()
+    db.delete(table).where(eq(table.id, id)).run()
     res.json({success: true})
   }),
 )

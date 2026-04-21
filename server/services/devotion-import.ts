@@ -1,6 +1,6 @@
 import {eq} from 'drizzle-orm'
 
-import {devotionsDb, devotionsSchema} from '../db-devotions/index.js'
+import {db, schema} from '../db/index.js'
 
 interface ParsedDevotion {
   date: string
@@ -239,10 +239,10 @@ export function importDevotions(devotions: ParsedDevotion[]): {inserted: number;
   for (const d of devotions) {
     try {
       // Check if already exists
-      const existing = devotionsDb
-        .select({id: devotionsSchema.devotions.id})
-        .from(devotionsSchema.devotions)
-        .where(eq(devotionsSchema.devotions.number, d.number))
+      const existing = db
+        .select({id: schema.devotions.id})
+        .from(schema.devotions)
+        .where(eq(schema.devotions.number, d.number))
         .get()
 
       if (existing) {
@@ -250,7 +250,7 @@ export function importDevotions(devotions: ParsedDevotion[]): {inserted: number;
         continue
       }
 
-      devotionsDb.insert(devotionsSchema.devotions).values(d).run()
+      db.insert(schema.devotions).values(d).run()
       inserted++
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error)

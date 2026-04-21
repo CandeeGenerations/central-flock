@@ -1,7 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import {and, desc, eq, sql} from 'drizzle-orm'
 
-import {devotionsDb, devotionsSchema} from '../db-devotions/index.js'
 import {db, schema} from '../db/index.js'
 import {resolveModel} from '../lib/ai-models.js'
 import {parseReference} from '../lib/bible-reference.js'
@@ -43,30 +42,30 @@ function getConfiguredModel(): string {
 }
 
 function getRepetitionContext(): {references: string[]; titles: string[]} {
-  const tylerHistory = devotionsDb
+  const tylerHistory = db
     .select({
-      bibleReference: devotionsSchema.devotions.bibleReference,
-      title: devotionsSchema.devotions.title,
+      bibleReference: schema.devotions.bibleReference,
+      title: schema.devotions.title,
     })
-    .from(devotionsSchema.devotions)
+    .from(schema.devotions)
     .where(
       and(
-        eq(devotionsSchema.devotions.devotionType, 'guest'),
-        eq(devotionsSchema.devotions.guestSpeaker, 'Tyler'),
-        sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`,
+        eq(schema.devotions.devotionType, 'guest'),
+        eq(schema.devotions.guestSpeaker, 'Tyler'),
+        sql`${schema.devotions.bibleReference} IS NOT NULL`,
       ),
     )
-    .orderBy(desc(devotionsSchema.devotions.date))
+    .orderBy(desc(schema.devotions.date))
     .limit(80)
     .all()
 
-  const poolHistory = devotionsDb
+  const poolHistory = db
     .select({
-      bibleReference: devotionsSchema.generatedPassages.bibleReference,
-      title: devotionsSchema.generatedPassages.title,
+      bibleReference: schema.generatedPassages.bibleReference,
+      title: schema.generatedPassages.title,
     })
-    .from(devotionsSchema.generatedPassages)
-    .orderBy(desc(devotionsSchema.generatedPassages.createdAt))
+    .from(schema.generatedPassages)
+    .orderBy(desc(schema.generatedPassages.createdAt))
     .limit(50)
     .all()
 

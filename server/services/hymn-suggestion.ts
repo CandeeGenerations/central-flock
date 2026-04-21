@@ -1,8 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import {eq} from 'drizzle-orm'
 
-import {hymnsDb, hymnsSchema, hymnsSqlite} from '../db-hymns/index.js'
-import {db, schema} from '../db/index.js'
+import {db, schema, sqlite} from '../db/index.js'
 import {resolveModel} from '../lib/ai-models.js'
 
 export type HymnBook = 'burgundy' | 'silver'
@@ -143,7 +142,7 @@ function loadHymns(filter: HymnalFilter): HymnRow[] {
       : `SELECT id, book, number, title, first_line AS firstLine, refrain_line AS refrainLine,
                 author, composer, tune, meter, topics, scripture_refs AS scriptureRefs, notes
          FROM hymns WHERE book = ? ORDER BY book, number`
-  const stmt = hymnsSqlite.prepare(query)
+  const stmt = sqlite.prepare(query)
   return (filter === 'both' ? stmt.all() : stmt.all(filter)) as HymnRow[]
 }
 
@@ -372,8 +371,8 @@ export async function runHymnSuggestion(input: HymnSuggestionInput): Promise<Hym
 
   const durationMs = Date.now() - start
 
-  const inserted = hymnsDb
-    .insert(hymnsSchema.hymnSearches)
+  const inserted = db
+    .insert(schema.hymnSearches)
     .values({
       title: input.title,
       scriptureText: input.scriptureText,
@@ -386,7 +385,7 @@ export async function runHymnSuggestion(input: HymnSuggestionInput): Promise<Hym
       candidateCount: hymns.length,
       durationMs,
     })
-    .returning({id: hymnsSchema.hymnSearches.id})
+    .returning({id: schema.hymnSearches.id})
     .get()
 
   return {

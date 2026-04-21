@@ -1,6 +1,6 @@
 import {Router} from 'express'
 
-import {hymnsSqlite} from '../db-hymns/index.js'
+import {sqlite} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {type HymnalFilter, rehydrateHymnSearch, runHymnSuggestion} from '../services/hymn-suggestion.js'
 
@@ -22,11 +22,11 @@ hymnsRouter.get(
       params.push(`%${q}%`, `%${q}%`)
     }
 
-    const countRow = hymnsSqlite
-      .prepare(`SELECT COUNT(*) AS count FROM hymn_searches ${whereClause}`)
-      .get(...params) as {count: number}
+    const countRow = sqlite.prepare(`SELECT COUNT(*) AS count FROM hymn_searches ${whereClause}`).get(...params) as {
+      count: number
+    }
 
-    const rows = hymnsSqlite
+    const rows = sqlite
       .prepare(
         `SELECT id, title, theme, hymnal_filter AS hymnalFilter, model, duration_ms AS durationMs,
                 candidate_count AS candidateCount, created_at AS createdAt
@@ -64,7 +64,7 @@ hymnsRouter.get(
       return
     }
 
-    const row = hymnsSqlite
+    const row = sqlite
       .prepare(
         `SELECT id, title, scripture_text AS scriptureText, theme, audience,
                 hymnal_filter AS hymnalFilter, sections, model,
@@ -106,7 +106,7 @@ hymnsRouter.delete(
       res.status(400).json({error: 'Invalid id'})
       return
     }
-    const result = hymnsSqlite.prepare(`DELETE FROM hymn_searches WHERE id = ?`).run(id)
+    const result = sqlite.prepare(`DELETE FROM hymn_searches WHERE id = ?`).run(id)
     if (result.changes === 0) {
       res.status(404).json({error: 'Search not found'})
       return
@@ -170,11 +170,11 @@ hymnsRouter.get(
     }
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-    const countRow = hymnsSqlite.prepare(`SELECT COUNT(*) AS count FROM hymns ${whereClause}`).get(...params) as {
+    const countRow = sqlite.prepare(`SELECT COUNT(*) AS count FROM hymns ${whereClause}`).get(...params) as {
       count: number
     }
 
-    const rows = hymnsSqlite
+    const rows = sqlite
       .prepare(
         `SELECT id, book, number, title, first_line AS firstLine, refrain_line AS refrainLine,
                 author, composer, tune, meter, topics, scripture_refs AS scriptureRefs, notes

@@ -1,7 +1,7 @@
 import {desc, eq} from 'drizzle-orm'
 import {Router} from 'express'
 
-import {nurseryDb, nurserySchema} from '../db-nursery/index.js'
+import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import type {ServiceConfig, WorkerWithEligibility} from '../services/nursery-scheduler.js'
 import {generateSchedule} from '../services/nursery-scheduler.js'
@@ -9,12 +9,8 @@ import {generateSchedule} from '../services/nursery-scheduler.js'
 export const nurserySchedulesRouter = Router()
 
 function loadWorkers(): WorkerWithEligibility[] {
-  const workers = nurseryDb
-    .select()
-    .from(nurserySchema.nurseryWorkers)
-    .where(eq(nurserySchema.nurseryWorkers.isActive, true))
-    .all()
-  const allServices = nurseryDb.select().from(nurserySchema.nurseryWorkerServices).all()
+  const workers = db.select().from(schema.nurseryWorkers).where(eq(schema.nurseryWorkers.isActive, true)).all()
+  const allServices = db.select().from(schema.nurseryWorkerServices).all()
 
   return workers.map((w) => ({
     id: w.id,
@@ -28,28 +24,20 @@ function loadWorkers(): WorkerWithEligibility[] {
 }
 
 function loadServiceConfig(): ServiceConfig[] {
-  return nurseryDb
-    .select()
-    .from(nurserySchema.nurseryServiceConfig)
-    .orderBy(nurserySchema.nurseryServiceConfig.sortOrder)
-    .all()
+  return db.select().from(schema.nurseryServiceConfig).orderBy(schema.nurseryServiceConfig.sortOrder).all()
 }
 
 function loadScheduleWithAssignments(scheduleId: number) {
-  const schedule = nurseryDb
-    .select()
-    .from(nurserySchema.nurserySchedules)
-    .where(eq(nurserySchema.nurserySchedules.id, scheduleId))
-    .get()
+  const schedule = db.select().from(schema.nurserySchedules).where(eq(schema.nurserySchedules.id, scheduleId)).get()
   if (!schedule) return null
 
-  const assignments = nurseryDb
+  const assignments = db
     .select()
-    .from(nurserySchema.nurseryAssignments)
-    .where(eq(nurserySchema.nurseryAssignments.scheduleId, scheduleId))
+    .from(schema.nurseryAssignments)
+    .where(eq(schema.nurseryAssignments.scheduleId, scheduleId))
     .all()
 
-  const workers = nurseryDb.select().from(nurserySchema.nurseryWorkers).all()
+  const workers = db.select().from(schema.nurseryWorkers).all()
   const workerMap = new Map(workers.map((w) => [w.id, w]))
 
   const enrichedAssignments = assignments.map((a) => ({
@@ -65,10 +53,10 @@ function loadScheduleWithAssignments(scheduleId: number) {
 nurserySchedulesRouter.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const schedules = nurseryDb
+    const schedules = db
       .select()
-      .from(nurserySchema.nurserySchedules)
-      .orderBy(desc(nurserySchema.nurserySchedules.year), desc(nurserySchema.nurserySchedules.month))
+      .from(schema.nurserySchedules)
+      .orderBy(desc(schema.nurserySchedules.year), desc(schema.nurserySchedules.month))
       .all()
     res.json(schedules)
   }),
@@ -88,27 +76,23 @@ nurserySchedulesRouter.post(
     const slots = generateSchedule(month, year, workers, serviceConfig)
 
     // Delete existing draft for this month if one exists
-    const existingDraft = nurseryDb
+    const existingDraft = db
       .select()
-      .from(nurserySchema.nurserySchedules)
-      .where(eq(nurserySchema.nurserySchedules.month, month))
+      .from(schema.nurserySchedules)
+      .where(eq(schema.nurserySchedules.month, month))
       .all()
       .find((s) => s.year === year && s.status === 'draft')
 
     if (existingDraft) {
-      nurseryDb
-        .delete(nurserySchema.nurserySchedules)
-        .where(eq(nurserySchema.nurserySchedules.id, existingDraft.id))
-        .run()
+      db.delete(schema.nurserySchedules).where(eq(schema.nurserySchedules.id, existingDraft.id)).run()
     }
 
     // Create new schedule
-    const schedule = nurseryDb.insert(nurserySchema.nurserySchedules).values({month, year}).returning().get()
+    const schedule = db.insert(schema.nurserySchedules).values({month, year}).returning().get()
 
     // Bulk insert assignments
     for (const slot of slots) {
-      nurseryDb
-        .insert(nurserySchema.nurseryAssignments)
+      db.insert(schema.nurseryAssignments)
         .values({
           scheduleId: schedule.id,
           date: slot.date,
@@ -148,10 +132,10 @@ nurserySchedulesRouter.put(
       return
     }
 
-    const updated = nurseryDb
-      .update(nurserySchema.nurserySchedules)
+    const updated = db
+      .update(schema.nurserySchedules)
       .set({status, updatedAt: new Date().toISOString()})
-      .where(eq(nurserySchema.nurserySchedules.id, id))
+      .where(eq(schema.nurserySchedules.id, id))
       .returning()
       .get()
 
@@ -168,7 +152,7 @@ nurserySchedulesRouter.delete(
   '/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
-    nurseryDb.delete(nurserySchema.nurserySchedules).where(eq(nurserySchema.nurserySchedules.id, id)).run()
+    db.delete(schema.nurserySchedules).where(eq(schema.nurserySchedules.id, id)).run()
     res.json({success: true})
   }),
 )
@@ -181,11 +165,7 @@ nurserySchedulesRouter.patch(
     const id = Number(req.params.id)
     const {workerId} = req.body as {workerId: number | null}
 
-    const assignment = nurseryDb
-      .select()
-      .from(nurserySchema.nurseryAssignments)
-      .where(eq(nurserySchema.nurseryAssignments.id, id))
-      .get()
+    const assignment = db.select().from(schema.nurseryAssignments).where(eq(schema.nurseryAssignments.id, id)).get()
 
     if (!assignment) {
       res.status(404).json({error: 'Assignment not found'})
@@ -193,10 +173,10 @@ nurserySchedulesRouter.patch(
     }
 
     // Check schedule is still a draft
-    const schedule = nurseryDb
+    const schedule = db
       .select()
-      .from(nurserySchema.nurserySchedules)
-      .where(eq(nurserySchema.nurserySchedules.id, assignment.scheduleId))
+      .from(schema.nurserySchedules)
+      .where(eq(schema.nurserySchedules.id, assignment.scheduleId))
       .get()
 
     if (schedule?.status === 'final') {
@@ -204,16 +184,15 @@ nurserySchedulesRouter.patch(
       return
     }
 
-    const updated = nurseryDb
-      .update(nurserySchema.nurseryAssignments)
+    const updated = db
+      .update(schema.nurseryAssignments)
       .set({workerId})
-      .where(eq(nurserySchema.nurseryAssignments.id, id))
+      .where(eq(schema.nurseryAssignments.id, id))
       .returning()
       .get()
 
     const workerName = workerId
-      ? nurseryDb.select().from(nurserySchema.nurseryWorkers).where(eq(nurserySchema.nurseryWorkers.id, workerId)).get()
-          ?.name || null
+      ? db.select().from(schema.nurseryWorkers).where(eq(schema.nurseryWorkers.id, workerId)).get()?.name || null
       : null
 
     res.json({...updated, workerName})

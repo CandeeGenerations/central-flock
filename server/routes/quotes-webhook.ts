@@ -1,7 +1,7 @@
 import {sql} from 'drizzle-orm'
 import {Router} from 'express'
 
-import {quotesDb, quotesSchema} from '../db-quotes/index.js'
+import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {extractCitedAuthor} from '../services/quote-parser.js'
 
@@ -51,16 +51,16 @@ quotesWebhookRouter.post(
       if (!isNaN(d.getTime())) capturedAt = d.toISOString()
     }
 
-    const existing = quotesDb
-      .select({id: quotesSchema.quotes.id})
-      .from(quotesSchema.quotes)
-      .where(sql`${quotesSchema.quotes.externalId} = ${body.externalId}`)
+    const existing = db
+      .select({id: schema.quotes.id})
+      .from(schema.quotes)
+      .where(sql`${schema.quotes.externalId} = ${body.externalId}`)
       .get()
 
     const tags = JSON.stringify(parseHashtags(body.tags))
 
-    const result = quotesDb
-      .insert(quotesSchema.quotes)
+    const result = db
+      .insert(schema.quotes)
       .values({
         externalId: body.externalId,
         title,
@@ -74,7 +74,7 @@ quotesWebhookRouter.post(
         source: 'n8n',
       })
       .onConflictDoUpdate({
-        target: quotesSchema.quotes.externalId,
+        target: schema.quotes.externalId,
         set: {
           title,
           author: resolvedAuthor,
@@ -87,7 +87,7 @@ quotesWebhookRouter.post(
           updatedAt: sql`datetime('now')`,
         },
       })
-      .returning({id: quotesSchema.quotes.id})
+      .returning({id: schema.quotes.id})
       .get()
 
     res.json({ok: true, id: result!.id, created: !existing})

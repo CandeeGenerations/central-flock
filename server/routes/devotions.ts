@@ -5,7 +5,7 @@ import path from 'path'
 import {fileURLToPath} from 'url'
 import * as XLSX from 'xlsx'
 
-import {devotionsDb, devotionsSchema} from '../db-devotions/index.js'
+import {db, schema} from '../db/index.js'
 import {parseReference, referenceKeys} from '../lib/bible-reference.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 import {generateDevotionPassage} from '../services/devotion-generation.js'
@@ -21,10 +21,7 @@ export function cleanupOrphanedScanImages(): {deleted: number; kept: number} {
   if (!fs.existsSync(SCAN_IMAGES_DIR)) return {deleted: 0, kept: 0}
 
   const files = fs.readdirSync(SCAN_IMAGES_DIR)
-  const drafts = devotionsDb
-    .select({imagePath: devotionsSchema.scanDrafts.imagePath})
-    .from(devotionsSchema.scanDrafts)
-    .all()
+  const drafts = db.select({imagePath: schema.scanDrafts.imagePath}).from(schema.scanDrafts).all()
 
   const activePaths = new Set(drafts.map((d) => d.imagePath).filter(Boolean))
 
@@ -54,18 +51,18 @@ type ToggleField = (typeof TOGGLE_FIELDS)[number]
 // Returns ids of revisits that currently have unresolved chain audit issues
 // (prior verse-matching devotions in the same lineage, not in the chain, not ignored).
 function computeRevisitsWithChainIssues(): number[] {
-  const all = devotionsDb
+  const all = db
     .select({
-      id: devotionsSchema.devotions.id,
-      number: devotionsSchema.devotions.number,
-      date: devotionsSchema.devotions.date,
-      devotionType: devotionsSchema.devotions.devotionType,
-      bibleReference: devotionsSchema.devotions.bibleReference,
-      referencedDevotions: devotionsSchema.devotions.referencedDevotions,
-      chainIgnores: devotionsSchema.devotions.chainIgnores,
+      id: schema.devotions.id,
+      number: schema.devotions.number,
+      date: schema.devotions.date,
+      devotionType: schema.devotions.devotionType,
+      bibleReference: schema.devotions.bibleReference,
+      referencedDevotions: schema.devotions.referencedDevotions,
+      chainIgnores: schema.devotions.chainIgnores,
     })
-    .from(devotionsSchema.devotions)
-    .where(sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`)
+    .from(schema.devotions)
+    .where(sql`${schema.devotions.bibleReference} IS NOT NULL`)
     .all()
 
   const parseChainRaw = (raw: string | null): number[] => {
@@ -141,11 +138,7 @@ function computeRevisitsWithChainIssues(): number[] {
 devotionsRouter.get(
   '/audit',
   asyncHandler(async (_req, res) => {
-    const all = devotionsDb
-      .select()
-      .from(devotionsSchema.devotions)
-      .orderBy(asc(devotionsSchema.devotions.number))
-      .all()
+    const all = db.select().from(schema.devotions).orderBy(asc(schema.devotions.number)).all()
 
     const numbers = new Set(all.map((d) => d.number))
     const minNum = all.length > 0 ? all[0].number : 0
@@ -401,28 +394,28 @@ devotionsRouter.get(
 devotionsRouter.get(
   '/stats',
   asyncHandler(async (_req, res) => {
-    const total = devotionsDb
+    const total = db
       .select({count: sql<number>`count(*)`})
-      .from(devotionsSchema.devotions)
+      .from(schema.devotions)
       .get()!.count
 
-    const byType = devotionsDb
+    const byType = db
       .select({
-        type: devotionsSchema.devotions.devotionType,
+        type: schema.devotions.devotionType,
         count: sql<number>`count(*)`,
       })
-      .from(devotionsSchema.devotions)
-      .groupBy(devotionsSchema.devotions.devotionType)
+      .from(schema.devotions)
+      .groupBy(schema.devotions.devotionType)
       .all()
 
-    const bySpeaker = devotionsDb
+    const bySpeaker = db
       .select({
-        speaker: devotionsSchema.devotions.guestSpeaker,
+        speaker: schema.devotions.guestSpeaker,
         count: sql<number>`count(*)`,
       })
-      .from(devotionsSchema.devotions)
-      .where(eq(devotionsSchema.devotions.devotionType, 'guest'))
-      .groupBy(devotionsSchema.devotions.guestSpeaker)
+      .from(schema.devotions)
+      .where(eq(schema.devotions.devotionType, 'guest'))
+      .groupBy(schema.devotions.guestSpeaker)
       .all()
 
     // Completion rate window: from the first of the current month onward.
@@ -431,53 +424,53 @@ devotionsRouter.get(
     const now = new Date()
     const windowStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
 
-    const completionRates = devotionsDb
+    const completionRates = db
       .select({
         total: sql<number>`count(*)`,
-        produced: sql<number>`sum(case when ${devotionsSchema.devotions.produced} = 1 then 1 else 0 end)`,
-        rendered: sql<number>`sum(case when ${devotionsSchema.devotions.rendered} = 1 then 1 else 0 end)`,
-        youtube: sql<number>`sum(case when ${devotionsSchema.devotions.youtube} = 1 then 1 else 0 end)`,
-        facebookInstagram: sql<number>`sum(case when ${devotionsSchema.devotions.facebookInstagram} = 1 then 1 else 0 end)`,
-        podcast: sql<number>`sum(case when ${devotionsSchema.devotions.podcast} = 1 then 1 else 0 end)`,
+        produced: sql<number>`sum(case when ${schema.devotions.produced} = 1 then 1 else 0 end)`,
+        rendered: sql<number>`sum(case when ${schema.devotions.rendered} = 1 then 1 else 0 end)`,
+        youtube: sql<number>`sum(case when ${schema.devotions.youtube} = 1 then 1 else 0 end)`,
+        facebookInstagram: sql<number>`sum(case when ${schema.devotions.facebookInstagram} = 1 then 1 else 0 end)`,
+        podcast: sql<number>`sum(case when ${schema.devotions.podcast} = 1 then 1 else 0 end)`,
       })
-      .from(devotionsSchema.devotions)
-      .where(sql`${devotionsSchema.devotions.date} >= ${windowStart}`)
+      .from(schema.devotions)
+      .where(sql`${schema.devotions.date} >= ${windowStart}`)
       .get()!
 
-    const byYear = devotionsDb
+    const byYear = db
       .select({
-        year: sql<string>`substr(${devotionsSchema.devotions.date}, 1, 4)`,
+        year: sql<string>`substr(${schema.devotions.date}, 1, 4)`,
         count: sql<number>`count(*)`,
       })
-      .from(devotionsSchema.devotions)
-      .groupBy(sql`substr(${devotionsSchema.devotions.date}, 1, 4)`)
-      .orderBy(asc(sql`substr(${devotionsSchema.devotions.date}, 1, 4)`))
+      .from(schema.devotions)
+      .groupBy(sql`substr(${schema.devotions.date}, 1, 4)`)
+      .orderBy(asc(sql`substr(${schema.devotions.date}, 1, 4)`))
       .all()
 
     const latestNumber =
-      devotionsDb
-        .select({max: sql<number>`max(${devotionsSchema.devotions.number})`})
-        .from(devotionsSchema.devotions)
+      db
+        .select({max: sql<number>`max(${schema.devotions.number})`})
+        .from(schema.devotions)
         .get()?.max || 0
 
     // Next-up incomplete devotions: sort by date ascending from window start,
     // so the soonest upcoming work appears first.
-    const recentIncomplete = devotionsDb
+    const recentIncomplete = db
       .select()
-      .from(devotionsSchema.devotions)
+      .from(schema.devotions)
       .where(
         and(
-          sql`${devotionsSchema.devotions.date} >= ${windowStart}`,
+          sql`${schema.devotions.date} >= ${windowStart}`,
           or(
-            eq(devotionsSchema.devotions.produced, false),
-            eq(devotionsSchema.devotions.rendered, false),
-            eq(devotionsSchema.devotions.youtube, false),
-            eq(devotionsSchema.devotions.facebookInstagram, false),
-            eq(devotionsSchema.devotions.podcast, false),
+            eq(schema.devotions.produced, false),
+            eq(schema.devotions.rendered, false),
+            eq(schema.devotions.youtube, false),
+            eq(schema.devotions.facebookInstagram, false),
+            eq(schema.devotions.podcast, false),
           ),
         ),
       )
-      .orderBy(asc(devotionsSchema.devotions.date))
+      .orderBy(asc(schema.devotions.date))
       .limit(10)
       .all()
 
@@ -508,14 +501,11 @@ devotionsRouter.get(
   asyncHandler(async (req, res) => {
     const {search, limit = '50'} = req.query
 
-    const all = devotionsDb
+    const all = db
       .select()
-      .from(devotionsSchema.devotions)
+      .from(schema.devotions)
       .where(
-        and(
-          sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`,
-          sql`${devotionsSchema.devotions.devotionType} != 'revisit'`,
-        ),
+        and(sql`${schema.devotions.bibleReference} IS NOT NULL`, sql`${schema.devotions.devotionType} != 'revisit'`),
       )
       .all()
 
@@ -550,16 +540,13 @@ devotionsRouter.get(
 devotionsRouter.get(
   '/scriptures/duplicates',
   asyncHandler(async (_req, res) => {
-    const all = devotionsDb
+    const all = db
       .select()
-      .from(devotionsSchema.devotions)
+      .from(schema.devotions)
       .where(
-        and(
-          sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`,
-          sql`${devotionsSchema.devotions.devotionType} != 'revisit'`,
-        ),
+        and(sql`${schema.devotions.bibleReference} IS NOT NULL`, sql`${schema.devotions.devotionType} != 'revisit'`),
       )
-      .orderBy(asc(devotionsSchema.devotions.number))
+      .orderBy(asc(schema.devotions.number))
       .all()
 
     const refMap = new Map<
@@ -621,11 +608,7 @@ devotionsRouter.get(
       res.json([])
       return
     }
-    const result = devotionsDb
-      .select()
-      .from(devotionsSchema.devotions)
-      .where(inArray(devotionsSchema.devotions.number, nums))
-      .all()
+    const result = db.select().from(schema.devotions).where(inArray(schema.devotions.number, nums)).all()
     res.json(result)
   }),
 )
@@ -642,16 +625,16 @@ devotionsRouter.get(
 
     const includeRev = includeRevisits === 'true'
 
-    const all = devotionsDb
+    const all = db
       .select()
-      .from(devotionsSchema.devotions)
+      .from(schema.devotions)
       .where(
         and(
-          sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`,
-          ...(includeRev ? [] : [sql`${devotionsSchema.devotions.devotionType} != 'revisit'`]),
+          sql`${schema.devotions.bibleReference} IS NOT NULL`,
+          ...(includeRev ? [] : [sql`${schema.devotions.devotionType} != 'revisit'`]),
         ),
       )
-      .orderBy(asc(devotionsSchema.devotions.number))
+      .orderBy(asc(schema.devotions.number))
       .all()
 
     // Parse the search term into reference keys
@@ -730,29 +713,26 @@ devotionsRouter.get(
 devotionsRouter.get(
   '/stats/speakers',
   asyncHandler(async (_req, res) => {
-    const speakers = devotionsDb
+    const speakers = db
       .select({
-        speaker: sql<string>`COALESCE(${devotionsSchema.devotions.guestSpeaker}, 'Main')`,
+        speaker: sql<string>`COALESCE(${schema.devotions.guestSpeaker}, 'Main')`,
         count: sql<number>`count(*)`,
       })
-      .from(devotionsSchema.devotions)
-      .groupBy(sql`COALESCE(${devotionsSchema.devotions.guestSpeaker}, 'Main')`)
+      .from(schema.devotions)
+      .groupBy(sql`COALESCE(${schema.devotions.guestSpeaker}, 'Main')`)
       .orderBy(desc(sql`count(*)`))
       .all()
 
     // Per-year breakdown
-    const byYear = devotionsDb
+    const byYear = db
       .select({
-        speaker: sql<string>`COALESCE(${devotionsSchema.devotions.guestSpeaker}, 'Main')`,
-        year: sql<string>`substr(${devotionsSchema.devotions.date}, 1, 4)`,
+        speaker: sql<string>`COALESCE(${schema.devotions.guestSpeaker}, 'Main')`,
+        year: sql<string>`substr(${schema.devotions.date}, 1, 4)`,
         count: sql<number>`count(*)`,
       })
-      .from(devotionsSchema.devotions)
-      .groupBy(
-        sql`COALESCE(${devotionsSchema.devotions.guestSpeaker}, 'Main')`,
-        sql`substr(${devotionsSchema.devotions.date}, 1, 4)`,
-      )
-      .orderBy(asc(sql`substr(${devotionsSchema.devotions.date}, 1, 4)`))
+      .from(schema.devotions)
+      .groupBy(sql`COALESCE(${schema.devotions.guestSpeaker}, 'Main')`, sql`substr(${schema.devotions.date}, 1, 4)`)
+      .orderBy(asc(sql`substr(${schema.devotions.date}, 1, 4)`))
       .all()
 
     res.json({speakers, byYear})
@@ -763,11 +743,11 @@ devotionsRouter.get(
 devotionsRouter.get(
   '/months',
   asyncHandler(async (_req, res) => {
-    const months = devotionsDb
-      .select({month: sql<string>`substr(${devotionsSchema.devotions.date}, 1, 7)`})
-      .from(devotionsSchema.devotions)
-      .groupBy(sql`substr(${devotionsSchema.devotions.date}, 1, 7)`)
-      .orderBy(desc(sql`substr(${devotionsSchema.devotions.date}, 1, 7)`))
+    const months = db
+      .select({month: sql<string>`substr(${schema.devotions.date}, 1, 7)`})
+      .from(schema.devotions)
+      .groupBy(sql`substr(${schema.devotions.date}, 1, 7)`)
+      .orderBy(desc(sql`substr(${schema.devotions.date}, 1, 7)`))
       .all()
 
     res.json(months.map((m) => m.month))
@@ -778,9 +758,9 @@ devotionsRouter.get(
 devotionsRouter.get(
   '/next-number',
   asyncHandler(async (_req, res) => {
-    const result = devotionsDb
-      .select({max: sql<number>`max(${devotionsSchema.devotions.number})`})
-      .from(devotionsSchema.devotions)
+    const result = db
+      .select({max: sql<number>`max(${schema.devotions.number})`})
+      .from(schema.devotions)
       .get()
 
     res.json({next: (result?.max || 0) + 1})
@@ -815,20 +795,20 @@ devotionsRouter.get(
       const isNumber = /^\d+$/.test(searchNum)
       conditions.push(
         or(
-          like(devotionsSchema.devotions.songName, `%${search}%`),
-          like(devotionsSchema.devotions.bibleReference, `%${search}%`),
-          like(devotionsSchema.devotions.notes, `%${search}%`),
-          like(devotionsSchema.devotions.title, `%${search}%`),
-          ...(isNumber ? [eq(devotionsSchema.devotions.number, Number(searchNum))] : []),
+          like(schema.devotions.songName, `%${search}%`),
+          like(schema.devotions.bibleReference, `%${search}%`),
+          like(schema.devotions.notes, `%${search}%`),
+          like(schema.devotions.title, `%${search}%`),
+          ...(isNumber ? [eq(schema.devotions.number, Number(searchNum))] : []),
         ),
       )
     }
 
     if (dateFrom && typeof dateFrom === 'string') {
-      conditions.push(sql`${devotionsSchema.devotions.date} >= ${dateFrom}`)
+      conditions.push(sql`${schema.devotions.date} >= ${dateFrom}`)
     }
     if (dateTo && typeof dateTo === 'string') {
-      conditions.push(sql`${devotionsSchema.devotions.date} <= ${dateTo}`)
+      conditions.push(sql`${schema.devotions.date} <= ${dateTo}`)
     }
     if (months && typeof months === 'string') {
       const monthList = months
@@ -841,7 +821,7 @@ devotionsRouter.get(
           const lastDay = new Date(y, m, 0).getDate()
           const from = `${ym}-01`
           const to = `${ym}-${String(lastDay).padStart(2, '0')}`
-          return and(sql`${devotionsSchema.devotions.date} >= ${from}`, sql`${devotionsSchema.devotions.date} <= ${to}`)
+          return and(sql`${schema.devotions.date} >= ${from}`, sql`${schema.devotions.date} <= ${to}`)
         })
         const monthOr = monthConditions.length === 1 ? monthConditions[0] : or(...monthConditions)
         if (monthOr) conditions.push(monthOr)
@@ -853,9 +833,9 @@ devotionsRouter.get(
         .map((t) => t.trim())
         .filter(Boolean) as ('original' | 'favorite' | 'guest' | 'revisit')[]
       if (types.length === 1) {
-        conditions.push(eq(devotionsSchema.devotions.devotionType, types[0]))
+        conditions.push(eq(schema.devotions.devotionType, types[0]))
       } else if (types.length > 1) {
-        conditions.push(inArray(devotionsSchema.devotions.devotionType, types))
+        conditions.push(inArray(schema.devotions.devotionType, types))
       }
     }
     if (guestSpeaker && typeof guestSpeaker === 'string') {
@@ -864,30 +844,30 @@ devotionsRouter.get(
         .map((s) => s.trim())
         .filter(Boolean)
       if (speakers.length === 1) {
-        conditions.push(eq(devotionsSchema.devotions.guestSpeaker, speakers[0]))
+        conditions.push(eq(schema.devotions.guestSpeaker, speakers[0]))
       } else if (speakers.length > 1) {
-        conditions.push(inArray(devotionsSchema.devotions.guestSpeaker, speakers))
+        conditions.push(inArray(schema.devotions.guestSpeaker, speakers))
       }
     }
     if (status && typeof status === 'string') {
       if (status === 'complete') {
         conditions.push(
           and(
-            eq(devotionsSchema.devotions.produced, true),
-            eq(devotionsSchema.devotions.rendered, true),
-            eq(devotionsSchema.devotions.youtube, true),
-            eq(devotionsSchema.devotions.facebookInstagram, true),
-            eq(devotionsSchema.devotions.podcast, true),
+            eq(schema.devotions.produced, true),
+            eq(schema.devotions.rendered, true),
+            eq(schema.devotions.youtube, true),
+            eq(schema.devotions.facebookInstagram, true),
+            eq(schema.devotions.podcast, true),
           ),
         )
       } else if (status === 'incomplete') {
         conditions.push(
           or(
-            eq(devotionsSchema.devotions.produced, false),
-            eq(devotionsSchema.devotions.rendered, false),
-            eq(devotionsSchema.devotions.youtube, false),
-            eq(devotionsSchema.devotions.facebookInstagram, false),
-            eq(devotionsSchema.devotions.podcast, false),
+            eq(schema.devotions.produced, false),
+            eq(schema.devotions.rendered, false),
+            eq(schema.devotions.youtube, false),
+            eq(schema.devotions.facebookInstagram, false),
+            eq(schema.devotions.podcast, false),
           ),
         )
       }
@@ -900,17 +880,17 @@ devotionsRouter.get(
         .map((s) => s.trim())
         .filter((s): s is (typeof allowed)[number] => (allowed as readonly string[]).includes(s))
       if (steps.length > 0) {
-        for (const s of steps) conditions.push(eq(devotionsSchema.devotions[s], false))
+        for (const s of steps) conditions.push(eq(schema.devotions[s], false))
       }
     }
 
     if (flagged === 'true') {
-      conditions.push(eq(devotionsSchema.devotions.flagged, true))
+      conditions.push(eq(schema.devotions.flagged, true))
     }
 
     if (chainIssues === 'true') {
       const issueIds = computeRevisitsWithChainIssues()
-      conditions.push(issueIds.length > 0 ? inArray(devotionsSchema.devotions.id, issueIds) : sql`1 = 0`)
+      conditions.push(issueIds.length > 0 ? inArray(schema.devotions.id, issueIds) : sql`1 = 0`)
     }
 
     const where = conditions.length > 0 ? and(...conditions) : undefined
@@ -919,27 +899,27 @@ devotionsRouter.get(
       const dir = sortDir === 'asc' ? asc : desc
       switch (sort) {
         case 'number':
-          return [dir(devotionsSchema.devotions.number)]
+          return [dir(schema.devotions.number)]
         case 'date':
-          return [dir(devotionsSchema.devotions.date)]
+          return [dir(schema.devotions.date)]
         case 'devotionType':
-          return [dir(devotionsSchema.devotions.devotionType)]
+          return [dir(schema.devotions.devotionType)]
         default:
-          return [dir(devotionsSchema.devotions.date)]
+          return [dir(schema.devotions.date)]
       }
     }
 
     const [data, countResult] = await Promise.all([
-      devotionsDb
+      db
         .select()
-        .from(devotionsSchema.devotions)
+        .from(schema.devotions)
         .where(where)
         .limit(Number(limit))
         .offset(offset)
         .orderBy(...getOrderBy()),
-      devotionsDb
+      db
         .select({count: sql<number>`count(*)`})
-        .from(devotionsSchema.devotions)
+        .from(schema.devotions)
         .where(where),
     ])
 
@@ -949,17 +929,17 @@ devotionsRouter.get(
     const annotated = !pageHasRevisits
       ? data.map((d) => ({...d, chainAuditStatus: null as 'ok' | 'issues' | null}))
       : (() => {
-          const all = devotionsDb
+          const all = db
             .select({
-              id: devotionsSchema.devotions.id,
-              number: devotionsSchema.devotions.number,
-              date: devotionsSchema.devotions.date,
-              devotionType: devotionsSchema.devotions.devotionType,
-              bibleReference: devotionsSchema.devotions.bibleReference,
-              referencedDevotions: devotionsSchema.devotions.referencedDevotions,
+              id: schema.devotions.id,
+              number: schema.devotions.number,
+              date: schema.devotions.date,
+              devotionType: schema.devotions.devotionType,
+              bibleReference: schema.devotions.bibleReference,
+              referencedDevotions: schema.devotions.referencedDevotions,
             })
-            .from(devotionsSchema.devotions)
-            .where(sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`)
+            .from(schema.devotions)
+            .where(sql`${schema.devotions.bibleReference} IS NOT NULL`)
             .all()
 
           const parseChainRaw = (raw: string | null): number[] => {
@@ -1050,16 +1030,16 @@ devotionsRouter.get(
 devotionsRouter.get(
   '/scan-drafts',
   asyncHandler(async (_req, res) => {
-    const drafts = devotionsDb
+    const drafts = db
       .select({
-        id: devotionsSchema.scanDrafts.id,
-        month: devotionsSchema.scanDrafts.month,
-        year: devotionsSchema.scanDrafts.year,
-        createdAt: devotionsSchema.scanDrafts.createdAt,
-        count: sql<number>`json_array_length(json_extract(${devotionsSchema.scanDrafts.data}, '$.devotions'))`,
+        id: schema.scanDrafts.id,
+        month: schema.scanDrafts.month,
+        year: schema.scanDrafts.year,
+        createdAt: schema.scanDrafts.createdAt,
+        count: sql<number>`json_array_length(json_extract(${schema.scanDrafts.data}, '$.devotions'))`,
       })
-      .from(devotionsSchema.scanDrafts)
-      .orderBy(desc(devotionsSchema.scanDrafts.createdAt))
+      .from(schema.scanDrafts)
+      .orderBy(desc(schema.scanDrafts.createdAt))
       .all()
 
     res.json(drafts)
@@ -1070,10 +1050,10 @@ devotionsRouter.get(
 devotionsRouter.get(
   '/scan-drafts/:id',
   asyncHandler(async (req, res) => {
-    const draft = devotionsDb
+    const draft = db
       .select()
-      .from(devotionsSchema.scanDrafts)
-      .where(eq(devotionsSchema.scanDrafts.id, Number(req.params.id)))
+      .from(schema.scanDrafts)
+      .where(eq(schema.scanDrafts.id, Number(req.params.id)))
       .get()
 
     if (!draft) {
@@ -1101,8 +1081,8 @@ devotionsRouter.post(
       imagePath = `/data/scan-images/${filename}`
     }
 
-    const result = devotionsDb
-      .insert(devotionsSchema.scanDrafts)
+    const result = db
+      .insert(schema.scanDrafts)
       .values({
         month,
         year,
@@ -1126,10 +1106,10 @@ devotionsRouter.put(
     // Handle image: if new image provided, save it and remove old one
     let imagePath: string | undefined
     if (image) {
-      const existing = devotionsDb
-        .select({imagePath: devotionsSchema.scanDrafts.imagePath})
-        .from(devotionsSchema.scanDrafts)
-        .where(eq(devotionsSchema.scanDrafts.id, id))
+      const existing = db
+        .select({imagePath: schema.scanDrafts.imagePath})
+        .from(schema.scanDrafts)
+        .where(eq(schema.scanDrafts.id, id))
         .get()
 
       if (existing?.imagePath) {
@@ -1156,7 +1136,7 @@ devotionsRouter.put(
     }
     if (imagePath) updates.imagePath = imagePath
 
-    devotionsDb.update(devotionsSchema.scanDrafts).set(updates).where(eq(devotionsSchema.scanDrafts.id, id)).run()
+    db.update(schema.scanDrafts).set(updates).where(eq(schema.scanDrafts.id, id)).run()
 
     res.json({id})
   }),
@@ -1166,10 +1146,10 @@ devotionsRouter.put(
 devotionsRouter.delete(
   '/scan-drafts/:id',
   asyncHandler(async (req, res) => {
-    const draft = devotionsDb
-      .select({imagePath: devotionsSchema.scanDrafts.imagePath})
-      .from(devotionsSchema.scanDrafts)
-      .where(eq(devotionsSchema.scanDrafts.id, Number(req.params.id)))
+    const draft = db
+      .select({imagePath: schema.scanDrafts.imagePath})
+      .from(schema.scanDrafts)
+      .where(eq(schema.scanDrafts.id, Number(req.params.id)))
       .get()
 
     if (draft?.imagePath) {
@@ -1181,9 +1161,8 @@ devotionsRouter.delete(
       }
     }
 
-    devotionsDb
-      .delete(devotionsSchema.scanDrafts)
-      .where(eq(devotionsSchema.scanDrafts.id, Number(req.params.id)))
+    db.delete(schema.scanDrafts)
+      .where(eq(schema.scanDrafts.id, Number(req.params.id)))
       .run()
     res.json({success: true})
   }),
@@ -1215,8 +1194,7 @@ devotionsRouter.post(
     const passages = await generateDevotionPassage(count)
 
     for (const p of passages) {
-      devotionsDb
-        .insert(devotionsSchema.generatedPassages)
+      db.insert(schema.generatedPassages)
         .values({
           title: p.title,
           bibleReference: p.bibleReference,
@@ -1236,16 +1214,16 @@ devotionsRouter.get(
     const usedFilter = req.query.used
     const limit = Number(req.query.limit) || 100
 
-    let query = devotionsDb
+    let query = db
       .select()
-      .from(devotionsSchema.generatedPassages)
-      .orderBy(desc(devotionsSchema.generatedPassages.createdAt))
+      .from(schema.generatedPassages)
+      .orderBy(desc(schema.generatedPassages.createdAt))
       .limit(limit)
 
     if (usedFilter === 'true') {
-      query = query.where(eq(devotionsSchema.generatedPassages.used, true)) as typeof query
+      query = query.where(eq(schema.generatedPassages.used, true)) as typeof query
     } else if (usedFilter === 'false') {
-      query = query.where(eq(devotionsSchema.generatedPassages.used, false)) as typeof query
+      query = query.where(eq(schema.generatedPassages.used, false)) as typeof query
     }
 
     const rows = query.all()
@@ -1255,14 +1233,11 @@ devotionsRouter.get(
     const usageCounts = new Map<string, number>()
 
     if (uniqueRefs.length > 0) {
-      const allDevotions = devotionsDb
-        .select({bibleReference: devotionsSchema.devotions.bibleReference})
-        .from(devotionsSchema.devotions)
+      const allDevotions = db
+        .select({bibleReference: schema.devotions.bibleReference})
+        .from(schema.devotions)
         .where(
-          and(
-            sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`,
-            sql`${devotionsSchema.devotions.devotionType} != 'revisit'`,
-          ),
+          and(sql`${schema.devotions.bibleReference} IS NOT NULL`, sql`${schema.devotions.devotionType} != 'revisit'`),
         )
         .all()
 
@@ -1295,11 +1270,7 @@ devotionsRouter.post(
   asyncHandler(async (req, res) => {
     const {passageId, devotionId} = req.body as {passageId: number; devotionId: number}
 
-    const passage = devotionsDb
-      .select()
-      .from(devotionsSchema.generatedPassages)
-      .where(eq(devotionsSchema.generatedPassages.id, passageId))
-      .get()
+    const passage = db.select().from(schema.generatedPassages).where(eq(schema.generatedPassages.id, passageId)).get()
 
     if (!passage) {
       res.status(404).json({error: 'Passage not found'})
@@ -1307,39 +1278,33 @@ devotionsRouter.post(
     }
 
     // Update devotion with passage content
-    devotionsDb
-      .update(devotionsSchema.devotions)
+    db.update(schema.devotions)
       .set({
         title: passage.title,
         bibleReference: passage.bibleReference,
         talkingPoints: passage.talkingPoints,
         updatedAt: sql`datetime('now')`,
       })
-      .where(eq(devotionsSchema.devotions.id, devotionId))
+      .where(eq(schema.devotions.id, devotionId))
       .run()
 
     // Mark passage as used
-    devotionsDb
-      .update(devotionsSchema.generatedPassages)
+    db.update(schema.generatedPassages)
       .set({
         used: true,
         devotionId,
         usedAt: sql`datetime('now')`,
       })
-      .where(eq(devotionsSchema.generatedPassages.id, passageId))
+      .where(eq(schema.generatedPassages.id, passageId))
       .run()
 
-    const updatedPassage = devotionsDb
+    const updatedPassage = db
       .select()
-      .from(devotionsSchema.generatedPassages)
-      .where(eq(devotionsSchema.generatedPassages.id, passageId))
+      .from(schema.generatedPassages)
+      .where(eq(schema.generatedPassages.id, passageId))
       .get()
 
-    const updatedDevotion = devotionsDb
-      .select()
-      .from(devotionsSchema.devotions)
-      .where(eq(devotionsSchema.devotions.id, devotionId))
-      .get()
+    const updatedDevotion = db.select().from(schema.devotions).where(eq(schema.devotions.id, devotionId)).get()
 
     res.json({passage: updatedPassage, devotion: updatedDevotion})
   }),
@@ -1352,11 +1317,11 @@ devotionsRouter.post(
     const count = Math.min(Math.max(Number(req.body.count) || 1, 1), 30)
 
     // Pull available passages from pool
-    const available = devotionsDb
+    const available = db
       .select()
-      .from(devotionsSchema.generatedPassages)
-      .where(eq(devotionsSchema.generatedPassages.used, false))
-      .orderBy(asc(devotionsSchema.generatedPassages.createdAt))
+      .from(schema.generatedPassages)
+      .where(eq(schema.generatedPassages.used, false))
+      .orderBy(asc(schema.generatedPassages.createdAt))
       .limit(count)
       .all()
 
@@ -1373,8 +1338,8 @@ devotionsRouter.post(
     if (shortage > 0) {
       const newPassages = await generateDevotionPassage(shortage)
       for (const p of newPassages) {
-        const inserted = devotionsDb
-          .insert(devotionsSchema.generatedPassages)
+        const inserted = db
+          .insert(schema.generatedPassages)
           .values({
             title: p.title,
             bibleReference: p.bibleReference,
@@ -1400,10 +1365,10 @@ devotionsRouter.post(
 devotionsRouter.put(
   '/pool/:id',
   asyncHandler(async (req, res) => {
-    const passage = devotionsDb
+    const passage = db
       .select()
-      .from(devotionsSchema.generatedPassages)
-      .where(eq(devotionsSchema.generatedPassages.id, Number(req.params.id)))
+      .from(schema.generatedPassages)
+      .where(eq(schema.generatedPassages.id, Number(req.params.id)))
       .get()
 
     if (!passage) {
@@ -1411,14 +1376,14 @@ devotionsRouter.put(
       return
     }
 
-    const result = devotionsDb
-      .update(devotionsSchema.generatedPassages)
+    const result = db
+      .update(schema.generatedPassages)
       .set({
         title: req.body.title ?? passage.title,
         bibleReference: req.body.bibleReference ?? passage.bibleReference,
         talkingPoints: req.body.talkingPoints ?? passage.talkingPoints,
       })
-      .where(eq(devotionsSchema.generatedPassages.id, passage.id))
+      .where(eq(schema.generatedPassages.id, passage.id))
       .returning()
       .get()
 
@@ -1430,10 +1395,10 @@ devotionsRouter.put(
 devotionsRouter.delete(
   '/pool/:id',
   asyncHandler(async (req, res) => {
-    const passage = devotionsDb
+    const passage = db
       .select()
-      .from(devotionsSchema.generatedPassages)
-      .where(eq(devotionsSchema.generatedPassages.id, Number(req.params.id)))
+      .from(schema.generatedPassages)
+      .where(eq(schema.generatedPassages.id, Number(req.params.id)))
       .get()
 
     if (!passage) {
@@ -1445,10 +1410,7 @@ devotionsRouter.delete(
       return
     }
 
-    devotionsDb
-      .delete(devotionsSchema.generatedPassages)
-      .where(eq(devotionsSchema.generatedPassages.id, passage.id))
-      .run()
+    db.delete(schema.generatedPassages).where(eq(schema.generatedPassages.id, passage.id)).run()
 
     res.json({success: true})
   }),
@@ -1458,10 +1420,10 @@ devotionsRouter.delete(
 devotionsRouter.get(
   '/:id/chain-audit',
   asyncHandler(async (req, res) => {
-    const devotion = devotionsDb
+    const devotion = db
       .select()
-      .from(devotionsSchema.devotions)
-      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+      .from(schema.devotions)
+      .where(eq(schema.devotions.id, Number(req.params.id)))
       .get()
 
     if (!devotion) {
@@ -1495,10 +1457,10 @@ devotionsRouter.get(
 
     // Find all prior devotions (originals + revisits, excluding guests) that share
     // any verse key with this devotion
-    const all = devotionsDb
+    const all = db
       .select()
-      .from(devotionsSchema.devotions)
-      .where(sql`${devotionsSchema.devotions.bibleReference} IS NOT NULL`)
+      .from(schema.devotions)
+      .where(sql`${schema.devotions.bibleReference} IS NOT NULL`)
       .all()
 
     const byNumber = new Map(all.map((d) => [d.number, d]))
@@ -1594,10 +1556,10 @@ devotionsRouter.post(
       return
     }
 
-    const current = devotionsDb
+    const current = db
       .select()
-      .from(devotionsSchema.devotions)
-      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+      .from(schema.devotions)
+      .where(eq(schema.devotions.id, Number(req.params.id)))
       .get()
     if (!current) {
       res.status(404).json({error: 'Devotion not found'})
@@ -1608,11 +1570,7 @@ devotionsRouter.post(
       return
     }
 
-    const targetDevos = devotionsDb
-      .select()
-      .from(devotionsSchema.devotions)
-      .where(inArray(devotionsSchema.devotions.number, targets))
-      .all()
+    const targetDevos = db.select().from(schema.devotions).where(inArray(schema.devotions.number, targets)).all()
     if (targetDevos.length !== targets.length) {
       const found = new Set(targetDevos.map((d) => d.number))
       const missing = targets.filter((n) => !found.has(n))
@@ -1639,11 +1597,7 @@ devotionsRouter.post(
 
     // Collect all numbers we need dates for: original chain, targets, and every ancestor's chain
     const ancestorRevisits = originalChain.length
-      ? devotionsDb
-          .select()
-          .from(devotionsSchema.devotions)
-          .where(inArray(devotionsSchema.devotions.number, originalChain))
-          .all()
+      ? db.select().from(schema.devotions).where(inArray(schema.devotions.number, originalChain)).all()
       : []
 
     const allNumbers = new Set<number>([...targets, ...originalChain])
@@ -1651,10 +1605,10 @@ devotionsRouter.post(
       for (const n of parseChain(a.referencedDevotions)) allNumbers.add(n)
     }
 
-    const allDevos = devotionsDb
+    const allDevos = db
       .select()
-      .from(devotionsSchema.devotions)
-      .where(inArray(devotionsSchema.devotions.number, [...allNumbers]))
+      .from(schema.devotions)
+      .where(inArray(schema.devotions.number, [...allNumbers]))
       .all()
     const byNumber = new Map(allDevos.map((d) => [d.number, d]))
     const targetsByNumber = new Map(targetDevos.map((d) => [d.number, d]))
@@ -1691,13 +1645,12 @@ devotionsRouter.post(
     }
 
     for (const u of updates) {
-      devotionsDb
-        .update(devotionsSchema.devotions)
+      db.update(schema.devotions)
         .set({
           referencedDevotions: JSON.stringify(u.chain),
           updatedAt: sql`datetime('now')`,
         })
-        .where(eq(devotionsSchema.devotions.id, u.id))
+        .where(eq(schema.devotions.id, u.id))
         .run()
     }
 
@@ -1723,10 +1676,10 @@ devotionsRouter.post(
       return
     }
 
-    const devotion = devotionsDb
+    const devotion = db
       .select()
-      .from(devotionsSchema.devotions)
-      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+      .from(schema.devotions)
+      .where(eq(schema.devotions.id, Number(req.params.id)))
       .get()
     if (!devotion) {
       res.status(404).json({error: 'Devotion not found'})
@@ -1744,13 +1697,12 @@ devotionsRouter.post(
     for (const n of remove) set.delete(n)
     const next = [...set].sort((a, b) => a - b)
 
-    devotionsDb
-      .update(devotionsSchema.devotions)
+    db.update(schema.devotions)
       .set({
         chainIgnores: next.length > 0 ? JSON.stringify(next) : null,
         updatedAt: sql`datetime('now')`,
       })
-      .where(eq(devotionsSchema.devotions.id, devotion.id))
+      .where(eq(schema.devotions.id, devotion.id))
       .run()
 
     res.json({ignored: next})
@@ -1761,10 +1713,10 @@ devotionsRouter.post(
 devotionsRouter.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const devotion = devotionsDb
+    const devotion = db
       .select()
-      .from(devotionsSchema.devotions)
-      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+      .from(schema.devotions)
+      .where(eq(schema.devotions.id, Number(req.params.id)))
       .get()
 
     if (!devotion) {
@@ -1780,8 +1732,8 @@ devotionsRouter.post(
   '/',
   asyncHandler(async (req, res) => {
     try {
-      const result = devotionsDb
-        .insert(devotionsSchema.devotions)
+      const result = db
+        .insert(schema.devotions)
         .values({
           date: req.body.date,
           number: req.body.number,
@@ -1823,8 +1775,8 @@ devotionsRouter.post(
 devotionsRouter.put(
   '/:id',
   asyncHandler(async (req, res) => {
-    const result = devotionsDb
-      .update(devotionsSchema.devotions)
+    const result = db
+      .update(schema.devotions)
       .set({
         date: req.body.date ?? undefined,
         number: req.body.number ?? undefined,
@@ -1851,7 +1803,7 @@ devotionsRouter.put(
         flagged: req.body.flagged ?? undefined,
         updatedAt: sql`datetime('now')`,
       })
-      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+      .where(eq(schema.devotions.id, Number(req.params.id)))
       .returning()
       .get()
 
@@ -1873,10 +1825,10 @@ devotionsRouter.post(
       return
     }
 
-    const devotion = devotionsDb
+    const devotion = db
       .select()
-      .from(devotionsSchema.devotions)
-      .where(eq(devotionsSchema.devotions.number, Number(number)))
+      .from(schema.devotions)
+      .where(eq(schema.devotions.number, Number(number)))
       .get()
 
     if (!devotion) {
@@ -1908,10 +1860,10 @@ devotionsRouter.post(
       `Copyright \u00A9 ${year}`,
     ].join('\n\n')
 
-    const result = devotionsDb
-      .update(devotionsSchema.devotions)
+    const result = db
+      .update(schema.devotions)
       .set({youtubeDescription, updatedAt: sql`datetime('now')`})
-      .where(eq(devotionsSchema.devotions.id, devotion.id))
+      .where(eq(schema.devotions.id, devotion.id))
       .returning()
       .get()
 
@@ -1923,9 +1875,9 @@ devotionsRouter.post(
 devotionsRouter.delete(
   '/:id',
   asyncHandler(async (req, res) => {
-    const result = devotionsDb
-      .delete(devotionsSchema.devotions)
-      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+    const result = db
+      .delete(schema.devotions)
+      .where(eq(schema.devotions.id, Number(req.params.id)))
       .returning()
       .get()
 
@@ -1947,10 +1899,10 @@ devotionsRouter.patch(
       return
     }
 
-    const devotion = devotionsDb
+    const devotion = db
       .select()
-      .from(devotionsSchema.devotions)
-      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+      .from(schema.devotions)
+      .where(eq(schema.devotions.id, Number(req.params.id)))
       .get()
 
     if (!devotion) {
@@ -1958,13 +1910,13 @@ devotionsRouter.patch(
       return
     }
 
-    const result = devotionsDb
-      .update(devotionsSchema.devotions)
+    const result = db
+      .update(schema.devotions)
       .set({
         [field]: !devotion[field],
         updatedAt: sql`datetime('now')`,
       })
-      .where(eq(devotionsSchema.devotions.id, Number(req.params.id)))
+      .where(eq(schema.devotions.id, Number(req.params.id)))
       .returning()
       .get()
 
@@ -2056,8 +2008,8 @@ devotionsRouter.post(
     let notFound = 0
 
     for (const entry of entries) {
-      const result = devotionsDb
-        .update(devotionsSchema.devotions)
+      const result = db
+        .update(schema.devotions)
         .set({
           title: entry.title || undefined,
           youtubeDescription: entry.youtubeDescription || undefined,
@@ -2065,7 +2017,7 @@ devotionsRouter.post(
           podcastDescription: entry.podcastDescription || undefined,
           updatedAt: sql`datetime('now')`,
         })
-        .where(eq(devotionsSchema.devotions.number, entry.number))
+        .where(eq(schema.devotions.number, entry.number))
         .returning()
         .get()
 
@@ -2109,11 +2061,11 @@ devotionsRouter.post(
       return
     }
 
-    const existing = devotionsDb
-      .select({number: devotionsSchema.devotions.number})
-      .from(devotionsSchema.devotions)
+    const existing = db
+      .select({number: schema.devotions.number})
+      .from(schema.devotions)
       .where(
-        sql`${devotionsSchema.devotions.number} IN (${sql.join(
+        sql`${schema.devotions.number} IN (${sql.join(
           numbers.map((n) => sql`${n}`),
           sql`, `,
         )})`,
@@ -2163,15 +2115,14 @@ devotionsRouter.post(
       const hasGenerated = d.generatedTitle || d.generatedTalkingPoints
 
       try {
-        const existing = devotionsDb
-          .select({id: devotionsSchema.devotions.id})
-          .from(devotionsSchema.devotions)
-          .where(eq(devotionsSchema.devotions.number, d.number))
+        const existing = db
+          .select({id: schema.devotions.id})
+          .from(schema.devotions)
+          .where(eq(schema.devotions.number, d.number))
           .get()
 
         if (existing) {
-          devotionsDb
-            .update(devotionsSchema.devotions)
+          db.update(schema.devotions)
             .set({
               date: d.date,
               devotionType: d.devotionType,
@@ -2191,13 +2142,13 @@ devotionsRouter.post(
                 : {}),
               updatedAt: sql`datetime('now')`,
             })
-            .where(eq(devotionsSchema.devotions.id, existing.id))
+            .where(eq(schema.devotions.id, existing.id))
             .run()
           updated++
           importedDevotions.push({number: d.number, id: existing.id, passageId: d.generatedPassageId ?? null})
         } else {
-          const result = devotionsDb
-            .insert(devotionsSchema.devotions)
+          const result = db
+            .insert(schema.devotions)
             .values({
               date: d.date,
               number: d.number,
@@ -2230,14 +2181,13 @@ devotionsRouter.post(
     // Mark pool passages as used
     for (const imp of importedDevotions) {
       if (imp.passageId) {
-        devotionsDb
-          .update(devotionsSchema.generatedPassages)
+        db.update(schema.generatedPassages)
           .set({
             used: true,
             devotionId: imp.id,
             usedAt: sql`datetime('now')`,
           })
-          .where(eq(devotionsSchema.generatedPassages.id, imp.passageId))
+          .where(eq(schema.generatedPassages.id, imp.passageId))
           .run()
       }
     }
@@ -2286,11 +2236,7 @@ devotionsRouter.post(
       let originalNum: number | null = null
 
       for (let depth = 0; depth < 20; depth++) {
-        const devo = devotionsDb
-          .select()
-          .from(devotionsSchema.devotions)
-          .where(eq(devotionsSchema.devotions.number, current))
-          .get()
+        const devo = db.select().from(schema.devotions).where(eq(schema.devotions.number, current)).get()
 
         if (!devo) break
 

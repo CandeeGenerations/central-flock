@@ -1,8 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import {eq} from 'drizzle-orm'
 
-import {quotesDb, quotesSchema, quotesSqlite} from '../db-quotes/index.js'
-import {db, schema} from '../db/index.js'
+import {db, schema, sqlite} from '../db/index.js'
 import {resolveModel} from '../lib/ai-models.js'
 
 const PREFILTER_THRESHOLD = 300
@@ -67,17 +66,17 @@ function toFtsQuery(topic: string): string {
 }
 
 function loadAllQuotes(): QuoteRow[] {
-  return quotesDb
+  return db
     .select({
-      id: quotesSchema.quotes.id,
-      title: quotesSchema.quotes.title,
-      author: quotesSchema.quotes.author,
-      dateDisplay: quotesSchema.quotes.dateDisplay,
-      summary: quotesSchema.quotes.summary,
-      quoteText: quotesSchema.quotes.quoteText,
-      tags: quotesSchema.quotes.tags,
+      id: schema.quotes.id,
+      title: schema.quotes.title,
+      author: schema.quotes.author,
+      dateDisplay: schema.quotes.dateDisplay,
+      summary: schema.quotes.summary,
+      quoteText: schema.quotes.quoteText,
+      tags: schema.quotes.tags,
     })
-    .from(quotesSchema.quotes)
+    .from(schema.quotes)
     .all() as QuoteRow[]
 }
 
@@ -86,7 +85,7 @@ function prefilterCandidates(topic: string, limit: number): QuoteRow[] {
 
   let ftsIds: number[] = []
   try {
-    const ftsHits = quotesSqlite
+    const ftsHits = sqlite
       .prepare(
         `SELECT rowid AS id, bm25(quotes_fts) AS score FROM quotes_fts WHERE quotes_fts MATCH ? ORDER BY score LIMIT 200`,
       )
@@ -99,7 +98,7 @@ function prefilterCandidates(topic: string, limit: number): QuoteRow[] {
   // If FTS found fewer than limit, pad with most recent
   if (ftsIds.length < limit) {
     const recentIds = (
-      quotesSqlite.prepare(`SELECT id FROM quotes ORDER BY created_at DESC LIMIT ${limit}`).all() as {id: number}[]
+      sqlite.prepare(`SELECT id FROM quotes ORDER BY created_at DESC LIMIT ${limit}`).all() as {id: number}[]
     ).map((r) => r.id)
     const combined = [...new Set([...ftsIds, ...recentIds])]
     ftsIds = combined.slice(0, limit)
@@ -110,7 +109,7 @@ function prefilterCandidates(topic: string, limit: number): QuoteRow[] {
   if (ftsIds.length === 0) return loadAllQuotes().slice(0, limit)
 
   const placeholders = ftsIds.map(() => '?').join(',')
-  const rows = quotesSqlite
+  const rows = sqlite
     .prepare(
       `SELECT id, title, author, date_display AS dateDisplay, summary, quote_text AS quoteText, tags FROM quotes WHERE id IN (${placeholders})`,
     )
@@ -167,7 +166,7 @@ export async function runQuoteResearch(topic: string): Promise<ResearchResult> {
   const start = Date.now()
   const model = getConfiguredModel()
 
-  const totalRow = quotesSqlite.prepare(`SELECT COUNT(*) AS count FROM quotes`).get() as {count: number}
+  const totalRow = sqlite.prepare(`SELECT COUNT(*) AS count FROM quotes`).get() as {count: number}
   const total = totalRow.count
 
   const candidates = total <= PREFILTER_THRESHOLD ? loadAllQuotes() : prefilterCandidates(topic, 100)
@@ -205,8 +204,8 @@ export async function runQuoteResearch(topic: string): Promise<ResearchResult> {
   const {synthesis, results} = parseAiResponse(textBlock.text, quotesById)
   const durationMs = Date.now() - start
 
-  const inserted = quotesDb
-    .insert(quotesSchema.quoteSearches)
+  const inserted = db
+    .insert(schema.quoteSearches)
     .values({
       topic,
       synthesis,
@@ -215,7 +214,7 @@ export async function runQuoteResearch(topic: string): Promise<ResearchResult> {
       candidateCount: candidates.length,
       durationMs,
     })
-    .returning({id: quotesSchema.quoteSearches.id})
+    .returning({id: schema.quoteSearches.id})
     .get()
 
   return {
@@ -254,7 +253,7 @@ export function rehydrateSearch(searchRow: {
 
   if (ids.length > 0) {
     const placeholders = ids.map(() => '?').join(',')
-    const rows = quotesSqlite
+    const rows = sqlite
       .prepare(
         `SELECT id, title, author, date_display AS dateDisplay, summary, quote_text AS quoteText, tags FROM quotes WHERE id IN (${placeholders})`,
       )

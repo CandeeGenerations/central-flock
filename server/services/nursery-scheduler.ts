@@ -1,4 +1,4 @@
-import type {ServiceType} from '../db-nursery/schema.js'
+import type {ServiceType} from '../db/schema-nursery.js'
 
 export interface ServiceConfig {
   serviceType: ServiceType

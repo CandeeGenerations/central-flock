@@ -11,12 +11,10 @@ import {sql} from 'drizzle-orm'
 import path from 'path'
 import {fileURLToPath} from 'url'
 
-// Bootstrap the quotes DB (creates tables + FTS if they don't exist)
-// We need to import after potential DB init, so we do a dynamic path resolve.
+// Bootstrap the DB (side-effect: ensures tables + FTS exist).
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// Import DB (side-effect: creates quotes.db and tables)
-const {quotesDb, quotesSchema} = await import(path.join(__dirname, '..', 'server', 'db-quotes', 'index.js'))
+const {db, schema} = await import(path.join(__dirname, '..', 'server', 'db', 'index.js'))
 const {parseQuoteMarkdown} = await import(path.join(__dirname, '..', 'server', 'services', 'quote-parser.js'))
 
 const REPO = 'cgen01/tscandeequotes'
@@ -73,14 +71,13 @@ for (const file of quoteFiles) {
       continue
     }
 
-    const existing = quotesDb
-      .select({id: quotesSchema.quotes.id})
-      .from(quotesSchema.quotes)
-      .where(sql`${quotesSchema.quotes.externalId} = ${parsed.externalId}`)
+    const existing = db
+      .select({id: schema.quotes.id})
+      .from(schema.quotes)
+      .where(sql`${schema.quotes.externalId} = ${parsed.externalId}`)
       .get()
 
-    quotesDb
-      .insert(quotesSchema.quotes)
+    db.insert(schema.quotes)
       .values({
         externalId: parsed.externalId,
         title: parsed.title,
@@ -94,7 +91,7 @@ for (const file of quoteFiles) {
         source: parsed.source,
       })
       .onConflictDoUpdate({
-        target: quotesSchema.quotes.externalId,
+        target: schema.quotes.externalId,
         set: {
           title: parsed.title,
           author: parsed.author,

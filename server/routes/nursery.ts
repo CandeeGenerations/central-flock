@@ -5,9 +5,8 @@ import os from 'os'
 import path from 'path'
 import {fileURLToPath} from 'url'
 
-import {nurseryDb, nurserySchema} from '../db-nursery/index.js'
-import {serviceTypes} from '../db-nursery/schema.js'
 import {db, schema} from '../db/index.js'
+import {serviceTypes} from '../db/schema-nursery.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {sendImageViaUI} from '../services/applescript.js'
 
@@ -21,12 +20,8 @@ export const nurseryRouter = Router()
 nurseryRouter.get(
   '/workers',
   asyncHandler(async (_req, res) => {
-    const workers = nurseryDb
-      .select()
-      .from(nurserySchema.nurseryWorkers)
-      .orderBy(nurserySchema.nurseryWorkers.name)
-      .all()
-    const workerServices = nurseryDb.select().from(nurserySchema.nurseryWorkerServices).all()
+    const workers = db.select().from(schema.nurseryWorkers).orderBy(schema.nurseryWorkers.name).all()
+    const workerServices = db.select().from(schema.nurseryWorkerServices).all()
 
     const result = workers.map((w) => ({
       ...w,
@@ -46,8 +41,8 @@ nurseryRouter.post(
       return
     }
 
-    const worker = nurseryDb
-      .insert(nurserySchema.nurseryWorkers)
+    const worker = db
+      .insert(schema.nurseryWorkers)
       .values({
         name: name.trim(),
         maxPerMonth: maxPerMonth ?? 4,
@@ -58,17 +53,16 @@ nurseryRouter.post(
 
     if (services && Array.isArray(services)) {
       for (const svc of services) {
-        nurseryDb
-          .insert(nurserySchema.nurseryWorkerServices)
+        db.insert(schema.nurseryWorkerServices)
           .values({workerId: worker.id, serviceType: svc.serviceType, maxPerMonth: svc.maxPerMonth ?? null})
           .run()
       }
     }
 
-    const workerServices = nurseryDb
+    const workerServices = db
       .select()
-      .from(nurserySchema.nurseryWorkerServices)
-      .where(eq(nurserySchema.nurseryWorkerServices.workerId, worker.id))
+      .from(schema.nurseryWorkerServices)
+      .where(eq(schema.nurseryWorkerServices.workerId, worker.id))
       .all()
 
     res.json({...worker, services: workerServices})
@@ -81,18 +75,14 @@ nurseryRouter.put(
     const id = Number(req.params.id)
     const {name, maxPerMonth, allowMultiplePerDay, isActive} = req.body
 
-    const existing = nurseryDb
-      .select()
-      .from(nurserySchema.nurseryWorkers)
-      .where(eq(nurserySchema.nurseryWorkers.id, id))
-      .get()
+    const existing = db.select().from(schema.nurseryWorkers).where(eq(schema.nurseryWorkers.id, id)).get()
     if (!existing) {
       res.status(404).json({error: 'Worker not found'})
       return
     }
 
-    const updated = nurseryDb
-      .update(nurserySchema.nurseryWorkers)
+    const updated = db
+      .update(schema.nurseryWorkers)
       .set({
         ...(name !== undefined && {name: name.trim()}),
         ...(maxPerMonth !== undefined && {maxPerMonth}),
@@ -100,14 +90,14 @@ nurseryRouter.put(
         ...(isActive !== undefined && {isActive}),
         updatedAt: new Date().toISOString(),
       })
-      .where(eq(nurserySchema.nurseryWorkers.id, id))
+      .where(eq(schema.nurseryWorkers.id, id))
       .returning()
       .get()
 
-    const workerServices = nurseryDb
+    const workerServices = db
       .select()
-      .from(nurserySchema.nurseryWorkerServices)
-      .where(eq(nurserySchema.nurseryWorkerServices.workerId, id))
+      .from(schema.nurseryWorkerServices)
+      .where(eq(schema.nurseryWorkerServices.workerId, id))
       .all()
 
     res.json({...updated, services: workerServices})
@@ -118,7 +108,7 @@ nurseryRouter.delete(
   '/workers/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
-    nurseryDb.delete(nurserySchema.nurseryWorkers).where(eq(nurserySchema.nurseryWorkers.id, id)).run()
+    db.delete(schema.nurseryWorkers).where(eq(schema.nurseryWorkers.id, id)).run()
     res.json({success: true})
   }),
 )
@@ -129,26 +119,18 @@ nurseryRouter.put(
     const id = Number(req.params.id)
     const {services} = req.body as {services: {serviceType: string; maxPerMonth: number | null}[]}
 
-    const existing = nurseryDb
-      .select()
-      .from(nurserySchema.nurseryWorkers)
-      .where(eq(nurserySchema.nurseryWorkers.id, id))
-      .get()
+    const existing = db.select().from(schema.nurseryWorkers).where(eq(schema.nurseryWorkers.id, id)).get()
     if (!existing) {
       res.status(404).json({error: 'Worker not found'})
       return
     }
 
     // Delete all existing service rows for this worker, then re-insert
-    nurseryDb
-      .delete(nurserySchema.nurseryWorkerServices)
-      .where(eq(nurserySchema.nurseryWorkerServices.workerId, id))
-      .run()
+    db.delete(schema.nurseryWorkerServices).where(eq(schema.nurseryWorkerServices.workerId, id)).run()
 
     for (const svc of services) {
       if (serviceTypes.includes(svc.serviceType as (typeof serviceTypes)[number])) {
-        nurseryDb
-          .insert(nurserySchema.nurseryWorkerServices)
+        db.insert(schema.nurseryWorkerServices)
           .values({
             workerId: id,
             serviceType: svc.serviceType as (typeof serviceTypes)[number],
@@ -158,10 +140,10 @@ nurseryRouter.put(
       }
     }
 
-    const workerServices = nurseryDb
+    const workerServices = db
       .select()
-      .from(nurserySchema.nurseryWorkerServices)
-      .where(eq(nurserySchema.nurseryWorkerServices.workerId, id))
+      .from(schema.nurseryWorkerServices)
+      .where(eq(schema.nurseryWorkerServices.workerId, id))
       .all()
 
     res.json({...existing, services: workerServices})
@@ -173,11 +155,7 @@ nurseryRouter.put(
 nurseryRouter.get(
   '/service-config',
   asyncHandler(async (_req, res) => {
-    const config = nurseryDb
-      .select()
-      .from(nurserySchema.nurseryServiceConfig)
-      .orderBy(nurserySchema.nurseryServiceConfig.sortOrder)
-      .all()
+    const config = db.select().from(schema.nurseryServiceConfig).orderBy(schema.nurseryServiceConfig.sortOrder).all()
     res.json(config)
   }),
 )
@@ -197,10 +175,10 @@ nurseryRouter.put(
       return
     }
 
-    const updated = nurseryDb
-      .update(nurserySchema.nurseryServiceConfig)
+    const updated = db
+      .update(schema.nurseryServiceConfig)
       .set({workerCount})
-      .where(eq(nurserySchema.nurseryServiceConfig.serviceType, type as (typeof serviceTypes)[number]))
+      .where(eq(schema.nurseryServiceConfig.serviceType, type as (typeof serviceTypes)[number]))
       .returning()
       .get()
 
@@ -213,7 +191,7 @@ nurseryRouter.put(
 nurseryRouter.get(
   '/settings',
   asyncHandler(async (_req, res) => {
-    const settings = nurseryDb.select().from(nurserySchema.nurserySettings).all()
+    const settings = db.select().from(schema.nurserySettings).all()
     const result: Record<string, string> = {}
     for (const s of settings) {
       result[s.key] = s.value
@@ -228,11 +206,10 @@ nurseryRouter.put(
     const key = String(req.params.key)
     const {value} = req.body
 
-    nurseryDb
-      .insert(nurserySchema.nurserySettings)
+    db.insert(schema.nurserySettings)
       .values({key, value, updatedAt: new Date().toISOString()})
       .onConflictDoUpdate({
-        target: nurserySchema.nurserySettings.key,
+        target: schema.nurserySettings.key,
         set: {value, updatedAt: new Date().toISOString()},
       })
       .run()
@@ -264,11 +241,7 @@ nurseryRouter.post(
     const logoPath = `/data/nursery-logos/${filename}`
 
     // Clean up old logo
-    const oldLogo = nurseryDb
-      .select()
-      .from(nurserySchema.nurserySettings)
-      .where(eq(nurserySchema.nurserySettings.key, 'logoPath'))
-      .get()
+    const oldLogo = db.select().from(schema.nurserySettings).where(eq(schema.nurserySettings.key, 'logoPath')).get()
     if (oldLogo) {
       const oldFullPath = path.join(LOGOS_DIR, path.basename(oldLogo.value))
       if (fs.existsSync(oldFullPath)) {
@@ -276,11 +249,10 @@ nurseryRouter.post(
       }
     }
 
-    nurseryDb
-      .insert(nurserySchema.nurserySettings)
+    db.insert(schema.nurserySettings)
       .values({key: 'logoPath', value: logoPath, updatedAt: new Date().toISOString()})
       .onConflictDoUpdate({
-        target: nurserySchema.nurserySettings.key,
+        target: schema.nurserySettings.key,
         set: {value: logoPath, updatedAt: new Date().toISOString()},
       })
       .run()

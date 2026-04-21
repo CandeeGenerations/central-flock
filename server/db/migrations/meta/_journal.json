@@ -15,6 +15,13 @@
       "when": 1776186474920,
       "tag": "0001_violet_randall",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1776779608564,
+      "tag": "0002_absent_reaper",
+      "breakpoints": true
     }
   ]
 }

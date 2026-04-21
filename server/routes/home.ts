@@ -1,9 +1,7 @@
 import {and, eq, gte, inArray, lte, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
-import {devotionsDb, devotionsSchema} from '../db-devotions/index.js'
-import {quotesSqlite} from '../db-quotes/index.js'
-import {db, schema} from '../db/index.js'
+import {db, schema, sqlite} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {getSetting} from './settings.js'
 
@@ -97,30 +95,30 @@ homeRouter.get(
       .get()!.total
 
     // Quotes stats (from separate DB)
-    const quotesTotal = (quotesSqlite.prepare(`SELECT count(*) AS count FROM quotes`).get() as {count: number}).count
+    const quotesTotal = (sqlite.prepare(`SELECT count(*) AS count FROM quotes`).get() as {count: number}).count
 
     // Devotion stats (from separate DB)
-    const devotionsTotal = devotionsDb
+    const devotionsTotal = db
       .select({count: sql<number>`count(*)`})
-      .from(devotionsSchema.devotions)
+      .from(schema.devotions)
       .get()!.count
 
     const devotionsLatestNumber =
-      devotionsDb
-        .select({max: sql<number>`max(${devotionsSchema.devotions.number})`})
-        .from(devotionsSchema.devotions)
+      db
+        .select({max: sql<number>`max(${schema.devotions.number})`})
+        .from(schema.devotions)
         .get()?.max || 0
 
-    const completionRaw = devotionsDb
+    const completionRaw = db
       .select({
         total: sql<number>`count(*)`,
-        produced: sql<number>`sum(case when ${devotionsSchema.devotions.produced} = 1 then 1 else 0 end)`,
-        rendered: sql<number>`sum(case when ${devotionsSchema.devotions.rendered} = 1 then 1 else 0 end)`,
-        youtube: sql<number>`sum(case when ${devotionsSchema.devotions.youtube} = 1 then 1 else 0 end)`,
-        facebookInstagram: sql<number>`sum(case when ${devotionsSchema.devotions.facebookInstagram} = 1 then 1 else 0 end)`,
-        podcast: sql<number>`sum(case when ${devotionsSchema.devotions.podcast} = 1 then 1 else 0 end)`,
+        produced: sql<number>`sum(case when ${schema.devotions.produced} = 1 then 1 else 0 end)`,
+        rendered: sql<number>`sum(case when ${schema.devotions.rendered} = 1 then 1 else 0 end)`,
+        youtube: sql<number>`sum(case when ${schema.devotions.youtube} = 1 then 1 else 0 end)`,
+        facebookInstagram: sql<number>`sum(case when ${schema.devotions.facebookInstagram} = 1 then 1 else 0 end)`,
+        podcast: sql<number>`sum(case when ${schema.devotions.podcast} = 1 then 1 else 0 end)`,
       })
-      .from(devotionsSchema.devotions)
+      .from(schema.devotions)
       .get()!
 
     const devotionsCompletionRate =

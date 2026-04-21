@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import {Router} from 'express'
 
-import {quotesDb, quotesSchema, quotesSqlite} from '../db-quotes/index.js'
+import {db, schema, sqlite} from '../db/index.js'
 import {AI_MODELS} from '../lib/ai-models.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {extractCitedAuthor} from '../services/quote-parser.js'
@@ -15,7 +15,7 @@ export const quotesRouter = Router()
 quotesRouter.get(
   '/authors',
   asyncHandler(async (_req, res) => {
-    const rows = quotesSqlite.prepare(`SELECT DISTINCT author FROM quotes ORDER BY author ASC`).all() as {
+    const rows = sqlite.prepare(`SELECT DISTINCT author FROM quotes ORDER BY author ASC`).all() as {
       author: string
     }[]
     res.json(rows.map((r) => r.author))
@@ -38,11 +38,11 @@ quotesRouter.get(
       params.push(`%${q}%`)
     }
 
-    const countRow = quotesSqlite
-      .prepare(`SELECT COUNT(*) AS count FROM quote_searches ${whereClause}`)
-      .get(...params) as {count: number}
+    const countRow = sqlite.prepare(`SELECT COUNT(*) AS count FROM quote_searches ${whereClause}`).get(...params) as {
+      count: number
+    }
 
-    const rows = quotesSqlite
+    const rows = sqlite
       .prepare(
         `SELECT id, topic, created_at AS createdAt, model, json_array_length(results) AS resultCount
          FROM quote_searches ${whereClause}
@@ -76,7 +76,7 @@ quotesRouter.get(
       return
     }
 
-    const row = quotesSqlite
+    const row = sqlite
       .prepare(`SELECT id, topic, synthesis, results, model, created_at AS createdAt FROM quote_searches WHERE id = ?`)
       .get(id) as
       | {
@@ -107,7 +107,7 @@ quotesRouter.delete(
       res.status(400).json({error: 'Invalid id'})
       return
     }
-    const result = quotesSqlite.prepare(`DELETE FROM quote_searches WHERE id = ?`).run(id)
+    const result = sqlite.prepare(`DELETE FROM quote_searches WHERE id = ?`).run(id)
     if (result.changes === 0) {
       res.status(404).json({error: 'Search not found'})
       return
@@ -200,7 +200,7 @@ quotesRouter.get(
       try {
         const ftsQuery = q.split(/\s+/).filter(Boolean).join(' OR ')
         const ftsIds = (
-          quotesSqlite.prepare(`SELECT rowid FROM quotes_fts WHERE quotes_fts MATCH ? LIMIT 1000`).all(ftsQuery) as {
+          sqlite.prepare(`SELECT rowid FROM quotes_fts WHERE quotes_fts MATCH ? LIMIT 1000`).all(ftsQuery) as {
             rowid: number
           }[]
         ).map((r) => r.rowid)
@@ -242,11 +242,11 @@ quotesRouter.get(
     const orderCol = allowedSort[sortField] ?? 'captured_at'
     const orderDir = sortDir === 'asc' ? 'ASC' : 'DESC'
 
-    const countRow = quotesSqlite.prepare(`SELECT COUNT(*) AS count FROM quotes ${whereClause}`).get(...params) as {
+    const countRow = sqlite.prepare(`SELECT COUNT(*) AS count FROM quotes ${whereClause}`).get(...params) as {
       count: number
     }
 
-    const rows = quotesSqlite
+    const rows = sqlite
       .prepare(
         `SELECT id, external_id AS externalId, title, author, captured_by AS capturedBy,
                 captured_at AS capturedAt, date_display AS dateDisplay, summary,
@@ -279,7 +279,7 @@ quotesRouter.get(
       return
     }
 
-    const row = quotesSqlite
+    const row = sqlite
       .prepare(
         `SELECT id, external_id AS externalId, title, author, captured_by AS capturedBy,
                 captured_at AS capturedAt, date_display AS dateDisplay, summary,
@@ -328,8 +328,8 @@ quotesRouter.post(
     // Generate a unique externalId for manual quotes
     const externalId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-    const result = quotesDb
-      .insert(quotesSchema.quotes)
+    const result = db
+      .insert(schema.quotes)
       .values({
         externalId,
         title: body.title,
@@ -342,7 +342,7 @@ quotesRouter.post(
         tags: JSON.stringify(body.tags ?? []),
         source: 'manual',
       })
-      .returning({id: quotesSchema.quotes.id})
+      .returning({id: schema.quotes.id})
       .get()
 
     res.status(201).json({id: result!.id})
@@ -369,7 +369,7 @@ quotesRouter.patch(
       tags?: string[]
     }
 
-    const existing = quotesSqlite.prepare(`SELECT id FROM quotes WHERE id = ?`).get(id)
+    const existing = sqlite.prepare(`SELECT id FROM quotes WHERE id = ?`).get(id)
     if (!existing) {
       res.status(404).json({error: 'Quote not found'})
       return
@@ -415,7 +415,7 @@ quotesRouter.patch(
     updates.push(`updated_at = datetime('now', 'localtime')`)
     params.push(id)
 
-    quotesSqlite.prepare(`UPDATE quotes SET ${updates.join(', ')} WHERE id = ?`).run(...params)
+    sqlite.prepare(`UPDATE quotes SET ${updates.join(', ')} WHERE id = ?`).run(...params)
 
     res.json({ok: true})
   }),
@@ -431,7 +431,7 @@ quotesRouter.delete(
       return
     }
 
-    const result = quotesSqlite.prepare(`DELETE FROM quotes WHERE id = ?`).run(id)
+    const result = sqlite.prepare(`DELETE FROM quotes WHERE id = ?`).run(id)
     if (result.changes === 0) {
       res.status(404).json({error: 'Quote not found'})
       return

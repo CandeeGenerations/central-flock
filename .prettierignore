@@ -4,3 +4,6 @@ pnpm-lock.yaml
 schema.graphql
 
 .github/dependabot.yml
+data
+backups
+server/db/migrations/meta

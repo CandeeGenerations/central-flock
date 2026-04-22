@@ -22,7 +22,7 @@ export function DevotionPassagesPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [count, setCount] = useState(10)
-  const [filter, setFilter] = useState<FilterMode>('all')
+  const [filter, setFilter] = useState<FilterMode>('available')
   const [page, setPage] = useState(1)
 
   const usedParam = filter === 'available' ? 'false' : filter === 'used' ? 'true' : undefined
@@ -124,7 +124,7 @@ export function DevotionPassagesPage() {
           </div>
         </CardContent>
 
-        <div className="overflow-x-auto border-t">
+        <div className="border-t">
           {isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -137,6 +137,7 @@ export function DevotionPassagesPage() {
                 <TableRow>
                   <TableHead>Title</TableHead>
                   <TableHead>Reference</TableHead>
+                  <TableHead>Subcode</TableHead>
                   <TableHead className="text-center">Used In</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -165,6 +166,7 @@ function PassageRow({passage, onClick}: {passage: PoolPassage; onClick: () => vo
     <TableRow className="cursor-pointer hover:bg-muted/50" onClick={onClick}>
       <TableCell className="font-medium max-w-48">{passage.title}</TableCell>
       <TableCell>{passage.bibleReference}</TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">{passage.subcode || '—'}</TableCell>
       <TableCell className="text-center">
         {passage.scriptureUsageCount > 0 ? (
           <Badge variant={passage.scriptureUsageCount > 2 ? 'destructive' : 'secondary'}>

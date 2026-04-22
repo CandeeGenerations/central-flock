@@ -300,6 +300,7 @@ export interface GeneratedPassage {
 
 export interface PoolPassage extends GeneratedPassage {
   id: number
+  subcode: string | null
   used: boolean
   devotionId: number | null
   createdAt: string
@@ -327,8 +328,9 @@ export function deletePoolPassage(id: number) {
 }
 
 export function pullPassagesForScan(count: number) {
-  return request<{passages: Array<GeneratedPassage & {id: number}>; generated: number; fromPool: number}>(
-    '/devotions/pool/pull-for-scan',
-    {method: 'POST', body: JSON.stringify({count})},
-  )
+  return request<{
+    passages: Array<GeneratedPassage & {id: number; subcode: string | null}>
+    generated: number
+    fromPool: number
+  }>('/devotions/pool/pull-for-scan', {method: 'POST', body: JSON.stringify({count})})
 }

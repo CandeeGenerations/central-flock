@@ -1,5 +1,6 @@
 import {AIProgress} from '@/components/ai-progress'
 import {ConfirmDialog} from '@/components/confirm-dialog'
+import {TalkingPointsPresenter} from '@/components/talking-points-presenter'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -29,7 +30,19 @@ import {
   youtubeSearchUrl,
 } from '@/lib/devotion-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertTriangle, ArrowLeft, Check, Copy, ExternalLink, Flag, Loader2, Save, Sparkles, Trash2} from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  Copy,
+  ExternalLink,
+  Flag,
+  Loader2,
+  Maximize2,
+  Save,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import {useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -236,6 +249,7 @@ export function DevotionDetailPage() {
     {message: 'Processing response\u2026', progress: 80},
   ])
   const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false)
+  const [presenterOpen, setPresenterOpen] = useState(false)
 
   const {data: devotion, isLoading} = useQuery({
     queryKey: ['devotion', id],
@@ -682,7 +696,19 @@ export function DevotionDetailPage() {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground">Talking Points</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">Talking Points</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setPresenterOpen(true)}
+                        disabled={!form.talkingPoints}
+                      >
+                        <Maximize2 className="h-3.5 w-3.5 mr-1.5" />
+                        Present
+                      </Button>
+                    </div>
                     <Textarea
                       value={form.talkingPoints}
                       onChange={(e) => update({talkingPoints: e.target.value})}
@@ -835,8 +861,10 @@ export function DevotionDetailPage() {
                                   {TYPE_LABELS[m.type] || m.type}
                                 </Badge>
                               </td>
-                              <td className="py-2 px-3 text-muted-foreground">{m.bibleReference || '—'}</td>
-                              <td className="py-2 px-3 text-muted-foreground">{m.songName || '—'}</td>
+                              <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                                {m.bibleReference || '—'}
+                              </td>
+                              <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">{m.songName || '—'}</td>
                               <td className="py-2 px-3 text-right">
                                 <Button
                                   size="sm"
@@ -910,6 +938,7 @@ export function DevotionDetailPage() {
                       <tr className="border-b">
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground">#</th>
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground">Type</th>
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Date</th>
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground">Scripture</th>
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground">Song</th>
                       </tr>
@@ -941,8 +970,19 @@ export function DevotionDetailPage() {
                                 <span className="text-xs text-muted-foreground">not found</span>
                               )}
                             </td>
-                            <td className="py-2 px-3 text-muted-foreground">{d?.bibleReference || '—'}</td>
-                            <td className="py-2 px-3 text-muted-foreground">{d?.songName || '—'}</td>
+                            <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                              {d?.date
+                                ? new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  })
+                                : '—'}
+                            </td>
+                            <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                              {d?.bibleReference || '—'}
+                            </td>
+                            <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">{d?.songName || '—'}</td>
                           </tr>
                         )
                       })}
@@ -1178,6 +1218,15 @@ export function DevotionDetailPage() {
           setGenerateConfirmOpen(false)
           doGenerate()
         }}
+      />
+
+      <TalkingPointsPresenter
+        open={presenterOpen}
+        onClose={() => setPresenterOpen(false)}
+        title={form.title || (typeof form.number === 'number' ? `#${String(form.number).padStart(3, '0')}` : undefined)}
+        subcode={form.subcode}
+        reference={form.bibleReference}
+        content={form.talkingPoints}
       />
     </div>
   )

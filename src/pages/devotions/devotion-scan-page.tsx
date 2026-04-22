@@ -316,7 +316,10 @@ export function DevotionScanPage() {
       if (d.devotionType === 'guest' && d.guestSpeaker === 'Tyler') tylerIndices.push(i)
     })
 
-    const passageMap = new Map<number, {id: number; title: string; bibleReference: string; talkingPoints: string}>()
+    const passageMap = new Map<
+      number,
+      {id: number; title: string; bibleReference: string; talkingPoints: string; subcode: string | null}
+    >()
     if (tylerIndices.length > 0) {
       try {
         const pullResult = await pullPassagesForScan(tylerIndices.length)
@@ -350,6 +353,9 @@ export function DevotionScanPage() {
           updatedDevotion.generatedBibleReference = passage.bibleReference
           updatedDevotion.generatedTalkingPoints = passage.talkingPoints
           updatedDevotion.generatedPassageId = passage.id
+          if (passage.subcode) {
+            updatedDevotion.subcode = passage.subcode
+          }
           if (!updatedDevotion.bibleReference) {
             updatedDevotion.bibleReference = passage.bibleReference
           }

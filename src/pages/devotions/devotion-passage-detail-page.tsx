@@ -1,4 +1,5 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
+import {TalkingPointsPresenter} from '@/components/talking-points-presenter'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -8,7 +9,7 @@ import {PageSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
 import {type PoolPassage, deletePoolPassage, fetchPool, youtubeSearchUrl} from '@/lib/devotion-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, ExternalLink, Save, Trash2} from 'lucide-react'
+import {ArrowLeft, ExternalLink, Maximize2, Save, Trash2} from 'lucide-react'
 import {useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -44,6 +45,7 @@ interface PassageForm {
   title: string
   bibleReference: string
   talkingPoints: string
+  subcode: string
 }
 
 function fetchScriptureLookup(search: string) {
@@ -71,8 +73,9 @@ export function DevotionPassageDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [presenterOpen, setPresenterOpen] = useState(false)
 
-  const [form, setForm] = useState<PassageForm>({title: '', bibleReference: '', talkingPoints: ''})
+  const [form, setForm] = useState<PassageForm>({title: '', bibleReference: '', talkingPoints: '', subcode: ''})
   const [loadedPassageId, setLoadedPassageId] = useState<number | null>(null)
 
   // Fetch all pool passages and find the one we need
@@ -89,6 +92,7 @@ export function DevotionPassageDetailPage() {
       title: passage.title,
       bibleReference: passage.bibleReference,
       talkingPoints: passage.talkingPoints,
+      subcode: passage.subcode ?? '',
     })
   }
 
@@ -169,13 +173,34 @@ export function DevotionPassageDetailPage() {
             )}
           </div>
           <div>
-            <Label>Talking Points</Label>
+            <div className="flex items-center justify-between">
+              <Label>Talking Points</Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setPresenterOpen(true)}
+                disabled={!form.talkingPoints}
+              >
+                <Maximize2 className="h-3.5 w-3.5 mr-1.5" />
+                Present
+              </Button>
+            </div>
             <Textarea
               value={form.talkingPoints}
               onChange={(e) => update({talkingPoints: e.target.value})}
               rows={6}
               placeholder="Key phrases for the devotion"
             />
+          </div>
+          <div>
+            <Label>Subcode</Label>
+            <Input
+              value={form.subcode}
+              onChange={(e) => update({subcode: e.target.value})}
+              placeholder="Recording slot, e.g. 019 - B-B"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Copies to the devotion when this passage is assigned.</p>
           </div>
 
           {passage.devotionId && (
@@ -258,6 +283,15 @@ export function DevotionPassageDetailPage() {
         variant="destructive"
         loading={deleteMutation.isPending}
         onConfirm={() => deleteMutation.mutate()}
+      />
+
+      <TalkingPointsPresenter
+        open={presenterOpen}
+        onClose={() => setPresenterOpen(false)}
+        title={form.title}
+        subcode={form.subcode}
+        reference={form.bibleReference}
+        content={form.talkingPoints}
       />
     </div>
   )

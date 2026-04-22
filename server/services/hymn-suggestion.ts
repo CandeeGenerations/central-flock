@@ -328,7 +328,7 @@ export async function runHymnSuggestion(input: HymnSuggestionInput): Promise<Hym
   const hymns = loadHymns(filter)
   if (hymns.length === 0) {
     throw new Error(
-      'No hymns found in the hymns.db. Run `npx tsx scripts/extract-hymns.ts` then `npx tsx scripts/load-hymns.ts` to seed.',
+      'No hymns found in central-flock.db. Run `npx tsx scripts/extract-hymns.ts` then `npx tsx scripts/load-hymns.ts` to seed.',
     )
   }
 

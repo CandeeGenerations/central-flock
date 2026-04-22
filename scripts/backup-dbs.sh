@@ -20,6 +20,13 @@ done
 rm -rf "$DEST/$DATE"
 mv "$TMP" "$DEST/$DATE"
 
-# Retain 5 newest dated folders
+# Retain 5 newest dated folders. Use `while read` instead of xargs so each
+# deletion logs and a single failure doesn't silently swallow the rest.
 cd "$DEST"
-ls -1d 20*/ 2>/dev/null | sort -r | tail -n +6 | xargs -r rm -rf --
+ls -1d 20*/ 2>/dev/null | sort -r | tail -n +6 | while IFS= read -r OLD; do
+  echo "Pruning old backup: $OLD"
+  rm -rf -- "$OLD"
+done
+
+echo "Retained backups:"
+ls -1d 20*/ 2>/dev/null | sort -r | head -n 5 | sed 's/^/  /'

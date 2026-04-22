@@ -69,6 +69,7 @@ export const generatedPassages = sqliteTable('generated_passages', {
   title: text('title').notNull(),
   bibleReference: text('bible_reference').notNull(),
   talkingPoints: text('talking_points').notNull(),
+  subcode: text('subcode'),
   used: integer('used', {mode: 'boolean'}).default(false).notNull(),
   devotionId: integer('devotion_id').references(() => devotions.id, {onDelete: 'set null'}),
   createdAt: text('created_at')

@@ -1283,6 +1283,7 @@ devotionsRouter.post(
         title: passage.title,
         bibleReference: passage.bibleReference,
         talkingPoints: passage.talkingPoints,
+        ...(passage.subcode ? {subcode: passage.subcode} : {}),
         updatedAt: sql`datetime('now')`,
       })
       .where(eq(schema.devotions.id, devotionId))
@@ -1330,6 +1331,7 @@ devotionsRouter.post(
       title: p.title,
       bibleReference: p.bibleReference,
       talkingPoints: p.talkingPoints,
+      subcode: p.subcode,
     }))
 
     // If not enough in pool, generate the remainder
@@ -1352,6 +1354,7 @@ devotionsRouter.post(
           title: inserted.title,
           bibleReference: inserted.bibleReference,
           talkingPoints: inserted.talkingPoints,
+          subcode: inserted.subcode,
         })
       }
     }
@@ -1382,6 +1385,7 @@ devotionsRouter.put(
         title: req.body.title ?? passage.title,
         bibleReference: req.body.bibleReference ?? passage.bibleReference,
         talkingPoints: req.body.talkingPoints ?? passage.talkingPoints,
+        subcode: req.body.subcode !== undefined ? req.body.subcode || null : passage.subcode,
       })
       .where(eq(schema.generatedPassages.id, passage.id))
       .returning()

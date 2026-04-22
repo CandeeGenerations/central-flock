@@ -154,18 +154,49 @@ function formatMonthLabel(ym: string): string {
   return new Date(y, m - 1).toLocaleDateString('en-US', {month: 'long', year: 'numeric'})
 }
 
+type ColumnKey =
+  | 'date'
+  | 'number'
+  | 'type'
+  | 'subcode'
+  | 'reference'
+  | 'song'
+  | 'produced'
+  | 'rendered'
+  | 'youtube'
+  | 'facebookInstagram'
+  | 'podcast'
+
+const ALWAYS_VISIBLE: ColumnKey[] = ['date', 'number']
+
+const COLUMNS: {key: ColumnKey; label: string; defaultHidden?: boolean}[] = [
+  {key: 'type', label: 'Type'},
+  {key: 'subcode', label: 'Subcode', defaultHidden: true},
+  {key: 'reference', label: 'Reference'},
+  {key: 'song', label: 'Song'},
+  {key: 'produced', label: 'Produced'},
+  {key: 'rendered', label: 'R/V'},
+  {key: 'youtube', label: 'YouTube'},
+  {key: 'facebookInstagram', label: 'FB/IG'},
+  {key: 'podcast', label: 'Podcast'},
+]
+
+const DEFAULT_HIDDEN = COLUMNS.filter((c) => c.defaultHidden).map((c) => c.key)
+
 export function DevotionListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [search, setSearch] = usePersistedState('devotions.search', '')
   const debouncedSearch = useDebouncedValue(search, 250)
   const [typeFilters, setTypeFilters] = usePersistedState<string[]>('devotions.typeFilters', [])
-  const [guestFilters, setGuestFilters] = usePersistedState<string[]>('devotions.guestFilters', [])
   const [statusFilter, setStatusFilter] = usePersistedState('devotions.statusFilter', 'all')
   const [pipelineFilters, setPipelineFilters] = usePersistedState<string[]>('devotions.pipelineFilters', [])
   const [flaggedFilter, setFlaggedFilter] = usePersistedState('devotions.flaggedFilter', 'all')
   const [monthFilters, setMonthFilters] = usePersistedState<string[]>('devotions.monthFilters', [])
   const [page, setPage] = usePersistedState('devotions.page', 1)
+  const [hiddenColumns, setHiddenColumns] = usePersistedState<ColumnKey[]>('devotions.hiddenColumns', DEFAULT_HIDDEN)
+  const isVisible = (key: ColumnKey) => ALWAYS_VISIBLE.includes(key) || !hiddenColumns.includes(key)
+  const visibleColSpan = ALWAYS_VISIBLE.length + COLUMNS.filter((c) => isVisible(c.key)).length + 2 // +flag +menu
 
   const {data: draftCountData} = useQuery({
     queryKey: ['scan-draft-count'],
@@ -187,7 +218,6 @@ export function DevotionListPage() {
       'devotions',
       debouncedSearch,
       typeFilters.join(','),
-      guestFilters.join(','),
       statusFilter,
       pipelineFilters.join(','),
       flaggedFilter,
@@ -200,7 +230,6 @@ export function DevotionListPage() {
       fetchDevotions({
         search: debouncedSearch || undefined,
         devotionType: typeFilters.length > 0 ? typeFilters.join(',') : undefined,
-        guestSpeaker: guestFilters.length > 0 ? guestFilters.join(',') : undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
         pipelineMissing: pipelineFilters.length > 0 ? pipelineFilters.join(',') : undefined,
         flagged: flaggedFilter === 'flagged' ? 'true' : undefined,
@@ -275,6 +304,17 @@ export function DevotionListPage() {
               containerClassName="sm:max-w-sm"
             />
             <MultiSelect
+              value={COLUMNS.filter((c) => isVisible(c.key)).map((c) => c.key)}
+              onValueChange={(v) => {
+                const visible = new Set(v as ColumnKey[])
+                setHiddenColumns(COLUMNS.filter((c) => !visible.has(c.key)).map((c) => c.key))
+              }}
+              options={COLUMNS.map((c) => ({value: c.key, label: c.label}))}
+              allLabel="All Columns"
+              searchable={false}
+              className="w-full sm:w-44"
+            />
+            <MultiSelect
               value={typeFilters}
               onValueChange={(v) => {
                 setTypeFilters(v)
@@ -289,21 +329,6 @@ export function DevotionListPage() {
               allLabel="All Types"
               searchable={false}
               className="w-full sm:w-40"
-            />
-            <MultiSelect
-              value={guestFilters}
-              onValueChange={(v) => {
-                setGuestFilters(v)
-                setPage(1)
-              }}
-              options={[
-                {value: 'Tyler', label: 'Tyler'},
-                {value: 'Gabe', label: 'Gabe'},
-                {value: 'Ed', label: 'Ed'},
-              ]}
-              allLabel="All Speakers"
-              searchable={false}
-              className="w-full sm:w-44"
             />
             <Select
               value={statusFilter}
@@ -382,31 +407,36 @@ export function DevotionListPage() {
                     <TableHead className="w-10 text-center">
                       <Flag className="h-3.5 w-3.5 text-muted-foreground mx-auto" />
                     </TableHead>
-                    <TableHead>
-                      <button
-                        className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
-                        onClick={() => handleSort('date')}
-                      >
-                        Date
-                        {sortIcon('date')}
-                      </button>
-                    </TableHead>
-                    <TableHead>
-                      <button
-                        className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
-                        onClick={() => handleSort('number')}
-                      >
-                        #{sortIcon('number')}
-                      </button>
-                    </TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead>Song</TableHead>
-                    <TableHead className="text-center">Produced</TableHead>
-                    <TableHead className="text-center">R/V</TableHead>
-                    <TableHead className="text-center">YouTube</TableHead>
-                    <TableHead className="text-center">FB/IG</TableHead>
-                    <TableHead className="text-center">Podcast</TableHead>
+                    {isVisible('date') && (
+                      <TableHead>
+                        <button
+                          className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
+                          onClick={() => handleSort('date')}
+                        >
+                          Date
+                          {sortIcon('date')}
+                        </button>
+                      </TableHead>
+                    )}
+                    {isVisible('number') && (
+                      <TableHead>
+                        <button
+                          className="flex items-center gap-1 font-bold hover:text-foreground cursor-pointer"
+                          onClick={() => handleSort('number')}
+                        >
+                          #{sortIcon('number')}
+                        </button>
+                      </TableHead>
+                    )}
+                    {isVisible('type') && <TableHead>Type</TableHead>}
+                    {isVisible('subcode') && <TableHead>Subcode</TableHead>}
+                    {isVisible('reference') && <TableHead>Reference</TableHead>}
+                    {isVisible('song') && <TableHead>Song</TableHead>}
+                    {isVisible('produced') && <TableHead className="text-center">Produced</TableHead>}
+                    {isVisible('rendered') && <TableHead className="text-center">R/V</TableHead>}
+                    {isVisible('youtube') && <TableHead className="text-center">YouTube</TableHead>}
+                    {isVisible('facebookInstagram') && <TableHead className="text-center">FB/IG</TableHead>}
+                    {isVisible('podcast') && <TableHead className="text-center">Podcast</TableHead>}
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -426,64 +456,89 @@ export function DevotionListPage() {
                           }}
                         />
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {formatDate(devotion.date)}
-                      </TableCell>
-                      <TableCell className="font-medium tabular-nums">
-                        #{String(devotion.number).padStart(3, '0')}
-                      </TableCell>
-                      <TableCell>
-                        <TypeBadge devotion={devotion} />
-                      </TableCell>
-                      <TableCell className="max-w-48 truncate">{devotion.bibleReference || '—'}</TableCell>
-                      <TableCell className="max-w-48 truncate text-muted-foreground">
-                        {devotion.songName || '—'}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <CheckboxCell
-                          checked={devotion.produced}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleMutation.mutate({id: devotion.id, field: 'produced'})
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <CheckboxCell
-                          checked={devotion.rendered}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleMutation.mutate({id: devotion.id, field: 'rendered'})
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <CheckboxCell
-                          checked={devotion.youtube}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleMutation.mutate({id: devotion.id, field: 'youtube'})
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <CheckboxCell
-                          checked={devotion.facebookInstagram}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleMutation.mutate({id: devotion.id, field: 'facebookInstagram'})
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <CheckboxCell
-                          checked={devotion.podcast}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleMutation.mutate({id: devotion.id, field: 'podcast'})
-                          }}
-                        />
-                      </TableCell>
+                      {isVisible('date') && (
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {formatDate(devotion.date)}
+                        </TableCell>
+                      )}
+                      {isVisible('number') && (
+                        <TableCell className="font-medium tabular-nums">
+                          #{String(devotion.number).padStart(3, '0')}
+                        </TableCell>
+                      )}
+                      {isVisible('type') && (
+                        <TableCell>
+                          <TypeBadge devotion={devotion} />
+                        </TableCell>
+                      )}
+                      {isVisible('subcode') && (
+                        <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+                          {devotion.subcode || '—'}
+                        </TableCell>
+                      )}
+                      {isVisible('reference') && (
+                        <TableCell className="max-w-48 truncate">{devotion.bibleReference || '—'}</TableCell>
+                      )}
+                      {isVisible('song') && (
+                        <TableCell className="max-w-48 truncate text-muted-foreground">
+                          {devotion.songName || '—'}
+                        </TableCell>
+                      )}
+                      {isVisible('produced') && (
+                        <TableCell className="text-center">
+                          <CheckboxCell
+                            checked={devotion.produced}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleMutation.mutate({id: devotion.id, field: 'produced'})
+                            }}
+                          />
+                        </TableCell>
+                      )}
+                      {isVisible('rendered') && (
+                        <TableCell className="text-center">
+                          <CheckboxCell
+                            checked={devotion.rendered}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleMutation.mutate({id: devotion.id, field: 'rendered'})
+                            }}
+                          />
+                        </TableCell>
+                      )}
+                      {isVisible('youtube') && (
+                        <TableCell className="text-center">
+                          <CheckboxCell
+                            checked={devotion.youtube}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleMutation.mutate({id: devotion.id, field: 'youtube'})
+                            }}
+                          />
+                        </TableCell>
+                      )}
+                      {isVisible('facebookInstagram') && (
+                        <TableCell className="text-center">
+                          <CheckboxCell
+                            checked={devotion.facebookInstagram}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleMutation.mutate({id: devotion.id, field: 'facebookInstagram'})
+                            }}
+                          />
+                        </TableCell>
+                      )}
+                      {isVisible('podcast') && (
+                        <TableCell className="text-center">
+                          <CheckboxCell
+                            checked={devotion.podcast}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleMutation.mutate({id: devotion.id, field: 'podcast'})
+                            }}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <CopyMenu devotion={devotion} />
                       </TableCell>
@@ -491,7 +546,7 @@ export function DevotionListPage() {
                   ))}
                   {data?.data.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={visibleColSpan} className="text-center text-muted-foreground py-8">
                         No devotions found.
                       </TableCell>
                     </TableRow>

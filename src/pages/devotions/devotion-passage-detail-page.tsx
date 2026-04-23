@@ -3,6 +3,7 @@ import {TalkingPointsPresenter} from '@/components/talking-points-presenter'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {PageSpinner} from '@/components/ui/spinner'
@@ -46,6 +47,7 @@ interface PassageForm {
   bibleReference: string
   talkingPoints: string
   subcode: string
+  recorded: boolean
 }
 
 function fetchScriptureLookup(search: string) {
@@ -75,7 +77,13 @@ export function DevotionPassageDetailPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [presenterOpen, setPresenterOpen] = useState(false)
 
-  const [form, setForm] = useState<PassageForm>({title: '', bibleReference: '', talkingPoints: '', subcode: ''})
+  const [form, setForm] = useState<PassageForm>({
+    title: '',
+    bibleReference: '',
+    talkingPoints: '',
+    subcode: '',
+    recorded: false,
+  })
   const [loadedPassageId, setLoadedPassageId] = useState<number | null>(null)
 
   // Fetch all pool passages and find the one we need
@@ -93,6 +101,7 @@ export function DevotionPassageDetailPage() {
       bibleReference: passage.bibleReference,
       talkingPoints: passage.talkingPoints,
       subcode: passage.subcode ?? '',
+      recorded: passage.recorded,
     })
   }
 
@@ -202,6 +211,10 @@ export function DevotionPassageDetailPage() {
             />
             <p className="text-xs text-muted-foreground mt-1">Copies to the devotion when this passage is assigned.</p>
           </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox checked={form.recorded} onCheckedChange={(checked) => update({recorded: !!checked})} />
+            <span className="text-sm">Recorded</span>
+          </label>
 
           {passage.devotionId && (
             <div className="text-sm text-muted-foreground">

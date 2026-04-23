@@ -1386,6 +1386,7 @@ devotionsRouter.put(
         bibleReference: req.body.bibleReference ?? passage.bibleReference,
         talkingPoints: req.body.talkingPoints ?? passage.talkingPoints,
         subcode: req.body.subcode !== undefined ? req.body.subcode || null : passage.subcode,
+        recorded: req.body.recorded ?? passage.recorded,
       })
       .where(eq(schema.generatedPassages.id, passage.id))
       .returning()

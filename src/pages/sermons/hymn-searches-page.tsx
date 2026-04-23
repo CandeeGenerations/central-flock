@@ -120,7 +120,7 @@ export function HymnSearchesPage() {
             </TableBody>
           </Table>
         </div>
-        {data && data.total > 20 && (
+        {data && data.total > 0 && (
           <CardContent>
             <Pagination page={page} pageSize={20} total={data.total} onPageChange={setPage} noun="searches" />
           </CardContent>

@@ -7,14 +7,15 @@ import {Label} from '@/components/ui/label'
 import {Pagination} from '@/components/ui/pagination'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useProgressOperation} from '@/hooks/use-sse'
-import {type PoolPassage, fetchPool, generatePoolPassages} from '@/lib/devotion-api'
-import {useQuery, useQueryClient} from '@tanstack/react-query'
-import {Loader2, Sparkles} from 'lucide-react'
+import {type PoolPassage, fetchPool, generatePoolPassages, setPoolPassageRecorded} from '@/lib/devotion-api'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {Check, Loader2, Sparkles, X} from 'lucide-react'
 import {useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
 
 type FilterMode = 'all' | 'available' | 'used'
+type RecordedFilter = 'all' | 'not-recorded' | 'recorded'
 
 const PAGE_SIZE = 25
 
@@ -23,13 +24,20 @@ export function DevotionPassagesPage() {
   const navigate = useNavigate()
   const [count, setCount] = useState(10)
   const [filter, setFilter] = useState<FilterMode>('available')
+  const [recordedFilter, setRecordedFilter] = useState<RecordedFilter>('not-recorded')
   const [page, setPage] = useState(1)
 
   const usedParam = filter === 'available' ? 'false' : filter === 'used' ? 'true' : undefined
 
-  const {data: passages = [], isLoading} = useQuery({
+  const {data: allPassages = [], isLoading} = useQuery({
     queryKey: ['passages-pool', filter],
     queryFn: () => fetchPool({used: usedParam}),
+  })
+
+  const passages = allPassages.filter((p) => {
+    if (recordedFilter === 'recorded') return p.recorded
+    if (recordedFilter === 'not-recorded') return !p.recorded
+    return true
   })
 
   const {state: genState, start: startGenerate} = useProgressOperation(
@@ -55,11 +63,18 @@ export function DevotionPassagesPage() {
 
   const availableCount = passages.filter((p) => !p.used).length
   const totalCount = passages.length
+  const recordedCount = allPassages.filter((p) => p.recorded).length
+  const notRecordedCount = allPassages.length - recordedCount
 
   const paginatedPassages = passages.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const handleFilterChange = (mode: FilterMode) => {
     setFilter(mode)
+    setPage(1)
+  }
+
+  const handleRecordedFilterChange = (mode: RecordedFilter) => {
+    setRecordedFilter(mode)
     setPage(1)
   }
 
@@ -102,7 +117,7 @@ export function DevotionPassagesPage() {
       {genState.isRunning && <AIProgress message={genState.message} progress={genState.progress} />}
 
       <Card size="sm">
-        <CardContent>
+        <CardContent className="space-y-2">
           <div className="flex gap-2">
             {(['all', 'available', 'used'] as const).map((mode) => (
               <button
@@ -122,6 +137,25 @@ export function DevotionPassagesPage() {
               </button>
             ))}
           </div>
+          <div className="flex gap-2">
+            {(['all', 'not-recorded', 'recorded'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => handleRecordedFilterChange(mode)}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                  recordedFilter === mode
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {mode === 'all'
+                  ? `All (${allPassages.length})`
+                  : mode === 'not-recorded'
+                    ? `Not Recorded (${notRecordedCount})`
+                    : `Recorded (${recordedCount})`}
+              </button>
+            ))}
+          </div>
         </CardContent>
 
         <div className="border-t">
@@ -138,6 +172,7 @@ export function DevotionPassagesPage() {
                   <TableHead>Title</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead>Subcode</TableHead>
+                  <TableHead className="text-center">Recorded</TableHead>
                   <TableHead className="text-center">Used In</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -162,11 +197,29 @@ export function DevotionPassagesPage() {
 }
 
 function PassageRow({passage, onClick}: {passage: PoolPassage; onClick: () => void}) {
+  const queryClient = useQueryClient()
+  const toggleRecorded = useMutation({
+    mutationFn: () => setPoolPassageRecorded(passage.id, !passage.recorded),
+    onSuccess: () => queryClient.invalidateQueries({queryKey: ['passages-pool']}),
+    onError: (err: Error) => toast.error(err.message),
+  })
+
   return (
     <TableRow className="cursor-pointer hover:bg-muted/50" onClick={onClick}>
       <TableCell className="font-medium max-w-48">{passage.title}</TableCell>
       <TableCell>{passage.bibleReference}</TableCell>
       <TableCell className="font-mono text-xs text-muted-foreground">{passage.subcode || '—'}</TableCell>
+      <TableCell className="text-center">
+        <div
+          className="flex items-center justify-center cursor-pointer h-7 w-7 rounded-lg border border-border hover:bg-muted/50 mx-auto"
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleRecorded.mutate()
+          }}
+        >
+          {passage.recorded ? <Check className="h-4 w-4 text-green-600" /> : <X className="h-4 w-4 text-red-500" />}
+        </div>
+      </TableCell>
       <TableCell className="text-center">
         {passage.scriptureUsageCount > 0 ? (
           <Badge variant={passage.scriptureUsageCount > 2 ? 'destructive' : 'secondary'}>

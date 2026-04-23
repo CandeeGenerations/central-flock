@@ -53,14 +53,9 @@ export function HymnSearchDetailPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate('/sermons/hymns/searches')}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>
-          <Trash2 className="h-4 w-4 mr-1 text-destructive" /> Delete
+        <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+          <Trash2 className="h-4 w-4 mr-1" /> Delete
         </Button>
-      </div>
-
-      <div className="text-sm text-muted-foreground px-1">
-        Saved {fmtDate(data.createdAt)} · model: {data.model} · {(data.durationMs / 1000).toFixed(1)}s from{' '}
-        {data.candidateCount} hymns
       </div>
 
       <Card>
@@ -85,6 +80,10 @@ export function HymnSearchDetailPage() {
               </Badge>
             </div>
           </dl>
+          <div className="pt-3 mt-2 border-t text-xs text-muted-foreground">
+            Saved {fmtDate(data.createdAt)} · model: {data.model} · {(data.durationMs / 1000).toFixed(1)}s from{' '}
+            {data.candidateCount} hymns
+          </div>
         </CardContent>
       </Card>
 

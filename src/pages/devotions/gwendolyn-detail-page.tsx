@@ -197,7 +197,7 @@ export function GwendolynDetailPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl space-y-6">
+    <div className="p-4 md:p-6 max-w-6xl space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/devotions/gwendolyn')}>
@@ -209,72 +209,124 @@ export function GwendolynDetailPage() {
         </div>
       </div>
 
-      {/* Content card */}
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <Select value={devotional.status} onValueChange={(v) => statusMutation.mutate(v as GwendolynStatus)}>
-            <SelectTrigger className="w-52">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
+      <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex-1 min-w-0 max-w-3xl space-y-6">
+          {/* Content card */}
+          <Card>
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <Select value={devotional.status} onValueChange={(v) => statusMutation.mutate(v as GwendolynStatus)}>
+                <SelectTrigger className="w-52">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-2 flex-wrap shrink-0">
+                <Button variant="outline" size="sm" onClick={() => copy(buildCopyTitle(devotional), 'Title')}>
+                  <Copy className="h-4 w-4 mr-1" />
+                  Copy title
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => copy(buildCopyContent(devotional), 'Full post')}>
+                  <Copy className="h-4 w-4 mr-1" />
+                  Copy full + hashtags
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {devotional.blocks.map((block, i) => (
+                <BlockView key={i} block={block} />
               ))}
-            </SelectContent>
-          </Select>
-          <div className="flex gap-2 flex-wrap shrink-0">
-            <Button variant="outline" size="sm" onClick={() => copy(buildCopyTitle(devotional), 'Title')}>
-              <Copy className="h-4 w-4 mr-1" />
-              Copy title
+              <p className="italic text-muted-foreground text-sm pl-8">— Passing the truth along</p>
+            </CardContent>
+          </Card>
+
+          {/* Hashtags card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle>Hashtags</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => regenMutation.mutate()}
+                disabled={regenMutation.isPending}
+              >
+                {regenMutation.isPending ? <Spinner size="sm" className="mr-1" /> : null}
+                Regenerate
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm break-words">
+                <span className="font-medium">#Faith #God #Prayer</span> {devotional.hashtags}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <div className="flex items-center justify-between">
+            <Button variant="destructive" size="sm" onClick={() => setShowDelete(true)}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
             </Button>
-            <Button variant="outline" size="sm" onClick={() => copy(buildCopyContent(devotional), 'Full post')}>
-              <Copy className="h-4 w-4 mr-1" />
-              Copy full + hashtags
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={openScheduleDialog}>
+                <MessageSquare className="h-4 w-4 mr-1" />
+                Schedule text
+              </Button>
+              <Button size="sm" onClick={() => setEditing(true)}>
+                <Edit className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {devotional.blocks.map((block, i) => (
-            <BlockView key={i} block={block} />
-          ))}
-          <p className="italic text-muted-foreground text-sm pl-8">— Passing the truth along</p>
-        </CardContent>
-      </Card>
-
-      {/* Hashtags card */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle>Hashtags</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => regenMutation.mutate()} disabled={regenMutation.isPending}>
-            {regenMutation.isPending ? <Spinner size="sm" className="mr-1" /> : null}
-            Regenerate
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm break-words">
-            <span className="font-medium">#Faith #God #Prayer</span> {devotional.hashtags}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Actions */}
-      <div className="flex items-center justify-between">
-        <Button variant="destructive" size="sm" onClick={() => setShowDelete(true)}>
-          <Trash2 className="h-4 w-4 mr-1" />
-          Delete
-        </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={openScheduleDialog}>
-            <MessageSquare className="h-4 w-4 mr-1" />
-            Schedule text
-          </Button>
-          <Button size="sm" onClick={() => setEditing(true)}>
-            <Edit className="h-4 w-4 mr-1" />
-            Edit
-          </Button>
         </div>
+
+        {/* Production instructions sidebar */}
+        <aside className="lg:w-72 lg:shrink-0">
+          <div className="lg:sticky lg:top-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Production Instructions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5 text-sm">
+                <section className="space-y-2">
+                  <h3 className="font-semibold text-base">Music</h3>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Fade in: 1s</li>
+                    <li>Fade out: 2s</li>
+                  </ul>
+                </section>
+                <section className="space-y-2">
+                  <h3 className="font-semibold text-base">Footage</h3>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Scale to 320%</li>
+                    <li>Cut at the beginning of the text.</li>
+                    <li>Cut at the end of the text.</li>
+                    <li>
+                      Middle section:
+                      <ul className="list-[circle] pl-5 mt-1 space-y-1">
+                        <li>Blur: 50%</li>
+                        <li>Opacity: 50%</li>
+                        <li>Vignette: 30</li>
+                      </ul>
+                    </li>
+                    <li>
+                      Blur Transition
+                      <ul className="list-[circle] pl-5 mt-1 space-y-1">
+                        <li>Beginning: Max (0.7s)</li>
+                        <li>End: 1s</li>
+                      </ul>
+                    </li>
+                  </ul>
+                </section>
+              </CardContent>
+            </Card>
+          </div>
+        </aside>
       </div>
 
       <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>

@@ -1,0 +1,1 @@
+ALTER TABLE `generated_passages` ADD `recorded` integer DEFAULT false NOT NULL;

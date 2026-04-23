@@ -10,6 +10,7 @@ import {
   List,
   MessageSquare,
   Music,
+  NotebookText,
   Quote,
   ScrollText,
   Settings,
@@ -88,6 +89,12 @@ export const navGroups: NavGroup[] = [
       {to: '/sermons/hymns', label: 'Hymns', icon: Music},
       {to: '/sermons/hymns/searches', label: 'Hymn History', icon: History},
     ],
+  },
+  {
+    id: 'notes',
+    label: 'Notes',
+    icon: NotebookText,
+    children: [{to: '/notes', label: 'Notes', icon: NotebookText}],
   },
   {
     id: 'calendar',

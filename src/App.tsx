@@ -30,6 +30,9 @@ import {LoginPage} from '@/pages/login-page'
 import {MessageComposePage} from '@/pages/message-compose-page'
 import {MessageDetailPage} from '@/pages/message-detail-page'
 import {MessageHistoryPage} from '@/pages/message-history-page'
+import {NoteDetailPage} from '@/pages/notes/note-detail-page'
+import {NoteEditPage} from '@/pages/notes/note-edit-page'
+import {NotesPage} from '@/pages/notes/notes-page'
 import {NurseryScheduleViewPage} from '@/pages/nursery/nursery-schedule-view-page'
 import {NurserySchedulesPage} from '@/pages/nursery/nursery-schedules-page'
 import {NurserySettingsPage} from '@/pages/nursery/nursery-settings-page'
@@ -371,6 +374,9 @@ function AppLayout() {
               <Route path="/sermons/hymns" element={<HymnsPrepPage />} />
               <Route path="/sermons/hymns/searches" element={<HymnSearchesPage />} />
               <Route path="/sermons/hymns/searches/:id" element={<HymnSearchDetailPage />} />
+              <Route path="/notes" element={<NotesPage />} />
+              <Route path="/notes/note/:noteId" element={<NoteDetailPage />} />
+              <Route path="/notes/note/:noteId/edit" element={<NoteEditPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>

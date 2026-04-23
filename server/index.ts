@@ -18,6 +18,7 @@ import {homeRouter} from './routes/home.js'
 import {hymnsRouter} from './routes/hymns.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter, processSendJob} from './routes/messages.js'
+import {notesRouter} from './routes/notes.js'
 import {nurserySchedulesRouter} from './routes/nursery-schedules.js'
 import {nurseryRouter} from './routes/nursery.js'
 import {peopleRouter} from './routes/people.js'
@@ -66,10 +67,12 @@ app.use('/api/nursery', nurseryRouter)
 app.use('/api/quotes', quotesRouter)
 app.use('/api/hymns', hymnsRouter)
 app.use('/api/settings', settingsRouter)
+app.use('/api/notes', notesRouter)
 
-// Serve scan images and nursery logos
+// Serve scan images, nursery logos, and note attachments
 app.use('/data/scan-images', express.static(path.join(__dirname, '..', 'data', 'scan-images')))
 app.use('/data/nursery-logos', express.static(path.join(__dirname, '..', 'data', 'nursery-logos')))
+app.use('/data/notes-attachments', express.static(path.join(__dirname, '..', 'data', 'notes-attachments')))
 
 // In production, serve the built Vite static files
 const distPath = path.join(__dirname, '..', 'dist')

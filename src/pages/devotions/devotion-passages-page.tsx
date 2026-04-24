@@ -2,9 +2,11 @@ import {AIProgress} from '@/components/ai-progress'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Pagination} from '@/components/ui/pagination'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useProgressOperation} from '@/hooks/use-sse'
 import {type PoolPassage, fetchPool, generatePoolPassages, setPoolPassageRecorded} from '@/lib/devotion-api'
@@ -26,6 +28,7 @@ export function DevotionPassagesPage() {
   const [filter, setFilter] = useState<FilterMode>('available')
   const [recordedFilter, setRecordedFilter] = useState<RecordedFilter>('not-recorded')
   const [page, setPage] = useState(1)
+  const [generateOpen, setGenerateOpen] = useState(false)
 
   const usedParam = filter === 'available' ? 'false' : filter === 'used' ? 'true' : undefined
 
@@ -56,15 +59,14 @@ export function DevotionPassagesPage() {
       const data = await startGenerate(() => generatePoolPassages(count))
       queryClient.invalidateQueries({queryKey: ['passages-pool']})
       toast.success(`Generated ${data.generated} passages`)
+      setGenerateOpen(false)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Generation failed')
     }
   }
 
-  const availableCount = passages.filter((p) => !p.used).length
+  const availableCount = allPassages.filter((p) => !p.used).length
   const totalCount = passages.length
-  const recordedCount = allPassages.filter((p) => p.recorded).length
-  const notRecordedCount = allPassages.length - recordedCount
 
   const paginatedPassages = passages.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
@@ -86,75 +88,73 @@ export function DevotionPassagesPage() {
           <h2 className="text-2xl font-bold">Passages</h2>
           <Badge variant="secondary">{availableCount} available</Badge>
         </div>
-        <div className="flex items-end gap-2">
-          <div>
-            <Label className="text-xs">Count</Label>
-            <Input
-              type="number"
-              min={1}
-              max={20}
-              value={count}
-              onChange={(e) => setCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))}
-              className="w-20 h-8"
-            />
-          </div>
-          <Button size="sm" onClick={handleGenerate} disabled={genState.isRunning}>
-            {genState.isRunning ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-1.5" />
-                Generate
-              </>
-            )}
-          </Button>
-        </div>
+        <Button size="sm" onClick={() => setGenerateOpen(true)}>
+          <Sparkles className="h-4 w-4 mr-1.5" />
+          Generate
+        </Button>
       </div>
 
-      {genState.isRunning && <AIProgress message={genState.message} progress={genState.progress} />}
+      <Dialog open={generateOpen} onOpenChange={(open) => !genState.isRunning && setGenerateOpen(open)}>
+        <DialogContent showCloseButton={!genState.isRunning}>
+          <DialogHeader>
+            <DialogTitle>Generate Passages</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Number to generate</Label>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                value={count}
+                onChange={(e) => setCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))}
+                className="w-28"
+                disabled={genState.isRunning}
+              />
+            </div>
+            {genState.isRunning && <AIProgress message={genState.message} progress={genState.progress} />}
+          </div>
+          <DialogFooter showCloseButton={!genState.isRunning}>
+            <Button onClick={handleGenerate} disabled={genState.isRunning}>
+              {genState.isRunning ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-1.5" />
+                  Generate
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card size="sm">
-        <CardContent className="space-y-2">
+        <CardContent>
           <div className="flex gap-2">
-            {(['all', 'available', 'used'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => handleFilterChange(mode)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                  filter === mode
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                }`}
-              >
-                {mode === 'all'
-                  ? `All (${totalCount})`
-                  : mode === 'available'
-                    ? `Available (${availableCount})`
-                    : `Used (${totalCount - availableCount})`}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            {(['all', 'not-recorded', 'recorded'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => handleRecordedFilterChange(mode)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                  recordedFilter === mode
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                }`}
-              >
-                {mode === 'all'
-                  ? `All (${allPassages.length})`
-                  : mode === 'not-recorded'
-                    ? `Not Recorded (${notRecordedCount})`
-                    : `Recorded (${recordedCount})`}
-              </button>
-            ))}
+            <Select value={filter} onValueChange={(v) => handleFilterChange(v as FilterMode)}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="available">Available</SelectItem>
+                <SelectItem value="used">Used</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={recordedFilter} onValueChange={(v) => handleRecordedFilterChange(v as RecordedFilter)}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="not-recorded">Not Recorded</SelectItem>
+                <SelectItem value="recorded">Recorded</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
 

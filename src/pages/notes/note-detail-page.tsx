@@ -2,6 +2,7 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {NotesBreadcrumbs} from '@/components/notes/breadcrumbs'
 import {Button} from '@/components/ui/button'
 import {PageSpinner} from '@/components/ui/spinner'
+import {formatDateTime} from '@/lib/date'
 import {printNote} from '@/lib/note-to-html'
 import {deleteNoteItems, fetchNote, fetchNotesBreadcrumb} from '@/lib/notes-api'
 import {queryKeys} from '@/lib/query-keys'
@@ -58,58 +59,65 @@ export function NoteDetailPage() {
 
   if (noteLoading) {
     return (
-      <div className="p-4 md:p-6">
+      <div className="p-6">
         <PageSpinner />
       </div>
     )
   }
 
   if (!note) {
-    return (
-      <div className="p-4 md:p-6">
-        <p className="text-muted-foreground">Note not found.</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate('/notes')}>
-          Back to Notes
-        </Button>
-      </div>
-    )
+    return <div className="p-6 text-sm text-muted-foreground">Note not found.</div>
   }
 
-  return (
-    <div className="p-4 md:p-6 space-y-4 max-w-3xl">
-      {/* Breadcrumbs */}
-      <NotesBreadcrumbs crumbs={crumbs.slice(0, -1)} lastIsText={false} />
+  // Breadcrumb path excludes the note itself (last crumb) — shows parent folders only
+  const parentCrumbs = crumbs.slice(0, -1)
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="text-3xl font-bold leading-tight">{note.title}</h1>
+  return (
+    <div className="max-w-3xl mx-auto px-6 py-6 space-y-5">
+      {/* Breadcrumb path */}
+      {parentCrumbs.length > 0 && <NotesBreadcrumbs crumbs={parentCrumbs} lastIsText={false} />}
+
+      {/* Title + actions */}
+      <div className="flex items-start justify-between gap-4">
+        <h1 className="text-3xl font-bold leading-tight tracking-tight">{note.title}</h1>
         <div className="flex gap-2 shrink-0">
-          <Button variant="outline" onClick={() => navigate(`/notes/note/${id}/edit`)}>
-            <Pencil className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={() => navigate(`/notes/note/${id}/edit`)}>
+            <Pencil className="h-4 w-4 mr-1" />
             Edit
           </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            title="Print / Save as PDF"
-            onClick={() => printNote(note.title, note.contentJson)}
-          >
-            <Printer className="h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={() => printNote(note.title, note.contentJson)}>
+            <Printer className="h-4 w-4 mr-1" />
+            Print
           </Button>
-          <Button variant="destructive" size="icon" onClick={() => setConfirmOpen(true)}>
-            <Trash2 className="h-4 w-4" />
+          <Button variant="destructive" size="sm" onClick={() => setConfirmOpen(true)}>
+            <Trash2 className="h-4 w-4 mr-1" />
+            Delete
           </Button>
         </div>
       </div>
 
-      {/* Content — BlockNote read-only view; key ensures re-mount when navigating between notes */}
-      <div className="rounded-md border bg-card min-h-48">
+      {/* Timestamps */}
+      <p className="text-xs text-muted-foreground/60 -mt-2">
+        Created {formatDateTime(note.createdAt)}
+        {note.updatedAt !== note.createdAt && <> &middot; Edited {formatDateTime(note.updatedAt)}</>}
+      </p>
+
+      {/* Content */}
+      <div className="rounded-lg border bg-card min-h-48">
         {note.contentJson ? (
           <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading…</div>}>
             <NotePreview key={id} contentJson={note.contentJson} />
           </Suspense>
         ) : (
-          <p className="p-4 text-muted-foreground text-sm italic">This note is empty. Click Edit to add content.</p>
+          <p className="p-4 text-muted-foreground text-sm italic">
+            This note is empty.{' '}
+            <button
+              className="underline underline-offset-2 hover:text-foreground transition-colors"
+              onClick={() => navigate(`/notes/note/${id}/edit`)}
+            >
+              Start writing
+            </button>
+          </p>
         )}
       </div>
 

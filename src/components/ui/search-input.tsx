@@ -44,7 +44,7 @@ export function SearchInput({
         </button>
       ) : !hideShortcut ? (
         <kbd className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden md:inline-flex items-center rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono font-medium text-muted-foreground">
-          {typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl+'}K
+          {typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC') ? '⌘⇧' : 'Ctrl+Shift+'}K
         </kbd>
       ) : null}
     </div>

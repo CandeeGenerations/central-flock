@@ -1,7 +1,9 @@
 import {CollapsibleNavGroup} from '@/components/collapsible-nav-group'
+import {CommandPaletteProvider} from '@/components/command-palette-provider'
 import {Toaster} from '@/components/ui/sonner'
 import {Spinner} from '@/components/ui/spinner'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
+import {useCommandPalette} from '@/hooks/use-command-palette'
 import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts'
 import {useSidebarCollapsed} from '@/hooks/use-sidebar-collapsed'
 import {checkAuthStatus, logout} from '@/lib/api'
@@ -30,8 +32,8 @@ import {LoginPage} from '@/pages/login-page'
 import {MessageComposePage} from '@/pages/message-compose-page'
 import {MessageDetailPage} from '@/pages/message-detail-page'
 import {MessageHistoryPage} from '@/pages/message-history-page'
-import {NoteDetailPage} from '@/pages/notes/note-detail-page'
 import {NoteEditPage} from '@/pages/notes/note-edit-page'
+import {NotesLayout} from '@/pages/notes/notes-layout'
 import {NotesPage} from '@/pages/notes/notes-page'
 import {NurseryScheduleViewPage} from '@/pages/nursery/nursery-schedule-view-page'
 import {NurserySchedulesPage} from '@/pages/nursery/nursery-schedules-page'
@@ -51,7 +53,7 @@ import {SettingsPage} from '@/pages/settings-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
 import {QueryClient, QueryClientProvider, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Home, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Plus, Settings, Sun} from 'lucide-react'
+import {Home, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun} from 'lucide-react'
 import {BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate} from 'react-router-dom'
 
 const queryClient = new QueryClient({
@@ -215,6 +217,20 @@ const fabActions: Record<string, {label: string; to: string}> = {
   '/templates': {label: 'New Template', to: '/templates/new'},
 }
 
+function MobileSearchButton() {
+  const {setOpen} = useCommandPalette()
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      aria-label="Open search"
+      className="absolute right-4 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+    >
+      <Search className="h-5 w-5" />
+    </button>
+  )
+}
+
 function MobileFab() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -285,6 +301,20 @@ function AppLayout() {
   const [collapsed, setCollapsed] = useSidebarCollapsed()
 
   return (
+    <CommandPaletteProvider>
+      <AppLayoutInner collapsed={collapsed} setCollapsed={setCollapsed} />
+    </CommandPaletteProvider>
+  )
+}
+
+function AppLayoutInner({
+  collapsed,
+  setCollapsed,
+}: {
+  collapsed: boolean
+  setCollapsed: React.Dispatch<React.SetStateAction<boolean>>
+}) {
+  return (
     <TooltipProvider delayDuration={150}>
       <div className="flex h-screen overflow-hidden">
         {/* Desktop Sidebar */}
@@ -326,11 +356,12 @@ function AppLayout() {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Mobile top bar */}
-          <header className="md:hidden flex items-center justify-center border-b px-4 py-3 bg-background shrink-0">
+          <header className="md:hidden relative flex items-center justify-center border-b px-4 py-3 bg-background shrink-0">
             <Link to="/">
               <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-5 dark:hidden" />
               <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-5 hidden dark:block" />
             </Link>
+            <MobileSearchButton />
           </header>
 
           {/* Main content */}
@@ -374,9 +405,10 @@ function AppLayout() {
               <Route path="/sermons/hymns" element={<HymnsPrepPage />} />
               <Route path="/sermons/hymns/searches" element={<HymnSearchesPage />} />
               <Route path="/sermons/hymns/searches/:id" element={<HymnSearchDetailPage />} />
-              <Route path="/notes" element={<NotesPage />} />
-              <Route path="/notes/note/:noteId" element={<NoteDetailPage />} />
-              <Route path="/notes/note/:noteId/edit" element={<NoteEditPage />} />
+              <Route path="/notes" element={<NotesLayout />}>
+                <Route index element={<NotesPage />} />
+                <Route path="note/:noteId" element={<NoteEditPage />} />
+              </Route>
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>

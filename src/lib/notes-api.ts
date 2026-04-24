@@ -65,8 +65,10 @@ export function buildNoteTree(items: NoteTreeItem[]): NoteTreeItem[] {
     arr.sort((a, b) => {
       // Folders first, then notes
       if (a.type !== b.type) return a.type === 'folder' ? -1 : 1
-      // Then by position, then by title
-      return a.position - b.position || a.title.localeCompare(b.title)
+      // Then by position, then by title (defensive against missing titles)
+      const posDiff = (a.position ?? 0) - (b.position ?? 0)
+      if (posDiff !== 0) return posDiff
+      return (a.title ?? '').localeCompare(b.title ?? '')
     })
     for (const item of arr) {
       if (item.subRows?.length) sortItems(item.subRows)
@@ -81,7 +83,7 @@ export function filterNoteTree(items: NoteTreeItem[], search: string): NoteTreeI
   const term = search.toLowerCase()
 
   function matchesOrHasMatch(item: NoteTreeItem): boolean {
-    if (item.title.toLowerCase().includes(term)) return true
+    if (item.title?.toLowerCase().includes(term)) return true
     if (item.excerpt?.toLowerCase().includes(term)) return true
     return item.subRows?.some(matchesOrHasMatch) ?? false
   }

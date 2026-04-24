@@ -16,6 +16,7 @@ Central Flock is growing fast — 5 sub-apps now (messaging, devotions, sermon p
 ## Critical Files
 
 ### New files
+
 - `src/lib/search/registry.ts` — `SearchProvider`/`SearchItem` types, `registerProvider`, `getProviders`
 - `src/lib/search/fuzzy.ts` — Fuse config + ranking helpers (title-weight > keywords > subtitle)
 - `src/lib/search/providers/people.ts` — and one file per entity (see list below). `notes.ts` provider emits **both** Notes and Folders sections from a single `fetchNotesTree()` call.
@@ -26,12 +27,14 @@ Central Flock is growing fast — 5 sub-apps now (messaging, devotions, sermon p
 - `src/hooks/use-command-palette.ts` — `useCommandPalette()` returning `{open, setOpen}`
 
 ### Modified files
+
 - [src/App.tsx:281](src/App.tsx:281) — wrap `AppLayout` body with `<CommandPaletteProvider>` + mount `<CommandPalette />`
 - [src/hooks/use-keyboard-shortcuts.ts](src/hooks/use-keyboard-shortcuts.ts) — add `⌘K` (open palette) and `⌘⇧K` (focus nearest `[data-search-input] input` — the attribute already exists at [search-input.tsx:25](src/components/ui/search-input.tsx:25))
 - [src/components/ui/search-input.tsx:47](src/components/ui/search-input.tsx:47) — change `kbd` hint from `⌘K` to `⌘⇧K` (and `Ctrl+Shift+K` on non-Mac). No per-page changes needed since all 17 consumers (16 prior + [notes-page.tsx](src/pages/notes/notes-page.tsx)) share this component.
 - [src/pages/notes/notes-page.tsx](src/pages/notes/notes-page.tsx) — read `?expand=<id>` URL param on mount to support jumping to a folder from the palette (see "Folder Navigation" below).
 
 ### Package additions
+
 - `cmdk` (~5kb)
 - `fuse.js` (~12kb gzipped)
 
@@ -39,22 +42,22 @@ Central Flock is growing fast — 5 sub-apps now (messaging, devotions, sermon p
 
 Every provider maps to a React Query `queryKey` (reuse existing keys from [src/lib/query-keys.ts](src/lib/query-keys.ts)) and an existing list endpoint. Fields listed are what Fuse indexes.
 
-| Provider | Source endpoint | Route | Fuse fields |
-|---|---|---|---|
-| People | `GET /api/people?limit=5000` | `/people/:id` | `firstName`, `lastName`, `phoneNumber` |
-| Groups | `GET /api/groups` | `/groups/:id` | `name`, `description` |
-| Messages | `GET /api/messages?limit=500` | `/messages/:id` | `renderedPreview` (skip full `content` — too large) |
-| Templates | `GET /api/templates` | `/templates/:id/edit` | `name` |
-| Drafts | `GET /api/drafts` | (compose flow) | `name` |
-| Devotions | `GET /api/devotions` | `/devotions/:id` | `title`, `bibleReference`, `guestSpeaker`, `songName` |
-| Gwendolyn Devotions | `GET /api/devotions/gwendolyn` | `/devotions/gwendolyn/:id` | `title`, `date` |
-| Generated Passages | `GET /api/devotions/passages` | `/devotions/passages/:id` | `title`, `bibleReference` |
-| Quotes | `GET /api/quotes` | `/sermons/quotes/:id` | `title`, `author`, `tags`, `summary` (skip full `quoteText`) |
-| Hymns | `GET /api/hymns` | hymn browser | `title`, `firstLine`, `author`, `composer`, `topics` |
-| Nursery Schedules | `GET /api/nursery/schedules` | `/nursery/:id` | `month`, `year`, `status` |
-| Calendar Events | `GET /api/calendar` | `/calendar` | `title`, `location` |
-| **Notes** | `GET /api/notes/tree` (filtered `type==='note'`) | `/notes/note/:id` | `title`, `excerpt` |
-| **Folders** | `GET /api/notes/tree` (filtered `type==='folder'`) | `/notes?expand=:id` (see note below) | `title` |
+| Provider            | Source endpoint                                    | Route                                | Fuse fields                                                  |
+| ------------------- | -------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------ |
+| People              | `GET /api/people?limit=5000`                       | `/people/:id`                        | `firstName`, `lastName`, `phoneNumber`                       |
+| Groups              | `GET /api/groups`                                  | `/groups/:id`                        | `name`, `description`                                        |
+| Messages            | `GET /api/messages?limit=500`                      | `/messages/:id`                      | `renderedPreview` (skip full `content` — too large)          |
+| Templates           | `GET /api/templates`                               | `/templates/:id/edit`                | `name`                                                       |
+| Drafts              | `GET /api/drafts`                                  | (compose flow)                       | `name`                                                       |
+| Devotions           | `GET /api/devotions`                               | `/devotions/:id`                     | `title`, `bibleReference`, `guestSpeaker`, `songName`        |
+| Gwendolyn Devotions | `GET /api/devotions/gwendolyn`                     | `/devotions/gwendolyn/:id`           | `title`, `date`                                              |
+| Generated Passages  | `GET /api/devotions/passages`                      | `/devotions/passages/:id`            | `title`, `bibleReference`                                    |
+| Quotes              | `GET /api/quotes`                                  | `/sermons/quotes/:id`                | `title`, `author`, `tags`, `summary` (skip full `quoteText`) |
+| Hymns               | `GET /api/hymns`                                   | hymn browser                         | `title`, `firstLine`, `author`, `composer`, `topics`         |
+| Nursery Schedules   | `GET /api/nursery/schedules`                       | `/nursery/:id`                       | `month`, `year`, `status`                                    |
+| Calendar Events     | `GET /api/calendar`                                | `/calendar`                          | `title`, `location`                                          |
+| **Notes**           | `GET /api/notes/tree` (filtered `type==='note'`)   | `/notes/note/:id`                    | `title`, `excerpt`                                           |
+| **Folders**         | `GET /api/notes/tree` (filtered `type==='folder'`) | `/notes?expand=:id` (see note below) | `title`                                                      |
 
 **Notes + Folders unified source:** A single `fetchNotesTree()` call ([src/lib/notes-api.ts:114](src/lib/notes-api.ts:114)) returns both folders and notes from `notes_items`. The provider emits two sections so results are grouped visually, but shares one query (`queryKeys.notesTree` at [src/lib/query-keys.ts:40](src/lib/query-keys.ts:40)) and one network round-trip. Subtitle for both = breadcrumb path (e.g. `Sermons / 2025 / Easter`) built client-side by walking `parentId` — gives the user unambiguous context in results, which matters because note titles repeat (many "Untitled" / "Sermon notes"). The tree-walk is O(depth) per item and runs once at index-build time.
 

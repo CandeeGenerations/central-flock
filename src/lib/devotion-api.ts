@@ -136,6 +136,25 @@ export function createDevotion(data: Partial<Devotion>) {
   })
 }
 
+export interface BibleVerseAnalysis {
+  result: string
+  videoId: string
+  transcriptSegments: number
+}
+
+export function analyzeBibleVerses(url: string) {
+  return request<BibleVerseAnalysis>('/devotions/bible-verses', {
+    method: 'POST',
+    body: JSON.stringify({url}),
+  })
+}
+
+export function fixChainRoot(id: number) {
+  return request<{oldChain: number[]; newChain: number[]; resolved: boolean}>(`/devotions/${id}/chain-fix-root`, {
+    method: 'POST',
+  })
+}
+
 export function updateDevotion(id: number, data: Partial<Devotion>) {
   return request<Devotion>(`/devotions/${id}`, {
     method: 'PUT',

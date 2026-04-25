@@ -33,6 +33,11 @@ export function useSearchIndex(enabled: boolean): SearchIndex {
 
   const actions = useMemo(() => buildAllActions({toggleDark}), [toggleDark])
 
+  // `useQueries` returns a new `results` array on every render, so we depend on the
+  // individual `data` references (which are stable until a query refetches). Without
+  // this, `items`/`fuse` would rebuild on every keystroke and cause typing lag.
+  const dataDeps = results.map((r) => r.data)
+
   const {items, itemsByGroup} = useMemo(() => {
     const byGroup = new Map<string, SearchItem[]>()
     const all: SearchItem[] = []
@@ -46,16 +51,15 @@ export function useSearchIndex(enabled: boolean): SearchIndex {
 
     for (const a of actions) push(a)
     for (let i = 0; i < providers.length; i++) {
-      const rows = results[i]?.data
+      const rows = dataDeps[i]
       if (!rows) continue
-      // Transform raw rows → SearchItem[] in render. Memoized so this only
-      // runs when a provider's data actually changes.
       const searchItems = providers[i].toItems(rows as never)
       for (const item of searchItems) push(item)
     }
 
     return {items: all, itemsByGroup: byGroup}
-  }, [actions, results])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actions, ...dataDeps])
 
   return {
     items,

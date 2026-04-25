@@ -1,10 +1,13 @@
 import {Badge} from '@/components/ui/badge'
+import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {PageSpinner} from '@/components/ui/spinner'
-import {useQuery} from '@tanstack/react-query'
-import {AlertTriangle, CheckCircle2, ChevronDown, ChevronUp} from 'lucide-react'
+import {fixChainRoot} from '@/lib/devotion-api'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Wrench} from 'lucide-react'
 import {useState} from 'react'
 import {Link} from 'react-router-dom'
+import {toast} from 'sonner'
 
 function fmtDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})
@@ -26,6 +29,24 @@ interface AuditResult {
     referencedDevotions: number[]
     missing: {number: number; date: string; type: string}[]
   }[]
+  mismatchedRevisits: {
+    id: number
+    number: number
+    date: string
+    bibleReference: string
+    originalNumber: number
+    originalDate: string
+    originalBibleReference: string | null
+  }[]
+  chainLineageIssues: {
+    id: number
+    number: number
+    date: string
+    rootNumber: number | null
+    issueType: 'root-not-found' | 'root-is-revisit' | 'inconsistent-root' | 'missing-siblings'
+    detail: string
+    related: {number: number; date: string}[]
+  }[]
   totalDevotions: number
   numberRange: {min: number; max: number}
   issueCount: number
@@ -36,9 +57,27 @@ function fetchAudit() {
 }
 
 export function DevotionAuditPage() {
+  const qc = useQueryClient()
   const {data: audit, isLoading} = useQuery({
     queryKey: ['devotion-audit'],
     queryFn: fetchAudit,
+    refetchOnMount: 'always',
+  })
+
+  const fixRootMutation = useMutation({
+    mutationFn: (id: number) => fixChainRoot(id),
+    onSuccess: (data, id) => {
+      qc.invalidateQueries({queryKey: ['devotion-audit']})
+      qc.invalidateQueries({queryKey: ['devotion', String(id)]})
+      qc.invalidateQueries({queryKey: ['devotion-chain-audit', String(id)]})
+      const tail = data.newChain[data.newChain.length - 1]
+      toast.success(
+        data.resolved
+          ? `Chain extended to #${String(tail).padStart(3, '0')} (${data.newChain.length} entries)`
+          : `Chain extended but still terminates at a revisit — investigate #${tail}`,
+      )
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to fix chain'),
   })
 
   if (isLoading || !audit) return <PageSpinner />
@@ -75,12 +114,21 @@ export function DevotionAuditPage() {
 
       {/* Missing Devotion Numbers */}
       <AuditSection title="Missing Devotion Numbers" count={audit.missingNumbers.length}>
-        <div className="flex flex-wrap gap-1.5">
-          {audit.missingNumbers.map((n) => (
-            <Badge key={n} variant="outline">
-              #{n}
-            </Badge>
-          ))}
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-1.5">
+            {audit.missingNumbers.map((n) => (
+              <Link
+                key={n}
+                to={`/devotions/missing?number=${n}`}
+                className="rounded-md hover:bg-accent transition-colors"
+              >
+                <Badge variant="outline">#{n}</Badge>
+              </Link>
+            ))}
+          </div>
+          <Link to="/devotions/missing" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+            Add a missing devotion →
+          </Link>
         </div>
       </AuditSection>
 
@@ -253,6 +301,110 @@ export function DevotionAuditPage() {
                       ))}
                     </div>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </AuditSection>
+
+      {/* Chain Lineage Issues */}
+      <AuditSection title="Chain Lineage Issues" count={audit.chainLineageIssues.length}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Revisit</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Date</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Root</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Issue</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Details</th>
+                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {audit.chainLineageIssues.map((li) => (
+                <tr key={li.id} className="border-b last:border-0 align-top">
+                  <td className="py-2 px-3">
+                    <Link to={`/devotions/${li.id}`} className="text-primary hover:underline font-medium">
+                      #{String(li.number).padStart(3, '0')}
+                    </Link>
+                  </td>
+                  <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">{fmtDate(li.date)}</td>
+                  <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                    {li.rootNumber != null ? `#${String(li.rootNumber).padStart(3, '0')}` : '—'}
+                  </td>
+                  <td className="py-2 px-3">
+                    <Badge
+                      variant={li.issueType === 'missing-siblings' ? 'outline' : 'destructive'}
+                      className="text-xs"
+                    >
+                      {li.issueType}
+                    </Badge>
+                  </td>
+                  <td className="py-2 px-3">
+                    <div className="space-y-1">
+                      <div className="text-muted-foreground">{li.detail}</div>
+                      {li.related.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {li.related.map((r) => (
+                            <Badge key={r.number} variant="outline" className="text-xs">
+                              #{String(r.number).padStart(3, '0')}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-2 px-3 text-right">
+                    {li.issueType === 'root-is-revisit' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => fixRootMutation.mutate(li.id)}
+                        disabled={fixRootMutation.isPending}
+                      >
+                        <Wrench className="h-3.5 w-3.5" />
+                        Fix
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </AuditSection>
+
+      {/* Revisits with Mismatched Verses */}
+      <AuditSection title="Revisits with Mismatched Verses" count={audit.mismatchedRevisits.length}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Revisit</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Date</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Revisit Scripture</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Original</th>
+                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Original Scripture</th>
+              </tr>
+            </thead>
+            <tbody>
+              {audit.mismatchedRevisits.map((m) => (
+                <tr key={m.id} className="border-b last:border-0 align-top">
+                  <td className="py-2 px-3">
+                    <Link to={`/devotions/${m.id}`} className="text-primary hover:underline font-medium">
+                      #{String(m.number).padStart(3, '0')}
+                    </Link>
+                  </td>
+                  <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">{fmtDate(m.date)}</td>
+                  <td className="py-2 px-3">{m.bibleReference}</td>
+                  <td className="py-2 px-3 whitespace-nowrap">
+                    <span className="text-muted-foreground">
+                      #{String(m.originalNumber).padStart(3, '0')} · {fmtDate(m.originalDate)}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 text-muted-foreground">{m.originalBibleReference || '—'}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,16 +1,24 @@
+import Anthropic from '@anthropic-ai/sdk'
 import {and, asc, desc, eq, inArray, like, or, sql} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'fs'
 import path from 'path'
 import {fileURLToPath} from 'url'
 import * as XLSX from 'xlsx'
+// The package publishes a broken dual build — package.json sets `type: module` but its
+// main entry is a CJS file with `exports.X = ...`, which crashes under Node's ESM loader.
+// Import directly from the ESM bundle instead.
+import {YoutubeTranscript} from 'youtube-transcript/dist/youtube-transcript.esm.js'
 
 import {db, schema} from '../db/index.js'
+import {AI_MODELS} from '../lib/ai-models.js'
 import {parseReference, referenceKeys} from '../lib/bible-reference.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 import {generateDevotionPassage} from '../services/devotion-generation.js'
 import {importDevotions, parseSheetRows} from '../services/devotion-import.js'
 import {parseDevotionImage} from '../services/devotion-ocr.js'
+
+const anthropic = new Anthropic()
 
 const __devotionsDir = path.dirname(fileURLToPath(import.meta.url))
 const SCAN_IMAGES_DIR = path.join(__devotionsDir, '..', '..', 'data', 'scan-images')
@@ -363,6 +371,168 @@ devotionsRouter.get(
     }
     brokenChains.sort((a, b) => b.number - a.number)
 
+    // Chain lineage issues: checks based on the topology of `referencedDevotions` alone,
+    // independent of verse-reference text. Catches the cases where verses have typos /
+    // subtle differences that the verse-key audit misses, but the chain still records
+    // relationships correctly (or incorrectly).
+    //
+    // Three sub-checks per revisit:
+    //   1. `root-not-found` — chain ends at a number that doesn't exist in the DB
+    //   2. `root-is-revisit` — chain ends at a revisit instead of an original/guest
+    //   3. `inconsistent-root` — an ancestor revisit in the chain points to a different root
+    //   4. `missing-siblings` — another revisit sharing the same root original is earlier
+    //      in time but not in this revisit's chain (and not explicitly ignored)
+    type LineageIssueType = 'root-not-found' | 'root-is-revisit' | 'inconsistent-root' | 'missing-siblings'
+    const chainLineageIssues: {
+      id: number
+      number: number
+      date: string
+      rootNumber: number | null
+      issueType: LineageIssueType
+      detail: string
+      related: {number: number; date: string}[]
+    }[] = []
+
+    // Group revisits by their chain's root-original number (chain[last]).
+    const byRoot = new Map<number, (typeof all)[number][]>()
+    for (const d of all) {
+      if (d.devotionType !== 'revisit') continue
+      const chain = parseChainRaw(d.referencedDevotions)
+      if (chain.length === 0) continue
+      const root = chain[chain.length - 1]
+      if (!byRoot.has(root)) byRoot.set(root, [])
+      byRoot.get(root)!.push(d)
+    }
+    for (const arr of byRoot.values()) arr.sort((a, b) => a.date.localeCompare(b.date))
+
+    for (const d of all) {
+      if (d.devotionType !== 'revisit') continue
+      const chain = parseChainRaw(d.referencedDevotions)
+      if (chain.length === 0) continue
+      const rootNum = chain[chain.length - 1]
+      const root = byNum.get(rootNum)
+
+      const ignoreSet: Set<number> = (() => {
+        try {
+          return new Set(d.chainIgnores ? (JSON.parse(d.chainIgnores) as number[]) : [])
+        } catch {
+          return new Set<number>()
+        }
+      })()
+
+      if (!root) {
+        chainLineageIssues.push({
+          id: d.id,
+          number: d.number,
+          date: d.date,
+          rootNumber: rootNum,
+          issueType: 'root-not-found',
+          detail: `Chain ends at #${rootNum}, which doesn't exist in the database.`,
+          related: [],
+        })
+        continue
+      }
+
+      if (root.devotionType === 'revisit') {
+        chainLineageIssues.push({
+          id: d.id,
+          number: d.number,
+          date: d.date,
+          rootNumber: rootNum,
+          issueType: 'root-is-revisit',
+          detail: `Chain ends at revisit #${rootNum} — should terminate at an original.`,
+          related: [{number: rootNum, date: root.date}],
+        })
+        continue
+      }
+
+      const inconsistent: {number: number; date: string; otherRoot: number}[] = []
+      for (let i = 0; i < chain.length - 1; i++) {
+        const ancestor = byNum.get(chain[i])
+        if (!ancestor || ancestor.devotionType !== 'revisit') continue
+        const ancestorChain = parseChainRaw(ancestor.referencedDevotions)
+        if (ancestorChain.length === 0) continue
+        const otherRoot = ancestorChain[ancestorChain.length - 1]
+        if (otherRoot !== rootNum) {
+          inconsistent.push({number: ancestor.number, date: ancestor.date, otherRoot})
+        }
+      }
+      if (inconsistent.length > 0) {
+        chainLineageIssues.push({
+          id: d.id,
+          number: d.number,
+          date: d.date,
+          rootNumber: rootNum,
+          issueType: 'inconsistent-root',
+          detail: `Chain mixes lineages: ${inconsistent.map((x) => `#${x.number} → root #${x.otherRoot}`).join(', ')}`,
+          related: inconsistent.map((x) => ({number: x.number, date: x.date})),
+        })
+        continue
+      }
+
+      const siblings = byRoot.get(rootNum) ?? []
+      const chainSet = new Set(chain)
+      const missing = siblings.filter(
+        (s) => s.number !== d.number && s.date < d.date && !chainSet.has(s.number) && !ignoreSet.has(s.number),
+      )
+      if (missing.length > 0) {
+        chainLineageIssues.push({
+          id: d.id,
+          number: d.number,
+          date: d.date,
+          rootNumber: rootNum,
+          issueType: 'missing-siblings',
+          detail: `Missing ${missing.length} earlier sibling${missing.length === 1 ? '' : 's'} sharing root original #${rootNum}`,
+          related: missing.map((s) => ({number: s.number, date: s.date})),
+        })
+      }
+    }
+    chainLineageIssues.sort((a, b) => b.number - a.number)
+
+    // Revisit/original verse mismatch: each revisit's bible reference should share
+    // at least one verse key with the original at the end of its chain. If it doesn't,
+    // either the chain was linked to the wrong original or the reference drifted.
+    const mismatchedRevisits: {
+      id: number
+      number: number
+      date: string
+      bibleReference: string
+      originalNumber: number
+      originalDate: string
+      originalBibleReference: string | null
+    }[] = []
+    for (const d of all) {
+      if (d.devotionType !== 'revisit' || !d.bibleReference) continue
+      const chain = parseChainRaw(d.referencedDevotions)
+      if (chain.length === 0) continue
+      const original = byNum.get(chain[chain.length - 1])
+      if (!original || original.devotionType === 'revisit' || !original.bibleReference) continue
+
+      const revisitKeys = new Set(parseReference(d.bibleReference).flatMap((r) => referenceKeys(r)))
+      const originalKeys = new Set(parseReference(original.bibleReference).flatMap((r) => referenceKeys(r)))
+      if (revisitKeys.size === 0 || originalKeys.size === 0) continue
+
+      let overlap = false
+      for (const k of revisitKeys) {
+        if (originalKeys.has(k)) {
+          overlap = true
+          break
+        }
+      }
+      if (!overlap) {
+        mismatchedRevisits.push({
+          id: d.id,
+          number: d.number,
+          date: d.date,
+          bibleReference: d.bibleReference,
+          originalNumber: original.number,
+          originalDate: original.date,
+          originalBibleReference: original.bibleReference,
+        })
+      }
+    }
+    mismatchedRevisits.sort((a, b) => b.number - a.number)
+
     const issueCount =
       missingNumbers.length +
       missingDates.length +
@@ -371,7 +541,9 @@ devotionsRouter.get(
       guestsNoNumber.length +
       guestsNoSpeaker.length +
       speakerGaps.reduce((sum, s) => sum + s.missing.length + s.duplicates.length, 0) +
-      brokenChains.length
+      brokenChains.length +
+      mismatchedRevisits.length +
+      chainLineageIssues.length
 
     res.json({
       missingNumbers,
@@ -383,6 +555,8 @@ devotionsRouter.get(
       speakerGaps,
       duplicateScriptures,
       brokenChains,
+      mismatchedRevisits,
+      chainLineageIssues,
       totalDevotions: all.length,
       numberRange: {min: minNum, max: maxNum},
       issueCount,
@@ -1437,14 +1611,14 @@ devotionsRouter.get(
     }
 
     if (devotion.devotionType !== 'revisit' || !devotion.bibleReference) {
-      res.json({currentChain: [], proposedChain: [], missing: []})
+      res.json({currentChain: [], proposedChain: [], missing: [], ignored: []})
       return
     }
 
     const parsed = parseReference(devotion.bibleReference)
     const keys = new Set(parsed.flatMap((r) => referenceKeys(r)))
     if (keys.size === 0) {
-      res.json({currentChain: [], proposedChain: [], missing: []})
+      res.json({currentChain: [], proposedChain: [], missing: [], ignored: []})
       return
     }
 
@@ -1633,20 +1807,33 @@ devotionsRouter.post(
     const updates: {id: number; chain: number[]}[] = []
 
     // Always update the current devotion with all targets
-    updates.push({id: current.id, chain: insertSorted(originalChain, targets)})
+    const currentNewChain = insertSorted(originalChain, targets)
+    updates.push({id: current.id, chain: currentNewChain})
 
-    // Cascade into ancestor revisits: each ancestor only gets targets whose date < ancestor's date
-    for (const a of ancestorRevisits) {
-      if (a.devotionType !== 'revisit') continue
-      const applicable = targets.filter((t) => {
-        const td = targetsByNumber.get(t)!
-        return a.date > td.date
+    // Cascade into every revisit in the new chain (both original ancestors and newly-added
+    // targets). Each such revisit R gets every other item from the new chain that is dated
+    // before R — ensuring newly-inserted targets like 1321 also receive the older siblings
+    // (954, 590) that now belong in their chain.
+    const newChainDevotions = new Map<number, (typeof ancestorRevisits)[number]>()
+    for (const d of ancestorRevisits) newChainDevotions.set(d.number, d)
+    for (const d of targetDevos) newChainDevotions.set(d.number, d)
+
+    for (const num of currentNewChain) {
+      const r = newChainDevotions.get(num)
+      if (!r || r.devotionType !== 'revisit' || r.id === current.id) continue
+
+      const applicable = currentNewChain.filter((x) => {
+        if (x === num) return false
+        const xDate = byNumber.get(x)?.date ?? targetsByNumber.get(x)?.date ?? ''
+        return xDate !== '' && xDate < r.date
       })
       if (applicable.length === 0) continue
-      const aChain = parseChain(a.referencedDevotions)
-      const toAdd = applicable.filter((t) => !aChain.includes(t))
+
+      const rChain = parseChain(r.referencedDevotions)
+      const toAdd = applicable.filter((x) => !rChain.includes(x))
       if (toAdd.length === 0) continue
-      updates.push({id: a.id, chain: insertSorted(aChain, toAdd)})
+
+      updates.push({id: r.id, chain: insertSorted(rChain, toAdd)})
     }
 
     for (const u of updates) {
@@ -1663,6 +1850,88 @@ devotionsRouter.post(
       updated: updates.length,
       currentChain: updates.find((u) => u.id === current.id)?.chain ?? originalChain,
     })
+  }),
+)
+
+// POST /api/devotions/:id/chain-fix-root - Extend this revisit's chain down through
+// any terminal-revisit tail until it lands at an original. Used to heal chains flagged
+// as `root-is-revisit` by the audit.
+devotionsRouter.post(
+  '/:id/chain-fix-root',
+  asyncHandler(async (req, res) => {
+    const current = db
+      .select()
+      .from(schema.devotions)
+      .where(eq(schema.devotions.id, Number(req.params.id)))
+      .get()
+    if (!current) {
+      res.status(404).json({error: 'Devotion not found'})
+      return
+    }
+    if (current.devotionType !== 'revisit') {
+      res.status(400).json({error: 'Only revisits can have a chain'})
+      return
+    }
+
+    const parseChain = (raw: string | null): number[] => {
+      if (!raw) return []
+      try {
+        return JSON.parse(raw) as number[]
+      } catch {
+        return []
+      }
+    }
+
+    const originalChain = parseChain(current.referencedDevotions)
+    if (originalChain.length === 0) {
+      res.status(400).json({error: 'Chain is empty — nothing to extend. Use chain-insert to seed it.'})
+      return
+    }
+
+    // Walk the tail: while the last number points at a revisit, splice in that
+    // revisit's chain. Track visited numbers to break any cycles in bad data.
+    const all = db.select().from(schema.devotions).all()
+    const byNum = new Map(all.map((d) => [d.number, d]))
+
+    const newChain: number[] = [...originalChain]
+    const seen = new Set(newChain)
+    const MAX_ITERATIONS = 50
+
+    for (let i = 0; i < MAX_ITERATIONS; i++) {
+      const tail = newChain[newChain.length - 1]
+      const tailDevo = byNum.get(tail)
+      if (!tailDevo || tailDevo.devotionType !== 'revisit') break
+
+      const tailChain = parseChain(tailDevo.referencedDevotions)
+      if (tailChain.length === 0) break
+
+      let added = false
+      for (const n of tailChain) {
+        if (seen.has(n)) continue
+        newChain.push(n)
+        seen.add(n)
+        added = true
+      }
+      if (!added) break
+    }
+
+    // Sanity-sort by date DESC (newest parent first, original last) using all available dates.
+    const entries = newChain.map((n) => ({num: n, date: byNum.get(n)?.date ?? ''}))
+    entries.sort((a, b) => b.date.localeCompare(a.date) || b.num - a.num)
+    const sortedChain = entries.map((e) => e.num)
+
+    const terminal = byNum.get(sortedChain[sortedChain.length - 1])
+    const resolved = !!terminal && terminal.devotionType !== 'revisit'
+
+    db.update(schema.devotions)
+      .set({
+        referencedDevotions: JSON.stringify(sortedChain),
+        updatedAt: sql`datetime('now')`,
+      })
+      .where(eq(schema.devotions.id, current.id))
+      .run()
+
+    res.json({oldChain: originalChain, newChain: sortedChain, resolved})
   }),
 )
 
@@ -1729,6 +1998,70 @@ devotionsRouter.get(
       return
     }
     res.json(devotion)
+  }),
+)
+
+// POST /api/devotions/bible-verses - Analyze a YouTube video transcript for Bible references
+devotionsRouter.post(
+  '/bible-verses',
+  asyncHandler(async (req, res) => {
+    const {url} = req.body as {url?: string}
+    if (!url || typeof url !== 'string' || !url.trim()) {
+      res.status(400).json({error: 'url is required'})
+      return
+    }
+
+    let videoId = url.trim()
+    const m = videoId.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\s]+)/)
+    if (m) videoId = m[1]
+
+    let transcript
+    try {
+      transcript = await YoutubeTranscript.fetchTranscript(videoId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      res.status(502).json({error: `Failed to fetch transcript. Make sure the video has captions. ${msg}`})
+      return
+    }
+
+    if (!transcript || transcript.length === 0) {
+      res.status(404).json({error: 'No transcript found for this video'})
+      return
+    }
+
+    const transcriptText = transcript
+      .map((entry) => {
+        const minutes = Math.floor(entry.offset / 60000)
+        const seconds = Math.floor((entry.offset % 60000) / 1000)
+        const timestamp = `${minutes}:${String(seconds).padStart(2, '0')}`
+        return `[${timestamp}] ${entry.text}`
+      })
+      .join('\n')
+
+    const message = await anthropic.messages.create({
+      model: AI_MODELS.sonnet,
+      max_tokens: 4096,
+      system: `You analyze YouTube video transcripts to identify Bible verse references.
+
+First, look ONLY for direct references — places where the speaker explicitly names a Bible book, chapter, and/or verse (e.g., "John 3:16", "Romans chapter 8", "in First Corinthians Paul says..."), or directly reads/quotes scripture by name.
+
+If you find direct references, list ONLY those. Do NOT include indirect or paraphrased references.
+
+If and ONLY if there are NO direct references at all, then look for indirect/paraphrased references where the speaker is clearly alluding to a specific Bible passage without naming it.
+
+For each verse found, provide:
+1. The Bible reference (book, chapter, verse)
+2. The approximate timestamp where it's mentioned
+3. A brief snippet of what the speaker said
+
+Format your response as a clean, readable list. If no Bible verses are found at all (direct or indirect), say so.`,
+      messages: [{role: 'user', content: `TRANSCRIPT:\n${transcriptText}`}],
+    })
+
+    const textBlock = message.content.find((b) => b.type === 'text')
+    const result = textBlock && textBlock.type === 'text' ? textBlock.text : ''
+
+    res.json({result, videoId, transcriptSegments: transcript.length})
   }),
 )
 

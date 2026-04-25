@@ -1,12 +1,11 @@
 import {Dialog, DialogContent, DialogDescription, DialogTitle} from '@/components/ui/dialog'
-import {useDebouncedValue} from '@/hooks/use-debounced-value'
-import {buildFuse} from '@/lib/search/fuzzy'
+import {buildSearchIndex} from '@/lib/search/fuzzy'
 import type {SearchItem} from '@/lib/search/registry'
 import {useSearchIndex} from '@/lib/search/use-search-index'
 import {cn} from '@/lib/utils'
 import {Command} from 'cmdk'
 import {CornerDownLeft, Loader2, Search} from 'lucide-react'
-import {memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react'
+import {memo, useCallback, useEffect, useMemo, useRef, useState, useTransition} from 'react'
 import {type NavigateFunction, useNavigate} from 'react-router-dom'
 
 const MAX_EMPTY_RESULTS_PER_GROUP = 6
@@ -111,11 +110,18 @@ export function CommandPalette({open, onOpenChange}: {open: boolean; onOpenChang
   const inputRef = useRef<HTMLInputElement>(null)
   const {items, itemsByGroup, isLoading} = useSearchIndex(open)
 
-  const fuse = useMemo(() => buildFuse(items), [items])
+  const index = useMemo(() => buildSearchIndex(items), [items])
 
+  // rawQuery updates synchronously (keeps the input responsive); query is
+  // written in a transition so React can keep typing fluid while the heavier
+  // search + list re-render happens in the background.
   const [rawQuery, setRawQuery] = useState('')
-  const debouncedQuery = useDebouncedValue(rawQuery, 120)
-  const query = useDeferredValue(debouncedQuery)
+  const [query, setQuery] = useState('')
+  const [, startTransition] = useTransition()
+  const onQueryChange = useCallback((value: string) => {
+    setRawQuery(value)
+    startTransition(() => setQuery(value))
+  }, [])
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 0)
@@ -127,7 +133,10 @@ export function CommandPalette({open, onOpenChange}: {open: boolean; onOpenChang
   }, [onOpenChange])
 
   const handleOpenChange = useCallback((v: boolean) => {
-    if (!v) setRawQuery('')
+    if (!v) {
+      setRawQuery('')
+      setQuery('')
+    }
     onOpenChangeRef.current(v)
   }, [])
 
@@ -150,34 +159,38 @@ export function CommandPalette({open, onOpenChange}: {open: boolean; onOpenChang
     }
 
     const searchLimit = filterGroup ? MAX_SEARCH_RESULTS * 4 : MAX_SEARCH_RESULTS
-    let matched = fuse.search(effective, {limit: searchLimit}).map((r) => r.item)
+    let matched = index.search(effective, searchLimit)
     if (filterGroup) matched = matched.filter((i) => i.group === filterGroup).slice(0, MAX_SEARCH_RESULTS)
     return groupBy(matched)
-  }, [fuse, itemsByGroup, query])
+  }, [index, itemsByGroup, query])
 
   const orderedGroups = useMemo(() => sortGroups([...visible.keys()]), [visible])
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent showCloseButton={false} className="!p-0 gap-0 overflow-hidden sm:!max-w-xl sm:!rounded-2xl">
+      <DialogContent
+        showCloseButton={false}
+        className="p-0 gap-0 overflow-hidden sm:rounded-2xl"
+        style={{maxWidth: 'min(720px, 90vw)'}}
+      >
         <DialogTitle className="sr-only">Global Search</DialogTitle>
         <DialogDescription className="sr-only">
           Search people, groups, notes, and jump to any page or action.
         </DialogDescription>
-        <Command shouldFilter={false} loop className="flex flex-col h-[100dvh] sm:h-auto sm:max-h-[70vh]">
+        <Command shouldFilter={false} loop className="flex flex-col min-w-0 h-[100dvh] sm:h-auto sm:max-h-[85vh]">
           <div className="flex items-center gap-3 border-b px-4 py-3 shrink-0">
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <Command.Input
               ref={inputRef}
               value={rawQuery}
-              onValueChange={setRawQuery}
+              onValueChange={onQueryChange}
               placeholder="Search people, notes, devotions, or type a command…"
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground text-sm"
             />
             {isLoading && <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin shrink-0" />}
           </div>
 
-          <Command.List className="flex-1 overflow-y-auto px-2 py-2">
+          <Command.List className="flex-1 min-w-0 overflow-y-auto px-4 py-2">
             <Command.Empty className="py-10 text-center text-sm text-muted-foreground">
               {isLoading ? 'Loading…' : 'No results.'}
             </Command.Empty>

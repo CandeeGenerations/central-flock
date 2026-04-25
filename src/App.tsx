@@ -16,6 +16,7 @@ import {DashboardPage} from '@/pages/dashboard-page'
 import {DevotionAuditPage} from '@/pages/devotions/devotion-audit-page'
 import {DevotionDetailPage} from '@/pages/devotions/devotion-detail-page'
 import {DevotionListPage} from '@/pages/devotions/devotion-list-page'
+import {DevotionMissingPage} from '@/pages/devotions/devotion-missing-page'
 import {DevotionPassageDetailPage} from '@/pages/devotions/devotion-passage-detail-page'
 import {DevotionPassagesPage} from '@/pages/devotions/devotion-passages-page'
 import {DevotionScanPage} from '@/pages/devotions/devotion-scan-page'
@@ -388,6 +389,7 @@ function AppLayoutInner({
               <Route path="/devotions/passages" element={<DevotionPassagesPage />} />
               <Route path="/devotions/passages/:id" element={<DevotionPassageDetailPage />} />
               <Route path="/devotions/audit" element={<DevotionAuditPage />} />
+              <Route path="/devotions/missing" element={<DevotionMissingPage />} />
               <Route path="/devotions/gwendolyn" element={<GwendolynListPage />} />
               <Route path="/devotions/gwendolyn/new" element={<GwendolynNewPage />} />
               <Route path="/devotions/gwendolyn/:id" element={<GwendolynDetailPage />} />

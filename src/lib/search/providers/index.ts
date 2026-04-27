@@ -7,6 +7,7 @@ import {groupsProvider} from './groups'
 import {gwendolynDevotionsProvider} from './gwendolyn-devotions'
 import {hymnsProvider} from './hymns'
 import {messagesProvider} from './messages'
+import {notionProvider} from './notion'
 import {nurserySchedulesProvider} from './nursery-schedules'
 import {peopleProvider} from './people'
 import {quotesProvider} from './quotes'
@@ -15,6 +16,7 @@ import {templatesProvider} from './templates'
 export const providers: SearchProvider[] = [
   peopleProvider as SearchProvider,
   groupsProvider as SearchProvider,
+  notionProvider as SearchProvider,
   devotionsProvider as SearchProvider,
   messagesProvider as SearchProvider,
   quotesProvider as SearchProvider,

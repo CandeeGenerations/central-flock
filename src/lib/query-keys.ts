@@ -37,4 +37,8 @@ export const queryKeys = {
     return ['gwendolynDevotions'] as const
   },
   gwendolynDevotional: (id: number) => ['gwendolynDevotional', id] as const,
+  notionStatus: ['notionStatus'] as const,
+  notionTree: ['notionTree'] as const,
+  notionPage: (id: string) => ['notionPage', id] as const,
+  notionSearch: (q: string) => ['notionSearch', q] as const,
 }

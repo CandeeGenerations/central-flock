@@ -18,6 +18,7 @@ import {homeRouter} from './routes/home.js'
 import {hymnsRouter} from './routes/hymns.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter, processSendJob} from './routes/messages.js'
+import {notionRouter} from './routes/notion.js'
 import {nurserySchedulesRouter} from './routes/nursery-schedules.js'
 import {nurseryRouter} from './routes/nursery.js'
 import {peopleRouter} from './routes/people.js'
@@ -28,6 +29,7 @@ import {templatesRouter} from './routes/templates.js'
 import {webhooksRouter} from './routes/webhooks.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
+import {startNotionSyncScheduler} from './services/notion-sync.js'
 import {startScheduler} from './services/scheduler.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -65,6 +67,7 @@ app.use('/api/nursery/schedules', nurserySchedulesRouter)
 app.use('/api/nursery', nurseryRouter)
 app.use('/api/quotes', quotesRouter)
 app.use('/api/hymns', hymnsRouter)
+app.use('/api/notion', notionRouter)
 app.use('/api/settings', settingsRouter)
 
 // Serve scan images and nursery logos
@@ -91,5 +94,6 @@ app.listen(PORT, () => {
   startScheduler(processSendJob)
   startBirthdayScheduler()
   startCalendarSyncScheduler()
+  startNotionSyncScheduler()
   cleanupOrphanedScanImages()
 })

@@ -50,6 +50,13 @@
       "when": 1777304657031,
       "tag": "0006_wealthy_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1777305236281,
+      "tag": "0007_sad_psynapse",
+      "breakpoints": true
     }
   ]
 }

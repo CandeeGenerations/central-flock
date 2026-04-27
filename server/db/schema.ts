@@ -1,5 +1,6 @@
 export * from './schema-core.js'
 export * from './schema-devotions.js'
 export * from './schema-hymns.js'
+export * from './schema-notion.js'
 export * from './schema-nursery.js'
 export * from './schema-quotes.js'

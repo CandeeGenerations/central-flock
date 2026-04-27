@@ -33,6 +33,9 @@ import {LoginPage} from '@/pages/login-page'
 import {MessageComposePage} from '@/pages/message-compose-page'
 import {MessageDetailPage} from '@/pages/message-detail-page'
 import {MessageHistoryPage} from '@/pages/message-history-page'
+import {NotionDetailPage} from '@/pages/notion/notion-detail-page'
+import {NotionLayout} from '@/pages/notion/notion-layout'
+import {NotionPage} from '@/pages/notion/notion-page'
 import {NurseryScheduleViewPage} from '@/pages/nursery/nursery-schedule-view-page'
 import {NurserySchedulesPage} from '@/pages/nursery/nursery-schedules-page'
 import {NurserySettingsPage} from '@/pages/nursery/nursery-settings-page'
@@ -406,6 +409,10 @@ function AppLayoutInner({
               <Route path="/sermons/hymns/searches" element={<HymnSearchesPage />} />
               <Route path="/sermons/hymns/searches/:id" element={<HymnSearchDetailPage />} />
               <Route path="/sermons/verse-strips" element={<VerseStripsPage />} />
+              <Route path="/notion" element={<NotionLayout />}>
+                <Route index element={<NotionPage />} />
+                <Route path="page/:id" element={<NotionDetailPage />} />
+              </Route>
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>

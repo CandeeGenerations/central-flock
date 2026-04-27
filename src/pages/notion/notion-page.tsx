@@ -18,9 +18,8 @@ export function NotionPage() {
           <div className="text-sm text-muted-foreground space-y-2">
             <p>Notion is not configured yet.</p>
             <p>
-              Add <code className="rounded bg-muted px-1 py-0.5">NOTION_API_TOKEN</code> and{' '}
-              <code className="rounded bg-muted px-1 py-0.5">NOTION_ROOT_PAGE_ID</code> to the launchd plist, then
-              restart the service.
+              Add <code className="rounded bg-muted px-1 py-0.5">NOTION_API_TOKEN</code> to the launchd plist, then
+              restart the service. Anything you've shared with the integration in Notion will appear here.
             </p>
           </div>
         ) : (

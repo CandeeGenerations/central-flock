@@ -105,7 +105,7 @@ export function NotionSidebar() {
         {isLoading && <div className="text-sm text-muted-foreground p-2">Loading…</div>}
         {tree?.roots.length === 0 && (
           <div className="text-sm text-muted-foreground p-2">
-            No pages yet. Make sure your Notion root page is shared with the integration, then click ↻.
+            No pages yet. Share databases or pages with the integration in Notion, then click ↻.
           </div>
         )}
         {tree && (

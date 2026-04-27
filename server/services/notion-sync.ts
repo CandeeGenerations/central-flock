@@ -1,16 +1,15 @@
+import type {DataSourceObjectResponse, PageObjectResponse} from '@notionhq/client/build/src/api-endpoints.js'
+
 import {db, schema, sqlite} from '../db/index.js'
 import {
   extractIcon,
   extractTitle,
-  getRootPageId,
-  listChildBlocks,
   notionConfigured,
-  queryDatabaseRows,
-  retrieveDatabase,
-  retrievePage,
+  searchAccessibleDataSources,
+  searchAccessiblePages,
 } from './notion.js'
 
-interface SyncedPage {
+interface SyncedEntry {
   id: string
   parentId: string | null
   title: string
@@ -36,100 +35,105 @@ export function getNotionSyncStatus() {
   return {lastSyncedAt, lastSyncError, configured: notionConfigured}
 }
 
-async function walkTree(rootId: string): Promise<Map<string, SyncedPage>> {
-  const seen = new Map<string, SyncedPage>()
-  const queue: {id: string; parentId: string | null; isDatabase: boolean}[] = [
-    {id: rootId, parentId: null, isDatabase: false},
-  ]
+type ParentRef = {type: string} & Record<string, string | undefined>
 
-  while (queue.length > 0) {
-    const item = queue.shift()!
-    if (seen.has(item.id)) continue
+function resolveParent(parent: ParentRef, accessibleIds: Set<string>): string | null {
+  if (parent.type === 'page_id' && parent.page_id) {
+    return accessibleIds.has(parent.page_id) ? parent.page_id : null
+  }
+  if (parent.type === 'data_source_id' && parent.data_source_id) {
+    return accessibleIds.has(parent.data_source_id) ? parent.data_source_id : null
+  }
+  if (parent.type === 'database_id' && parent.database_id) {
+    return accessibleIds.has(parent.database_id) ? parent.database_id : null
+  }
+  return null
+}
 
-    let title: string
-    let icon: string | null
-    let url: string
-    let lastEditedTime: string
+async function discoverAll(): Promise<Map<string, SyncedEntry>> {
+  const dataSources: DataSourceObjectResponse[] = await searchAccessibleDataSources()
+  const pages: PageObjectResponse[] = await searchAccessiblePages()
 
-    if (item.isDatabase) {
-      const dbResp = await retrieveDatabase(item.id)
-      if (!dbResp) continue
-      title = extractTitle(dbResp)
-      icon = extractIcon(dbResp)
-      url = dbResp.url
-      lastEditedTime = dbResp.last_edited_time
-      for (const row of await queryDatabaseRows(dbResp)) {
-        queue.push({id: row.id, parentId: item.id, isDatabase: false})
-      }
-    } else {
-      const page = await retrievePage(item.id)
-      if (!page) continue
-      title = extractTitle(page)
-      icon = extractIcon(page)
-      url = page.url
-      lastEditedTime = page.last_edited_time
-    }
+  const accessibleIds = new Set<string>()
+  for (const d of dataSources) accessibleIds.add(d.id)
+  for (const p of pages) accessibleIds.add(p.id)
 
-    let hasChildren = item.isDatabase
-    for (const block of await listChildBlocks(item.id)) {
-      if (!('type' in block)) continue
-      if (block.type === 'child_page') {
-        hasChildren = true
-        queue.push({id: block.id, parentId: item.id, isDatabase: false})
-      } else if (block.type === 'child_database') {
-        hasChildren = true
-        queue.push({id: block.id, parentId: item.id, isDatabase: true})
-      }
-    }
+  const entries = new Map<string, SyncedEntry>()
 
-    seen.set(item.id, {
-      id: item.id,
-      parentId: item.parentId,
-      title,
-      icon,
-      url,
-      isDatabase: item.isDatabase,
-      isFolder: hasChildren,
-      lastEditedTime,
+  // Each data source is treated as a top-level "folder" entity. Its tree-parent comes from
+  // `database_parent` (the database's workspace/page), not `parent` (which is the database itself).
+  for (const d of dataSources) {
+    const dbParent = (d.database_parent ?? {type: 'workspace'}) as ParentRef
+    entries.set(d.id, {
+      id: d.id,
+      parentId: resolveParent(dbParent, accessibleIds),
+      title: extractTitle(d),
+      icon: extractIcon(d),
+      url: d.url,
+      isDatabase: true,
+      isFolder: true,
+      lastEditedTime: d.last_edited_time,
     })
   }
 
-  return seen
+  for (const p of pages) {
+    entries.set(p.id, {
+      id: p.id,
+      parentId: resolveParent(p.parent as ParentRef, accessibleIds),
+      title: extractTitle(p),
+      icon: extractIcon(p),
+      url: p.url,
+      isDatabase: false,
+      isFolder: false,
+      lastEditedTime: p.last_edited_time,
+    })
+  }
+
+  // Mark pages with descendants as folders so the sidebar renders them expandable.
+  const childCount = new Map<string, number>()
+  for (const e of entries.values()) {
+    if (e.parentId) childCount.set(e.parentId, (childCount.get(e.parentId) ?? 0) + 1)
+  }
+  for (const e of entries.values()) {
+    if (!e.isDatabase && (childCount.get(e.id) ?? 0) > 0) e.isFolder = true
+  }
+
+  return entries
 }
 
 async function doSync(): Promise<SyncResult> {
   if (!notionConfigured) {
-    return {ok: false, pages: 0, error: 'NOTION_API_TOKEN or NOTION_ROOT_PAGE_ID not configured'}
+    return {ok: false, pages: 0, error: 'NOTION_API_TOKEN is not configured'}
   }
 
   try {
-    const map = await walkTree(getRootPageId())
+    const map = await discoverAll()
     const now = new Date().toISOString()
 
     sqlite.transaction(() => {
-      for (const p of map.values()) {
+      for (const e of map.values()) {
         db.insert(schema.notionPages)
           .values({
-            id: p.id,
-            parentId: p.parentId,
-            title: p.title,
-            icon: p.icon,
-            url: p.url,
-            isDatabase: p.isDatabase,
-            isFolder: p.isFolder,
-            lastEditedTime: p.lastEditedTime,
+            id: e.id,
+            parentId: e.parentId,
+            title: e.title,
+            icon: e.icon,
+            url: e.url,
+            isDatabase: e.isDatabase,
+            isFolder: e.isFolder,
+            lastEditedTime: e.lastEditedTime,
             syncedAt: now,
           })
           .onConflictDoUpdate({
             target: schema.notionPages.id,
             set: {
-              parentId: p.parentId,
-              title: p.title,
-              icon: p.icon,
-              url: p.url,
-              isDatabase: p.isDatabase,
-              isFolder: p.isFolder,
-              lastEditedTime: p.lastEditedTime,
+              parentId: e.parentId,
+              title: e.title,
+              icon: e.icon,
+              url: e.url,
+              isDatabase: e.isDatabase,
+              isFolder: e.isFolder,
+              lastEditedTime: e.lastEditedTime,
               syncedAt: now,
             },
           })
@@ -159,13 +163,13 @@ export function syncNotion(): Promise<SyncResult> {
 
 export function startNotionSyncScheduler(intervalMs = 5 * 60_000) {
   if (!notionConfigured) {
-    console.log('[notion-sync] Skipped: NOTION_API_TOKEN or NOTION_ROOT_PAGE_ID not set')
+    console.log('[notion-sync] Skipped: NOTION_API_TOKEN not set')
     return
   }
 
   syncNotion()
     .then((r) => {
-      if (r.ok) console.log(`[notion-sync] Initial sync: ${r.pages} pages`)
+      if (r.ok) console.log(`[notion-sync] Initial sync: ${r.pages} entries`)
       else console.warn('[notion-sync] Initial sync failed:', r.error)
     })
     .catch((err) => console.error('[notion-sync] Initial sync error:', err))
@@ -173,7 +177,7 @@ export function startNotionSyncScheduler(intervalMs = 5 * 60_000) {
   intervalId = setInterval(() => {
     syncNotion()
       .then((r) => {
-        if (r.ok) console.log(`[notion-sync] Synced ${r.pages} pages`)
+        if (r.ok) console.log(`[notion-sync] Synced ${r.pages} entries`)
       })
       .catch((err) => console.error('[notion-sync] Scheduled sync error:', err))
   }, intervalMs)

@@ -9,7 +9,7 @@ import {
   extractTitle,
   listChildBlocks,
   notionConfigured,
-  retrieveDatabase,
+  retrieveDataSource,
   retrievePage,
 } from '../services/notion.js'
 
@@ -26,7 +26,7 @@ notionRouter.get(
   '/tree',
   asyncHandler(async (_req, res) => {
     if (!notionConfigured) {
-      res.status(503).json({error: 'Notion is not configured. Set NOTION_API_TOKEN and NOTION_ROOT_PAGE_ID.'})
+      res.status(503).json({error: 'Notion is not configured. Set NOTION_API_TOKEN.'})
       return
     }
     const rows = db.select().from(schema.notionPages).orderBy(asc(schema.notionPages.title)).all()
@@ -74,28 +74,31 @@ notionRouter.get(
     let lastEditedTime: string
 
     if (cached?.isDatabase) {
-      const dbResp = await retrieveDatabase(id)
-      if (!dbResp) {
+      // "Database" entries are v5 data sources — folders, not pages with block content.
+      const ds = await retrieveDataSource(id)
+      if (!ds) {
         res.status(404).json({error: 'Page not found'})
         return
       }
-      title = extractTitle(dbResp)
-      icon = extractIcon(dbResp)
-      url = dbResp.url
+      title = extractTitle(ds)
+      icon = extractIcon(ds)
+      url = ds.url
       isDatabase = true
-      lastEditedTime = dbResp.last_edited_time
-    } else {
-      const page = await retrievePage(id)
-      if (!page) {
-        res.status(404).json({error: 'Page not found'})
-        return
-      }
-      title = extractTitle(page)
-      icon = extractIcon(page)
-      url = page.url
-      isDatabase = false
-      lastEditedTime = page.last_edited_time
+      lastEditedTime = ds.last_edited_time
+      res.json({id, title, icon, url, isDatabase, lastEditedTime, blocks: []})
+      return
     }
+
+    const page = await retrievePage(id)
+    if (!page) {
+      res.status(404).json({error: 'Page not found'})
+      return
+    }
+    title = extractTitle(page)
+    icon = extractIcon(page)
+    url = page.url
+    isDatabase = false
+    lastEditedTime = page.last_edited_time
 
     const blocks = await listChildBlocks(id)
     res.json({id, title, icon, url, isDatabase, lastEditedTime, blocks})

@@ -37,7 +37,4 @@ export const queryKeys = {
     return ['gwendolynDevotions'] as const
   },
   gwendolynDevotional: (id: number) => ['gwendolynDevotional', id] as const,
-  notesTree: ['notesTree'] as const,
-  note: (id: number) => ['note', id] as const,
-  notesBreadcrumb: (id: number) => ['notesBreadcrumb', id] as const,
 }

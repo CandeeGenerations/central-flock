@@ -18,10 +18,10 @@ export function useSearchIndex(enabled: boolean): SearchIndex {
   const {toggleDark} = useTheme()
 
   // IMPORTANT: the queryFn stores the **raw rows** under the provider's queryKey so
-  // the cache can be safely shared with other consumers (e.g. the notes sidebar reads
-  // the same `['notesTree']` key). Transforming to SearchItem[] here would pollute the
-  // cache with component references (icon: Folder/FileText) that cause
-  // "Objects are not valid as a React child" when the raw consumer tries to render them.
+  // the cache can be safely shared with other consumers that read the same key.
+  // Transforming to SearchItem[] here would pollute the cache with component references
+  // (icon: Folder/FileText) that cause "Objects are not valid as a React child" when
+  // the raw consumer tries to render them.
   const results = useQueries({
     queries: providers.map((p) => ({
       queryKey: p.queryKey,

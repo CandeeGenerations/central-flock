@@ -33,9 +33,6 @@ import {LoginPage} from '@/pages/login-page'
 import {MessageComposePage} from '@/pages/message-compose-page'
 import {MessageDetailPage} from '@/pages/message-detail-page'
 import {MessageHistoryPage} from '@/pages/message-history-page'
-import {NoteEditPage} from '@/pages/notes/note-edit-page'
-import {NotesLayout} from '@/pages/notes/notes-layout'
-import {NotesPage} from '@/pages/notes/notes-page'
 import {NurseryScheduleViewPage} from '@/pages/nursery/nursery-schedule-view-page'
 import {NurserySchedulesPage} from '@/pages/nursery/nursery-schedules-page'
 import {NurserySettingsPage} from '@/pages/nursery/nursery-settings-page'
@@ -50,6 +47,7 @@ import {QuoteSearchDetailPage} from '@/pages/sermons/quote-search-detail-page'
 import {QuoteSearchesPage} from '@/pages/sermons/quote-searches-page'
 import {QuotesPage} from '@/pages/sermons/quotes-page'
 import {QuotesResearchPage} from '@/pages/sermons/quotes-research-page'
+import {VerseStripsPage} from '@/pages/sermons/verse-strips-page'
 import {SettingsPage} from '@/pages/settings-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
@@ -407,10 +405,7 @@ function AppLayoutInner({
               <Route path="/sermons/hymns" element={<HymnsPrepPage />} />
               <Route path="/sermons/hymns/searches" element={<HymnSearchesPage />} />
               <Route path="/sermons/hymns/searches/:id" element={<HymnSearchDetailPage />} />
-              <Route path="/notes" element={<NotesLayout />}>
-                <Route index element={<NotesPage />} />
-                <Route path="note/:noteId" element={<NoteEditPage />} />
-              </Route>
+              <Route path="/sermons/verse-strips" element={<VerseStripsPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>

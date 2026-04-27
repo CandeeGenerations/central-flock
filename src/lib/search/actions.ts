@@ -1,5 +1,4 @@
 import {exportPeopleCSV} from '@/lib/api'
-import {createNoteItem} from '@/lib/notes-api'
 import type {ActionsBuildContext, SearchItem} from '@/lib/search/registry'
 import {
   ArrowRight,
@@ -7,7 +6,6 @@ import {
   BookOpen,
   Calendar,
   Download,
-  FileEdit,
   FileText,
   FolderOpen,
   FolderPlus,
@@ -16,7 +14,6 @@ import {
   MessageSquare,
   Moon,
   Music,
-  NotebookText,
   Plus,
   Quote,
   Settings,
@@ -51,7 +48,6 @@ export function buildNavigationActions(): SearchItem[] {
     nav('/messages', 'Messages', MessageSquare, ['history', 'sent']),
     nav('/messages/compose', 'Compose Message', Mail, ['new message', 'send']),
     nav('/templates', 'Templates', FileText),
-    nav('/notes', 'Notes', NotebookText),
     nav('/devotions', 'Devotions', BookOpen),
     nav('/devotions/stats', 'Devotions Dashboard', LayoutDashboard),
     nav('/devotions/gwendolyn', 'Gwendolyn Devotions', BookOpen),
@@ -112,30 +108,6 @@ export function buildCreateActions(): SearchItem[] {
       keywords: ['new', 'template'],
       action: ({navigate, close}) => {
         navigate('/templates/new')
-        close()
-      },
-    },
-    {
-      id: 'create-note',
-      label: 'New Note',
-      group: 'Create',
-      icon: FileEdit,
-      keywords: ['new', 'note', 'write'],
-      action: async ({navigate, close}) => {
-        const note = await createNoteItem({type: 'note', parentId: null})
-        navigate(`/notes/note/${note.id}`)
-        close()
-      },
-    },
-    {
-      id: 'create-folder',
-      label: 'New Folder',
-      group: 'Create',
-      icon: FolderPlus,
-      keywords: ['new', 'folder', 'notes'],
-      action: async ({navigate, close}) => {
-        const folder = await createNoteItem({type: 'folder', parentId: null})
-        navigate(`/notes?expand=${folder.id}`)
         close()
       },
     },

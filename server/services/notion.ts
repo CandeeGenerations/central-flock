@@ -101,20 +101,16 @@ type TitledEntity = {title?: unknown; properties?: unknown; icon?: unknown}
 export function extractTitle(entity: TitledEntity): string {
   if (entity.properties && typeof entity.properties === 'object') {
     for (const prop of Object.values(entity.properties as Record<string, unknown>)) {
-      if (
-        prop &&
-        typeof prop === 'object' &&
-        'type' in prop &&
-        (prop as {type: string}).type === 'title' &&
-        'title' in prop
-      ) {
-        const text = ((prop as {title: {plain_text: string}[]}).title ?? []).map((t) => t.plain_text).join('')
-        if (text) return text
-      }
+      if (!prop || typeof prop !== 'object' || !('type' in prop)) continue
+      if ((prop as {type: string}).type !== 'title') continue
+      const titleField = (prop as {title?: unknown}).title
+      if (!Array.isArray(titleField)) continue
+      const text = (titleField as {plain_text?: string}[]).map((t) => t.plain_text ?? '').join('')
+      if (text) return text
     }
   }
   if (Array.isArray(entity.title)) {
-    const text = (entity.title as {plain_text: string}[]).map((t) => t.plain_text).join('')
+    const text = (entity.title as {plain_text?: string}[]).map((t) => t.plain_text ?? '').join('')
     if (text) return text
   }
   return 'Untitled'

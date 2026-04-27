@@ -61,7 +61,7 @@ export function NotionDetailPage() {
       <hr className="border-muted-foreground/20" />
 
       {data.isDatabase && data.table ? (
-        <NotionTableView table={data.table} />
+        <NotionTableView key={data.id} table={data.table} />
       ) : data.blocks.length === 0 ? (
         <p className="text-sm text-muted-foreground italic">This page is empty.</p>
       ) : (

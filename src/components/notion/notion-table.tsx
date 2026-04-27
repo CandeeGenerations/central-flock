@@ -1,7 +1,11 @@
+import {Pagination} from '@/components/ui/pagination'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import type {NotionTable as NotionTableData} from '@/lib/notion-api'
 import {cn} from '@/lib/utils'
+import {useMemo, useState} from 'react'
 import {Link} from 'react-router-dom'
+
+const PAGE_SIZE = 20
 
 const NOTION_COLOR_TO_BG: Record<string, string> = {
   default: 'bg-muted text-muted-foreground',
@@ -134,34 +138,42 @@ function renderProperty(value: unknown, columnType: string, rowId: string): Reac
   }
 }
 
+// Caller should `key={data.id}` this component so navigating between databases
+// remounts it and resets pagination to page 1.
 export function NotionTableView({table}: {table: NotionTableData}) {
+  const [page, setPage] = useState(1)
+  const visibleRows = useMemo(() => table.rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [table.rows, page])
+
   if (table.rows.length === 0) {
     return <p className="text-sm text-muted-foreground italic">This database is empty.</p>
   }
   return (
-    <div className="overflow-x-auto rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {table.columns.map((c) => (
-              <TableHead key={c.key} className="whitespace-nowrap">
-                {c.name}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {table.rows.map((row) => (
-            <TableRow key={row.id}>
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
               {table.columns.map((c) => (
-                <TableCell key={c.key} className="align-top">
-                  {renderProperty(row.values[c.key], c.type, row.id)}
-                </TableCell>
+                <TableHead key={c.key} className="whitespace-nowrap">
+                  {c.name}
+                </TableHead>
               ))}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {visibleRows.map((row) => (
+              <TableRow key={row.id}>
+                {table.columns.map((c) => (
+                  <TableCell key={c.key} className="align-top">
+                    {renderProperty(row.values[c.key], c.type, row.id)}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <Pagination page={page} pageSize={PAGE_SIZE} total={table.rows.length} onPageChange={setPage} noun="rows" />
     </div>
   )
 }

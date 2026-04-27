@@ -89,6 +89,9 @@ async function discoverAll(): Promise<Map<string, SyncedEntry>> {
     })
   }
 
+  collapseDatabaseWrappers(entries)
+  promoteHiddenRoot(entries)
+
   // Mark pages with descendants as folders so the sidebar renders them expandable.
   const childCount = new Map<string, number>()
   for (const e of entries.values()) {
@@ -99,6 +102,45 @@ async function discoverAll(): Promise<Map<string, SyncedEntry>> {
   }
 
   return entries
+}
+
+// A Notion full-page-database renders as a page that contains a single same-named
+// data source. Without this pass, the sidebar shows two nested folders with the
+// same title. Collapse the page and let the data source take its tree position.
+function collapseDatabaseWrappers(entries: Map<string, SyncedEntry>): void {
+  const childrenOf = new Map<string, string[]>()
+  for (const e of entries.values()) {
+    if (!e.parentId) continue
+    const list = childrenOf.get(e.parentId) ?? []
+    list.push(e.id)
+    childrenOf.set(e.parentId, list)
+  }
+
+  for (const page of [...entries.values()]) {
+    if (page.isDatabase) continue
+    const childIds = childrenOf.get(page.id) ?? []
+    if (childIds.length !== 1) continue
+    const child = entries.get(childIds[0])
+    if (!child?.isDatabase) continue
+    if (child.title.trim().toLowerCase() !== page.title.trim().toLowerCase()) continue
+
+    child.parentId = page.parentId
+    if (!child.icon) child.icon = page.icon
+    entries.delete(page.id)
+  }
+}
+
+// If NOTION_HIDDEN_ROOT_ID is set, the configured page is removed from the tree
+// and its direct children are promoted to its place in the hierarchy.
+function promoteHiddenRoot(entries: Map<string, SyncedEntry>): void {
+  const hiddenId = process.env.NOTION_HIDDEN_ROOT_ID?.trim()
+  if (!hiddenId) return
+  const hidden = entries.get(hiddenId)
+  if (!hidden) return
+  for (const e of entries.values()) {
+    if (e.parentId === hiddenId) e.parentId = hidden.parentId
+  }
+  entries.delete(hiddenId)
 }
 
 async function doSync(): Promise<SyncResult> {

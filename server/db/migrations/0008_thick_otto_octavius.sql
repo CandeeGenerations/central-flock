@@ -1,0 +1,1 @@
+ALTER TABLE `notion_pages` ADD `blocks_walked_at` text;

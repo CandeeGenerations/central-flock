@@ -4,6 +4,7 @@ import {db, schema, sqlite} from '../db/index.js'
 import {
   extractIcon,
   extractTitle,
+  findChildDatabaseRefs,
   notionConfigured,
   searchAccessibleDataSources,
   searchAccessiblePages,
@@ -18,6 +19,7 @@ interface SyncedEntry {
   isDatabase: boolean
   isFolder: boolean
   lastEditedTime: string
+  blocksWalkedAt: string | null
 }
 
 export interface SyncResult {
@@ -58,6 +60,14 @@ async function discoverAll(): Promise<Map<string, SyncedEntry>> {
   for (const d of dataSources) accessibleIds.add(d.id)
   for (const p of pages) accessibleIds.add(p.id)
 
+  const cachedWalkedAt = new Map<string, string | null>()
+  for (const row of db
+    .select({id: schema.notionPages.id, blocksWalkedAt: schema.notionPages.blocksWalkedAt})
+    .from(schema.notionPages)
+    .all()) {
+    cachedWalkedAt.set(row.id, row.blocksWalkedAt)
+  }
+
   const entries = new Map<string, SyncedEntry>()
 
   // Each data source is treated as a top-level "folder" entity. Its tree-parent comes from
@@ -73,6 +83,7 @@ async function discoverAll(): Promise<Map<string, SyncedEntry>> {
       isDatabase: true,
       isFolder: true,
       lastEditedTime: d.last_edited_time,
+      blocksWalkedAt: cachedWalkedAt.get(d.id) ?? null,
     })
   }
 
@@ -86,9 +97,11 @@ async function discoverAll(): Promise<Map<string, SyncedEntry>> {
       isDatabase: false,
       isFolder: false,
       lastEditedTime: p.last_edited_time,
+      blocksWalkedAt: cachedWalkedAt.get(p.id) ?? null,
     })
   }
 
+  await reparentLinkedDatabases(entries, dataSources)
   collapseDatabaseWrappers(entries)
   promoteHiddenRoot(entries)
 
@@ -102,6 +115,107 @@ async function discoverAll(): Promise<Map<string, SyncedEntry>> {
   }
 
   return entries
+}
+
+// Pages can embed a database via toggle/inline blocks ("linked database view")
+// without that database actually being their child in Notion's parent graph.
+// Walk blocks for non-database pages whose content has changed since the last
+// walk; if a child_database block points at a workspace-rooted database that's
+// referenced by exactly one page, reparent the database to that page.
+async function reparentLinkedDatabases(
+  entries: Map<string, SyncedEntry>,
+  dataSources: DataSourceObjectResponse[],
+): Promise<void> {
+  const wrapperToDataSources = new Map<string, string[]>()
+  for (const d of dataSources) {
+    const wrapperId = (d.parent as {database_id?: string}).database_id
+    if (!wrapperId) continue
+    const list = wrapperToDataSources.get(wrapperId) ?? []
+    list.push(d.id)
+    wrapperToDataSources.set(wrapperId, list)
+  }
+
+  const refsByDataSource = new Map<string, Set<string>>()
+  const now = new Date().toISOString()
+  let walked = 0
+
+  for (const e of entries.values()) {
+    if (e.isDatabase) continue
+    if (e.blocksWalkedAt && e.blocksWalkedAt >= e.lastEditedTime) {
+      const cachedRefs = cachedRefsForPage(e.id)
+      for (const dsId of cachedRefs) addRef(refsByDataSource, dsId, e.id)
+      continue
+    }
+    try {
+      const wrapperIds = await findChildDatabaseRefs(e.id)
+      const dataSourceIds: string[] = []
+      for (const w of wrapperIds) {
+        for (const dsId of wrapperToDataSources.get(w) ?? []) {
+          dataSourceIds.push(dsId)
+          addRef(refsByDataSource, dsId, e.id)
+        }
+      }
+      writeCachedRefs(e.id, dataSourceIds)
+      e.blocksWalkedAt = now
+      walked++
+    } catch (err) {
+      console.warn(`[notion-sync] block walk failed for ${e.id}:`, err instanceof Error ? err.message : err)
+    }
+  }
+
+  if (walked > 0) console.log(`[notion-sync] walked blocks for ${walked} pages`)
+
+  // Apply reparenting: a workspace-rooted data source referenced from exactly
+  // one page is moved under that page. Multiple references → leave alone.
+  for (const [dsId, pageIds] of refsByDataSource) {
+    if (pageIds.size !== 1) continue
+    const ds = entries.get(dsId)
+    if (!ds || !ds.isDatabase || ds.parentId !== null) continue
+    const [pageId] = pageIds
+    if (!entries.has(pageId)) continue
+    ds.parentId = pageId
+  }
+}
+
+function addRef(map: Map<string, Set<string>>, dsId: string, pageId: string) {
+  const set = map.get(dsId) ?? new Set<string>()
+  set.add(pageId)
+  map.set(dsId, set)
+}
+
+// Cached child_database references per page, persisted in a tiny side table so
+// unchanged pages don't need to be re-walked on every sync.
+function cachedRefsForPage(pageId: string): string[] {
+  ensureRefsTable()
+  const row = sqlite.prepare(`SELECT data_source_ids FROM notion_page_refs WHERE page_id=?`).get(pageId) as
+    | {data_source_ids: string}
+    | undefined
+  if (!row) return []
+  try {
+    const parsed = JSON.parse(row.data_source_ids)
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeCachedRefs(pageId: string, ids: string[]) {
+  ensureRefsTable()
+  sqlite
+    .prepare(
+      `INSERT INTO notion_page_refs (page_id, data_source_ids) VALUES (?, ?)
+       ON CONFLICT(page_id) DO UPDATE SET data_source_ids=excluded.data_source_ids`,
+    )
+    .run(pageId, JSON.stringify(ids))
+}
+
+let refsTableEnsured = false
+function ensureRefsTable() {
+  if (refsTableEnsured) return
+  sqlite.exec(
+    `CREATE TABLE IF NOT EXISTS notion_page_refs (page_id TEXT PRIMARY KEY, data_source_ids TEXT NOT NULL)`,
+  )
+  refsTableEnsured = true
 }
 
 // A Notion full-page-database renders as a page that contains a single same-named
@@ -165,6 +279,7 @@ async function doSync(): Promise<SyncResult> {
             isFolder: e.isFolder,
             lastEditedTime: e.lastEditedTime,
             syncedAt: now,
+            blocksWalkedAt: e.blocksWalkedAt,
           })
           .onConflictDoUpdate({
             target: schema.notionPages.id,
@@ -177,6 +292,7 @@ async function doSync(): Promise<SyncResult> {
               isFolder: e.isFolder,
               lastEditedTime: e.lastEditedTime,
               syncedAt: now,
+              blocksWalkedAt: e.blocksWalkedAt,
             },
           })
           .run()

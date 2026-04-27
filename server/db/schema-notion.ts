@@ -15,6 +15,7 @@ export const notionPages = sqliteTable(
     syncedAt: text('synced_at')
       .notNull()
       .default(sql`(datetime('now'))`),
+    blocksWalkedAt: text('blocks_walked_at'),
   },
   (t) => [index('notion_pages_parent_idx').on(t.parentId)],
 )

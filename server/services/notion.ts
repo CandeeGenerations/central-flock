@@ -49,6 +49,29 @@ export async function retrieveDataSource(id: string): Promise<DataSourceObjectRe
   }
 }
 
+// Recursively collect every database wrapper id referenced from a page via
+// `child_database` blocks (including those nested inside toggles, columns, etc.).
+// Used during sync to detect linked-database views so we can reparent databases
+// to the page that references them, even when their canonical `database_parent`
+// is the workspace.
+export async function findChildDatabaseRefs(rootBlockId: string, depth = 0): Promise<string[]> {
+  if (depth > 4) return []
+  const refs: string[] = []
+  const blocks = await listChildBlocks(rootBlockId)
+  for (const b of blocks) {
+    if (!('type' in b)) continue
+    if (b.type === 'child_database') {
+      refs.push(b.id)
+    } else if (
+      (b.type === 'toggle' || b.type === 'column_list' || b.type === 'column' || b.type === 'callout') &&
+      b.has_children
+    ) {
+      refs.push(...(await findChildDatabaseRefs(b.id, depth + 1)))
+    }
+  }
+  return refs
+}
+
 export async function listChildBlocks(blockId: string): Promise<(BlockObjectResponse | PartialBlockObjectResponse)[]> {
   const all: (BlockObjectResponse | PartialBlockObjectResponse)[] = []
   let cursor: string | undefined

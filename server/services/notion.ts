@@ -102,6 +102,19 @@ export async function searchAccessibleDataSources(): Promise<DataSourceObjectRes
   return all
 }
 
+export async function queryDataSourceRows(dataSourceId: string): Promise<PageObjectResponse[]> {
+  const all: PageObjectResponse[] = []
+  let cursor: string | undefined
+  do {
+    const resp = await paced(() =>
+      getNotionClient().dataSources.query({data_source_id: dataSourceId, start_cursor: cursor, page_size: 100}),
+    )
+    for (const r of resp.results) if (isFullPage(r)) all.push(r)
+    cursor = resp.has_more ? (resp.next_cursor ?? undefined) : undefined
+  } while (cursor)
+  return all
+}
+
 export async function searchAccessiblePages(): Promise<PageObjectResponse[]> {
   const all: PageObjectResponse[] = []
   let cursor: string | undefined

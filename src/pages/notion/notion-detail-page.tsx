@@ -1,8 +1,10 @@
 import {NotionBlockRenderer} from '@/components/notion/notion-block-renderer'
+import {NotionTableView} from '@/components/notion/notion-table'
 import {Button} from '@/components/ui/button'
 import {PageSpinner} from '@/components/ui/spinner'
 import {fetchNotionPage} from '@/lib/notion-api'
 import {queryKeys} from '@/lib/query-keys'
+import {cn} from '@/lib/utils'
 import {useQuery} from '@tanstack/react-query'
 import {ExternalLink, NotebookText} from 'lucide-react'
 import {useParams} from 'react-router-dom'
@@ -30,7 +32,7 @@ export function NotionDetailPage() {
   if (!data) return null
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-4">
+    <div className={cn('p-6 space-y-4', data.isDatabase ? 'max-w-none' : 'max-w-3xl mx-auto')}>
       <div className="flex items-start gap-3">
         {data.icon &&
           (/^https?:\/\//.test(data.icon) ? (
@@ -56,16 +58,11 @@ export function NotionDetailPage() {
         </Button>
       </div>
 
-      {data.isDatabase && (
-        <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
-          This is a database. Open it in Notion to view its rows and properties; the sidebar shows each row as a child
-          page.
-        </div>
-      )}
-
       <hr className="border-muted-foreground/20" />
 
-      {data.blocks.length === 0 ? (
+      {data.isDatabase && data.table ? (
+        <NotionTableView table={data.table} />
+      ) : data.blocks.length === 0 ? (
         <p className="text-sm text-muted-foreground italic">This page is empty.</p>
       ) : (
         <NotionBlockRenderer blocks={data.blocks} />

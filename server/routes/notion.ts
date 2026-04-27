@@ -9,6 +9,7 @@ import {
   extractTitle,
   listChildBlocks,
   notionConfigured,
+  queryDataSourceRows,
   retrieveDataSource,
   retrievePage,
 } from '../services/notion.js'
@@ -74,7 +75,8 @@ notionRouter.get(
     let lastEditedTime: string
 
     if (cached?.isDatabase) {
-      // "Database" entries are v5 data sources — folders, not pages with block content.
+      // "Database" entries are v5 data sources. Return the schema + rows so the
+      // frontend can render a table view similar to Notion's.
       const ds = await retrieveDataSource(id)
       if (!ds) {
         res.status(404).json({error: 'Page not found'})
@@ -85,7 +87,20 @@ notionRouter.get(
       url = ds.url
       isDatabase = true
       lastEditedTime = ds.last_edited_time
-      res.json({id, title, icon, url, isDatabase, lastEditedTime, blocks: []})
+
+      const propEntries = Object.entries(ds.properties as Record<string, {type: string; name?: string}>)
+      const titleEntry = propEntries.find(([, v]) => v?.type === 'title')
+      const otherEntries = propEntries.filter(([k]) => k !== titleEntry?.[0])
+      const columns = [...(titleEntry ? [titleEntry] : []), ...otherEntries].map(([key, v]) => ({
+        key,
+        name: v.name ?? key,
+        type: v.type,
+      }))
+
+      const rowPages = await queryDataSourceRows(id)
+      const rows = rowPages.map((p) => ({id: p.id, url: p.url, values: p.properties}))
+
+      res.json({id, title, icon, url, isDatabase, lastEditedTime, blocks: [], table: {columns, rows}})
       return
     }
 

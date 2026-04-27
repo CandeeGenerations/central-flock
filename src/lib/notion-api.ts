@@ -33,6 +33,23 @@ export interface NotionStatus {
   lastSyncError: string | null
 }
 
+export interface NotionTableColumn {
+  key: string
+  name: string
+  type: string
+}
+
+export interface NotionTableRow {
+  id: string
+  url: string
+  values: Record<string, unknown>
+}
+
+export interface NotionTable {
+  columns: NotionTableColumn[]
+  rows: NotionTableRow[]
+}
+
 export interface NotionPageDetail {
   id: string
   title: string
@@ -41,6 +58,7 @@ export interface NotionPageDetail {
   isDatabase: boolean
   lastEditedTime: string
   blocks: NotionBlock[]
+  table?: NotionTable
 }
 
 // Loose Notion block shape — matches @notionhq/client's BlockObjectResponse but

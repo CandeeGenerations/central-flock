@@ -41,4 +41,6 @@ export const queryKeys = {
   notionTree: ['notionTree'] as const,
   notionPage: (id: string) => ['notionPage', id] as const,
   notionSearch: (q: string) => ['notionSearch', q] as const,
+  calendarPrintPage: (year: number, month: number) => ['calendarPrintPage', year, month] as const,
+  calendarPrintDefaultSchedule: ['calendarPrintDefaultSchedule'] as const,
 }

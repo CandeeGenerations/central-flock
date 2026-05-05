@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Music,
   NotebookText,
+  Printer,
   Quote,
   Scissors,
   ScrollText,
@@ -102,6 +103,9 @@ export const navGroups: NavGroup[] = [
     id: 'calendar',
     label: 'Calendar',
     icon: Calendar,
-    children: [{to: '/calendar', label: 'Upcoming', icon: Calendar}],
+    children: [
+      {to: '/calendar', label: 'Upcoming', icon: Calendar, end: true},
+      {to: '/calendar/print', label: 'Print', icon: Printer},
+    ],
   },
 ]

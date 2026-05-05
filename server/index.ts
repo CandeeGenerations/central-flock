@@ -7,6 +7,7 @@ import {fileURLToPath} from 'url'
 import {sqlite} from './db/index.js'
 import {requireAuth} from './middleware/auth.js'
 import {authRouter} from './routes/auth.js'
+import {calendarPrintRouter} from './routes/calendar-print.js'
 import {calendarRouter} from './routes/calendar.js'
 import {contactsRouter} from './routes/contacts.js'
 import {cleanupOrphanedScanImages, devotionsRouter} from './routes/devotions.js'
@@ -59,6 +60,7 @@ app.use('/api/global-variables', globalVariablesRouter)
 app.use('/api/import', importRouter)
 app.use('/api/contacts', contactsRouter)
 app.use('/api/calendar', calendarRouter)
+app.use('/api/calendar-print', calendarPrintRouter)
 app.use('/api/stats', statsRouter)
 app.use('/api/home', homeRouter)
 app.use('/api/devotions', devotionsRouter)

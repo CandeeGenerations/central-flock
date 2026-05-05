@@ -767,18 +767,37 @@ export function PeoplePage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {person.groups?.slice(0, 3).map((g) => (
-                            <Badge key={g.id} variant="outline" className="text-xs">
-                              {g.name}
-                            </Badge>
-                          ))}
-                          {(person.groups?.length || 0) > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{person.groups!.length - 3}
-                            </Badge>
-                          )}
-                        </div>
+                        {(() => {
+                          const sortedGroups = [...(person.groups ?? [])].sort((a, b) => a.name.localeCompare(b.name))
+                          const overflow = sortedGroups.slice(3)
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {sortedGroups.slice(0, 3).map((g) => (
+                                <Badge key={g.id} variant="outline" className="text-xs">
+                                  {g.name}
+                                </Badge>
+                              ))}
+                              {overflow.length > 0 && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="text-xs cursor-default">
+                                        +{overflow.length}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <ul className="text-xs space-y-0.5">
+                                        {overflow.map((g) => (
+                                          <li key={g.id}>{g.name}</li>
+                                        ))}
+                                      </ul>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {person.birthMonth && person.birthDay

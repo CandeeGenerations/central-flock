@@ -1,0 +1,1 @@
+ALTER TABLE `calendar_print_pages` ADD `theme_color` text;

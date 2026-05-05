@@ -11,6 +11,7 @@ import {findActiveGroup, isChildActive, navGroups} from '@/lib/nav-config'
 import {ThemeProvider, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
 import {CalendarPage} from '@/pages/calendar-page'
+import {CalendarPrintPage} from '@/pages/calendar-print-page'
 import {ContactsImportPage} from '@/pages/contacts-import-page'
 import {DashboardPage} from '@/pages/dashboard-page'
 import {DevotionAuditPage} from '@/pages/devotions/devotion-audit-page'
@@ -414,6 +415,7 @@ function AppLayoutInner({
                 <Route path="page/:id" element={<NotionDetailPage />} />
               </Route>
               <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/calendar/print" element={<CalendarPrintPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </main>

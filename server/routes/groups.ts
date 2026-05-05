@@ -1,7 +1,7 @@
 import {and, eq, inArray, notInArray, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
-import {db, schema} from '../db/index.js'
+import {db, schema, sqlite} from '../db/index.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 
 export const groupsRouter = Router()
@@ -183,6 +183,64 @@ groupsRouter.put(
       return
     }
     res.json(result)
+  }),
+)
+
+// POST /api/groups/:id/duplicate - Duplicate group with members
+groupsRouter.post(
+  '/:id/duplicate',
+  asyncHandler(async (req, res) => {
+    const original = db
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, Number(req.params.id)))
+      .get()
+
+    if (!original) {
+      res.status(404).json({error: 'Group not found'})
+      return
+    }
+
+    const existingNames = new Set(
+      db
+        .select({name: schema.groups.name})
+        .from(schema.groups)
+        .all()
+        .map((g) => g.name),
+    )
+    let newName = `${original.name} - Copy`
+    let suffix = 2
+    while (existingNames.has(newName)) {
+      newName = `${original.name} - Copy ${suffix++}`
+    }
+
+    const memberIds = db
+      .select({personId: schema.peopleGroups.personId})
+      .from(schema.peopleGroups)
+      .where(eq(schema.peopleGroups.groupId, original.id))
+      .all()
+      .map((m) => m.personId)
+
+    const copy = sqlite.transaction(() => {
+      const inserted = db
+        .insert(schema.groups)
+        .values({
+          name: newName,
+          description: original.description,
+        })
+        .returning()
+        .get()
+
+      if (memberIds.length > 0) {
+        db.insert(schema.peopleGroups)
+          .values(memberIds.map((personId) => ({personId, groupId: inserted.id})))
+          .run()
+      }
+
+      return inserted
+    })()
+
+    res.status(201).json({...copy, memberCount: memberIds.length})
   }),
 )
 

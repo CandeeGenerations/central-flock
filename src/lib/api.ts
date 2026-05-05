@@ -172,6 +172,10 @@ export function deleteGroup(id: number) {
   return request(`/groups/${id}`, {method: 'DELETE'})
 }
 
+export function duplicateGroup(id: number) {
+  return request<Group>(`/groups/${id}/duplicate`, {method: 'POST'})
+}
+
 export function addGroupMembers(groupId: number, personIds: number[]) {
   return request(`/groups/${groupId}/members`, {
     method: 'POST',
@@ -758,4 +762,93 @@ export function fetchCalendarEvents(days: number) {
 
 export function triggerCalendarSync() {
   return request<CalendarSyncResponse>('/calendar/sync', {method: 'POST'})
+}
+
+// Calendar Print
+export type CalendarPrintEventStyle = 'bold' | 'no_kaya' | 'regular'
+
+export interface CalendarPrintPage {
+  id: number
+  year: number
+  month: number
+  theme: string | null
+  themeColor: string | null
+  verseText: string | null
+  verseReference: string | null
+  normalScheduleText: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CalendarPrintEvent {
+  id: number
+  pageId: number
+  date: string
+  title: string
+  style: CalendarPrintEventStyle
+  sortOrder: number
+  createdAt: string
+}
+
+export interface CalendarPrintPageResponse {
+  page: CalendarPrintPage
+  events: CalendarPrintEvent[]
+  defaultSchedule: string
+}
+
+export function fetchCalendarPrintPage(year: number, month: number) {
+  return request<CalendarPrintPageResponse>(`/calendar-print/${year}/${month}`)
+}
+
+export function updateCalendarPrintPage(
+  year: number,
+  month: number,
+  data: {
+    theme?: string | null
+    themeColor?: string | null
+    verseText?: string | null
+    verseReference?: string | null
+    normalScheduleText?: string | null
+  },
+) {
+  return request<CalendarPrintPage>(`/calendar-print/${year}/${month}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function createCalendarPrintEvent(
+  year: number,
+  month: number,
+  data: {date: string; title: string; style: CalendarPrintEventStyle; sortOrder?: number},
+) {
+  return request<CalendarPrintEvent>(`/calendar-print/${year}/${month}/events`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateCalendarPrintEvent(
+  id: number,
+  data: {date?: string; title?: string; style?: CalendarPrintEventStyle; sortOrder?: number},
+) {
+  return request<CalendarPrintEvent>(`/calendar-print/events/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteCalendarPrintEvent(id: number) {
+  return request<{success: boolean}>(`/calendar-print/events/${id}`, {method: 'DELETE'})
+}
+
+export function fetchCalendarPrintDefaultSchedule() {
+  return request<{value: string}>('/calendar-print/default-schedule')
+}
+
+export function updateCalendarPrintDefaultSchedule(value: string) {
+  return request<{value: string}>('/calendar-print/default-schedule', {
+    method: 'PUT',
+    body: JSON.stringify({value}),
+  })
 }

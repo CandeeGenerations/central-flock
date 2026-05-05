@@ -212,9 +212,7 @@ function writeCachedRefs(pageId: string, ids: string[]) {
 let refsTableEnsured = false
 function ensureRefsTable() {
   if (refsTableEnsured) return
-  sqlite.exec(
-    `CREATE TABLE IF NOT EXISTS notion_page_refs (page_id TEXT PRIMARY KEY, data_source_ids TEXT NOT NULL)`,
-  )
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS notion_page_refs (page_id TEXT PRIMARY KEY, data_source_ids TEXT NOT NULL)`)
   refsTableEnsured = true
 }
 

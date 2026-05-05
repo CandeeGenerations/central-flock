@@ -62,6 +62,10 @@ tell application "System Events"
   tell process "Messages"
     set frontmost to true
     delay 0.3
+    keystroke "a" using command down
+    delay 0.1
+    key code 51
+    delay 0.2
     keystroke "v" using command down
     delay 0.3
     key code 36
@@ -106,6 +110,10 @@ tell application "System Events"
   tell process "Messages"
     set frontmost to true
     delay 0.3
+    keystroke "a" using command down
+    delay 0.1
+    key code 51
+    delay 0.2
     keystroke "v" using command down
     delay 0.8${captionScript}
     key code 36

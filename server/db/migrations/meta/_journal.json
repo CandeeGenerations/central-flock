@@ -64,6 +64,20 @@
       "when": 1777318706978,
       "tag": "0008_thick_otto_octavius",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1777941359036,
+      "tag": "0009_optimal_silk_fever",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1777944141426,
+      "tag": "0010_damp_gunslinger",
+      "breakpoints": true
     }
   ]
 }

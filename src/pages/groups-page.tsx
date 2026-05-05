@@ -11,11 +11,11 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
-import {createGroup, deleteGroup, fetchGroups} from '@/lib/api'
+import {createGroup, deleteGroup, duplicateGroup, fetchGroups} from '@/lib/api'
 import {formatDate} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ArrowUpDown, MessageSquare, Plus, Trash2} from 'lucide-react'
+import {ArrowDown, ArrowUp, ArrowUpDown, Copy, MessageSquare, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -115,6 +115,15 @@ export function GroupsPage() {
     onError: (err: Error) => toast.error(err.message),
   })
 
+  const duplicateMutation = useMutation({
+    mutationFn: duplicateGroup,
+    onSuccess: (group) => {
+      queryClient.invalidateQueries({queryKey: queryKeys.groups})
+      toast.success(`Group duplicated as "${group.name}"`)
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
   const paginatedGroups = filteredGroups.slice((page - 1) * pageSize, page * pageSize)
 
   return (
@@ -206,7 +215,7 @@ export function GroupsPage() {
                       Created {sortIcon('createdAt')}
                     </button>
                   </TableHead>
-                  <TableHead className="w-24">Actions</TableHead>
+                  <TableHead className="w-32">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -238,6 +247,24 @@ export function GroupsPage() {
                               </Link>
                             </TooltipTrigger>
                             <TooltipContent>Send message to group</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled={duplicateMutation.isPending}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  duplicateMutation.mutate(group.id)
+                                }}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Duplicate group</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                         <Button

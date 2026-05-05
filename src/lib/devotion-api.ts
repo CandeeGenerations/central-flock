@@ -11,8 +11,27 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     throw new Error('Unauthorized')
   }
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || `Request failed: ${res.status}`)
+    const text = await res.text().catch(() => '')
+    let parsed: {error?: string} | undefined
+    try {
+      parsed = text ? JSON.parse(text) : undefined
+    } catch {
+      parsed = undefined
+    }
+    const contentType = res.headers.get('content-type') ?? ''
+    const err = new Error(parsed?.error || `Request failed: ${res.status} ${res.statusText}`) as Error & {
+      status?: number
+      statusText?: string
+      contentType?: string
+      body?: unknown
+      bodyText?: string
+    }
+    err.status = res.status
+    err.statusText = res.statusText
+    err.contentType = contentType
+    err.body = parsed
+    err.bodyText = text
+    throw err
   }
   return res.json()
 }

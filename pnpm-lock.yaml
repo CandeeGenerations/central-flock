@@ -24,6 +24,12 @@ importers:
       '@fontsource-variable/source-sans-3':
         specifier: ^5.2.9
         version: 5.2.9
+      '@fontsource/dm-serif-display':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/montserrat':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@notionhq/client':
         specifier: ^5.20.0
         version: 5.20.0
@@ -699,6 +705,12 @@ packages:
 
   '@fontsource-variable/source-sans-3@5.2.9':
     resolution: {integrity: sha512-K9fkQbb0BNnRmmaU+Gpr6U4IaYKpNzA8t07J6aam2i+6v84RT72MVpar8OBr3yYAEznj4riKivPQ2nAF2fPKsw==}
+
+  '@fontsource/dm-serif-display@5.2.8':
+    resolution: {integrity: sha512-GYSDSlGU6vyhv9a5MwaiVNf9HCuSVpK8hEFRyG4NNDHCDeHiX7YHDAcWsaoLKKcfXLgWG9YkBkk9T3SxM4rAjQ==}
+
+  '@fontsource/montserrat@5.2.8':
+    resolution: {integrity: sha512-xTjLxSbSfCycDB0pwmNsfNvdfWPaDaRQ2LC6yt/ZI7SdvXG52zHnzNYC/09mzuAuWNJyShkteutfCoDgym56hQ==}
 
   '@hono/node-server@1.19.12':
     resolution: {integrity: sha512-txsUW4SQ1iilgE0l9/e9VQWmELXifEFvmdA1j6WFh/aFPj99hIntrSsq/if0UWyGVkmrRPKA1wCeP+UCr1B9Uw==}
@@ -5344,6 +5356,10 @@ snapshots:
   '@fontsource-variable/raleway@5.2.8': {}
 
   '@fontsource-variable/source-sans-3@5.2.9': {}
+
+  '@fontsource/dm-serif-display@5.2.8': {}
+
+  '@fontsource/montserrat@5.2.8': {}
 
   '@hono/node-server@1.19.12(hono@4.12.10)':
     dependencies:

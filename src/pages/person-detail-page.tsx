@@ -503,25 +503,27 @@ export function PersonDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {person.groups.map((g) => (
-                  <TableRow
-                    key={g.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/groups/${g.id}`)}
-                  >
-                    <TableCell className="font-medium">{g.name}</TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeGroupMutation.mutate(g.id)}
-                        title={`Remove from ${g.name}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {[...person.groups]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((g) => (
+                    <TableRow
+                      key={g.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/groups/${g.id}`)}
+                    >
+                      <TableCell className="font-medium">{g.name}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeGroupMutation.mutate(g.id)}
+                          title={`Remove from ${g.name}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
               </TableBody>
             </Table>
           </div>

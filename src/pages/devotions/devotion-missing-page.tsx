@@ -1,6 +1,7 @@
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {DatePicker} from '@/components/ui/date-time-picker'
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Spinner} from '@/components/ui/spinner'
@@ -24,13 +25,37 @@ export function DevotionMissingPage() {
   const [bibleReference, setBibleReference] = useState('')
   const [songName, setSongName] = useState('')
 
+  const [analyzeError, setAnalyzeError] = useState<{
+    message: string
+    status?: number
+    statusText?: string
+    contentType?: string
+    stack?: string
+    bodyText?: string
+  } | null>(null)
+
   const analyzeMutation = useMutation({
     mutationFn: (u: string) => analyzeBibleVerses(u),
     onSuccess: (data) => {
       setAnalysis(data.result)
       toast.success(`Analyzed ${data.transcriptSegments} transcript segments`)
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to analyze'),
+    onError: (err) => {
+      const e = err as Error & {
+        status?: number
+        statusText?: string
+        contentType?: string
+        bodyText?: string
+      }
+      setAnalyzeError({
+        message: e?.message ?? 'Failed to analyze',
+        status: e?.status,
+        statusText: e?.statusText,
+        contentType: e?.contentType,
+        stack: e?.stack,
+        bodyText: e?.bodyText,
+      })
+    },
   })
 
   const createMutation = useMutation({
@@ -166,6 +191,73 @@ export function DevotionMissingPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={analyzeError !== null} onOpenChange={(open) => !open && setAnalyzeError(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Analysis failed
+              {analyzeError?.status
+                ? ` (${analyzeError.status}${analyzeError.statusText ? ` ${analyzeError.statusText}` : ''})`
+                : ''}
+            </DialogTitle>
+            <DialogDescription>The video analysis request failed. Full error details below.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[60vh] overflow-auto">
+            <div className="space-y-1">
+              <Label>Message</Label>
+              <pre className="whitespace-pre-wrap rounded-md border bg-muted/50 p-3 text-sm font-mono">
+                {analyzeError?.message}
+              </pre>
+            </div>
+            {analyzeError?.contentType && (
+              <div className="space-y-1">
+                <Label>Content-Type</Label>
+                <pre className="whitespace-pre-wrap rounded-md border bg-muted/50 p-3 text-xs font-mono">
+                  {analyzeError.contentType}
+                </pre>
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label>
+                Response body {analyzeError?.bodyText ? `(${analyzeError.bodyText.length} chars)` : '(empty)'}
+              </Label>
+              <pre className="whitespace-pre-wrap rounded-md border bg-muted/50 p-3 text-xs font-mono">
+                {analyzeError?.bodyText ? analyzeError.bodyText : '(no response body)'}
+              </pre>
+            </div>
+            {analyzeError?.stack && (
+              <div className="space-y-1">
+                <Label>Stack</Label>
+                <pre className="whitespace-pre-wrap rounded-md border bg-muted/50 p-3 text-xs font-mono">
+                  {analyzeError.stack}
+                </pre>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const text = [
+                  `Status: ${analyzeError?.status ?? 'unknown'} ${analyzeError?.statusText ?? ''}`.trim(),
+                  `Content-Type: ${analyzeError?.contentType ?? '(none)'}`,
+                  `Message: ${analyzeError?.message}`,
+                  `Body: ${analyzeError?.bodyText || '(empty)'}`,
+                  analyzeError?.stack ? `Stack: ${analyzeError.stack}` : '',
+                ]
+                  .filter(Boolean)
+                  .join('\n\n')
+                navigator.clipboard.writeText(text)
+                toast.success('Error copied to clipboard')
+              }}
+            >
+              Copy
+            </Button>
+            <Button onClick={() => setAnalyzeError(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

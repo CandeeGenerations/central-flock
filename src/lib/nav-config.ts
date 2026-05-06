@@ -3,6 +3,7 @@ import {
   Baby,
   BookOpen,
   Calendar,
+  CheckSquare,
   FileText,
   FolderOpen,
   History,
@@ -105,6 +106,7 @@ export const navGroups: NavGroup[] = [
     icon: Calendar,
     children: [
       {to: '/calendar', label: 'Upcoming', icon: Calendar, end: true},
+      {to: '/rsvp', label: 'RSVPs', icon: CheckSquare},
       {to: '/calendar/print', label: 'Print', icon: Printer},
     ],
   },

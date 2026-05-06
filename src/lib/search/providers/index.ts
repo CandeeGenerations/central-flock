@@ -11,6 +11,7 @@ import {notionProvider} from './notion'
 import {nurserySchedulesProvider} from './nursery-schedules'
 import {peopleProvider} from './people'
 import {quotesProvider} from './quotes'
+import {rsvpProvider} from './rsvp'
 import {templatesProvider} from './templates'
 
 export const providers: SearchProvider[] = [
@@ -26,4 +27,5 @@ export const providers: SearchProvider[] = [
   gwendolynDevotionsProvider as SearchProvider,
   nurserySchedulesProvider as SearchProvider,
   calendarProvider as SearchProvider,
+  rsvpProvider as SearchProvider,
 ]

@@ -1,4 +1,5 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
+import {RsvpListCreateDialog} from '@/components/rsvp/rsvp-list-create-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -25,7 +26,18 @@ import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Download, MessageSquare, Save, Trash2, UserMinus, UserPlus, UserX, X} from 'lucide-react'
+import {
+  ArrowLeft,
+  CheckSquare,
+  Download,
+  MessageSquare,
+  Save,
+  Trash2,
+  UserMinus,
+  UserPlus,
+  UserX,
+  X,
+} from 'lucide-react'
 import {useCallback, useMemo, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -44,6 +56,7 @@ export function GroupDetailPage() {
   const [highlightIndex, setHighlightIndex] = useState(-1)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [removeInactiveOpen, setRemoveInactiveOpen] = useState(false)
+  const [rsvpCreateOpen, setRsvpCreateOpen] = useState(false)
   const [membersPage, setMembersPage] = useState(1)
   const [membersSearch, setMembersSearch] = useState('')
   const debouncedMembersSearch = useDebouncedValue(membersSearch, 250)
@@ -229,6 +242,10 @@ export function GroupDetailPage() {
             >
               <Download className="h-4 w-4 mr-1" />
               Export CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setRsvpCreateOpen(true)}>
+              <CheckSquare className="h-4 w-4 mr-1" />
+              Start RSVP List
             </Button>
             <Link to={`/messages/compose?groupId=${group.id}`}>
               <Button size="sm">
@@ -499,6 +516,12 @@ export function GroupDetailPage() {
         variant="destructive"
         loading={removeInactiveMutation.isPending}
         onConfirm={() => removeInactiveMutation.mutate()}
+      />
+      <RsvpListCreateDialog
+        open={rsvpCreateOpen}
+        onOpenChange={setRsvpCreateOpen}
+        prefillGroupId={group.id}
+        prefillName={group.name}
       />
     </div>
   )

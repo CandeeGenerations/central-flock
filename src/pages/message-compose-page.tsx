@@ -77,8 +77,16 @@ export function MessageComposePage() {
   const editMessageId = searchParams.get('editMessageId')
   const presetGroupId = searchParams.get('groupId') || (dupState?.groupId ? String(dupState.groupId) : '')
   const presetRecipientId = searchParams.get('recipientId')
+  const presetPersonIds = (searchParams.get('personIds') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(Number)
+    .filter((n) => Number.isFinite(n))
 
-  const [recipientMode, setRecipientMode] = useState<'group' | 'individual'>(presetRecipientId ? 'individual' : 'group')
+  const [recipientMode, setRecipientMode] = useState<'group' | 'individual'>(
+    presetRecipientId || presetPersonIds.length > 0 ? 'individual' : 'group',
+  )
   const [selectedGroupId, setSelectedGroupId] = useState(presetGroupId || '')
   const [content, setContent] = useState(dupState?.content || '')
   const [messageTab, setMessageTab] = useState<'edit' | 'preview'>('edit')
@@ -99,6 +107,7 @@ export function MessageComposePage() {
   const [individualHighlight, setIndividualHighlight] = useState(-1)
   const individualSearchRef = useRef<HTMLInputElement>(null)
   const [selectedIndividualIds, setSelectedIndividualIds] = useState<Set<number>>(() => {
+    if (presetPersonIds.length > 0) return new Set(presetPersonIds)
     return presetRecipientId ? new Set([Number(presetRecipientId)]) : new Set()
   })
 
@@ -111,22 +120,25 @@ export function MessageComposePage() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const insertAtCursor = useCallback((text: string) => {
-    const el = textareaRef.current
-    if (!el) {
-      setContent((c) => c + text)
-      return
-    }
-    const start = el.selectionStart
-    const end = el.selectionEnd
-    setContent((c) => c.substring(0, start) + text + c.substring(end))
-    // Restore cursor position after the inserted text
-    requestAnimationFrame(() => {
-      el.focus()
-      const pos = start + text.length
-      el.setSelectionRange(pos, pos)
-    })
-  }, [])
+  const insertAtCursor = useCallback(
+    (text: string) => {
+      const el = textareaRef.current
+      if (!el) {
+        setContent((c) => c + text)
+        return
+      }
+      const start = el.selectionStart
+      const end = el.selectionEnd
+      setContent((c) => c.substring(0, start) + text + c.substring(end))
+      // Restore cursor position after the inserted text
+      requestAnimationFrame(() => {
+        el.focus()
+        const pos = start + text.length
+        el.setSelectionRange(pos, pos)
+      })
+    },
+    [setContent],
+  )
 
   const toggleExclude = useSetToggle(setExcludeIds)
   const toggleIndividual = useSetToggle(setSelectedIndividualIds)
@@ -373,7 +385,7 @@ export function MessageComposePage() {
         excludeSearchRef.current?.focus()
       }
     },
-    [excludeResults, excludeHighlight],
+    [excludeResults, excludeHighlight, setExcludeHighlight, setExcludeIds, setExcludeSearch],
   )
 
   const individualResults = useMemo(() => {
@@ -407,7 +419,7 @@ export function MessageComposePage() {
         individualSearchRef.current?.focus()
       }
     },
-    [individualResults, individualHighlight],
+    [individualResults, individualHighlight, setIndividualHighlight, setSelectedIndividualIds, setIndividualSearch],
   )
 
   // Build resolved custom var values for preview and send
@@ -1069,6 +1081,7 @@ export function MessageComposePage() {
                   <div className="space-y-2">
                     <Label>Send Date and Time</Label>
                     <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
+                    {/* eslint-disable-next-line react-hooks/purity */}
                     {scheduledAt && new Date(scheduledAt).getTime() <= Date.now() && (
                       <p className="text-xs text-destructive">Scheduled time must be in the future</p>
                     )}
@@ -1117,6 +1130,7 @@ export function MessageComposePage() {
                   sendMutation.isPending ||
                   recipients.length === 0 ||
                   !content.trim() ||
+                  // eslint-disable-next-line react-hooks/purity
                   (sendTimeMode === 'schedule' && !!scheduledAt && new Date(scheduledAt).getTime() <= Date.now())
                 }
               >

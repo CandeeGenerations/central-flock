@@ -5,6 +5,7 @@ import {
   Baby,
   BookOpen,
   Calendar,
+  CheckSquare,
   Download,
   FileText,
   FolderOpen,
@@ -59,6 +60,7 @@ export function buildNavigationActions(): SearchItem[] {
     nav('/nursery', 'Nursery Schedules', Baby),
     nav('/nursery/workers', 'Nursery Workers', Users),
     nav('/calendar', 'Calendar', Calendar),
+    nav('/rsvp', 'RSVPs', CheckSquare, ['rsvp', 'attendance', 'event', 'invite']),
     nav('/import', 'Import CSV', Upload, ['upload']),
     nav('/import/contacts', 'Import Mac Contacts', Upload),
     nav('/settings', 'Settings', Settings),
@@ -108,6 +110,17 @@ export function buildCreateActions(): SearchItem[] {
       keywords: ['new', 'template'],
       action: ({navigate, close}) => {
         navigate('/templates/new')
+        close()
+      },
+    },
+    {
+      id: 'create-rsvp-list',
+      label: 'New RSVP List',
+      group: 'Create',
+      icon: CheckSquare,
+      keywords: ['new', 'rsvp', 'event', 'attendance'],
+      action: ({navigate, close}) => {
+        navigate('/rsvp?new=1')
         close()
       },
     },

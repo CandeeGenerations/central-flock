@@ -43,4 +43,11 @@ export const queryKeys = {
   notionSearch: (q: string) => ['notionSearch', q] as const,
   calendarPrintPage: (year: number, month: number) => ['calendarPrintPage', year, month] as const,
   calendarPrintDefaultSchedule: ['calendarPrintDefaultSchedule'] as const,
+  rsvpLists: (archived: boolean) => ['rsvpLists', archived] as const,
+  rsvpList: (id: number | string) => ['rsvpList', String(id)] as const,
+  rsvpCalendarEvents: ['rsvpCalendarEvents'] as const,
+  rsvpNonEntries: (listId: number | string, search?: string) => {
+    if (search !== undefined) return ['rsvpNonEntries', String(listId), search] as const
+    return ['rsvpNonEntries', String(listId)] as const
+  },
 }

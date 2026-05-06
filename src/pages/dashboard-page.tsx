@@ -5,12 +5,14 @@ import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {PageSpinner} from '@/components/ui/spinner'
 import {fetchStats, fetchStatsOverTime} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
+import {fetchRsvpLists} from '@/lib/rsvp-api'
 import {cn} from '@/lib/utils'
 import {useQuery} from '@tanstack/react-query'
 import {
   BarChart2,
   CalendarClock,
   CalendarIcon,
+  CheckSquare,
   FileText,
   FolderOpen,
   MessageSquare,
@@ -144,6 +146,11 @@ export function DashboardPage() {
     queryFn: () => fetchStatsOverTime(chartParams),
   })
 
+  const {data: activeRsvpLists} = useQuery({
+    queryKey: queryKeys.rsvpLists(false),
+    queryFn: () => fetchRsvpLists(false),
+  })
+
   if (isLoading || !stats) return <PageSpinner />
 
   const {people, groups, messages, drafts} = stats
@@ -211,6 +218,39 @@ export function DashboardPage() {
         />
         <StatCard label="Drafts" value={drafts.total} to="/messages?tab=drafts" icon={FileText} />
       </div>
+
+      {activeRsvpLists && activeRsvpLists.length > 0 && (
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+              <CheckSquare className="h-4 w-4 shrink-0" />
+              Active RSVPs
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {activeRsvpLists.slice(0, 5).map((l) => (
+              <Link
+                key={l.id}
+                to={`/rsvp/${l.id}`}
+                className="flex items-center justify-between gap-3 px-2 py-1.5 -mx-2 rounded hover:bg-muted/60"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{l.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Yes {l.counts.yes} · No {l.counts.no} · Maybe {l.counts.maybe} · No Response {l.counts.no_response}
+                  </div>
+                </div>
+                <div className="text-sm tabular-nums whitespace-nowrap">{l.counts.expectedAttendees} expected</div>
+              </Link>
+            ))}
+            {activeRsvpLists.length > 5 && (
+              <Link to="/rsvp" className="text-xs text-muted-foreground hover:underline">
+                + {activeRsvpLists.length - 5} more
+              </Link>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Row 2 — Donut charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

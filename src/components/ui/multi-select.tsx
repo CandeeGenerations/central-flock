@@ -124,7 +124,12 @@ export function MultiSelect({
             Clear
           </button>
         </div>
-        <div className="max-h-60 overflow-y-auto overscroll-contain p-1.5">
+        <div
+          className="max-h-60 overflow-y-auto overscroll-contain p-1.5"
+          onWheel={(e) => {
+            if (e.defaultPrevented) e.currentTarget.scrollTop += e.deltaY
+          }}
+        >
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">No results</p>
           ) : (

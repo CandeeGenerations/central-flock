@@ -7,7 +7,7 @@ import {usePersistedState} from '@/hooks/use-persisted-state'
 import {cn} from '@/lib/utils'
 import {generateVerseStripsPdf} from '@/lib/verse-strips-pdf'
 import {Download, Scissors} from 'lucide-react'
-import {useEffect, useMemo, useState} from 'react'
+import {useMemo, useState} from 'react'
 import {toast} from 'sonner'
 
 const FONT_SIZE_OPTIONS = [72, 96, 120, 144]
@@ -18,13 +18,15 @@ export function VerseStripsPage() {
   const [fontSize, setFontSize] = usePersistedState<number>('sermons.verse-strips.fontSize', 96)
   const [generating, setGenerating] = useState(false)
   const [mergedAfter, setMergedAfter] = useState<Set<number>>(new Set())
+  // Reset merge selections when the verse text changes (indices shift on edit).
+  // Render-time state adjustment per the React docs is preferable to a useEffect here.
+  const [prevVerseText, setPrevVerseText] = useState(verseText)
+  if (prevVerseText !== verseText) {
+    setPrevVerseText(verseText)
+    setMergedAfter(new Set())
+  }
 
   const words = useMemo(() => verseText.trim().split(/\s+/).filter(Boolean), [verseText])
-
-  // Reset merge selections when the verse text changes (indices shift on edit).
-  useEffect(() => {
-    setMergedAfter(new Set())
-  }, [verseText])
 
   const groups = useMemo(() => {
     const result: number[][] = []

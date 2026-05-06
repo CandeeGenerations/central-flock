@@ -119,7 +119,15 @@ export function SearchableSelect({
             />
           </div>
         )}
-        <div ref={listRef} className="max-h-60 overflow-y-auto overscroll-contain p-1.5">
+        <div
+          ref={listRef}
+          className="max-h-60 overflow-y-auto overscroll-contain p-1.5"
+          onWheel={(e) => {
+            // Inside a scroll-locked Dialog, Radix's RemoveScroll prevents wheel default at
+            // capture phase — manually advance scrollTop so the popover list still scrolls.
+            if (e.defaultPrevented) e.currentTarget.scrollTop += e.deltaY
+          }}
+        >
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">No results</p>
           ) : (

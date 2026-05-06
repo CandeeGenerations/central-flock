@@ -450,6 +450,79 @@ rsvpRouter.get(
   }),
 )
 
+// GET /api/rsvp/lists/:id/context — compose-page context (event meta + first token + URL base)
+rsvpRouter.get(
+  '/lists/:id/context',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const list = db
+      .select({
+        id: schema.rsvpLists.id,
+        name: schema.rsvpLists.name,
+        standaloneTitle: schema.rsvpLists.standaloneTitle,
+        standaloneDate: schema.rsvpLists.standaloneDate,
+        standaloneTime: schema.rsvpLists.standaloneTime,
+        calendarEventTitle: schema.calendarEvents.title,
+        calendarEventStartDate: schema.calendarEvents.startDate,
+      })
+      .from(schema.rsvpLists)
+      .leftJoin(schema.calendarEvents, eq(schema.rsvpLists.calendarEventId, schema.calendarEvents.id))
+      .where(eq(schema.rsvpLists.id, id))
+      .get()
+
+    if (!list) {
+      res.status(404).json({error: 'RSVP list not found'})
+      return
+    }
+
+    const eventTitle = list.calendarEventTitle ?? list.standaloneTitle ?? list.name
+    const eventDate = list.calendarEventStartDate?.slice(0, 10) ?? list.standaloneDate ?? null
+    const eventTime = list.calendarEventStartDate
+      ? list.calendarEventStartDate.length >= 16
+        ? list.calendarEventStartDate.slice(11, 16)
+        : null
+      : (list.standaloneTime ?? null)
+
+    const firstEntry = db
+      .select({publicToken: schema.rsvpEntries.publicToken})
+      .from(schema.rsvpEntries)
+      .where(eq(schema.rsvpEntries.rsvpListId, id))
+      .limit(1)
+      .get()
+
+    res.json({
+      id: list.id,
+      name: list.name,
+      eventTitle,
+      eventDate,
+      eventTime,
+      firstEntryPublicToken: firstEntry?.publicToken ?? null,
+      rsvpPublicUrlBase: process.env.RSVP_PUBLIC_URL_BASE ?? '',
+      missingEntryCount: 0,
+    })
+  }),
+)
+
+// POST /api/rsvp/lists/:id/missing-entries — given recipient IDs, return which are not on the list
+rsvpRouter.post(
+  '/lists/:id/missing-entries',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const {personIds} = req.body as {personIds?: number[]}
+    if (!Array.isArray(personIds) || personIds.length === 0) {
+      res.json({missingPersonIds: []})
+      return
+    }
+    const present = db
+      .select({personId: schema.rsvpEntries.personId})
+      .from(schema.rsvpEntries)
+      .where(and(eq(schema.rsvpEntries.rsvpListId, id), inArray(schema.rsvpEntries.personId, personIds)))
+      .all()
+    const presentSet = new Set(present.map((p) => p.personId))
+    res.json({missingPersonIds: personIds.filter((pid) => !presentSet.has(pid))})
+  }),
+)
+
 // GET /api/rsvp/calendar-events?days=120 — synced calendar events for the create dialog picker
 rsvpRouter.get(
   '/calendar-events',

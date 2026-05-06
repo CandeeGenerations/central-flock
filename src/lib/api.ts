@@ -262,6 +262,7 @@ export function sendMessage(data: {
   customVarValues?: Record<string, string>
   scheduledAt?: string
   templateState?: string
+  rsvpListId?: number | null
 }) {
   return request<{messageId: number; jobId?: string; scheduled?: boolean}>('/messages/send', {
     method: 'POST',
@@ -323,6 +324,7 @@ export function updateMessage(
     customVarValues?: Record<string, string>
     scheduledAt?: string
     templateState?: string
+    rsvpListId?: number | null
   },
 ) {
   return request<{messageId: number; scheduled?: boolean}>(`/messages/${id}`, {
@@ -345,6 +347,7 @@ export interface Draft {
   batchDelayMs: number
   scheduledAt: string | null
   templateState: string | null
+  rsvpListId: number | null
   recipientCount?: number
   renderedPreview?: string | null
   extraNames?: string[]

@@ -179,3 +179,26 @@ export const STATUS_LABELS: Record<RsvpStatus, string> = {
   maybe: 'Maybe',
   no_response: 'No Response',
 }
+
+export interface RsvpListContext {
+  id: number
+  name: string
+  eventTitle: string
+  eventDate: string | null
+  eventTime: string | null
+  firstEntryPublicToken: string | null
+  rsvpPublicUrlBase: string
+  missingEntryCount: number
+}
+
+export function fetchRsvpListContext(listId: number): Promise<RsvpListContext> {
+  return request(`/lists/${listId}/context`)
+}
+
+export interface MissingEntriesCheckResponse {
+  missingPersonIds: number[]
+}
+
+export function checkMissingRsvpEntries(listId: number, personIds: number[]): Promise<MissingEntriesCheckResponse> {
+  return request(`/lists/${listId}/missing-entries`, {method: 'POST', body: JSON.stringify({personIds})})
+}

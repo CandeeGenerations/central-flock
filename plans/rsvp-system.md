@@ -4,6 +4,8 @@ Track who's coming to events (Extravaganza, 4th of July, etc.) by attaching an R
 
 Domain context lives in [/CONTEXT.md](../CONTEXT.md). This plan is the implementation playbook.
 
+**Status:** implemented across branches `rsvp/phase-1-schema` → `rsvp/phase-5-integrations` (each phase = one commit). Final landing branch merges the lot.
+
 ## Goals
 
 - One place to track attendance for any event (linked from Calendar.app or standalone in-app).

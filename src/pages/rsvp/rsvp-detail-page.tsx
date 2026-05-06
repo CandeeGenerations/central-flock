@@ -133,8 +133,7 @@ export function RsvpDetailPage() {
   const handleSendMessage = () => {
     if (audienceCount === 0) return
     const params = new URLSearchParams()
-    params.set('mode', 'individual')
-    params.set('individualIds', audienceIds.join(','))
+    params.set('personIds', audienceIds.join(','))
     navigate(`/messages/compose?${params.toString()}`)
   }
 

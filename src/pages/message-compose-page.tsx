@@ -77,8 +77,16 @@ export function MessageComposePage() {
   const editMessageId = searchParams.get('editMessageId')
   const presetGroupId = searchParams.get('groupId') || (dupState?.groupId ? String(dupState.groupId) : '')
   const presetRecipientId = searchParams.get('recipientId')
+  const presetPersonIds = (searchParams.get('personIds') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(Number)
+    .filter((n) => Number.isFinite(n))
 
-  const [recipientMode, setRecipientMode] = useState<'group' | 'individual'>(presetRecipientId ? 'individual' : 'group')
+  const [recipientMode, setRecipientMode] = useState<'group' | 'individual'>(
+    presetRecipientId || presetPersonIds.length > 0 ? 'individual' : 'group',
+  )
   const [selectedGroupId, setSelectedGroupId] = useState(presetGroupId || '')
   const [content, setContent] = useState(dupState?.content || '')
   const [messageTab, setMessageTab] = useState<'edit' | 'preview'>('edit')
@@ -99,6 +107,7 @@ export function MessageComposePage() {
   const [individualHighlight, setIndividualHighlight] = useState(-1)
   const individualSearchRef = useRef<HTMLInputElement>(null)
   const [selectedIndividualIds, setSelectedIndividualIds] = useState<Set<number>>(() => {
+    if (presetPersonIds.length > 0) return new Set(presetPersonIds)
     return presetRecipientId ? new Set([Number(presetRecipientId)]) : new Set()
   })
 

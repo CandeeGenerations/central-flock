@@ -13,12 +13,13 @@ import {fetchRsvpLists} from '@/lib/rsvp-api'
 import {useQuery} from '@tanstack/react-query'
 import {Plus} from 'lucide-react'
 import {useMemo, useState} from 'react'
-import {Link} from 'react-router-dom'
+import {Link, useSearchParams} from 'react-router-dom'
 
 export function RsvpListPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = usePersistedState('rsvp.search', '')
   const [showPast, setShowPast] = usePersistedState('rsvp.showPast', false)
-  const [createOpen, setCreateOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(searchParams.get('new') === '1')
 
   const {data, isLoading} = useQuery({
     queryKey: queryKeys.rsvpLists(showPast),
@@ -110,7 +111,17 @@ export function RsvpListPage() {
         )}
       </Card>
 
-      <RsvpListCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <RsvpListCreateDialog
+        open={createOpen}
+        onOpenChange={(o) => {
+          setCreateOpen(o)
+          if (!o && searchParams.get('new')) {
+            const next = new URLSearchParams(searchParams)
+            next.delete('new')
+            setSearchParams(next, {replace: true})
+          }
+        }}
+      />
     </div>
   )
 }

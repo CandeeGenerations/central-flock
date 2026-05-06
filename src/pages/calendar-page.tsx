@@ -1,3 +1,4 @@
+import {RsvpListCreateDialog} from '@/components/rsvp/rsvp-list-create-dialog'
 import {Button} from '@/components/ui/button'
 import {Calendar as CalendarWidget} from '@/components/ui/calendar'
 import {Card, CardContent} from '@/components/ui/card'
@@ -7,7 +8,7 @@ import {type CalendarEvent, fetchCalendarEvents, fetchSettings, triggerCalendarS
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {CalendarDays, Calendar as CalendarIcon, MapPin, RefreshCw, Settings} from 'lucide-react'
+import {CalendarDays, Calendar as CalendarIcon, CheckSquare, MapPin, RefreshCw, Settings} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link} from 'react-router-dom'
 
@@ -118,6 +119,7 @@ export function CalendarPage() {
   const [page, setPage] = useState(1)
   const [dismissedMissing, setDismissedMissing] = useState<Set<string>>(new Set())
   const [enabledCalendars, setEnabledCalendars] = useState<Set<string> | null>(null)
+  const [rsvpFromEvent, setRsvpFromEvent] = useState<{eventUid: string; title: string} | null>(null)
 
   const queryClient = useQueryClient()
   const {data: settings} = useQuery({queryKey: queryKeys.settings, queryFn: fetchSettings})
@@ -359,6 +361,17 @@ export function CalendarPage() {
                               )}
                             </div>
                           </div>
+                          {!event.recurring && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="shrink-0"
+                              onClick={() => setRsvpFromEvent({eventUid: event.id, title: event.title || ''})}
+                              title="Start RSVP list for this event"
+                            >
+                              <CheckSquare className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       )
                     })}
@@ -392,6 +405,15 @@ export function CalendarPage() {
           </div>
         </CardContent>
       </Card>
+
+      <RsvpListCreateDialog
+        open={rsvpFromEvent !== null}
+        onOpenChange={(o) => {
+          if (!o) setRsvpFromEvent(null)
+        }}
+        prefillCalendarEventUid={rsvpFromEvent?.eventUid}
+        prefillName={rsvpFromEvent?.title}
+      />
     </div>
   )
 }

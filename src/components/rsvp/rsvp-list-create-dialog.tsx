@@ -19,6 +19,7 @@ interface Props {
   onOpenChange: (open: boolean) => void
   prefillGroupId?: number
   prefillCalendarEventId?: number
+  prefillCalendarEventUid?: string
   prefillName?: string
 }
 
@@ -37,13 +38,17 @@ export function RsvpListCreateDialog(props: Props) {
 
 type Mode = 'calendar' | 'standalone'
 
-function CreateForm({onOpenChange, prefillGroupId, prefillCalendarEventId, prefillName}: Props) {
+function CreateForm({
+  onOpenChange,
+  prefillGroupId,
+  prefillCalendarEventId,
+  prefillCalendarEventUid,
+  prefillName,
+}: Props) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [mode, setMode] = useState<Mode>(prefillCalendarEventId ? 'calendar' : 'standalone')
-  const [calendarEventId, setCalendarEventId] = useState<string>(
-    prefillCalendarEventId ? String(prefillCalendarEventId) : '',
-  )
+  const hasCalendarPrefill = Boolean(prefillCalendarEventId || prefillCalendarEventUid)
+  const [mode, setMode] = useState<Mode>(hasCalendarPrefill ? 'calendar' : 'standalone')
   const [nameInput, setNameInput] = useState(prefillName || '')
   const [nameTouched, setNameTouched] = useState(Boolean(prefillName))
   const [standaloneDate, setStandaloneDate] = useState('')
@@ -56,6 +61,19 @@ function CreateForm({onOpenChange, prefillGroupId, prefillCalendarEventId, prefi
     queryFn: () => fetchRsvpCalendarEvents(180),
     enabled: mode === 'calendar',
   })
+
+  // Resolve initial calendar event ID from either explicit numeric ID or eventUid.
+  const resolvedPrefillId = prefillCalendarEventId
+    ? String(prefillCalendarEventId)
+    : prefillCalendarEventUid
+      ? (calendarEvents?.find((e) => e.eventUid === prefillCalendarEventUid)?.id?.toString() ?? '')
+      : ''
+  const [calendarEventId, setCalendarEventId] = useState<string>(resolvedPrefillId)
+  const [hasResolved, setHasResolved] = useState(Boolean(resolvedPrefillId))
+  if (!hasResolved && resolvedPrefillId) {
+    setHasResolved(true)
+    setCalendarEventId(resolvedPrefillId)
+  }
 
   // Derived name: if user hasn't typed, default from selected calendar event title.
   const derivedName =

@@ -74,6 +74,8 @@ const PREFIX_TO_GROUP: Record<string, string> = {
   nursery: 'Nursery',
   cal: 'Calendar',
   calendar: 'Calendar',
+  rsvp: 'Calendar',
+  rsvps: 'Calendar',
 }
 
 function parsePrefix(query: string): {group: string | null; rest: string} {

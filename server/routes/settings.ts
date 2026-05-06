@@ -58,10 +58,7 @@ settingsRouter.post(
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          type: 'pre_notification',
-          personName: 'Tyler C',
-          message: "Reminder - 7 days till Tyler C's birthday!",
-          daysUntil: 7,
+          message: 'Test from Central Flock — your send-me-a-text webhook is working.',
         }),
       })
 

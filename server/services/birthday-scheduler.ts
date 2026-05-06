@@ -3,22 +3,9 @@ import {and, eq, sql} from 'drizzle-orm'
 import {db, schema} from '../db/index.js'
 import {getSetting} from '../routes/settings.js'
 import {sendMessageViaUI} from './applescript.js'
+import {sendNotifyMeText} from './notify-me.js'
 
 let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-async function sendWebhook(
-  webhookUrl: string,
-  payload: {type: string; personName: string; message: string; daysUntil?: number},
-) {
-  const res = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(payload),
-  })
-  if (!res.ok) {
-    throw new Error(`Webhook returned ${res.status}: ${await res.text()}`)
-  }
-}
 
 function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
@@ -95,7 +82,6 @@ function recordMessageInHistory(personId: number, content: string) {
 }
 
 export async function checkBirthdays() {
-  const webhookUrl = getSetting('webhookUrl')
   const preNotifyDays = getSetting('birthdayPreNotifyDays')
   const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',').map((d) => Number(d.trim())) : [])
 
@@ -113,7 +99,7 @@ export async function checkBirthdays() {
     const days = daysUntilBirthday(bMonth, bDay, todayMonth, todayDay)
     const name = formatPersonName(person)
 
-    // Check pre-notifications (via webhook)
+    // Check pre-notifications (via notify-me webhook)
     for (const n of [3, 7, 10]) {
       if (!preNotifySet.has(n)) continue
       if (days !== n) continue
@@ -121,18 +107,13 @@ export async function checkBirthdays() {
       const type = `pre_${n}` as const
       if (wasSent(person.id, type, currentYear)) continue
 
-      if (!webhookUrl) {
-        console.log(`Birthday scheduler: webhookUrl not set, skipping ${type} reminder for ${name}`)
-        continue
-      }
-
       const message = `Reminder - ${n} days till ${name}'s birthday!`
 
       try {
-        await sendWebhook(webhookUrl, {type: 'pre_notification', personName: name, message, daysUntil: n})
+        await sendNotifyMeText(message)
         recordSent(person.id, type, currentYear)
         recordMessageInHistory(person.id, message)
-        console.log(`Birthday scheduler: sent ${type} reminder for ${name} via webhook`)
+        console.log(`Birthday scheduler: sent ${type} reminder for ${name} via notify-me`)
       } catch (error) {
         console.error(`Birthday scheduler: failed to send ${type} for ${name}:`, error)
       }
@@ -167,7 +148,6 @@ export async function checkBirthdays() {
 }
 
 export async function checkAnniversaries() {
-  const webhookUrl = getSetting('webhookUrl')
   const preNotifyDays = getSetting('anniversaryPreNotifyDays')
   const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',').map((d) => Number(d.trim())) : [])
 
@@ -185,7 +165,7 @@ export async function checkAnniversaries() {
     const days = daysUntilBirthday(aMonth, aDay, todayMonth, todayDay)
     const name = formatPersonName(person)
 
-    // Check pre-notifications (via webhook)
+    // Check pre-notifications (via notify-me webhook)
     for (const n of [3, 7, 10]) {
       if (!preNotifySet.has(n)) continue
       if (days !== n) continue
@@ -193,18 +173,13 @@ export async function checkAnniversaries() {
       const type = `anniversary_pre_${n}`
       if (wasSent(person.id, type, currentYear)) continue
 
-      if (!webhookUrl) {
-        console.log(`Anniversary scheduler: webhookUrl not set, skipping ${type} reminder for ${name}`)
-        continue
-      }
-
       const message = `Reminder - ${n} days till ${name}'s anniversary!`
 
       try {
-        await sendWebhook(webhookUrl, {type: 'pre_notification', personName: name, message, daysUntil: n})
+        await sendNotifyMeText(message)
         recordSent(person.id, type, currentYear)
         recordMessageInHistory(person.id, message)
-        console.log(`Anniversary scheduler: sent ${type} reminder for ${name} via webhook`)
+        console.log(`Anniversary scheduler: sent ${type} reminder for ${name} via notify-me`)
       } catch (error) {
         console.error(`Anniversary scheduler: failed to send ${type} for ${name}:`, error)
       }

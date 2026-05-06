@@ -195,7 +195,7 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Webhook URL</Label>
+              <Label>Send-me-a-text webhook</Label>
               <Input
                 type="url"
                 placeholder="https://..."
@@ -204,8 +204,8 @@ export function SettingsPage() {
                 className="w-full"
               />
               <p className="text-xs text-muted-foreground">
-                Pre-notification reminders are sent via webhook. Receives a POST with JSON body containing type,
-                personName, message, and daysUntil.
+                Used for birthday reminders, RSVP responses, and other admin notifications. n8n receives{' '}
+                <code>{'{message: string}'}</code> and sends an SMS.
               </p>
               {webhookUrl && (
                 <Button variant="outline" size="sm" onClick={testWebhook} disabled={testingWebhook}>

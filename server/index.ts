@@ -24,6 +24,7 @@ import {nurserySchedulesRouter} from './routes/nursery-schedules.js'
 import {nurseryRouter} from './routes/nursery.js'
 import {peopleRouter} from './routes/people.js'
 import {quotesRouter} from './routes/quotes.js'
+import {rsvpRouter} from './routes/rsvp.js'
 import {settingsRouter} from './routes/settings.js'
 import {statsRouter} from './routes/stats.js'
 import {templatesRouter} from './routes/templates.js'
@@ -70,6 +71,7 @@ app.use('/api/nursery', nurseryRouter)
 app.use('/api/quotes', quotesRouter)
 app.use('/api/hymns', hymnsRouter)
 app.use('/api/notion', notionRouter)
+app.use('/api/rsvp', rsvpRouter)
 app.use('/api/settings', settingsRouter)
 
 // Serve scan images and nursery logos

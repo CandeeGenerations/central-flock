@@ -5,7 +5,7 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
-import {formatDate, formatDateTime} from '@/lib/date'
+import {formatDate, formatDateTime, localDateFromUTC, localTimeFromUTC} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {type RsvpListDetail, fetchRsvpCalendarEvents, updateRsvpList} from '@/lib/rsvp-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
@@ -23,7 +23,7 @@ type Mode = 'calendar' | 'standalone'
 export function RsvpListEditDialog({open, onOpenChange, list}: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl sm:max-h-[calc(100vh-1rem)]">
         <DialogHeader>
           <DialogTitle>Edit RSVP List</DialogTitle>
         </DialogHeader>
@@ -57,9 +57,9 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
     setLastSyncedEventId(calendarEventId)
     const ev = calendarEvents.find((e) => e.id === Number(calendarEventId))
     if (ev) {
-      setStandaloneDate(ev.startDate.slice(0, 10))
-      setStandaloneTime(!ev.allDay && ev.startDate.length >= 16 ? ev.startDate.slice(11, 16) : '')
-      setStandaloneEndTime(!ev.allDay && ev.endDate && ev.endDate.length >= 16 ? ev.endDate.slice(11, 16) : '')
+      setStandaloneDate(ev.allDay ? ev.startDate.slice(0, 10) : localDateFromUTC(ev.startDate))
+      setStandaloneTime(!ev.allDay ? localTimeFromUTC(ev.startDate) : '')
+      setStandaloneEndTime(!ev.allDay && ev.endDate ? localTimeFromUTC(ev.endDate) : '')
     }
   }
 
@@ -132,28 +132,30 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
           </TabsContent>
         </Tabs>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-2">
           <div className="space-y-1">
             <Label htmlFor="rsvp-edit-date">Date{mode === 'calendar' ? ' (override)' : ''}</Label>
             <DatePicker value={standaloneDate} onChange={setStandaloneDate} />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="rsvp-edit-time">Start{mode === 'calendar' ? ' (override)' : ' (optional)'}</Label>
-            <Input
-              id="rsvp-edit-time"
-              type="time"
-              value={standaloneTime}
-              onChange={(e) => setStandaloneTime(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="rsvp-edit-end-time">End{mode === 'calendar' ? ' (override)' : ' (optional)'}</Label>
-            <Input
-              id="rsvp-edit-end-time"
-              type="time"
-              value={standaloneEndTime}
-              onChange={(e) => setStandaloneEndTime(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="rsvp-edit-time">Start{mode === 'calendar' ? ' (override)' : ' (optional)'}</Label>
+              <Input
+                id="rsvp-edit-time"
+                type="time"
+                value={standaloneTime}
+                onChange={(e) => setStandaloneTime(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rsvp-edit-end-time">End{mode === 'calendar' ? ' (override)' : ' (optional)'}</Label>
+              <Input
+                id="rsvp-edit-end-time"
+                type="time"
+                value={standaloneEndTime}
+                onChange={(e) => setStandaloneEndTime(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 

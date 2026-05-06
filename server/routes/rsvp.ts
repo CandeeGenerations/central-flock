@@ -485,18 +485,22 @@ rsvpRouter.get(
     }
 
     const eventTitle = list.calendarEventTitle ?? list.standaloneTitle ?? list.name
+    // Calendar event datetimes are stored as UTC ISO; convert to server-local for display.
+    const localDate = (utc: string) => {
+      const d = new Date(utc)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+    const localTime = (utc: string) => {
+      const d = new Date(utc)
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
     // Standalone fields act as overrides; fall back to the linked calendar event.
-    const eventDate = list.standaloneDate ?? list.calendarEventStartDate?.slice(0, 10) ?? null
+    const eventDate =
+      list.standaloneDate ?? (list.calendarEventStartDate ? localDate(list.calendarEventStartDate) : null)
     const eventTime =
-      list.standaloneTime ??
-      (list.calendarEventStartDate && list.calendarEventStartDate.length >= 16
-        ? list.calendarEventStartDate.slice(11, 16)
-        : null)
+      list.standaloneTime ?? (list.calendarEventStartDate ? localTime(list.calendarEventStartDate) : null)
     const eventEndTime =
-      list.standaloneEndTime ??
-      (list.calendarEventEndDate && list.calendarEventEndDate.length >= 16
-        ? list.calendarEventEndDate.slice(11, 16)
-        : null)
+      list.standaloneEndTime ?? (list.calendarEventEndDate ? localTime(list.calendarEventEndDate) : null)
 
     const firstEntry = db
       .select({publicToken: schema.rsvpEntries.publicToken})

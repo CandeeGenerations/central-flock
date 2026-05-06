@@ -48,6 +48,7 @@ const DATE_FORMATS = [
   {format: 'MMMM do'},
   {format: 'MMMM d, yyyy'},
   {format: 'M/d/yyyy'},
+  {format: 'EEE MMM d'},
   {format: 'EEEE, MMMM d'},
   {format: 'EEEE, MMMM do'},
   {format: 'EEEE, MMMM d, yyyy'},
@@ -57,6 +58,21 @@ const DATE_FORMATS = [
   {format: 'MMM', suffix: ' (month short)'},
   {format: 'yyyy', suffix: ' (year only)'},
 ]
+
+const TIME_FORMATS = [
+  {format: 'h:mm a'},
+  {format: 'h:mma'},
+  {format: 'h a'},
+  {format: 'ha'},
+  {format: 'HH:mm'},
+  {format: 'h'},
+]
+
+function getTimeFormatOptions() {
+  const sample = new Date()
+  sample.setHours(13, 30, 0, 0)
+  return TIME_FORMATS.map(({format: fmt}) => ({label: format(sample, fmt), format: fmt}))
+}
 
 function getDateFormatOptions(date: Date) {
   return DATE_FORMATS.map(({format: fmt, suffix}: {format: string; suffix?: string}) => ({
@@ -134,6 +150,8 @@ export function MessageComposePage() {
   const [customVarValues, setCustomVarValues] = useState<Record<string, string>>({})
   const [dateValues, setDateValues] = useState<Record<string, Date | undefined>>({})
   const [dateFormats, setDateFormats] = useState<Record<string, string>>({})
+  const [rsvpDateFormat, setRsvpDateFormat] = useState('EEEE, MMMM do')
+  const [rsvpTimeFormat, setRsvpTimeFormat] = useState('h:mm a')
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -449,27 +467,27 @@ export function MessageComposePage() {
     if (rsvpContext.eventDate) {
       const [y, m, d] = rsvpContext.eventDate.split('-').map(Number)
       if (y && m && d) {
-        out.eventDate = format(new Date(y, m - 1, d), 'EEE MMM d')
+        out.eventDate = format(new Date(y, m - 1, d), rsvpDateFormat)
       } else {
         out.eventDate = rsvpContext.eventDate
       }
     } else {
       out.eventDate = ''
     }
-    if (rsvpContext.eventTime) {
-      const [hh, mm] = rsvpContext.eventTime.split(':').map(Number)
+    const formatTime = (hhmm: string): string => {
+      const [hh, mm] = hhmm.split(':').map(Number)
       if (Number.isFinite(hh) && Number.isFinite(mm)) {
         const dt = new Date()
         dt.setHours(hh, mm, 0, 0)
-        out.eventTime = format(dt, 'h:mm a')
-      } else {
-        out.eventTime = rsvpContext.eventTime
+        return format(dt, rsvpTimeFormat)
       }
-    } else {
-      out.eventTime = ''
+      return hhmm
     }
+    out.eventTime = rsvpContext.eventTime ? formatTime(rsvpContext.eventTime) : ''
+    out.eventStartTime = out.eventTime
+    out.eventEndTime = rsvpContext.eventEndTime ? formatTime(rsvpContext.eventEndTime) : ''
     return out
-  }, [rsvpContext])
+  }, [rsvpContext, rsvpDateFormat, rsvpTimeFormat])
 
   // Build resolved custom var values for preview and send
   const resolvedCustomVarValues = useMemo(() => {
@@ -945,7 +963,7 @@ export function MessageComposePage() {
                     <div className="rounded-2xl bg-muted/30 p-4">
                       <div className="flex justify-start">
                         <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-4 py-3">
-                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{renderedPreview}</p>
+                          <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{renderedPreview}</p>
                         </div>
                       </div>
                     </div>
@@ -1029,15 +1047,59 @@ export function MessageComposePage() {
                         <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{eventDate}}')}>
                           {'{{eventDate}}'}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{eventTime}}')}>
-                          {'{{eventTime}}'}
+                        <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{eventStartTime}}')}>
+                          {'{{eventStartTime}}'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{eventEndTime}}')}>
+                          {'{{eventEndTime}}'}
                         </Button>
                       </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Date format</label>
+                          <Select value={rsvpDateFormat} onValueChange={setRsvpDateFormat}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(() => {
+                                const sample = rsvpContext.eventDate
+                                  ? (() => {
+                                      const [y, m, d] = rsvpContext.eventDate.split('-').map(Number)
+                                      return y && m && d ? new Date(y, m - 1, d) : new Date()
+                                    })()
+                                  : new Date()
+                                return getDateFormatOptions(sample).map((opt) => (
+                                  <SelectItem key={opt.format} value={opt.format}>
+                                    {opt.label}
+                                  </SelectItem>
+                                ))
+                              })()}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Time format</label>
+                          <Select value={rsvpTimeFormat} onValueChange={setRsvpTimeFormat}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getTimeFormatOptions().map((opt) => (
+                                <SelectItem key={opt.format} value={opt.format}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                       <p className="text-xs text-muted-foreground mt-2">
-                        {'{{rsvpLink}}'} resolves per-recipient at send time. {'{{eventTitle/Date/Time}}'} resolve to{' '}
+                        {'{{rsvpLink}}'} resolves per-recipient at send time. Event variables resolve to{' '}
                         <span className="font-medium">{rsvpContext.eventTitle}</span>
-                        {rsvpContext.eventDate ? ` · ${rsvpContext.eventDate}` : ''}
-                        {rsvpContext.eventTime ? ` ${rsvpContext.eventTime}` : ''}.
+                        {rsvpContextVarValues.eventDate ? ` · ${rsvpContextVarValues.eventDate}` : ''}
+                        {rsvpContextVarValues.eventStartTime ? ` ${rsvpContextVarValues.eventStartTime}` : ''}
+                        {rsvpContextVarValues.eventEndTime ? ` – ${rsvpContextVarValues.eventEndTime}` : ''}.
                       </p>
                     </VariableDropdown>
                   )}
@@ -1305,7 +1367,7 @@ export function MessageComposePage() {
                   {content ? (
                     <div className="flex justify-start">
                       <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-3 py-2">
-                        <p className="text-xs whitespace-pre-wrap leading-relaxed">{renderedPreview}</p>
+                        <p className="text-xs whitespace-pre-wrap break-words leading-relaxed">{renderedPreview}</p>
                       </div>
                     </div>
                   ) : (
@@ -1383,7 +1445,9 @@ export function MessageComposePage() {
           <Separator />
           <div>
             <span className="text-muted-foreground">Preview</span>
-            <p className="mt-1 bg-muted rounded-lg p-3 whitespace-pre-wrap text-sm">{renderedPreview || content}</p>
+            <p className="mt-1 bg-muted rounded-lg p-3 whitespace-pre-wrap break-words text-sm">
+              {renderedPreview || content}
+            </p>
           </div>
         </div>
       </ConfirmDialog>

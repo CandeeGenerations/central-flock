@@ -22,3 +22,15 @@ export function formatDate(dateStr: string): string {
 export function formatDateTime(dateStr: string): string {
   return format(parseUTC(dateStr), 'EEE M/d/yyyy h:mm a')
 }
+
+/** Extract local-time HH:MM (24h) from a UTC ISO datetime string, e.g. for <input type="time"> */
+export function localTimeFromUTC(dateStr: string): string {
+  const d = parseUTC(dateStr)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** Extract local-date YYYY-MM-DD from a UTC ISO datetime string */
+export function localDateFromUTC(dateStr: string): string {
+  const d = parseUTC(dateStr)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}

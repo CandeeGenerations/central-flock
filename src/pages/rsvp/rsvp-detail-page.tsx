@@ -11,7 +11,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/c
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {usePersistedState} from '@/hooks/use-persisted-state'
-import {formatDate, formatDateTime} from '@/lib/date'
+import {formatDate, formatDateTime, localTimeFromUTC} from '@/lib/date'
 import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {
@@ -115,15 +115,9 @@ export function RsvpDetailPage() {
   const eventDate = list.effectiveDate
   // Standalone fields act as overrides on top of the linked calendar event.
   const eventTime =
-    list.standaloneTime ??
-    (list.calendarEventStartDate && list.calendarEventStartDate.length >= 16
-      ? list.calendarEventStartDate.slice(11, 16)
-      : null)
+    list.standaloneTime ?? (list.calendarEventStartDate ? localTimeFromUTC(list.calendarEventStartDate) : null)
   const eventEndTime =
-    list.standaloneEndTime ??
-    (list.calendarEventEndDate && list.calendarEventEndDate.length >= 16
-      ? list.calendarEventEndDate.slice(11, 16)
-      : null)
+    list.standaloneEndTime ?? (list.calendarEventEndDate ? localTimeFromUTC(list.calendarEventEndDate) : null)
   const formatHHmm = (hhmm: string) => {
     const [h, m] = hhmm.split(':').map(Number)
     if (Number.isNaN(h) || Number.isNaN(m)) return hhmm

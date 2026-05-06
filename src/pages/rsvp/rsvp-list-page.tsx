@@ -12,9 +12,10 @@ import {fetchRsvpLists} from '@/lib/rsvp-api'
 import {useQuery} from '@tanstack/react-query'
 import {Plus} from 'lucide-react'
 import {useMemo, useState} from 'react'
-import {Link, useSearchParams} from 'react-router-dom'
+import {useNavigate, useSearchParams} from 'react-router-dom'
 
 export function RsvpListPage() {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = usePersistedState('rsvp.search', '')
   const [showPast, setShowPast] = usePersistedState('rsvp.showPast', false)
@@ -91,12 +92,12 @@ export function RsvpListPage() {
                   </TableRow>
                 )}
                 {filtered.map((l) => (
-                  <TableRow key={l.id} className="cursor-pointer hover:bg-muted">
-                    <TableCell>
-                      <Link to={`/rsvp/${l.id}`} className="block font-medium hover:underline">
-                        {l.name}
-                      </Link>
-                    </TableCell>
+                  <TableRow
+                    key={l.id}
+                    className="cursor-pointer hover:bg-muted"
+                    onClick={() => navigate(`/rsvp/${l.id}`)}
+                  >
+                    <TableCell className="font-medium">{l.name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {l.effectiveDate ? formatDate(l.effectiveDate) : '—'}
                     </TableCell>

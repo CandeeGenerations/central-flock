@@ -232,7 +232,7 @@ export function CalendarPrintPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => navigateMonth(-1)}>
@@ -421,8 +421,8 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
         </DropdownMenu>
       </div>
 
-      <div className="grid lg:grid-cols-[420px_1fr] gap-6">
-        <div className="space-y-4">
+      <div className="grid lg:grid-cols-[420px_1fr] 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-6">
+        <div className="space-y-4 2xl:contents">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Page Details</CardTitle>

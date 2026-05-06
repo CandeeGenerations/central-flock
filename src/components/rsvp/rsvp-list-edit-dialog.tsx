@@ -1,8 +1,9 @@
 import {Button} from '@/components/ui/button'
+import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
 import {formatDate} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
@@ -48,6 +49,27 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
     enabled: mode === 'calendar',
   })
 
+  // Synthesize an option for the currently-linked event so the picker shows it
+  // even before the fetch resolves, or when the event is filtered out (past date,
+  // recurring, or beyond the 180-day window).
+  const eventOptions = (() => {
+    const base = (calendarEvents || []).map((ev) => ({
+      value: String(ev.id),
+      label: `${ev.title} — ${formatDate(ev.startDate)}`,
+    }))
+    if (
+      list.calendarEventId &&
+      list.calendarEventTitle &&
+      !base.some((o) => o.value === String(list.calendarEventId))
+    ) {
+      base.unshift({
+        value: String(list.calendarEventId),
+        label: `${list.calendarEventTitle}${list.calendarEventStartDate ? ` — ${formatDate(list.calendarEventStartDate)}` : ''}`,
+      })
+    }
+    return base
+  })()
+
   const updateMutation = useMutation({
     mutationFn: () =>
       updateRsvpList(list.id, {
@@ -82,29 +104,19 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
           </TabsList>
           <TabsContent value="calendar" className="space-y-2 mt-3">
             <Label htmlFor="rsvp-edit-event">Event</Label>
-            <Select value={calendarEventId} onValueChange={setCalendarEventId}>
-              <SelectTrigger id="rsvp-edit-event">
-                <SelectValue placeholder="Pick a calendar event" />
-              </SelectTrigger>
-              <SelectContent>
-                {(calendarEvents || []).map((ev) => (
-                  <SelectItem key={ev.id} value={String(ev.id)}>
-                    {ev.title} — {formatDate(ev.startDate)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={calendarEventId}
+              onValueChange={setCalendarEventId}
+              options={eventOptions}
+              placeholder="Pick a calendar event"
+              className="w-full"
+            />
           </TabsContent>
           <TabsContent value="standalone" className="space-y-2 mt-3">
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label htmlFor="rsvp-edit-date">Date</Label>
-                <Input
-                  id="rsvp-edit-date"
-                  type="date"
-                  value={standaloneDate}
-                  onChange={(e) => setStandaloneDate(e.target.value)}
-                />
+                <DatePicker value={standaloneDate} onChange={setStandaloneDate} />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="rsvp-edit-time">Time (optional)</Label>

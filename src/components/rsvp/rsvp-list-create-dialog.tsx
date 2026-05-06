@@ -1,9 +1,10 @@
 import {Button} from '@/components/ui/button'
+import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {MultiSelect} from '@/components/ui/multi-select'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
 import {fetchGroups} from '@/lib/api'
 import {formatDate} from '@/lib/date'
@@ -117,29 +118,22 @@ function CreateForm({
           </TabsList>
           <TabsContent value="calendar" className="space-y-2 mt-3">
             <Label htmlFor="rsvp-calendar-event">Event</Label>
-            <Select value={calendarEventId} onValueChange={setCalendarEventId}>
-              <SelectTrigger id="rsvp-calendar-event">
-                <SelectValue placeholder="Pick a calendar event" />
-              </SelectTrigger>
-              <SelectContent>
-                {(calendarEvents || []).map((ev) => (
-                  <SelectItem key={ev.id} value={String(ev.id)}>
-                    {ev.title} — {formatDate(ev.startDate)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={calendarEventId}
+              onValueChange={setCalendarEventId}
+              options={(calendarEvents || []).map((ev) => ({
+                value: String(ev.id),
+                label: `${ev.title} — ${formatDate(ev.startDate)}`,
+              }))}
+              placeholder="Pick a calendar event"
+              className="w-full"
+            />
           </TabsContent>
           <TabsContent value="standalone" className="space-y-2 mt-3">
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label htmlFor="rsvp-date">Date</Label>
-                <Input
-                  id="rsvp-date"
-                  type="date"
-                  value={standaloneDate}
-                  onChange={(e) => setStandaloneDate(e.target.value)}
-                />
+                <DatePicker value={standaloneDate} onChange={setStandaloneDate} />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="rsvp-time">Time (optional)</Label>
@@ -175,6 +169,7 @@ function CreateForm({
             options={(groups || []).map((g) => ({value: String(g.id), label: g.name}))}
             allLabel="All groups"
             placeholder="Pick groups to seed"
+            className="w-full"
           />
         </div>
       </div>

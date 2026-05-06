@@ -1,12 +1,10 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
-import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
-import {addRsvpEntries, checkMissingRsvpEntries, fetchRsvpListContext} from '@/lib/rsvp-api'
-import type {RsvpListContext} from '@/lib/rsvp-api'
 import {Calendar} from '@/components/ui/calendar'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {DateTimePicker} from '@/components/ui/date-time-picker'
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
@@ -35,6 +33,8 @@ import type {Draft, TemplateVariable} from '@/lib/api'
 import {BATCH_DEFAULTS} from '@/lib/constants'
 import {formatFullName, renderTemplate} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
+import {addRsvpEntries, checkMissingRsvpEntries, fetchRsvpListContext} from '@/lib/rsvp-api'
+import type {RsvpListContext} from '@/lib/rsvp-api'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {format} from 'date-fns'
@@ -137,22 +137,25 @@ export function MessageComposePage() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const insertAtCursor = useCallback((text: string) => {
-    const el = textareaRef.current
-    if (!el) {
-      setContent((c) => c + text)
-      return
-    }
-    const start = el.selectionStart
-    const end = el.selectionEnd
-    setContent((c) => c.substring(0, start) + text + c.substring(end))
-    // Restore cursor position after the inserted text
-    requestAnimationFrame(() => {
-      el.focus()
-      const pos = start + text.length
-      el.setSelectionRange(pos, pos)
-    })
-  }, [])
+  const insertAtCursor = useCallback(
+    (text: string) => {
+      const el = textareaRef.current
+      if (!el) {
+        setContent((c) => c + text)
+        return
+      }
+      const start = el.selectionStart
+      const end = el.selectionEnd
+      setContent((c) => c.substring(0, start) + text + c.substring(end))
+      // Restore cursor position after the inserted text
+      requestAnimationFrame(() => {
+        el.focus()
+        const pos = start + text.length
+        el.setSelectionRange(pos, pos)
+      })
+    },
+    [setContent],
+  )
 
   const toggleExclude = useSetToggle(setExcludeIds)
   const toggleIndividual = useSetToggle(setSelectedIndividualIds)
@@ -400,7 +403,7 @@ export function MessageComposePage() {
         excludeSearchRef.current?.focus()
       }
     },
-    [excludeResults, excludeHighlight],
+    [excludeResults, excludeHighlight, setExcludeHighlight, setExcludeIds, setExcludeSearch],
   )
 
   const individualResults = useMemo(() => {
@@ -434,7 +437,7 @@ export function MessageComposePage() {
         individualSearchRef.current?.focus()
       }
     },
-    [individualResults, individualHighlight],
+    [individualResults, individualHighlight, setIndividualHighlight, setSelectedIndividualIds, setIndividualSearch],
   )
 
   // Auto-resolved values from the attached RSVP list. eventDate/eventTime get
@@ -876,7 +879,9 @@ export function MessageComposePage() {
           {rsvpContext && (
             <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
               <div className="flex items-center gap-2 min-w-0">
-                <Badge variant="secondary" className="shrink-0">RSVP</Badge>
+                <Badge variant="secondary" className="shrink-0">
+                  RSVP
+                </Badge>
                 <span className="truncate">
                   Sending for: <span className="font-medium">{rsvpContext.eventTitle}</span>
                   {rsvpContext.eventDate && <span className="text-muted-foreground"> ({rsvpContext.eventDate})</span>}
@@ -1196,6 +1201,7 @@ export function MessageComposePage() {
                   <div className="space-y-2">
                     <Label>Send Date and Time</Label>
                     <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
+                    {/* eslint-disable-next-line react-hooks/purity */}
                     {scheduledAt && new Date(scheduledAt).getTime() <= Date.now() && (
                       <p className="text-xs text-destructive">Scheduled time must be in the future</p>
                     )}
@@ -1244,6 +1250,7 @@ export function MessageComposePage() {
                   sendMutation.isPending ||
                   recipients.length === 0 ||
                   !content.trim() ||
+                  // eslint-disable-next-line react-hooks/purity
                   (sendTimeMode === 'schedule' && !!scheduledAt && new Date(scheduledAt).getTime() <= Date.now())
                 }
               >
@@ -1380,18 +1387,15 @@ export function MessageComposePage() {
           </div>
         </div>
       </ConfirmDialog>
-      <Dialog
-        open={missingRsvpDialog.open}
-        onOpenChange={(open) => setMissingRsvpDialog((d) => ({...d, open}))}
-      >
+      <Dialog open={missingRsvpDialog.open} onOpenChange={(open) => setMissingRsvpDialog((d) => ({...d, open}))}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Some recipients aren&apos;t on this RSVP list</DialogTitle>
           </DialogHeader>
           <p className="text-sm">
             <span className="font-medium">{missingRsvpDialog.missingPersonIds.length}</span> of your{' '}
-            {allRecipientIds.length} recipients aren&apos;t on this RSVP list, so their{' '}
-            <code>{'{{rsvpLink}}'}</code> will be blank.
+            {allRecipientIds.length} recipients aren&apos;t on this RSVP list, so their <code>{'{{rsvpLink}}'}</code>{' '}
+            will be blank.
           </p>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setMissingRsvpDialog({open: false, missingPersonIds: []})}>

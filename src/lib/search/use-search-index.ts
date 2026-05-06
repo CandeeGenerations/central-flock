@@ -3,7 +3,7 @@ import {providers} from '@/lib/search/providers'
 import type {SearchItem} from '@/lib/search/registry'
 import {useTheme} from '@/lib/theme-context'
 import {useQueries} from '@tanstack/react-query'
-import {useMemo} from 'react'
+import {useMemo, useState} from 'react'
 
 const DEFAULT_STALE_TIME = 5 * 60 * 1000
 
@@ -33,10 +33,16 @@ export function useSearchIndex(enabled: boolean): SearchIndex {
 
   const actions = useMemo(() => buildAllActions({toggleDark}), [toggleDark])
 
-  // `useQueries` returns a new `results` array on every render, so we depend on the
-  // individual `data` references (which are stable until a query refetches). Without
-  // this, `items`/`fuse` would rebuild on every keystroke and cause typing lag.
-  const dataDeps = results.map((r) => r.data)
+  // `useQueries` returns a new `results` array on every render, so we keep a stable
+  // tuple of `data` references in state and only update it when an element reference
+  // actually changes. Without this, `items`/`fuse` would rebuild on every keystroke
+  // and cause typing lag. This uses the React-recommended "adjust state during
+  // render" pattern (https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  const nextData = results.map((r) => r.data)
+  const [dataDeps, setDataDeps] = useState<unknown[]>(nextData)
+  if (dataDeps.length !== nextData.length || dataDeps.some((d, i) => d !== nextData[i])) {
+    setDataDeps(nextData)
+  }
 
   const {items, itemsByGroup} = useMemo(() => {
     const byGroup = new Map<string, SearchItem[]>()
@@ -58,8 +64,7 @@ export function useSearchIndex(enabled: boolean): SearchIndex {
     }
 
     return {items: all, itemsByGroup: byGroup}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions, ...dataDeps])
+  }, [actions, dataDeps])
 
   return {
     items,

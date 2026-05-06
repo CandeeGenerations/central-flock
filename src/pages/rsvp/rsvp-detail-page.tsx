@@ -170,9 +170,8 @@ export function RsvpDetailPage() {
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/rsvp')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            All RSVPs
+          <Button variant="ghost" size="sm" onClick={() => navigate('/rsvp')} aria-label="Back to RSVPs">
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <h2 className="text-2xl font-bold">{list.name}</h2>
         </div>
@@ -209,19 +208,19 @@ export function RsvpDetailPage() {
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <span>
-              <span className="font-medium text-emerald-700 dark:text-emerald-400">Yes</span> {list.counts.yes}
+              <span className="font-medium text-emerald-700 dark:text-emerald-400">Yes:</span> {list.counts.yes}
             </span>
             <span>
-              <span className="font-medium text-rose-700 dark:text-rose-400">No</span> {list.counts.no}
+              <span className="font-medium text-rose-700 dark:text-rose-400">No:</span> {list.counts.no}
             </span>
             <span>
-              <span className="font-medium text-amber-700 dark:text-amber-400">Maybe</span> {list.counts.maybe}
+              <span className="font-medium text-amber-700 dark:text-amber-400">Maybe:</span> {list.counts.maybe}
             </span>
             <span>
-              <span className="font-medium text-muted-foreground">No Response</span> {list.counts.no_response}
+              <span className="font-medium text-muted-foreground">No Response:</span> {list.counts.no_response}
             </span>
             <span>
-              <span className="font-medium">Total</span> {list.counts.total}
+              <span className="font-medium">Total:</span> {list.counts.total}
             </span>
           </div>
           <div className="text-sm">

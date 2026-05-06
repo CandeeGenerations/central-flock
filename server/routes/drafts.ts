@@ -135,7 +135,8 @@ draftsRouter.get(
         }
 
         // Per-recipient RSVP link substitution for the preview only.
-        const linkMap = draft.rsvpListId && samplePerson.id ? buildRsvpLinkMap(draft.rsvpListId, [samplePerson.id]) : null
+        const linkMap =
+          draft.rsvpListId && samplePerson.id ? buildRsvpLinkMap(draft.rsvpListId, [samplePerson.id]) : null
         renderedPreview = renderTemplate(
           draft.content,
           samplePerson,

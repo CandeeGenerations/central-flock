@@ -1,7 +1,6 @@
-import {randomBytes} from 'node:crypto'
-
 import {and, eq, inArray, sql} from 'drizzle-orm'
 import {Router} from 'express'
+import {randomBytes} from 'node:crypto'
 
 import {db, schema, sqlite} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
@@ -547,6 +546,7 @@ rsvpRouter.get(
         and(
           sql`substr(${schema.calendarEvents.startDate}, 1, 10) >= ${today}`,
           sql`substr(${schema.calendarEvents.startDate}, 1, 10) <= ${future}`,
+          eq(schema.calendarEvents.recurring, false),
         ),
       )
       .orderBy(schema.calendarEvents.startDate)

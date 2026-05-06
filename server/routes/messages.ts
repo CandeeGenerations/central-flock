@@ -55,7 +55,12 @@ messagesRouter.post(
     const activeRecipients = recipients.filter((r) => !excludeSet.has(r.id) && r.status === 'active')
     const skippedRecipients = recipients.filter((r) => excludeSet.has(r.id) || r.status !== 'active')
 
-    const linkMap = rsvpListId ? buildRsvpLinkMap(rsvpListId, recipients.map((r) => r.id)) : null
+    const linkMap = rsvpListId
+      ? buildRsvpLinkMap(
+          rsvpListId,
+          recipients.map((r) => r.id),
+        )
+      : null
 
     // Determine if this is a scheduled send
     let scheduledAtUtc: string | null = null
@@ -332,7 +337,12 @@ messagesRouter.put(
     const activeRecipients = recipients.filter((r) => !excludeSet.has(r.id) && r.status === 'active')
     const skippedRecipients = recipients.filter((r) => excludeSet.has(r.id) || r.status !== 'active')
 
-    const linkMap = rsvpListId ? buildRsvpLinkMap(rsvpListId, recipients.map((r) => r.id)) : null
+    const linkMap = rsvpListId
+      ? buildRsvpLinkMap(
+          rsvpListId,
+          recipients.map((r) => r.id),
+        )
+      : null
 
     // Determine if this is a scheduled send
     let scheduledAtUtc: string | null = null

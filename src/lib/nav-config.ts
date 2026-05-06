@@ -11,7 +11,6 @@ import {
   List,
   MessageSquare,
   Music,
-  NotebookText,
   Printer,
   Quote,
   Scissors,
@@ -93,12 +92,6 @@ export const navGroups: NavGroup[] = [
       {to: '/sermons/hymns/searches', label: 'Hymn History', icon: History},
       {to: '/sermons/verse-strips', label: 'Verse Strips', icon: Scissors},
     ],
-  },
-  {
-    id: 'notion',
-    label: 'Notion',
-    icon: NotebookText,
-    children: [{to: '/notion', label: 'Notes', icon: NotebookText}],
   },
   {
     id: 'calendar',

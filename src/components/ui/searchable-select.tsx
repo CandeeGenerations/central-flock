@@ -104,6 +104,7 @@ export function SearchableSelect({
       </PopoverTrigger>
       <PopoverContent
         align="start"
+        usePortal={false}
         className="w-(--radix-popover-trigger-width) gap-0 overflow-hidden p-0 relative bg-popover/70 before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
@@ -119,15 +120,7 @@ export function SearchableSelect({
             />
           </div>
         )}
-        <div
-          ref={listRef}
-          className="max-h-60 overflow-y-auto overscroll-contain p-1.5"
-          onWheel={(e) => {
-            // Inside a scroll-locked Dialog, Radix's RemoveScroll prevents wheel default at
-            // capture phase — manually advance scrollTop so the popover list still scrolls.
-            if (e.defaultPrevented) e.currentTarget.scrollTop += e.deltaY
-          }}
-        >
+        <div ref={listRef} className="max-h-60 overflow-y-auto overscroll-contain p-1.5">
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">No results</p>
           ) : (

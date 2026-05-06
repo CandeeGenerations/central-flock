@@ -1,0 +1,1 @@
+ALTER TABLE `rsvp_lists` ADD `standalone_end_time` text;

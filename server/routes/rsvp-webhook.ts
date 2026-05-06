@@ -14,6 +14,7 @@ type GetResponse = {
   eventTitle: string
   eventDate: string | null
   eventTime: string | null
+  eventEndTime: string | null
   status: Status
   headcount: number | null
   note: string | null
@@ -38,7 +39,9 @@ function loadEntryByToken(token: string) {
       listName: schema.rsvpLists.name,
       standaloneDate: schema.rsvpLists.standaloneDate,
       standaloneTime: schema.rsvpLists.standaloneTime,
+      standaloneEndTime: schema.rsvpLists.standaloneEndTime,
       calendarEventStartDate: schema.calendarEvents.startDate,
+      calendarEventEndDate: schema.calendarEvents.endDate,
     })
     .from(schema.rsvpEntries)
     .innerJoin(schema.people, eq(schema.rsvpEntries.personId, schema.people.id))
@@ -49,18 +52,25 @@ function loadEntryByToken(token: string) {
 }
 
 function buildResponse(entry: NonNullable<ReturnType<typeof loadEntryByToken>>): GetResponse {
-  const eventDate = entry.calendarEventStartDate?.slice(0, 10) ?? entry.standaloneDate ?? null
-  const eventTime = entry.calendarEventStartDate
-    ? entry.calendarEventStartDate.length >= 16
+  // Standalone fields act as overrides; fall back to the linked calendar event.
+  const eventDate = entry.standaloneDate ?? entry.calendarEventStartDate?.slice(0, 10) ?? null
+  const eventTime =
+    entry.standaloneTime ??
+    (entry.calendarEventStartDate && entry.calendarEventStartDate.length >= 16
       ? entry.calendarEventStartDate.slice(11, 16)
-      : null
-    : (entry.standaloneTime ?? null)
+      : null)
+  const eventEndTime =
+    entry.standaloneEndTime ??
+    (entry.calendarEventEndDate && entry.calendarEventEndDate.length >= 16
+      ? entry.calendarEventEndDate.slice(11, 16)
+      : null)
   const isPast = eventDate ? eventDate < todayIso() : false
   return {
     personFirstName: entry.personFirstName,
     eventTitle: entry.listName,
     eventDate,
     eventTime,
+    eventEndTime,
     status: entry.status as Status,
     headcount: entry.headcount,
     note: entry.note,

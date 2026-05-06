@@ -35,10 +35,12 @@ export interface RsvpListSummary {
   standaloneTitle: string | null
   standaloneDate: string | null
   standaloneTime: string | null
+  standaloneEndTime: string | null
   createdAt: string
   updatedAt: string
   calendarEventTitle: string | null
   calendarEventStartDate: string | null
+  calendarEventEndDate: string | null
   calendarEventLocation: string | null
   effectiveDate: string | null
   counts: RsvpCounts
@@ -52,6 +54,7 @@ export interface RsvpEntry {
   headcount: number | null
   note: string | null
   respondedAt: string | null
+  publicToken: string | null
   createdAt: string
   updatedAt: string
   firstName: string | null
@@ -63,6 +66,7 @@ export interface RsvpEntry {
 export interface RsvpListDetail extends Omit<RsvpListSummary, 'counts'> {
   entries: RsvpEntry[]
   counts: RsvpCounts
+  rsvpPublicUrlBase: string
 }
 
 export interface RsvpCalendarEvent {
@@ -82,6 +86,7 @@ export interface CreateRsvpListBody {
   standaloneTitle?: string | null
   standaloneDate?: string | null
   standaloneTime?: string | null
+  standaloneEndTime?: string | null
   seedGroupIds?: number[]
   seedPersonIds?: number[]
 }
@@ -92,6 +97,7 @@ export interface UpdateRsvpListBody {
   standaloneTitle?: string | null
   standaloneDate?: string | null
   standaloneTime?: string | null
+  standaloneEndTime?: string | null
 }
 
 export interface UpdateRsvpEntryBody {
@@ -186,6 +192,7 @@ export interface RsvpListContext {
   eventTitle: string
   eventDate: string | null
   eventTime: string | null
+  eventEndTime: string | null
   firstEntryPublicToken: string | null
   rsvpPublicUrlBase: string
   missingEntryCount: number

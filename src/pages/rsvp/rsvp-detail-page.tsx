@@ -24,7 +24,7 @@ import {
   updateRsvpEntry,
 } from '@/lib/rsvp-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Pencil, Send, Trash2, UserPlus, X} from 'lucide-react'
+import {ArrowLeft, Link2, Pencil, Send, Trash2, UserPlus, X} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -113,17 +113,47 @@ export function RsvpDetailPage() {
   }
 
   const eventDate = list.effectiveDate
-  const eventTime = list.calendarEventId ? null : list.standaloneTime
-  const headlineTime =
-    list.calendarEventId && list.calendarEventStartDate
-      ? (() => {
-          try {
-            return formatDateTime(list.calendarEventStartDate)
-          } catch {
-            return null
-          }
-        })()
-      : null
+  // Standalone fields act as overrides on top of the linked calendar event.
+  const eventTime =
+    list.standaloneTime ??
+    (list.calendarEventStartDate && list.calendarEventStartDate.length >= 16
+      ? list.calendarEventStartDate.slice(11, 16)
+      : null)
+  const eventEndTime =
+    list.standaloneEndTime ??
+    (list.calendarEventEndDate && list.calendarEventEndDate.length >= 16
+      ? list.calendarEventEndDate.slice(11, 16)
+      : null)
+  const formatHHmm = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number)
+    if (Number.isNaN(h) || Number.isNaN(m)) return hhmm
+    const period = h >= 12 ? 'PM' : 'AM'
+    const hr = ((h + 11) % 12) + 1
+    return `${hr}:${String(m).padStart(2, '0')} ${period}`
+  }
+  const headlineTime = (() => {
+    if (list.standaloneDate) {
+      try {
+        const startStr = list.standaloneTime
+          ? formatDateTime(`${list.standaloneDate}T${list.standaloneTime}:00`)
+          : formatDate(list.standaloneDate)
+        return list.standaloneTime && list.standaloneEndTime
+          ? `${startStr} – ${formatHHmm(list.standaloneEndTime)}`
+          : startStr
+      } catch {
+        return null
+      }
+    }
+    if (list.calendarEventId && list.calendarEventStartDate) {
+      try {
+        const startStr = formatDateTime(list.calendarEventStartDate)
+        return eventEndTime ? `${startStr} – ${formatHHmm(eventEndTime)}` : startStr
+      } catch {
+        return null
+      }
+    }
+    return null
+  })()
   const responded = list.counts.total - list.counts.no_response
   const responseRate = list.counts.total > 0 ? Math.round((responded / list.counts.total) * 100) : 0
 
@@ -146,6 +176,15 @@ export function RsvpDetailPage() {
         content: 'Hey {{firstName}}, RSVP for {{eventTitle}} on {{eventDate}}: {{rsvpLink}}',
       },
     })
+  }
+
+  const copyInviteLink = (entry: RsvpEntry) => {
+    if (!entry.publicToken || !list.rsvpPublicUrlBase) return
+    const url = `${list.rsvpPublicUrlBase}/r/${entry.publicToken}`
+    navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success('Invite link copied'))
+      .catch(() => toast.error('Failed to copy'))
   }
 
   const allFilteredSelected = filteredEntries.length > 0 && filteredEntries.every((e) => selectedIds.has(e.id))
@@ -203,7 +242,7 @@ export function RsvpDetailPage() {
         <CardContent className="space-y-1">
           <div className="text-sm text-muted-foreground">
             {headlineTime ? headlineTime : eventDate ? formatDate(eventDate) : 'No date set'}
-            {eventTime && ` · ${eventTime}`}
+            {!headlineTime && eventTime && ` · ${eventTime}`}
             {list.calendarEventLocation && ` · ${list.calendarEventLocation}`}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -289,7 +328,7 @@ export function RsvpDetailPage() {
                 <TableHead className="w-24 text-center">Headcount</TableHead>
                 <TableHead>Note</TableHead>
                 <TableHead className="w-40">Responded</TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -343,13 +382,30 @@ export function RsvpDetailPage() {
                     {entry.respondedAt ? formatDateTime(entry.respondedAt) : '—'}
                   </TableCell>
                   <TableCell>
-                    <button
-                      type="button"
-                      className="p-1 rounded hover:bg-muted cursor-pointer"
-                      onClick={() => setEditingEntry(entry)}
-                    >
-                      <Pencil className="h-4 w-4 text-muted-foreground" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="p-1 rounded hover:bg-muted cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        onClick={() => copyInviteLink(entry)}
+                        disabled={!entry.publicToken || !list.rsvpPublicUrlBase}
+                        title={
+                          !list.rsvpPublicUrlBase
+                            ? 'RSVP_PUBLIC_URL_BASE not configured'
+                            : !entry.publicToken
+                              ? 'No public token'
+                              : 'Copy invite link'
+                        }
+                      >
+                        <Link2 className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                      <button
+                        type="button"
+                        className="p-1 rounded hover:bg-muted cursor-pointer"
+                        onClick={() => setEditingEntry(entry)}
+                      >
+                        <Pencil className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

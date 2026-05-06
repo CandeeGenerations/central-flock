@@ -26,6 +26,7 @@ export function MultiSelect({
   const [search, setSearch] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   const filtered = search ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase())) : options
   const valueSet = new Set(value)
@@ -92,6 +93,7 @@ export function MultiSelect({
       </PopoverTrigger>
       <PopoverContent
         align="start"
+        usePortal={false}
         className="w-(--radix-popover-trigger-width) gap-0 overflow-hidden p-0 relative bg-popover/70 before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
@@ -124,12 +126,7 @@ export function MultiSelect({
             Clear
           </button>
         </div>
-        <div
-          className="max-h-60 overflow-y-auto overscroll-contain p-1.5"
-          onWheel={(e) => {
-            if (e.defaultPrevented) e.currentTarget.scrollTop += e.deltaY
-          }}
-        >
+        <div ref={listRef} className="max-h-60 overflow-y-auto overscroll-contain p-1.5">
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">No results</p>
           ) : (

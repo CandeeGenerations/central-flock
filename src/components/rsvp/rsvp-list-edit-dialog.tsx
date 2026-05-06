@@ -5,7 +5,7 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
-import {formatDate} from '@/lib/date'
+import {formatDate, formatDateTime} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {type RsvpListDetail, fetchRsvpCalendarEvents, updateRsvpList} from '@/lib/rsvp-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
@@ -23,7 +23,7 @@ type Mode = 'calendar' | 'standalone'
 export function RsvpListEditDialog({open, onOpenChange, list}: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Edit RSVP List</DialogTitle>
         </DialogHeader>
@@ -42,6 +42,7 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
   )
   const [standaloneDate, setStandaloneDate] = useState(list.standaloneDate || '')
   const [standaloneTime, setStandaloneTime] = useState(list.standaloneTime || '')
+  const [standaloneEndTime, setStandaloneEndTime] = useState(list.standaloneEndTime || '')
 
   const {data: calendarEvents} = useQuery({
     queryKey: queryKeys.rsvpCalendarEvents,
@@ -49,22 +50,38 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
     enabled: mode === 'calendar',
   })
 
+  // When the user picks a different calendar event, repopulate date/time from that event
+  // (user can then override). Initial mount keeps the persisted override values.
+  const [lastSyncedEventId, setLastSyncedEventId] = useState(calendarEventId)
+  if (mode === 'calendar' && calendarEventId !== lastSyncedEventId && calendarEvents) {
+    setLastSyncedEventId(calendarEventId)
+    const ev = calendarEvents.find((e) => e.id === Number(calendarEventId))
+    if (ev) {
+      setStandaloneDate(ev.startDate.slice(0, 10))
+      setStandaloneTime(!ev.allDay && ev.startDate.length >= 16 ? ev.startDate.slice(11, 16) : '')
+      setStandaloneEndTime(!ev.allDay && ev.endDate && ev.endDate.length >= 16 ? ev.endDate.slice(11, 16) : '')
+    }
+  }
+
   // Synthesize an option for the currently-linked event so the picker shows it
   // even before the fetch resolves, or when the event is filtered out (past date,
   // recurring, or beyond the 180-day window).
   const eventOptions = (() => {
+    const fmt = (ev: {startDate: string; allDay: boolean}) =>
+      ev.allDay ? formatDate(ev.startDate) : formatDateTime(ev.startDate)
     const base = (calendarEvents || []).map((ev) => ({
       value: String(ev.id),
-      label: `${ev.title} — ${formatDate(ev.startDate)}`,
+      label: `${ev.title} — ${fmt(ev)}`,
     }))
     if (
       list.calendarEventId &&
       list.calendarEventTitle &&
       !base.some((o) => o.value === String(list.calendarEventId))
     ) {
+      // Linked event isn't in the fetch result; assume timed (allDay flag not available here).
       base.unshift({
         value: String(list.calendarEventId),
-        label: `${list.calendarEventTitle}${list.calendarEventStartDate ? ` — ${formatDate(list.calendarEventStartDate)}` : ''}`,
+        label: `${list.calendarEventTitle}${list.calendarEventStartDate ? ` — ${formatDateTime(list.calendarEventStartDate)}` : ''}`,
       })
     }
     return base
@@ -76,8 +93,9 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
         name: name.trim(),
         calendarEventId: mode === 'calendar' ? (calendarEventId ? Number(calendarEventId) : null) : null,
         standaloneTitle: mode === 'standalone' ? name.trim() : null,
-        standaloneDate: mode === 'standalone' ? standaloneDate || null : null,
-        standaloneTime: mode === 'standalone' ? standaloneTime || null : null,
+        standaloneDate: standaloneDate || null,
+        standaloneTime: standaloneTime || null,
+        standaloneEndTime: standaloneEndTime || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.rsvpList(list.id)})
@@ -112,24 +130,32 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
               className="w-full"
             />
           </TabsContent>
-          <TabsContent value="standalone" className="space-y-2 mt-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="rsvp-edit-date">Date</Label>
-                <DatePicker value={standaloneDate} onChange={setStandaloneDate} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="rsvp-edit-time">Time (optional)</Label>
-                <Input
-                  id="rsvp-edit-time"
-                  type="time"
-                  value={standaloneTime}
-                  onChange={(e) => setStandaloneTime(e.target.value)}
-                />
-              </div>
-            </div>
-          </TabsContent>
         </Tabs>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-1">
+            <Label htmlFor="rsvp-edit-date">Date{mode === 'calendar' ? ' (override)' : ''}</Label>
+            <DatePicker value={standaloneDate} onChange={setStandaloneDate} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="rsvp-edit-time">Start{mode === 'calendar' ? ' (override)' : ' (optional)'}</Label>
+            <Input
+              id="rsvp-edit-time"
+              type="time"
+              value={standaloneTime}
+              onChange={(e) => setStandaloneTime(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="rsvp-edit-end-time">End{mode === 'calendar' ? ' (override)' : ' (optional)'}</Label>
+            <Input
+              id="rsvp-edit-end-time"
+              type="time"
+              value={standaloneEndTime}
+              onChange={(e) => setStandaloneEndTime(e.target.value)}
+            />
+          </div>
+        </div>
 
         <div className="space-y-1">
           <Label htmlFor="rsvp-edit-name">List name</Label>

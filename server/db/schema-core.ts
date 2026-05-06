@@ -209,6 +209,7 @@ export const rsvpLists = sqliteTable('rsvp_lists', {
   standaloneTitle: text('standalone_title'),
   standaloneDate: text('standalone_date'),
   standaloneTime: text('standalone_time'),
+  standaloneEndTime: text('standalone_end_time'),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

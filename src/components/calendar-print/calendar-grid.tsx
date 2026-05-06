@@ -31,11 +31,79 @@ interface CalendarGridProps {
   month: number // 1-12
   theme: string | null
   themeColor: string | null
+  themePlacement: string | null
+  versePlacement: string | null
   verseText: string | null
   verseReference: string | null
   normalScheduleText: string | null
   defaultSchedule: string
   events: CalendarPrintEvent[]
+}
+
+export const FOOTER_CENTER_PLACEMENT = 'footer-center'
+export const FOOTER_LEFT_PLACEMENT = 'footer-left'
+export const FOOTER_RIGHT_PLACEMENT = 'footer-right'
+export const DEFAULT_PLACEMENT = FOOTER_CENTER_PLACEMENT
+
+export function isFooterPlacement(id: string | null | undefined): boolean {
+  return (
+    id === FOOTER_CENTER_PLACEMENT || id === FOOTER_LEFT_PLACEMENT || id === FOOTER_RIGHT_PLACEMENT || id === 'footer'
+  )
+}
+
+export function footerAlignment(id: string | null | undefined): 'left' | 'center' | 'right' {
+  if (id === FOOTER_LEFT_PLACEMENT) return 'left'
+  if (id === FOOTER_RIGHT_PLACEMENT) return 'right'
+  return 'center'
+}
+
+export interface PlacementOption {
+  id: string // 'footer-center' | 'footer-left' | 'cell:<w>-<c>'
+  label: string
+}
+
+// Returns the list of placement options for a given month: the default footer variants
+// plus every open out-of-month merged cell (excluding the cell that hosts the footer).
+// The cell that hosts the month/year title gets a special "Under Month/Year" label.
+export function getAvailablePlacements(year: number, month: number): PlacementOption[] {
+  const layout = buildLayout(year, month)
+  const renderRows = buildRenderRows(layout)
+  const options: PlacementOption[] = [
+    {id: FOOTER_CENTER_PLACEMENT, label: 'Default — centered text'},
+    {id: FOOTER_LEFT_PLACEMENT, label: 'Default — left text'},
+    {id: FOOTER_RIGHT_PLACEMENT, label: 'Default — right text'},
+  ]
+
+  // Identify which merged-out cell hosts the footer (if footerInTrailing)
+  let footerCellId: string | null = null
+  if (layout.footerInTrailing) {
+    const lastRow = renderRows[layout.weeksNeeded - 1]
+    const last = lastRow[lastRow.length - 1]
+    if (last && last.type !== 'in_month') footerCellId = cellPlacementId(last)
+  }
+
+  // Identify the leading cell (if any) which may host the title
+  const firstRow = renderRows[0]
+  const leadingOut = firstRow[0]?.type === 'merged_out_leading' ? firstRow[0] : null
+  const titleCellId = leadingOut !== null && leadingOut.span >= 2 ? cellPlacementId(leadingOut) : null
+
+  for (const row of renderRows) {
+    for (const rc of row) {
+      if (rc.type === 'in_month') continue
+      const id = cellPlacementId(rc)
+      if (id === footerCellId) continue
+      let label: string
+      if (id === titleCellId) {
+        label = 'Under Month / Year'
+      } else {
+        const first = rc.cells[0].date
+        const last = rc.cells[rc.cells.length - 1].date
+        label = rc.span === 1 ? formatShortDate(first) : `${formatShortDate(first)} – ${formatShortDate(last)}`
+      }
+      options.push({id, label})
+    }
+  }
+  return options
 }
 
 interface CellMeta {
@@ -104,6 +172,15 @@ interface RenderCell {
   cells: CellMeta[]
 }
 
+function cellPlacementId(rc: RenderCell): string {
+  return `cell:${rc.weekIndex}-${rc.colIndex}`
+}
+
+function formatShortDate(d: Date): string {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${months[d.getMonth()]} ${d.getDate()}`
+}
+
 function buildRenderRows(layout: GridLayout): RenderCell[][] {
   const {cells, weeksNeeded} = layout
   const weeks: CellMeta[][] = []
@@ -167,7 +244,9 @@ function eventsByIso(events: CalendarPrintEvent[]): Map<string, CalendarPrintEve
 
 function shouldShowNormalScheduleLabel(dayOfWeek: number, dayEvents: CalendarPrintEvent[]): boolean {
   if (dayOfWeek !== 0 && dayOfWeek !== 3 && dayOfWeek !== 6) return false
-  return !dayEvents.some((e) => e.style === 'no_kaya')
+  if (dayEvents.some((e) => e.style === 'no_kaya')) return false
+  if (dayEvents.some((e) => e.suppressNormalSchedule)) return false
+  return true
 }
 
 function cellIsHighlighted(dayEvents: CalendarPrintEvent[]): boolean {
@@ -244,8 +323,26 @@ interface FooterContentProps {
   accentColor: string
 }
 
-function FooterContent({scheduleText, theme, verseText, verseReference, accentColor}: FooterContentProps) {
+interface FooterContentExtraProps extends FooterContentProps {
+  showThemeInFooter: boolean
+  showVerseInFooter: boolean
+  themeAlign: 'left' | 'center' | 'right'
+  verseAlign: 'left' | 'center' | 'right'
+}
+
+function FooterContent({
+  scheduleText,
+  theme,
+  verseText,
+  verseReference,
+  accentColor,
+  showThemeInFooter,
+  showVerseInFooter,
+  themeAlign,
+  verseAlign,
+}: FooterContentExtraProps) {
   const {col1, col2} = splitScheduleColumns(scheduleText)
+  const hasRightCol = (showThemeInFooter && theme) || (showVerseInFooter && (verseText || verseReference))
   return (
     <div
       style={{
@@ -254,8 +351,8 @@ function FooterContent({scheduleText, theme, verseText, verseReference, accentCo
         padding: '8px 12px',
         boxSizing: 'border-box',
         display: 'grid',
-        gridTemplateColumns: '1fr 1.2fr 1.4fr',
-        columnGap: '16px',
+        gridTemplateColumns: hasRightCol ? 'auto auto 1fr' : 'auto auto 1fr',
+        columnGap: '24px',
         fontFamily: 'Montserrat, sans-serif',
         fontSize: '10px',
         color: '#000',
@@ -279,27 +376,36 @@ function FooterContent({scheduleText, theme, verseText, verseReference, accentCo
       <div style={{paddingTop: '20px', textAlign: 'left'}}>
         <ScheduleColumn lines={col2} />
       </div>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'flex-end',
-          textAlign: 'right',
-          fontFamily: '"DM Serif Display", serif',
-          fontStyle: 'italic',
-          color: accentColor,
-          gap: '4px',
-        }}
-      >
-        {theme && <div style={{fontSize: '14px', lineHeight: 1.2, whiteSpace: 'pre-wrap'}}>{theme}</div>}
-        {verseText && (
-          <div style={{fontSize: '12px', lineHeight: 1.3, whiteSpace: 'pre-wrap'}}>&ldquo;{verseText}&rdquo;</div>
-        )}
-        {verseReference && (
-          <div style={{fontSize: '12px', lineHeight: 1.3, whiteSpace: 'pre-wrap'}}>{verseReference}</div>
-        )}
-      </div>
+      {hasRightCol && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'stretch',
+            fontFamily: '"DM Serif Display", serif',
+            fontStyle: 'italic',
+            color: accentColor,
+            gap: '4px',
+          }}
+        >
+          {showThemeInFooter && theme && (
+            <div style={{fontSize: '14px', lineHeight: 1.2, whiteSpace: 'pre-wrap', textAlign: themeAlign}}>
+              {theme}
+            </div>
+          )}
+          {showVerseInFooter && verseText && (
+            <div style={{fontSize: '12px', lineHeight: 1.3, whiteSpace: 'pre-wrap', textAlign: verseAlign}}>
+              &ldquo;{verseText}&rdquo;
+            </div>
+          )}
+          {showVerseInFooter && verseReference && (
+            <div style={{fontSize: '12px', lineHeight: 1.3, whiteSpace: 'pre-wrap', textAlign: verseAlign}}>
+              {verseReference}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -318,8 +424,8 @@ function InMonthCell({cell, dayEvents, showNormalSchedule, isLastRowInMonth, isL
   const cellTextColor = highlight ? HIGHLIGHT_PINK : '#000'
 
   const cellStyle: CSSProperties = {
-    borderRight: isLastColInMonth ? 'none' : '2pt solid #000',
-    borderBottom: isLastRowInMonth ? 'none' : '2pt solid #000',
+    borderRight: isLastColInMonth ? 'none' : '1pt solid #000',
+    borderBottom: isLastRowInMonth ? 'none' : '1pt solid #000',
     padding: '6px 8px',
     minHeight: 0,
     overflow: 'hidden',
@@ -421,29 +527,17 @@ function InMonthCell({cell, dayEvents, showNormalSchedule, isLastRowInMonth, isL
 
 interface MergedOutCellProps {
   rc: RenderCell
-  outOfMonthEventsByIso: Map<string, CalendarPrintEvent[]>
-  monthYearOverlay: ReactNode | null
+  cellContent: ReactNode | null
   footerOverlay: ReactNode | null
   isLastRowInMonth: boolean
   isLastColInMonth: boolean
-  hideEvents?: boolean
 }
 
-function MergedOutCell({
-  rc,
-  outOfMonthEventsByIso,
-  monthYearOverlay,
-  footerOverlay,
-  isLastRowInMonth,
-  isLastColInMonth,
-  hideEvents = false,
-}: MergedOutCellProps) {
-  const allEvents = hideEvents ? [] : rc.cells.flatMap((c) => outOfMonthEventsByIso.get(c.iso) ?? [])
-
+function MergedOutCell({rc, cellContent, footerOverlay, isLastRowInMonth, isLastColInMonth}: MergedOutCellProps) {
   const cellStyle: CSSProperties = {
     gridColumn: `span ${rc.span}`,
-    borderRight: isLastColInMonth ? 'none' : '2pt solid #000',
-    borderBottom: isLastRowInMonth ? 'none' : '2pt solid #000',
+    borderRight: isLastColInMonth ? 'none' : '1pt solid #000',
+    borderBottom: isLastRowInMonth ? 'none' : '1pt solid #000',
     overflow: 'hidden',
     fontFamily: 'Montserrat, sans-serif',
     color: '#000',
@@ -454,42 +548,8 @@ function MergedOutCell({
 
   return (
     <div style={cellStyle}>
-      {monthYearOverlay}
+      {cellContent}
       {footerOverlay}
-      {allEvents.length > 0 && !footerOverlay && (
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '2px',
-            marginTop: 'auto',
-            alignItems: 'flex-end',
-            textAlign: 'right',
-            padding: '6px 8px',
-          }}
-        >
-          {allEvents.map((event) => (
-            <div
-              key={event.id}
-              style={{
-                fontWeight: event.style === 'bold' || event.style === 'no_kaya' ? 700 : 500,
-                fontStyle: event.style === 'no_kaya' ? 'italic' : 'normal',
-                fontSize: '11px',
-                lineHeight: 1.15,
-                color: event.style === 'bold' || event.style === 'no_kaya' ? HIGHLIGHT_PINK : '#000',
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              <span style={{fontWeight: 500, color: '#999', marginRight: '4px'}}>
-                {event.date.slice(5).replace('-', '/')}
-              </span>
-              {event.title}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -499,6 +559,8 @@ export function CalendarGrid({
   month,
   theme,
   themeColor,
+  themePlacement,
+  versePlacement,
   verseText,
   verseReference,
   normalScheduleText,
@@ -512,12 +574,10 @@ export function CalendarGrid({
   const allEventsByIso = eventsByIso(events)
 
   const inMonthEventsByIso = new Map<string, CalendarPrintEvent[]>()
-  const outOfMonthEventsByIso = new Map<string, CalendarPrintEvent[]>()
   for (const cell of layout.cells) {
+    if (!cell.isInMonth) continue
     const list = allEventsByIso.get(cell.iso)
-    if (!list) continue
-    if (cell.isInMonth) inMonthEventsByIso.set(cell.iso, list)
-    else outOfMonthEventsByIso.set(cell.iso, list)
+    if (list) inMonthEventsByIso.set(cell.iso, list)
   }
 
   // Title placement
@@ -529,52 +589,9 @@ export function CalendarGrid({
 
   const monthName = MONTH_NAMES[month - 1]
 
-  const titleOverlayHorizontal = (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: '"DM Serif Display", serif',
-        fontSize: '52px',
-        lineHeight: 1,
-        fontWeight: 700,
-        fontStyle: 'italic',
-        color: accentColor,
-        zIndex: 1,
-        pointerEvents: 'none',
-        textAlign: 'center',
-      }}
-    >
-      {`${monthName} ${year}`}
-    </div>
-  )
-
-  const titleOverlayStacked = (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'column',
-        fontFamily: '"DM Serif Display", serif',
-        lineHeight: 1.05,
-        fontWeight: 700,
-        fontStyle: 'italic',
-        color: accentColor,
-        zIndex: 1,
-        pointerEvents: 'none',
-        textAlign: 'center',
-      }}
-    >
-      <div style={{fontSize: '34px'}}>{monthName}</div>
-      <div style={{fontSize: '34px'}}>{year}</div>
-    </div>
-  )
+  // Resolve placements; null falls back to default.
+  const effThemePlacement = themePlacement || DEFAULT_PLACEMENT
+  const effVersePlacement = versePlacement || DEFAULT_PLACEMENT
 
   // Footer placement
   const scheduleText = (normalScheduleText && normalScheduleText.trim()) || defaultSchedule
@@ -585,9 +602,117 @@ export function CalendarGrid({
       verseText={verseText}
       verseReference={verseReference}
       accentColor={accentColor}
+      showThemeInFooter={isFooterPlacement(effThemePlacement)}
+      showVerseInFooter={isFooterPlacement(effVersePlacement)}
+      themeAlign={footerAlignment(effThemePlacement)}
+      verseAlign={footerAlignment(effVersePlacement)}
     />
   )
   const footerWrapper = <div style={{position: 'absolute', inset: 0, zIndex: 2, display: 'flex'}}>{footerNode}</div>
+
+  const titleHorizontalInline = (
+    <div
+      style={{
+        fontFamily: '"DM Serif Display", serif',
+        fontSize: '52px',
+        lineHeight: 1.25,
+        fontWeight: 400,
+        fontStyle: 'italic',
+        textAlign: 'center',
+        color: accentColor,
+      }}
+    >
+      {`${monthName} ${year}`}
+    </div>
+  )
+
+  const titleStackedInline = (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        fontFamily: '"DM Serif Display", serif',
+        lineHeight: 1.2,
+        fontWeight: 400,
+        fontStyle: 'italic',
+        color: accentColor,
+        textAlign: 'center',
+      }}
+    >
+      <div style={{fontSize: '34px'}}>{monthName}</div>
+      <div style={{fontSize: '34px'}}>{year}</div>
+    </div>
+  )
+
+  const themeNode = theme ? (
+    <div
+      style={{
+        fontFamily: '"DM Serif Display", serif',
+        fontStyle: 'italic',
+        fontSize: '14px',
+        lineHeight: 1.25,
+        color: accentColor,
+        textAlign: 'center',
+        whiteSpace: 'pre-wrap',
+        padding: '0 8px',
+      }}
+    >
+      {theme}
+    </div>
+  ) : null
+
+  const verseNode =
+    verseText || verseReference ? (
+      <div
+        style={{
+          fontFamily: '"DM Serif Display", serif',
+          fontStyle: 'italic',
+          fontSize: '12px',
+          lineHeight: 1.3,
+          color: accentColor,
+          textAlign: 'center',
+          padding: '0 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2px',
+        }}
+      >
+        {verseText && <div style={{whiteSpace: 'pre-wrap'}}>&ldquo;{verseText}&rdquo;</div>}
+        {verseReference && <div style={{whiteSpace: 'pre-wrap'}}>{verseReference}</div>}
+      </div>
+    ) : null
+
+  // For each merged_out cell, pre-compute whether it hosts the title and/or theme/verse content.
+  const buildCellContent = (rc: RenderCell): ReactNode | null => {
+    const id = cellPlacementId(rc)
+    const isLeading = rc.weekIndex === 0 && rc.colIndex === 0
+    const titleHere = isLeading && (titleHorizontal || titleStacked)
+    const themeHere = effThemePlacement === id && !!themeNode
+    const verseHere = effVersePlacement === id && !!verseNode
+    if (!titleHere && !themeHere && !verseHere) return null
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          padding: '8px',
+          zIndex: 1,
+          pointerEvents: 'none',
+          textAlign: 'center',
+        }}
+      >
+        {titleHere && (titleStacked ? titleStackedInline : titleHorizontalInline)}
+        {themeHere && themeNode}
+        {verseHere && verseNode}
+      </div>
+    )
+  }
 
   const isCellLastCol = (rc: RenderCell) => rc.colIndex + rc.span - 1 === 6
   const lastInMonthRowIndex = layout.weeksNeeded - 1
@@ -632,13 +757,15 @@ export function CalendarGrid({
   const grid = (
     <div
       style={{
-        border: '4pt solid #000',
+        border: '2pt solid #000',
         borderRadius: '12px',
         overflow: 'hidden',
         flex: 1,
         display: 'grid',
         gridTemplateColumns: 'repeat(7, 1fr)',
-        gridTemplateRows: `repeat(${totalRowsRendered}, 1fr)`,
+        gridTemplateRows: layout.footerInTrailing
+          ? `repeat(${totalRowsRendered}, 1fr)`
+          : `repeat(${layout.weeksNeeded}, 1fr) auto`,
       }}
     >
       {renderRows.map((row) =>
@@ -660,26 +787,17 @@ export function CalendarGrid({
               />
             )
           }
-          const isLeadingOut = rc.weekIndex === 0 && rc.colIndex === 0
-          const overlay = isLeadingOut
-            ? titleHorizontal
-              ? titleOverlayHorizontal
-              : titleStacked
-                ? titleOverlayStacked
-                : null
-            : null
           const cellKey = `${rc.weekIndex}-${rc.colIndex}-out`
           const footerHere = trailingFooterCellKey === cellKey ? footerWrapper : null
+          const content = footerHere ? null : buildCellContent(rc)
           return (
             <MergedOutCell
               key={cellKey}
               rc={rc}
-              outOfMonthEventsByIso={outOfMonthEventsByIso}
-              monthYearOverlay={overlay}
+              cellContent={content}
               footerOverlay={footerHere}
               isLastRowInMonth={isLastRendered}
               isLastColInMonth={lastCol}
-              hideEvents={!!footerHere}
             />
           )
         }),
@@ -717,9 +835,9 @@ export function CalendarGrid({
           style={{
             fontFamily: '"DM Serif Display", serif',
             fontSize: '40px',
-            fontWeight: 700,
+            fontWeight: 400,
             fontStyle: 'italic',
-            lineHeight: 1,
+            lineHeight: 1.25,
             color: accentColor,
             marginBottom: '8px',
             textAlign: 'center',

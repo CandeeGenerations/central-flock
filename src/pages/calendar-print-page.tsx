@@ -1,4 +1,10 @@
-import {CalendarGrid, PAGE_HEIGHT, PAGE_WIDTH} from '@/components/calendar-print/calendar-grid'
+import {
+  CalendarGrid,
+  DEFAULT_PLACEMENT,
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+  getAvailablePlacements,
+} from '@/components/calendar-print/calendar-grid'
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -7,6 +13,7 @@ import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
 import type {CalendarPrintEvent, CalendarPrintEventStyle, CalendarPrintPage} from '@/lib/api'
@@ -46,6 +53,7 @@ interface EventFormState {
   date: string
   title: string
   style: CalendarPrintEventStyle
+  suppressNormalSchedule: boolean
 }
 
 const styleOptions: {value: CalendarPrintEventStyle; label: string; description: string}[] = [
@@ -278,9 +286,13 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
   // remounts on month change and these initializers re-run.
   const [theme, setTheme] = useState(page.theme ?? '')
   const [themeColor, setThemeColor] = useState(page.themeColor ?? '')
+  const [themePlacement, setThemePlacement] = useState(page.themePlacement ?? DEFAULT_PLACEMENT)
+  const [versePlacement, setVersePlacement] = useState(page.versePlacement ?? DEFAULT_PLACEMENT)
   const [verseText, setVerseText] = useState(page.verseText ?? '')
   const [verseReference, setVerseReference] = useState(page.verseReference ?? '')
   const [normalScheduleText, setNormalScheduleText] = useState(page.normalScheduleText ?? '')
+
+  const placementOptions = useMemo(() => getAvailablePlacements(year, month), [year, month])
 
   const [eventForm, setEventForm] = useState<EventFormState | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<CalendarPrintEvent | null>(null)
@@ -294,6 +306,8 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
       updateCalendarPrintPage(year, month, {
         theme: theme || null,
         themeColor: themeColor || null,
+        themePlacement: themePlacement === DEFAULT_PLACEMENT ? null : themePlacement,
+        versePlacement: versePlacement === DEFAULT_PLACEMENT ? null : versePlacement,
         verseText: verseText || null,
         verseReference: verseReference || null,
         normalScheduleText: normalScheduleText || null,
@@ -306,8 +320,12 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
   })
 
   const createEventMutation = useMutation({
-    mutationFn: (data: {date: string; title: string; style: CalendarPrintEventStyle}) =>
-      createCalendarPrintEvent(year, month, data),
+    mutationFn: (data: {
+      date: string
+      title: string
+      style: CalendarPrintEventStyle
+      suppressNormalSchedule: boolean
+    }) => createCalendarPrintEvent(year, month, data),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
     },
@@ -315,8 +333,13 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
   })
 
   const updateEventMutation = useMutation({
-    mutationFn: ({id, data}: {id: number; data: {date: string; title: string; style: CalendarPrintEventStyle}}) =>
-      updateCalendarPrintEvent(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number
+      data: {date: string; title: string; style: CalendarPrintEventStyle; suppressNormalSchedule: boolean}
+    }) => updateCalendarPrintEvent(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
     },
@@ -357,8 +380,14 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
 
   const submitEventForm = () => {
     if (!eventForm) return
-    if (!eventForm.title.trim() || !eventForm.date) return
-    const data = {date: eventForm.date, title: eventForm.title.trim(), style: eventForm.style}
+    if (!eventForm.date) return
+    if (eventForm.style !== 'no_kaya' && !eventForm.title.trim()) return
+    const data = {
+      date: eventForm.date,
+      title: eventForm.title.trim(),
+      style: eventForm.style,
+      suppressNormalSchedule: eventForm.suppressNormalSchedule,
+    }
     if (eventForm.id == null) {
       createEventMutation.mutate(data, {onSuccess: () => setEventForm(null)})
     } else {
@@ -473,6 +502,36 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                   placeholder="Ephesians 3:14-15"
                 />
               </div>
+              <div className="space-y-1.5">
+                <Label>Theme placement</Label>
+                <Select value={themePlacement} onValueChange={setThemePlacement}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {placementOptions.map((opt) => (
+                      <SelectItem key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Verse placement</Label>
+                <Select value={versePlacement} onValueChange={setVersePlacement}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {placementOptions.map((opt) => (
+                      <SelectItem key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1">
                 {!overrideOpen ? (
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -548,6 +607,7 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                     date: defaultEventDate,
                     title: '',
                     style: 'regular',
+                    suppressNormalSchedule: false,
                   })
                 }
               >
@@ -569,7 +629,9 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                         >
                           {event.style.replace('_', ' ')}
                         </span>
-                        <span className="flex-1 break-words">{event.title}</span>
+                        <span className="flex-1 break-words">
+                          {event.title || <span className="italic text-muted-foreground">NO KAYA or Choir</span>}
+                        </span>
                         <button
                           type="button"
                           className="opacity-60 hover:opacity-100"
@@ -580,6 +642,7 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                               date: event.date,
                               title: event.title,
                               style: event.style,
+                              suppressNormalSchedule: event.suppressNormalSchedule,
                             })
                           }
                         >
@@ -595,6 +658,7 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                               date: event.date,
                               title: event.title,
                               style: event.style,
+                              suppressNormalSchedule: event.suppressNormalSchedule,
                             })
                           }
                         >
@@ -613,10 +677,6 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                   </div>
                 ))
               )}
-              <p className="text-xs text-muted-foreground">
-                Tip: use a date <em>outside</em> the month (e.g., 2026-07-04) to add an event in the leading or trailing
-                cells of an adjacent month’s calendar.
-              </p>
             </CardContent>
           </Card>
         </div>
@@ -652,6 +712,8 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                   month={month}
                   theme={theme || null}
                   themeColor={themeColor || null}
+                  themePlacement={themePlacement}
+                  versePlacement={versePlacement}
                   verseText={verseText || null}
                   verseReference={verseReference || null}
                   normalScheduleText={normalScheduleText || null}
@@ -675,6 +737,8 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                 month={month}
                 theme={theme || null}
                 themeColor={themeColor || null}
+                themePlacement={themePlacement}
+                versePlacement={versePlacement}
                 verseText={verseText || null}
                 verseReference={verseReference || null}
                 normalScheduleText={normalScheduleText || null}
@@ -717,6 +781,8 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
             month={month}
             theme={theme || null}
             themeColor={themeColor || null}
+            themePlacement={themePlacement}
+            versePlacement={versePlacement}
             verseText={verseText || null}
             verseReference={verseReference || null}
             normalScheduleText={normalScheduleText || null}
@@ -740,9 +806,6 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                   onChange={(date) => setEventForm({...eventForm, date})}
                   placeholder="Pick a date..."
                 />
-                <p className="text-xs text-muted-foreground">
-                  May be outside the calendar month — useful for trailing cells (e.g., July 4 on the June calendar).
-                </p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="event-title">Title</Label>
@@ -751,10 +814,18 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                   rows={2}
                   value={eventForm.title}
                   onChange={(e) => setEventForm({...eventForm, title: e.target.value})}
-                  placeholder="Mother's Day"
+                  placeholder={
+                    eventForm.style === 'no_kaya'
+                      ? "Optional — leave blank for just 'NO KAYA or Choir'"
+                      : "Mother's Day"
+                  }
                   autoFocus
                 />
-                <p className="text-xs text-muted-foreground">Press Enter to add a line break.</p>
+                <p className="text-xs text-muted-foreground">
+                  {eventForm.style === 'no_kaya'
+                    ? 'Leave blank to show only "NO KAYA or Choir" at the bottom of the cell. Press Enter for a line break.'
+                    : 'Press Enter to add a line break.'}
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Style</Label>
@@ -777,6 +848,21 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                   ))}
                 </div>
               </div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={eventForm.suppressNormalSchedule}
+                  onChange={(e) => setEventForm({...eventForm, suppressNormalSchedule: e.target.checked})}
+                  className="mt-1"
+                />
+                <div>
+                  <div className="text-sm font-medium">Override Normal Schedule</div>
+                  <div className="text-xs text-muted-foreground">
+                    Hides the &ldquo;Normal Schedule&rdquo; label in this cell. Useful when a special event replaces the
+                    normal services.
+                  </div>
+                </div>
+              </label>
             </div>
           )}
           <DialogFooter>
@@ -785,7 +871,11 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
             </Button>
             <Button
               onClick={submitEventForm}
-              disabled={!eventForm?.title.trim() || createEventMutation.isPending || updateEventMutation.isPending}
+              disabled={
+                (eventForm?.style !== 'no_kaya' && !eventForm?.title.trim()) ||
+                createEventMutation.isPending ||
+                updateEventMutation.isPending
+              }
             >
               {eventForm?.id == null ? 'Add' : 'Save'}
             </Button>

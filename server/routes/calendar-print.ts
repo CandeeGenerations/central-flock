@@ -84,7 +84,7 @@ calendarPrintRouter.put(
   '/events/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
-    const {date, title, style, sortOrder} = req.body ?? {}
+    const {date, title, style, sortOrder, suppressNormalSchedule} = req.body ?? {}
 
     const result = db
       .update(schema.calendarPrintEvents)
@@ -93,6 +93,7 @@ calendarPrintRouter.put(
         title: title ?? undefined,
         style: style ?? undefined,
         sortOrder: sortOrder ?? undefined,
+        suppressNormalSchedule: suppressNormalSchedule ?? undefined,
       })
       .where(eq(schema.calendarPrintEvents.id, id))
       .returning()
@@ -153,13 +154,16 @@ calendarPrintRouter.put(
     }
 
     const page = getOrCreatePage(year, month)
-    const {theme, themeColor, verseText, verseReference, normalScheduleText} = req.body ?? {}
+    const {theme, themeColor, themePlacement, versePlacement, verseText, verseReference, normalScheduleText} =
+      req.body ?? {}
 
     const updated = db
       .update(schema.calendarPrintPages)
       .set({
         theme: theme ?? null,
         themeColor: themeColor ?? null,
+        themePlacement: themePlacement ?? null,
+        versePlacement: versePlacement ?? null,
         verseText: verseText ?? null,
         verseReference: verseReference ?? null,
         normalScheduleText: normalScheduleText ?? null,
@@ -181,7 +185,7 @@ calendarPrintRouter.post(
     const month = Number(req.params.month)
     const {date, title, style, sortOrder} = req.body ?? {}
 
-    if (!date || !title || !style) {
+    if (!date || title === undefined || title === null || !style) {
       res.status(400).json({error: 'date, title, and style are required'})
       return
     }
@@ -189,11 +193,22 @@ calendarPrintRouter.post(
       res.status(400).json({error: 'Invalid style'})
       return
     }
+    if (style !== 'no_kaya' && !String(title).trim()) {
+      res.status(400).json({error: 'Title is required for this event style'})
+      return
+    }
 
     const page = getOrCreatePage(year, month)
     const created = db
       .insert(schema.calendarPrintEvents)
-      .values({pageId: page.id, date, title, style, sortOrder: sortOrder ?? 0})
+      .values({
+        pageId: page.id,
+        date,
+        title,
+        style,
+        sortOrder: sortOrder ?? 0,
+        suppressNormalSchedule: req.body?.suppressNormalSchedule ?? false,
+      })
       .returning()
       .get()
 

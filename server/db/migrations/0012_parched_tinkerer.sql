@@ -1,0 +1,1 @@
+ALTER TABLE `calendar_print_events` ADD `suppress_normal_schedule` integer DEFAULT false NOT NULL;

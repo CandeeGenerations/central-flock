@@ -78,6 +78,20 @@
       "when": 1777944141426,
       "tag": "0010_damp_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1777946518304,
+      "tag": "0011_charming_starhawk",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1777948328710,
+      "tag": "0012_parched_tinkerer",
+      "breakpoints": true
     }
   ]
 }

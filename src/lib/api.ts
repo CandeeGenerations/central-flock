@@ -773,6 +773,8 @@ export interface CalendarPrintPage {
   month: number
   theme: string | null
   themeColor: string | null
+  themePlacement: string | null
+  versePlacement: string | null
   verseText: string | null
   verseReference: string | null
   normalScheduleText: string | null
@@ -786,6 +788,7 @@ export interface CalendarPrintEvent {
   date: string
   title: string
   style: CalendarPrintEventStyle
+  suppressNormalSchedule: boolean
   sortOrder: number
   createdAt: string
 }
@@ -806,6 +809,8 @@ export function updateCalendarPrintPage(
   data: {
     theme?: string | null
     themeColor?: string | null
+    themePlacement?: string | null
+    versePlacement?: string | null
     verseText?: string | null
     verseReference?: string | null
     normalScheduleText?: string | null
@@ -820,7 +825,13 @@ export function updateCalendarPrintPage(
 export function createCalendarPrintEvent(
   year: number,
   month: number,
-  data: {date: string; title: string; style: CalendarPrintEventStyle; sortOrder?: number},
+  data: {
+    date: string
+    title: string
+    style: CalendarPrintEventStyle
+    sortOrder?: number
+    suppressNormalSchedule?: boolean
+  },
 ) {
   return request<CalendarPrintEvent>(`/calendar-print/${year}/${month}/events`, {
     method: 'POST',
@@ -830,7 +841,13 @@ export function createCalendarPrintEvent(
 
 export function updateCalendarPrintEvent(
   id: number,
-  data: {date?: string; title?: string; style?: CalendarPrintEventStyle; sortOrder?: number},
+  data: {
+    date?: string
+    title?: string
+    style?: CalendarPrintEventStyle
+    sortOrder?: number
+    suppressNormalSchedule?: boolean
+  },
 ) {
   return request<CalendarPrintEvent>(`/calendar-print/events/${id}`, {
     method: 'PUT',

@@ -12,6 +12,8 @@ export const calendarPrintPages = sqliteTable(
     month: integer('month').notNull(),
     theme: text('theme'),
     themeColor: text('theme_color'),
+    themePlacement: text('theme_placement'),
+    versePlacement: text('verse_placement'),
     verseText: text('verse_text'),
     verseReference: text('verse_reference'),
     normalScheduleText: text('normal_schedule_text'),
@@ -33,6 +35,7 @@ export const calendarPrintEvents = sqliteTable('calendar_print_events', {
   date: text('date').notNull(),
   title: text('title').notNull(),
   style: text('style', {enum: calendarPrintEventStyles}).notNull(),
+  suppressNormalSchedule: integer('suppress_normal_schedule', {mode: 'boolean'}).default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)

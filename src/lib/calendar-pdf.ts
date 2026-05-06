@@ -1,4 +1,4 @@
-import html2canvas from 'html2canvas'
+import {toCanvas} from 'html-to-image'
 import {jsPDF} from 'jspdf'
 
 export type CalendarExportFormat = 'pdf' | 'jpg'
@@ -30,11 +30,16 @@ function fileBaseName(year: number, month: number) {
 }
 
 export async function generateCalendarExport({element, year, month, format}: GenerateCalendarOptions): Promise<void> {
-  const canvas = await html2canvas(element, {
-    scale: 3,
+  // Wait for fonts to be ready before rasterizing so DM Serif Display + Montserrat
+  // render correctly in the export.
+  if (document.fonts && document.fonts.ready) {
+    await document.fonts.ready
+  }
+
+  const canvas = await toCanvas(element, {
+    pixelRatio: 3,
     backgroundColor: '#ffffff',
-    useCORS: true,
-    logging: false,
+    cacheBust: true,
   })
 
   const base = fileBaseName(year, month)

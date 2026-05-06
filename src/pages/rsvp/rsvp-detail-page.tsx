@@ -132,9 +132,20 @@ export function RsvpDetailPage() {
 
   const handleSendMessage = () => {
     if (audienceCount === 0) return
-    const params = new URLSearchParams()
-    params.set('personIds', audienceIds.join(','))
-    navigate(`/messages/compose?${params.toString()}`)
+    navigate('/messages/compose', {
+      state: {selectedIndividualIds: audienceIds, rsvpListId: list.id},
+    })
+  }
+
+  const handleSendInvites = () => {
+    if (audienceCount === 0) return
+    navigate('/messages/compose', {
+      state: {
+        selectedIndividualIds: audienceIds,
+        rsvpListId: list.id,
+        content: 'Hey {{firstName}}, RSVP for {{eventTitle}} on {{eventDate}}: {{rsvpLink}}',
+      },
+    })
   }
 
   const allFilteredSelected = filteredEntries.length > 0 && filteredEntries.every((e) => selectedIds.has(e.id))
@@ -166,7 +177,11 @@ export function RsvpDetailPage() {
           <h2 className="text-2xl font-bold">{list.name}</h2>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button onClick={handleSendMessage} disabled={audienceCount === 0}>
+          <Button onClick={handleSendInvites} disabled={audienceCount === 0}>
+            <Send className="h-4 w-4 mr-2" />
+            Send Invites ({audienceCount})
+          </Button>
+          <Button variant="outline" onClick={handleSendMessage} disabled={audienceCount === 0}>
             <Send className="h-4 w-4 mr-2" />
             Send Message ({audienceCount})
           </Button>

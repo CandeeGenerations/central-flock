@@ -1,5 +1,5 @@
 import {sql} from 'drizzle-orm'
-import {integer, primaryKey, sqliteTable, text} from 'drizzle-orm/sqlite-core'
+import {integer, primaryKey, sqliteTable, text, uniqueIndex} from 'drizzle-orm/sqlite-core'
 
 export const people = sqliteTable('people', {
   id: integer('id').primaryKey({autoIncrement: true}),
@@ -200,3 +200,44 @@ export const calendarEvents = sqliteTable('calendar_events', {
   calendarName: text('calendar_name').notNull(),
   recurring: integer('recurring', {mode: 'boolean'}).default(false).notNull(),
 })
+
+export const rsvpLists = sqliteTable('rsvp_lists', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  name: text('name').notNull(),
+  calendarEventId: integer('calendar_event_id').references(() => calendarEvents.id, {onDelete: 'set null'}),
+  standaloneTitle: text('standalone_title'),
+  standaloneDate: text('standalone_date'),
+  standaloneTime: text('standalone_time'),
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+  updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})
+
+export const rsvpEntries = sqliteTable(
+  'rsvp_entries',
+  {
+    id: integer('id').primaryKey({autoIncrement: true}),
+    rsvpListId: integer('rsvp_list_id')
+      .notNull()
+      .references(() => rsvpLists.id, {onDelete: 'cascade'}),
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id, {onDelete: 'cascade'}),
+    status: text('status', {enum: ['yes', 'no', 'maybe', 'no_response']})
+      .default('no_response')
+      .notNull(),
+    headcount: integer('headcount'),
+    note: text('note'),
+    respondedAt: text('responded_at'),
+    createdAt: text('created_at')
+      .default(sql`(datetime('now'))`)
+      .notNull(),
+    updatedAt: text('updated_at')
+      .default(sql`(datetime('now'))`)
+      .notNull(),
+  },
+  (t) => [uniqueIndex('rsvp_entries_list_person_uniq').on(t.rsvpListId, t.personId)],
+)

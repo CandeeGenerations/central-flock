@@ -32,26 +32,38 @@ export const rsvpLists = sqliteTable('rsvp_lists', {
   name: text('name').notNull(),
   calendarEventId: integer('calendar_event_id').references(() => calendarEvents.id, {onDelete: 'set null'}),
   standaloneTitle: text('standalone_title'),
-  standaloneDate: text('standalone_date'),       // 'YYYY-MM-DD'
-  standaloneTime: text('standalone_time'),       // 'HH:MM' or null
-  createdAt: text('created_at').default(sql`(datetime('now'))`).notNull(),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`).notNull(),
+  standaloneDate: text('standalone_date'), // 'YYYY-MM-DD'
+  standaloneTime: text('standalone_time'), // 'HH:MM' or null
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+  updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
 })
 
 export const rsvpEntries = sqliteTable(
   'rsvp_entries',
   {
     id: integer('id').primaryKey({autoIncrement: true}),
-    rsvpListId: integer('rsvp_list_id').notNull().references(() => rsvpLists.id, {onDelete: 'cascade'}),
-    personId: integer('person_id').notNull().references(() => people.id, {onDelete: 'cascade'}),
+    rsvpListId: integer('rsvp_list_id')
+      .notNull()
+      .references(() => rsvpLists.id, {onDelete: 'cascade'}),
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id, {onDelete: 'cascade'}),
     status: text('status', {enum: ['yes', 'no', 'maybe', 'no_response']})
       .default('no_response')
       .notNull(),
     headcount: integer('headcount'),
     note: text('note'),
     respondedAt: text('responded_at'),
-    createdAt: text('created_at').default(sql`(datetime('now'))`).notNull(),
-    updatedAt: text('updated_at').default(sql`(datetime('now'))`).notNull(),
+    createdAt: text('created_at')
+      .default(sql`(datetime('now'))`)
+      .notNull(),
+    updatedAt: text('updated_at')
+      .default(sql`(datetime('now'))`)
+      .notNull(),
   },
   (t) => [uniqueIndex('rsvp_entries_list_person_uniq').on(t.rsvpListId, t.personId)],
 )
@@ -75,17 +87,17 @@ Re-export from `server/db/schema.ts`.
 
 Endpoints:
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/api/rsvp/lists?archived=false` | All lists; `archived=false` → only those whose effective event date is today or future (or has no date). |
-| `GET` | `/api/rsvp/lists/:id` | List metadata + entries (joined with person) + summary counts. |
-| `POST` | `/api/rsvp/lists` | Create list. Body: `{ name, calendarEventId?, standaloneTitle?, standaloneDate?, standaloneTime?, seedGroupIds?: number[], seedPersonIds?: number[] }`. Server seeds entries from the union (deduped) of group members and explicit person IDs. |
-| `PATCH` | `/api/rsvp/lists/:id` | Update name / standalone fields / calendarEventId. |
-| `DELETE` | `/api/rsvp/lists/:id` | Cascade-delete entries. |
-| `POST` | `/api/rsvp/lists/:id/entries` | Add people. Body: `{ personIds: number[] }`. Skips duplicates via unique index. |
-| `PATCH` | `/api/rsvp/entries/:id` | Update status / headcount / note. Server sets `respondedAt` when status transitions from `no_response`; auto-defaults `headcount` to 1 when status becomes `yes` or `maybe` and current headcount is null. |
-| `POST` | `/api/rsvp/entries/bulk` | Body: `{ ids: number[], status?, removeFromList?: boolean }`. For multi-select toolbar. |
-| `DELETE` | `/api/rsvp/entries/:id` | Remove from list. |
+| Method   | Path                             | Purpose                                                                                                                                                                                                                                         |
+| -------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/rsvp/lists?archived=false` | All lists; `archived=false` → only those whose effective event date is today or future (or has no date).                                                                                                                                        |
+| `GET`    | `/api/rsvp/lists/:id`            | List metadata + entries (joined with person) + summary counts.                                                                                                                                                                                  |
+| `POST`   | `/api/rsvp/lists`                | Create list. Body: `{ name, calendarEventId?, standaloneTitle?, standaloneDate?, standaloneTime?, seedGroupIds?: number[], seedPersonIds?: number[] }`. Server seeds entries from the union (deduped) of group members and explicit person IDs. |
+| `PATCH`  | `/api/rsvp/lists/:id`            | Update name / standalone fields / calendarEventId.                                                                                                                                                                                              |
+| `DELETE` | `/api/rsvp/lists/:id`            | Cascade-delete entries.                                                                                                                                                                                                                         |
+| `POST`   | `/api/rsvp/lists/:id/entries`    | Add people. Body: `{ personIds: number[] }`. Skips duplicates via unique index.                                                                                                                                                                 |
+| `PATCH`  | `/api/rsvp/entries/:id`          | Update status / headcount / note. Server sets `respondedAt` when status transitions from `no_response`; auto-defaults `headcount` to 1 when status becomes `yes` or `maybe` and current headcount is null.                                      |
+| `POST`   | `/api/rsvp/entries/bulk`         | Body: `{ ids: number[], status?, removeFromList?: boolean }`. For multi-select toolbar.                                                                                                                                                         |
+| `DELETE` | `/api/rsvp/entries/:id`          | Remove from list.                                                                                                                                                                                                                               |
 
 **Effective event date logic:** `COALESCE(calendarEvents.startDate (date portion), rsvpLists.standaloneDate, NULL)`. Computed in SQL where possible, fallback in route handler.
 

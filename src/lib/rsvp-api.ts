@@ -146,6 +146,33 @@ export function fetchRsvpCalendarEvents(days = 120): Promise<RsvpCalendarEvent[]
   return request(`/calendar-events?days=${days}`)
 }
 
+export interface NonEntryPerson {
+  id: number
+  firstName: string | null
+  lastName: string | null
+  phoneNumber: string | null
+  phoneDisplay: string | null
+}
+
+export interface NonEntriesResponse {
+  data: NonEntryPerson[]
+  total: number
+  page: number
+  limit: number
+}
+
+export function fetchRsvpNonEntries(
+  listId: number,
+  params: {search?: string; page?: number; limit?: number} = {},
+): Promise<NonEntriesResponse> {
+  const qs = new URLSearchParams()
+  if (params.search) qs.set('search', params.search)
+  if (params.page) qs.set('page', String(params.page))
+  if (params.limit) qs.set('limit', String(params.limit))
+  const query = qs.toString()
+  return request(`/lists/${listId}/non-entries${query ? `?${query}` : ''}`)
+}
+
 export const STATUS_LABELS: Record<RsvpStatus, string> = {
   yes: 'Yes',
   no: 'No',

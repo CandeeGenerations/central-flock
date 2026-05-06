@@ -43,6 +43,8 @@ import {NurserySettingsPage} from '@/pages/nursery/nursery-settings-page'
 import {NurseryWorkersPage} from '@/pages/nursery/nursery-workers-page'
 import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
+import {RsvpDetailPage} from '@/pages/rsvp/rsvp-detail-page'
+import {RsvpListPage} from '@/pages/rsvp/rsvp-list-page'
 import {HymnSearchDetailPage} from '@/pages/sermons/hymn-search-detail-page'
 import {HymnSearchesPage} from '@/pages/sermons/hymn-searches-page'
 import {HymnsPrepPage} from '@/pages/sermons/hymns-prep-page'
@@ -416,6 +418,8 @@ function AppLayoutInner({
               </Route>
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/calendar/print" element={<CalendarPrintPage />} />
+              <Route path="/rsvp" element={<RsvpListPage />} />
+              <Route path="/rsvp/:id" element={<RsvpDetailPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </main>

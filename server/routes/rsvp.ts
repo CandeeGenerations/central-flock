@@ -398,6 +398,52 @@ rsvpRouter.delete(
   }),
 )
 
+// GET /api/rsvp/lists/:id/non-entries — people not on this list, for the add-person dialog
+rsvpRouter.get(
+  '/lists/:id/non-entries',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const {search, page = '1', limit = '30'} = req.query
+    const offset = (Number(page) - 1) * Number(limit)
+
+    const memberIds = db
+      .select({personId: schema.rsvpEntries.personId})
+      .from(schema.rsvpEntries)
+      .where(eq(schema.rsvpEntries.rsvpListId, id))
+
+    const conditions = [sql`${schema.people.id} NOT IN ${memberIds}`, sql`${schema.people.phoneNumber} IS NOT NULL`]
+
+    if (search && typeof search === 'string') {
+      conditions.push(
+        sql`(${schema.people.firstName} LIKE ${'%' + search + '%'} OR ${schema.people.lastName} LIKE ${'%' + search + '%'} OR ${schema.people.phoneDisplay} LIKE ${'%' + search + '%'} OR (COALESCE(${schema.people.firstName}, '') || ' ' || COALESCE(${schema.people.lastName}, '')) LIKE ${'%' + search + '%'})`,
+      )
+    }
+
+    const where = and(...conditions)
+
+    const [nonMembers, countResult] = await Promise.all([
+      db
+        .select()
+        .from(schema.people)
+        .where(where)
+        .orderBy(schema.people.lastName, schema.people.firstName)
+        .limit(Number(limit))
+        .offset(offset),
+      db
+        .select({count: sql<number>`count(*)`})
+        .from(schema.people)
+        .where(where),
+    ])
+
+    res.json({
+      data: nonMembers,
+      total: countResult[0]?.count || 0,
+      page: Number(page),
+      limit: Number(limit),
+    })
+  }),
+)
+
 // GET /api/rsvp/calendar-events?days=120 — synced calendar events for the create dialog picker
 rsvpRouter.get(
   '/calendar-events',

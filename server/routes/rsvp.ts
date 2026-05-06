@@ -468,6 +468,7 @@ rsvpRouter.get(
         and(
           sql`substr(${schema.calendarEvents.startDate}, 1, 10) >= ${today}`,
           sql`substr(${schema.calendarEvents.startDate}, 1, 10) <= ${future}`,
+          eq(schema.calendarEvents.recurring, false),
         ),
       )
       .orderBy(schema.calendarEvents.startDate)

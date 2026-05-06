@@ -1,9 +1,8 @@
 import {RsvpListCreateDialog} from '@/components/rsvp/rsvp-list-create-dialog'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
-import {Checkbox} from '@/components/ui/checkbox'
-import {Label} from '@/components/ui/label'
 import {SearchInput} from '@/components/ui/search-input'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {usePersistedState} from '@/hooks/use-persisted-state'
@@ -51,12 +50,15 @@ export function RsvpListPage() {
               onChange={setSearch}
               containerClassName="sm:max-w-sm"
             />
-            <div className="flex items-center gap-2">
-              <Checkbox id="show-past" checked={showPast} onCheckedChange={(v) => setShowPast(v === true)} />
-              <Label htmlFor="show-past" className="text-sm cursor-pointer">
-                Show past
-              </Label>
-            </div>
+            <Select value={showPast ? 'all' : 'upcoming'} onValueChange={(v) => setShowPast(v === 'all')}>
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="upcoming">Upcoming</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
 

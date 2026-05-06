@@ -89,6 +89,7 @@ export const drafts = sqliteTable('drafts', {
   batchDelayMs: integer('batch_delay_ms').default(5000).notNull(),
   scheduledAt: text('scheduled_at'),
   templateState: text('template_state'),
+  rsvpListId: integer('rsvp_list_id').references(() => rsvpLists.id, {onDelete: 'set null'}),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),
@@ -208,6 +209,7 @@ export const rsvpLists = sqliteTable('rsvp_lists', {
   standaloneTitle: text('standalone_title'),
   standaloneDate: text('standalone_date'),
   standaloneTime: text('standalone_time'),
+  standaloneEndTime: text('standalone_end_time'),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),
@@ -231,6 +233,7 @@ export const rsvpEntries = sqliteTable(
       .notNull(),
     headcount: integer('headcount'),
     note: text('note'),
+    publicToken: text('public_token').unique(),
     respondedAt: text('responded_at'),
     createdAt: text('created_at')
       .default(sql`(datetime('now'))`)

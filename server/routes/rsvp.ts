@@ -1,8 +1,13 @@
 import {and, eq, inArray, sql} from 'drizzle-orm'
 import {Router} from 'express'
+import {randomBytes} from 'node:crypto'
 
 import {db, schema, sqlite} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
+
+function newPublicToken(): string {
+  return randomBytes(24).toString('base64url')
+}
 
 export const rsvpRouter = Router()
 
@@ -13,10 +18,10 @@ function todayIso(): string {
 }
 
 function effectiveDateExpr() {
-  // Prefer the calendar event start date (date portion) when linked, otherwise the standalone date.
+  // Prefer an explicit override; fall back to the linked calendar event's start date.
   return sql<
     string | null
-  >`COALESCE(substr(${schema.calendarEvents.startDate}, 1, 10), ${schema.rsvpLists.standaloneDate})`
+  >`COALESCE(${schema.rsvpLists.standaloneDate}, substr(${schema.calendarEvents.startDate}, 1, 10))`
 }
 
 function summaryRows(listIds: number[]) {
@@ -64,10 +69,12 @@ rsvpRouter.get(
         standaloneTitle: schema.rsvpLists.standaloneTitle,
         standaloneDate: schema.rsvpLists.standaloneDate,
         standaloneTime: schema.rsvpLists.standaloneTime,
+        standaloneEndTime: schema.rsvpLists.standaloneEndTime,
         createdAt: schema.rsvpLists.createdAt,
         updatedAt: schema.rsvpLists.updatedAt,
         calendarEventTitle: schema.calendarEvents.title,
         calendarEventStartDate: schema.calendarEvents.startDate,
+        calendarEventEndDate: schema.calendarEvents.endDate,
         calendarEventLocation: schema.calendarEvents.location,
         effectiveDate: effectiveDateExpr(),
       })
@@ -116,10 +123,12 @@ rsvpRouter.get(
         standaloneTitle: schema.rsvpLists.standaloneTitle,
         standaloneDate: schema.rsvpLists.standaloneDate,
         standaloneTime: schema.rsvpLists.standaloneTime,
+        standaloneEndTime: schema.rsvpLists.standaloneEndTime,
         createdAt: schema.rsvpLists.createdAt,
         updatedAt: schema.rsvpLists.updatedAt,
         calendarEventTitle: schema.calendarEvents.title,
         calendarEventStartDate: schema.calendarEvents.startDate,
+        calendarEventEndDate: schema.calendarEvents.endDate,
         calendarEventLocation: schema.calendarEvents.location,
         effectiveDate: effectiveDateExpr(),
       })
@@ -142,6 +151,7 @@ rsvpRouter.get(
         headcount: schema.rsvpEntries.headcount,
         note: schema.rsvpEntries.note,
         respondedAt: schema.rsvpEntries.respondedAt,
+        publicToken: schema.rsvpEntries.publicToken,
         createdAt: schema.rsvpEntries.createdAt,
         updatedAt: schema.rsvpEntries.updatedAt,
         firstName: schema.people.firstName,
@@ -159,7 +169,7 @@ rsvpRouter.get(
       entries.map((e) => ({rsvpListId: e.rsvpListId, status: e.status as Status, headcount: e.headcount})),
     ).get(id) || {yes: 0, no: 0, maybe: 0, no_response: 0, total: 0, expectedAttendees: 0}
 
-    res.json({...list, entries, counts})
+    res.json({...list, entries, counts, rsvpPublicUrlBase: process.env.RSVP_PUBLIC_URL_BASE ?? ''})
   }),
 )
 
@@ -169,6 +179,7 @@ type CreateBody = {
   standaloneTitle?: string | null
   standaloneDate?: string | null
   standaloneTime?: string | null
+  standaloneEndTime?: string | null
   seedGroupIds?: number[]
   seedPersonIds?: number[]
 }
@@ -190,8 +201,9 @@ rsvpRouter.post(
           name: body.name.trim(),
           calendarEventId: body.calendarEventId ?? null,
           standaloneTitle: body.calendarEventId ? null : body.standaloneTitle?.trim() || null,
-          standaloneDate: body.calendarEventId ? null : body.standaloneDate || null,
-          standaloneTime: body.calendarEventId ? null : body.standaloneTime || null,
+          standaloneDate: body.standaloneDate || null,
+          standaloneTime: body.standaloneTime || null,
+          standaloneEndTime: body.standaloneEndTime || null,
         })
         .returning()
         .get()
@@ -213,7 +225,7 @@ rsvpRouter.post(
 
       if (personIds.size > 0) {
         db.insert(schema.rsvpEntries)
-          .values([...personIds].map((personId) => ({rsvpListId: list.id, personId})))
+          .values([...personIds].map((personId) => ({rsvpListId: list.id, personId, publicToken: newPublicToken()})))
           .run()
       }
 
@@ -229,22 +241,23 @@ rsvpRouter.patch(
   '/lists/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
-    const {name, calendarEventId, standaloneTitle, standaloneDate, standaloneTime} = req.body as Partial<CreateBody>
+    const {name, calendarEventId, standaloneTitle, standaloneDate, standaloneTime, standaloneEndTime} =
+      req.body as Partial<CreateBody>
 
     const update: Record<string, unknown> = {updatedAt: sql`datetime('now')`}
     if (name !== undefined) update.name = String(name).trim()
     if (calendarEventId !== undefined) {
       update.calendarEventId = calendarEventId
-      // When linking to a calendar event, clear standalone fields.
+      // When linking to a calendar event, clear the standalone title (the event title takes over).
+      // Date/time fields are kept as overrides — null'd by the client if not desired.
       if (calendarEventId !== null) {
         update.standaloneTitle = null
-        update.standaloneDate = null
-        update.standaloneTime = null
       }
     }
     if (standaloneTitle !== undefined) update.standaloneTitle = standaloneTitle
     if (standaloneDate !== undefined) update.standaloneDate = standaloneDate
     if (standaloneTime !== undefined) update.standaloneTime = standaloneTime
+    if (standaloneEndTime !== undefined) update.standaloneEndTime = standaloneEndTime
 
     const result = db.update(schema.rsvpLists).set(update).where(eq(schema.rsvpLists.id, id)).returning().get()
     if (!result) {
@@ -296,7 +309,7 @@ rsvpRouter.post(
 
     if (newIds.length > 0) {
       db.insert(schema.rsvpEntries)
-        .values(newIds.map((personId) => ({rsvpListId: id, personId})))
+        .values(newIds.map((personId) => ({rsvpListId: id, personId, publicToken: newPublicToken()})))
         .run()
     }
 
@@ -441,6 +454,88 @@ rsvpRouter.get(
       page: Number(page),
       limit: Number(limit),
     })
+  }),
+)
+
+// GET /api/rsvp/lists/:id/context — compose-page context (event meta + first token + URL base)
+rsvpRouter.get(
+  '/lists/:id/context',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const list = db
+      .select({
+        id: schema.rsvpLists.id,
+        name: schema.rsvpLists.name,
+        standaloneTitle: schema.rsvpLists.standaloneTitle,
+        standaloneDate: schema.rsvpLists.standaloneDate,
+        standaloneTime: schema.rsvpLists.standaloneTime,
+        standaloneEndTime: schema.rsvpLists.standaloneEndTime,
+        calendarEventTitle: schema.calendarEvents.title,
+        calendarEventStartDate: schema.calendarEvents.startDate,
+        calendarEventEndDate: schema.calendarEvents.endDate,
+      })
+      .from(schema.rsvpLists)
+      .leftJoin(schema.calendarEvents, eq(schema.rsvpLists.calendarEventId, schema.calendarEvents.id))
+      .where(eq(schema.rsvpLists.id, id))
+      .get()
+
+    if (!list) {
+      res.status(404).json({error: 'RSVP list not found'})
+      return
+    }
+
+    const eventTitle = list.calendarEventTitle ?? list.standaloneTitle ?? list.name
+    // Standalone fields act as overrides; fall back to the linked calendar event.
+    const eventDate = list.standaloneDate ?? list.calendarEventStartDate?.slice(0, 10) ?? null
+    const eventTime =
+      list.standaloneTime ??
+      (list.calendarEventStartDate && list.calendarEventStartDate.length >= 16
+        ? list.calendarEventStartDate.slice(11, 16)
+        : null)
+    const eventEndTime =
+      list.standaloneEndTime ??
+      (list.calendarEventEndDate && list.calendarEventEndDate.length >= 16
+        ? list.calendarEventEndDate.slice(11, 16)
+        : null)
+
+    const firstEntry = db
+      .select({publicToken: schema.rsvpEntries.publicToken})
+      .from(schema.rsvpEntries)
+      .where(eq(schema.rsvpEntries.rsvpListId, id))
+      .limit(1)
+      .get()
+
+    res.json({
+      id: list.id,
+      name: list.name,
+      eventTitle,
+      eventDate,
+      eventTime,
+      eventEndTime,
+      firstEntryPublicToken: firstEntry?.publicToken ?? null,
+      rsvpPublicUrlBase: process.env.RSVP_PUBLIC_URL_BASE ?? '',
+      missingEntryCount: 0,
+    })
+  }),
+)
+
+// POST /api/rsvp/lists/:id/missing-entries — given recipient IDs, return which are not on the list
+rsvpRouter.post(
+  '/lists/:id/missing-entries',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const {personIds} = req.body as {personIds?: number[]}
+    if (!Array.isArray(personIds) || personIds.length === 0) {
+      res.json({missingPersonIds: []})
+      return
+    }
+    const present = db
+      .select({personId: schema.rsvpEntries.personId})
+      .from(schema.rsvpEntries)
+      .where(and(eq(schema.rsvpEntries.rsvpListId, id), inArray(schema.rsvpEntries.personId, personIds)))
+      .all()
+    const presentSet = new Set(present.map((p) => p.personId))
+    res.json({missingPersonIds: personIds.filter((pid) => !presentSet.has(pid))})
   }),
 )
 

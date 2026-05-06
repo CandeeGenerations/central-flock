@@ -9,6 +9,7 @@ export function renderTemplate(
   template: string,
   person: {firstName?: string | null; lastName?: string | null},
   customVarValues?: Record<string, string>,
+  perRecipientVarValues?: Record<string, string>,
 ): string {
   const firstName = person.firstName || ''
   const lastName = person.lastName || ''
@@ -19,6 +20,11 @@ export function renderTemplate(
     .replace(/\{\{fullName\}\}/g, fullName)
   if (customVarValues) {
     for (const [name, value] of Object.entries(customVarValues)) {
+      result = result.replace(new RegExp(`\\{\\{${name}\\}\\}`, 'g'), value)
+    }
+  }
+  if (perRecipientVarValues) {
+    for (const [name, value] of Object.entries(perRecipientVarValues)) {
       result = result.replace(new RegExp(`\\{\\{${name}\\}\\}`, 'g'), value)
     }
   }

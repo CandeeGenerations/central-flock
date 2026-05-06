@@ -5,10 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import {fileURLToPath} from 'url'
 import * as XLSX from 'xlsx'
-// The package publishes a broken dual build — package.json sets `type: module` but its
-// main entry is a CJS file with `exports.X = ...`, which crashes under Node's ESM loader.
-// Import directly from the ESM bundle instead.
-import {YoutubeTranscript} from 'youtube-transcript/dist/youtube-transcript.esm.js'
+import {YoutubeTranscript} from 'youtube-transcript'
 
 import {db, schema} from '../db/index.js'
 import {AI_MODELS} from '../lib/ai-models.js'

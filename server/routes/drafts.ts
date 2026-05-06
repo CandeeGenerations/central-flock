@@ -6,6 +6,7 @@ import {db, schema} from '../db/index.js'
 import {BATCH_DEFAULTS} from '../lib/constants.js'
 import {renderTemplate} from '../lib/format.js'
 import {asyncHandler, getGroupName} from '../lib/route-helpers.js'
+import {buildRsvpLinkMap, rsvpLinkFor} from '../services/rsvp-link.js'
 
 export const draftsRouter = Router()
 
@@ -103,10 +104,14 @@ draftsRouter.get(
           }
         }
         // Get a sample recipient
-        let samplePerson: {firstName: string | null; lastName: string | null} = {firstName: null, lastName: null}
+        let samplePerson: {id: number; firstName: string | null; lastName: string | null} = {
+          id: 0,
+          firstName: null,
+          lastName: null,
+        }
         if (draft.groupId) {
           const member = db
-            .select({firstName: schema.people.firstName, lastName: schema.people.lastName})
+            .select({id: schema.people.id, firstName: schema.people.firstName, lastName: schema.people.lastName})
             .from(schema.peopleGroups)
             .innerJoin(schema.people, eq(schema.peopleGroups.personId, schema.people.id))
             .where(eq(schema.peopleGroups.groupId, draft.groupId))
@@ -118,7 +123,7 @@ draftsRouter.get(
             const ids: number[] = JSON.parse(draft.selectedIndividualIds)
             if (ids.length > 0) {
               const person = db
-                .select({firstName: schema.people.firstName, lastName: schema.people.lastName})
+                .select({id: schema.people.id, firstName: schema.people.firstName, lastName: schema.people.lastName})
                 .from(schema.people)
                 .where(eq(schema.people.id, ids[0]))
                 .get()
@@ -128,7 +133,16 @@ draftsRouter.get(
             /* ignore */
           }
         }
-        renderedPreview = renderTemplate(draft.content, samplePerson, varValues)
+
+        // Per-recipient RSVP link substitution for the preview only.
+        const linkMap =
+          draft.rsvpListId && samplePerson.id ? buildRsvpLinkMap(draft.rsvpListId, [samplePerson.id]) : null
+        renderedPreview = renderTemplate(
+          draft.content,
+          samplePerson,
+          varValues,
+          linkMap ? rsvpLinkFor(samplePerson.id, linkMap) : undefined,
+        )
       }
 
       return {...draft, groupName, recipientCount, renderedPreview, extraNames}
@@ -184,6 +198,7 @@ draftsRouter.post(
       batchDelayMs,
       scheduledAt,
       templateState,
+      rsvpListId,
     } = req.body
 
     const draft = db
@@ -199,6 +214,7 @@ draftsRouter.post(
         batchDelayMs: batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs,
         scheduledAt: scheduledAt || null,
         templateState: templateState || null,
+        rsvpListId: rsvpListId ?? null,
       })
       .returning()
       .get()
@@ -223,6 +239,7 @@ draftsRouter.put(
       batchDelayMs,
       scheduledAt,
       templateState,
+      rsvpListId,
     } = req.body
 
     const draft = db
@@ -238,6 +255,7 @@ draftsRouter.put(
         batchDelayMs: batchDelayMs ?? BATCH_DEFAULTS.batchDelayMs,
         scheduledAt: scheduledAt ?? null,
         templateState: templateState ?? null,
+        rsvpListId: rsvpListId ?? null,
         updatedAt: sql`datetime('now')`,
       })
       .where(eq(schema.drafts.id, id))
@@ -280,6 +298,7 @@ draftsRouter.post(
         batchSize: original.batchSize,
         batchDelayMs: original.batchDelayMs,
         templateState: original.templateState,
+        rsvpListId: original.rsvpListId,
       })
       .returning()
       .get()

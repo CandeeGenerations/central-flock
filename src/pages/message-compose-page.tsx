@@ -4,6 +4,7 @@ import {Button} from '@/components/ui/button'
 import {Calendar} from '@/components/ui/calendar'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {DateTimePicker} from '@/components/ui/date-time-picker'
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
@@ -32,6 +33,8 @@ import type {Draft, TemplateVariable} from '@/lib/api'
 import {BATCH_DEFAULTS} from '@/lib/constants'
 import {formatFullName, renderTemplate} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
+import {addRsvpEntries, checkMissingRsvpEntries, fetchRsvpListContext} from '@/lib/rsvp-api'
+import type {RsvpListContext} from '@/lib/rsvp-api'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {format} from 'date-fns'
@@ -71,6 +74,8 @@ export function MessageComposePage() {
     content?: string
     groupId?: number
     excludeIds?: number[]
+    selectedIndividualIds?: number[]
+    rsvpListId?: number
   } | null
 
   const draftIdParam = searchParams.get('draftId')
@@ -85,7 +90,7 @@ export function MessageComposePage() {
     .filter((n) => Number.isFinite(n))
 
   const [recipientMode, setRecipientMode] = useState<'group' | 'individual'>(
-    presetRecipientId || presetPersonIds.length > 0 ? 'individual' : 'group',
+    presetRecipientId || presetPersonIds.length > 0 || dupState?.selectedIndividualIds?.length ? 'individual' : 'group',
   )
   const [selectedGroupId, setSelectedGroupId] = useState(presetGroupId || '')
   const [content, setContent] = useState(dupState?.content || '')
@@ -98,6 +103,10 @@ export function MessageComposePage() {
   const [batchSize] = useState<number>(BATCH_DEFAULTS.batchSize)
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [missingRsvpDialog, setMissingRsvpDialog] = useState<{open: boolean; missingPersonIds: number[]}>({
+    open: false,
+    missingPersonIds: [],
+  })
   const [batchDelayMs] = useState<number>(BATCH_DEFAULTS.batchDelayMs)
   const [scheduledAt, setScheduledAt] = useState('')
   const [sendTimeMode, setSendTimeMode] = useState<'now' | 'schedule'>('now')
@@ -107,8 +116,16 @@ export function MessageComposePage() {
   const [individualHighlight, setIndividualHighlight] = useState(-1)
   const individualSearchRef = useRef<HTMLInputElement>(null)
   const [selectedIndividualIds, setSelectedIndividualIds] = useState<Set<number>>(() => {
+    if (dupState?.selectedIndividualIds?.length) return new Set(dupState.selectedIndividualIds)
     if (presetPersonIds.length > 0) return new Set(presetPersonIds)
     return presetRecipientId ? new Set([Number(presetRecipientId)]) : new Set()
+  })
+
+  const [rsvpListId, setRsvpListId] = useState<number | null>(dupState?.rsvpListId ?? null)
+  const {data: rsvpContext} = useQuery<RsvpListContext>({
+    queryKey: ['rsvpListContext', rsvpListId],
+    queryFn: () => fetchRsvpListContext(rsvpListId!),
+    enabled: !!rsvpListId,
   })
 
   // Template state
@@ -161,6 +178,7 @@ export function MessageComposePage() {
     setRecipientMode(draftData.recipientMode || 'group')
     setSelectedGroupId(draftData.groupId ? String(draftData.groupId) : '')
     setScheduledAt(draftData.scheduledAt || '')
+    setRsvpListId(draftData.rsvpListId ?? null)
     if (draftData.scheduledAt) setSendTimeMode('schedule')
     if (draftData.excludeIds) {
       try {
@@ -422,9 +440,40 @@ export function MessageComposePage() {
     [individualResults, individualHighlight, setIndividualHighlight, setSelectedIndividualIds, setIndividualSearch],
   )
 
+  // Auto-resolved values from the attached RSVP list. eventDate/eventTime get
+  // friendlier formatting for SMS. {{rsvpLink}} is resolved per-recipient on the server.
+  const rsvpContextVarValues = useMemo<Record<string, string>>(() => {
+    if (!rsvpContext) return {}
+    const out: Record<string, string> = {}
+    out.eventTitle = rsvpContext.eventTitle
+    if (rsvpContext.eventDate) {
+      const [y, m, d] = rsvpContext.eventDate.split('-').map(Number)
+      if (y && m && d) {
+        out.eventDate = format(new Date(y, m - 1, d), 'EEE MMM d')
+      } else {
+        out.eventDate = rsvpContext.eventDate
+      }
+    } else {
+      out.eventDate = ''
+    }
+    if (rsvpContext.eventTime) {
+      const [hh, mm] = rsvpContext.eventTime.split(':').map(Number)
+      if (Number.isFinite(hh) && Number.isFinite(mm)) {
+        const dt = new Date()
+        dt.setHours(hh, mm, 0, 0)
+        out.eventTime = format(dt, 'h:mm a')
+      } else {
+        out.eventTime = rsvpContext.eventTime
+      }
+    } else {
+      out.eventTime = ''
+    }
+    return out
+  }, [rsvpContext])
+
   // Build resolved custom var values for preview and send
   const resolvedCustomVarValues = useMemo(() => {
-    const resolved: Record<string, string> = {...customVarValues}
+    const resolved: Record<string, string> = {...customVarValues, ...rsvpContextVarValues}
     for (const v of activeTemplateVars) {
       if (v.type === 'date') {
         const date = dateValues[v.name]
@@ -435,7 +484,7 @@ export function MessageComposePage() {
       }
     }
     return resolved
-  }, [customVarValues, dateValues, dateFormats, activeTemplateVars])
+  }, [customVarValues, rsvpContextVarValues, dateValues, dateFormats, activeTemplateVars])
 
   // Build preview values (with placeholders for empty vars)
   const previewCustomVarValues = useMemo(() => {
@@ -446,6 +495,8 @@ export function MessageComposePage() {
         preview[g.name] = g.value
       }
     }
+    // RSVP-context values populate the named variables
+    Object.assign(preview, rsvpContextVarValues)
     // Custom vars override globals
     for (const v of activeTemplateVars) {
       if (v.type === 'text') {
@@ -456,8 +507,14 @@ export function MessageComposePage() {
         preview[v.name] = date ? format(date, fmt) : `[${v.name}]`
       }
     }
+    // {{rsvpLink}} preview uses the first entry's token (server substitutes per-recipient at send).
+    if (rsvpContext?.firstEntryPublicToken && rsvpContext.rsvpPublicUrlBase) {
+      preview.rsvpLink = `${rsvpContext.rsvpPublicUrlBase}/r/${rsvpContext.firstEntryPublicToken}`
+    } else if (rsvpContext) {
+      preview.rsvpLink = '[rsvpLink]'
+    }
     return preview
-  }, [customVarValues, dateValues, dateFormats, activeTemplateVars, globalVariables])
+  }, [customVarValues, rsvpContextVarValues, dateValues, dateFormats, activeTemplateVars, globalVariables, rsvpContext])
 
   const previewPerson = recipients[0]
   const renderedPreview = previewPerson
@@ -493,6 +550,7 @@ export function MessageComposePage() {
         customVarValues: cvv,
         scheduledAt: scheduledAt || undefined,
         templateState: buildTemplateState(),
+        rsvpListId,
       }
       if (isEditMode) {
         return updateMessage(Number(editMessageId), payload)
@@ -557,6 +615,7 @@ export function MessageComposePage() {
       batchDelayMs,
       scheduledAt: scheduledAt || null,
       templateState,
+      rsvpListId,
     }
   }
 
@@ -582,7 +641,7 @@ export function MessageComposePage() {
     onError: (err: Error) => toast.error(err.message),
   })
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!content.trim()) {
       toast.error('Message content is required')
       return
@@ -590,6 +649,19 @@ export function MessageComposePage() {
     if (recipients.length === 0) {
       toast.error('No recipients selected')
       return
+    }
+    // Pre-send: warn if {{rsvpLink}} is in body but some recipients are not on the attached list.
+    if (rsvpListId && content.includes('{{rsvpLink}}') && allRecipientIds.length > 0) {
+      try {
+        const {missingPersonIds} = await checkMissingRsvpEntries(rsvpListId, allRecipientIds)
+        if (missingPersonIds.length > 0) {
+          setMissingRsvpDialog({open: true, missingPersonIds})
+          return
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to check RSVP recipients')
+        return
+      }
     }
     setSendConfirmOpen(true)
   }
@@ -803,6 +875,30 @@ export function MessageComposePage() {
             </CardContent>
           </Card>
 
+          {/* === RSVP CONTEXT BANNER === */}
+          {rsvpContext && (
+            <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                <Badge variant="secondary" className="shrink-0">
+                  RSVP
+                </Badge>
+                <span className="truncate">
+                  Sending for: <span className="font-medium">{rsvpContext.eventTitle}</span>
+                  {rsvpContext.eventDate && <span className="text-muted-foreground"> ({rsvpContext.eventDate})</span>}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRsvpListId(null)}
+                aria-label="Detach RSVP list"
+                className="shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
           {/* === MESSAGE Section === */}
           <Card>
             <CardHeader>
@@ -921,6 +1017,30 @@ export function MessageComposePage() {
                       </Button>
                     </div>
                   </VariableDropdown>
+                  {rsvpContext && (
+                    <VariableDropdown label="RSVP Variables" defaultOpen>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{rsvpLink}}')}>
+                          {'{{rsvpLink}}'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{eventTitle}}')}>
+                          {'{{eventTitle}}'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{eventDate}}')}>
+                          {'{{eventDate}}'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => insertAtCursor('{{eventTime}}')}>
+                          {'{{eventTime}}'}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {'{{rsvpLink}}'} resolves per-recipient at send time. {'{{eventTitle/Date/Time}}'} resolve to{' '}
+                        <span className="font-medium">{rsvpContext.eventTitle}</span>
+                        {rsvpContext.eventDate ? ` · ${rsvpContext.eventDate}` : ''}
+                        {rsvpContext.eventTime ? ` ${rsvpContext.eventTime}` : ''}.
+                      </p>
+                    </VariableDropdown>
+                  )}
                   {activeTemplateVars.length > 0 && (
                     <VariableDropdown label="Template Variables" count={activeTemplateVars.length} defaultOpen>
                       <div className="space-y-3 mt-2">
@@ -1267,6 +1387,47 @@ export function MessageComposePage() {
           </div>
         </div>
       </ConfirmDialog>
+      <Dialog open={missingRsvpDialog.open} onOpenChange={(open) => setMissingRsvpDialog((d) => ({...d, open}))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Some recipients aren&apos;t on this RSVP list</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm">
+            <span className="font-medium">{missingRsvpDialog.missingPersonIds.length}</span> of your{' '}
+            {allRecipientIds.length} recipients aren&apos;t on this RSVP list, so their <code>{'{{rsvpLink}}'}</code>{' '}
+            will be blank.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setMissingRsvpDialog({open: false, missingPersonIds: []})}>
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (!rsvpListId) return
+                try {
+                  await addRsvpEntries(rsvpListId, missingRsvpDialog.missingPersonIds)
+                  toast.success(`Added ${missingRsvpDialog.missingPersonIds.length} to the list`)
+                  setMissingRsvpDialog({open: false, missingPersonIds: []})
+                  setSendConfirmOpen(true)
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Failed to add to list')
+                }
+              }}
+            >
+              Add them and continue
+            </Button>
+            <Button
+              onClick={() => {
+                setMissingRsvpDialog({open: false, missingPersonIds: []})
+                setSendConfirmOpen(true)
+              }}
+            >
+              Continue anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}

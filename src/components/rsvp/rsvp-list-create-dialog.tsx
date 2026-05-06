@@ -7,7 +7,7 @@ import {MultiSelect} from '@/components/ui/multi-select'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
 import {fetchGroups} from '@/lib/api'
-import {formatDate} from '@/lib/date'
+import {formatDate, formatDateTime} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {createRsvpList, fetchRsvpCalendarEvents} from '@/lib/rsvp-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
@@ -27,7 +27,7 @@ interface Props {
 export function RsvpListCreateDialog(props: Props) {
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>New RSVP List</DialogTitle>
         </DialogHeader>
@@ -54,6 +54,7 @@ function CreateForm({
   const [nameTouched, setNameTouched] = useState(Boolean(prefillName))
   const [standaloneDate, setStandaloneDate] = useState('')
   const [standaloneTime, setStandaloneTime] = useState('')
+  const [standaloneEndTime, setStandaloneEndTime] = useState('')
   const [groupIds, setGroupIds] = useState<string[]>(prefillGroupId ? [String(prefillGroupId)] : [])
 
   const {data: groups} = useQuery({queryKey: queryKeys.groups, queryFn: fetchGroups})
@@ -76,6 +77,19 @@ function CreateForm({
     setCalendarEventId(resolvedPrefillId)
   }
 
+  // When a calendar event is picked, repopulate the date/time fields from the event
+  // (user can then override). Reset every time the picked event changes.
+  const [lastSyncedEventId, setLastSyncedEventId] = useState('')
+  if (mode === 'calendar' && calendarEventId !== lastSyncedEventId && calendarEvents) {
+    setLastSyncedEventId(calendarEventId)
+    const ev = calendarEvents.find((e) => e.id === Number(calendarEventId))
+    if (ev) {
+      setStandaloneDate(ev.startDate.slice(0, 10))
+      setStandaloneTime(!ev.allDay && ev.startDate.length >= 16 ? ev.startDate.slice(11, 16) : '')
+      setStandaloneEndTime(!ev.allDay && ev.endDate && ev.endDate.length >= 16 ? ev.endDate.slice(11, 16) : '')
+    }
+  }
+
   // Derived name: if user hasn't typed, default from selected calendar event title.
   const derivedName =
     mode === 'calendar' && calendarEventId
@@ -89,8 +103,9 @@ function CreateForm({
         name: name.trim(),
         calendarEventId: mode === 'calendar' && calendarEventId ? Number(calendarEventId) : null,
         standaloneTitle: mode === 'standalone' ? name.trim() : null,
-        standaloneDate: mode === 'standalone' && standaloneDate ? standaloneDate : null,
-        standaloneTime: mode === 'standalone' && standaloneTime ? standaloneTime : null,
+        standaloneDate: standaloneDate || null,
+        standaloneTime: standaloneTime || null,
+        standaloneEndTime: standaloneEndTime || null,
         seedGroupIds: groupIds.map((g) => Number(g)),
       }),
     onSuccess: (list) => {
@@ -123,30 +138,38 @@ function CreateForm({
               onValueChange={setCalendarEventId}
               options={(calendarEvents || []).map((ev) => ({
                 value: String(ev.id),
-                label: `${ev.title} — ${formatDate(ev.startDate)}`,
+                label: `${ev.title} — ${ev.allDay ? formatDate(ev.startDate) : formatDateTime(ev.startDate)}`,
               }))}
               placeholder="Pick a calendar event"
               className="w-full"
             />
           </TabsContent>
-          <TabsContent value="standalone" className="space-y-2 mt-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="rsvp-date">Date</Label>
-                <DatePicker value={standaloneDate} onChange={setStandaloneDate} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="rsvp-time">Time (optional)</Label>
-                <Input
-                  id="rsvp-time"
-                  type="time"
-                  value={standaloneTime}
-                  onChange={(e) => setStandaloneTime(e.target.value)}
-                />
-              </div>
-            </div>
-          </TabsContent>
         </Tabs>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-1">
+            <Label htmlFor="rsvp-date">Date{mode === 'calendar' ? ' (override)' : ''}</Label>
+            <DatePicker value={standaloneDate} onChange={setStandaloneDate} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="rsvp-time">Start{mode === 'calendar' ? ' (override)' : ' (optional)'}</Label>
+            <Input
+              id="rsvp-time"
+              type="time"
+              value={standaloneTime}
+              onChange={(e) => setStandaloneTime(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="rsvp-end-time">End{mode === 'calendar' ? ' (override)' : ' (optional)'}</Label>
+            <Input
+              id="rsvp-end-time"
+              type="time"
+              value={standaloneEndTime}
+              onChange={(e) => setStandaloneEndTime(e.target.value)}
+            />
+          </div>
+        </div>
 
         <div className="space-y-1">
           <Label htmlFor="rsvp-name">List name</Label>

@@ -6,6 +6,7 @@ import {renderTemplate} from '../lib/format.js'
 import {asyncHandler, getGroupName} from '../lib/route-helpers.js'
 import {sendMessageViaUI} from '../services/applescript.js'
 import {type SendJob, cancelJob, createJob, getJob} from '../services/message-queue.js'
+import {buildRsvpLinkMap, rsvpLinkFor} from '../services/rsvp-link.js'
 
 export const messagesRouter = Router()
 
@@ -21,6 +22,7 @@ messagesRouter.post(
       customVarValues,
       scheduledAt,
       templateState,
+      rsvpListId,
     } = req.body as {
       content: string
       recipientIds: number[]
@@ -29,6 +31,7 @@ messagesRouter.post(
       customVarValues?: Record<string, string>
       scheduledAt?: string
       templateState?: string
+      rsvpListId?: number | null
     }
 
     // Fetch global variables and merge with custom var values (custom takes precedence)
@@ -52,6 +55,8 @@ messagesRouter.post(
     const activeRecipients = recipients.filter((r) => !excludeSet.has(r.id) && r.status === 'active')
     const skippedRecipients = recipients.filter((r) => excludeSet.has(r.id) || r.status !== 'active')
 
+    const linkMap = rsvpListId ? buildRsvpLinkMap(rsvpListId, recipients.map((r) => r.id)) : null
+
     // Determine if this is a scheduled send
     let scheduledAtUtc: string | null = null
     let isScheduled = false
@@ -66,11 +71,17 @@ messagesRouter.post(
     }
 
     // Create message record
+    const previewPerson = activeRecipients[0] || recipients[0]
     const message = db
       .insert(schema.messages)
       .values({
         content,
-        renderedPreview: renderTemplate(content, activeRecipients[0] || recipients[0], mergedVarValues),
+        renderedPreview: renderTemplate(
+          content,
+          previewPerson,
+          mergedVarValues,
+          previewPerson ? rsvpLinkFor(previewPerson.id, linkMap) : undefined,
+        ),
         groupId: groupId || null,
         totalRecipients: activeRecipients.length,
         skippedCount: skippedRecipients.length,
@@ -87,7 +98,7 @@ messagesRouter.post(
         .values({
           messageId: message.id,
           personId: person.id,
-          renderedContent: renderTemplate(content, person, mergedVarValues),
+          renderedContent: renderTemplate(content, person, mergedVarValues, rsvpLinkFor(person.id, linkMap)),
           status: 'pending',
         })
         .run()
@@ -98,7 +109,7 @@ messagesRouter.post(
         .values({
           messageId: message.id,
           personId: person.id,
-          renderedContent: renderTemplate(content, person, mergedVarValues),
+          renderedContent: renderTemplate(content, person, mergedVarValues, rsvpLinkFor(person.id, linkMap)),
           status: 'skipped',
         })
         .run()
@@ -288,6 +299,7 @@ messagesRouter.put(
       customVarValues,
       scheduledAt,
       templateState,
+      rsvpListId,
     } = req.body as {
       content: string
       recipientIds: number[]
@@ -296,6 +308,7 @@ messagesRouter.put(
       customVarValues?: Record<string, string>
       scheduledAt?: string
       templateState?: string
+      rsvpListId?: number | null
     }
 
     // Fetch global variables and merge with custom var values
@@ -319,6 +332,8 @@ messagesRouter.put(
     const activeRecipients = recipients.filter((r) => !excludeSet.has(r.id) && r.status === 'active')
     const skippedRecipients = recipients.filter((r) => excludeSet.has(r.id) || r.status !== 'active')
 
+    const linkMap = rsvpListId ? buildRsvpLinkMap(rsvpListId, recipients.map((r) => r.id)) : null
+
     // Determine if this is a scheduled send
     let scheduledAtUtc: string | null = null
     let isScheduled = false
@@ -333,10 +348,16 @@ messagesRouter.put(
     }
 
     // Update message record
+    const previewPerson = activeRecipients[0] || recipients[0]
     db.update(schema.messages)
       .set({
         content,
-        renderedPreview: renderTemplate(content, activeRecipients[0] || recipients[0], mergedVarValues),
+        renderedPreview: renderTemplate(
+          content,
+          previewPerson,
+          mergedVarValues,
+          previewPerson ? rsvpLinkFor(previewPerson.id, linkMap) : undefined,
+        ),
         groupId: groupId || null,
         totalRecipients: activeRecipients.length,
         skippedCount: skippedRecipients.length,
@@ -358,7 +379,7 @@ messagesRouter.put(
         .values({
           messageId,
           personId: person.id,
-          renderedContent: renderTemplate(content, person, mergedVarValues),
+          renderedContent: renderTemplate(content, person, mergedVarValues, rsvpLinkFor(person.id, linkMap)),
           status: 'pending',
         })
         .run()
@@ -369,7 +390,7 @@ messagesRouter.put(
         .values({
           messageId,
           personId: person.id,
-          renderedContent: renderTemplate(content, person, mergedVarValues),
+          renderedContent: renderTemplate(content, person, mergedVarValues, rsvpLinkFor(person.id, linkMap)),
           status: 'skipped',
         })
         .run()

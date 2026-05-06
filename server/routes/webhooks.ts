@@ -2,6 +2,7 @@ import {Router} from 'express'
 
 import {requireInternalSecret} from '../middleware/require-internal-secret.js'
 import {quotesWebhookRouter} from './quotes-webhook.js'
+import {rsvpWebhookRouter} from './rsvp-webhook.js'
 
 export const webhooksRouter = Router()
 
@@ -10,4 +11,4 @@ webhooksRouter.use(requireInternalSecret)
 
 // Tool sub-routers
 webhooksRouter.use('/quotes', quotesWebhookRouter)
-// Future: webhooksRouter.use('/<next-tool>', nextToolWebhookRouter)
+webhooksRouter.use('/rsvp', rsvpWebhookRouter)

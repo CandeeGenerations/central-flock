@@ -1,8 +1,14 @@
+import {randomBytes} from 'node:crypto'
+
 import {and, eq, inArray, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema, sqlite} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
+
+function newPublicToken(): string {
+  return randomBytes(24).toString('base64url')
+}
 
 export const rsvpRouter = Router()
 
@@ -213,7 +219,7 @@ rsvpRouter.post(
 
       if (personIds.size > 0) {
         db.insert(schema.rsvpEntries)
-          .values([...personIds].map((personId) => ({rsvpListId: list.id, personId})))
+          .values([...personIds].map((personId) => ({rsvpListId: list.id, personId, publicToken: newPublicToken()})))
           .run()
       }
 
@@ -296,7 +302,7 @@ rsvpRouter.post(
 
     if (newIds.length > 0) {
       db.insert(schema.rsvpEntries)
-        .values(newIds.map((personId) => ({rsvpListId: id, personId})))
+        .values(newIds.map((personId) => ({rsvpListId: id, personId, publicToken: newPublicToken()})))
         .run()
     }
 

@@ -6,7 +6,6 @@ import {
   CheckSquare,
   FileText,
   FolderOpen,
-  History,
   LayoutDashboard,
   List,
   MessageSquare,
@@ -22,26 +21,34 @@ import {
 } from 'lucide-react'
 import type {LucideIcon} from 'lucide-react'
 
-export type NavChild = {to: string; label: string; icon: LucideIcon; end?: boolean}
+export type NavChild = {to: string; label: string; icon: LucideIcon; end?: boolean; matchPaths?: string[]}
 export type NavGroup = {id: string; label: string; icon: LucideIcon; children: NavChild[]}
 
 /**
- * Returns true when the given child's `to` is the best match for the current pathname.
- * A sibling with a more specific prefix match "wins" — e.g. on /nursery/settings, only
- * /nursery/settings is active (not /nursery).
+ * Returns true when the given child's `to` (or one of its `matchPaths`) is the best match
+ * for the current pathname. A sibling with a more specific prefix match "wins" — e.g. on
+ * /nursery/settings, only /nursery/settings is active (not /nursery).
  */
-export function isChildActive(childTo: string, pathname: string, siblings: {to: string}[]): boolean {
-  if (pathname === childTo) return true
-  if (!pathname.startsWith(childTo + '/')) return false
-  // Only a sibling that is more specific (longer path) than childTo can "win"
-  return !siblings.some(
-    (s) => s.to !== childTo && s.to.length > childTo.length && (pathname === s.to || pathname.startsWith(s.to + '/')),
-  )
+type ActiveTarget = {to: string; matchPaths?: string[]}
+
+export function isChildActive(child: ActiveTarget | string, pathname: string, siblings: ActiveTarget[]): boolean {
+  const target: ActiveTarget = typeof child === 'string' ? {to: child} : child
+  const candidates = [target.to, ...(target.matchPaths ?? [])]
+
+  const matches = (path: string) => pathname === path || pathname.startsWith(path + '/')
+  if (!candidates.some(matches)) return false
+
+  // A sibling with a longer matching path takes precedence (more specific route wins).
+  return !siblings.some((s) => {
+    if (s.to === target.to) return false
+    const sibPaths = [s.to, ...(s.matchPaths ?? [])]
+    return sibPaths.some((p) => p.length > target.to.length && matches(p))
+  })
 }
 
 /** Returns the nav group whose children match the current pathname, or null if none. */
 export function findActiveGroup(pathname: string): NavGroup | null {
-  return navGroups.find((g) => g.children.some((c) => isChildActive(c.to, pathname, g.children))) || null
+  return navGroups.find((g) => g.children.some((c) => isChildActive(c, pathname, g.children))) || null
 }
 
 export const navGroups: NavGroup[] = [
@@ -85,12 +92,22 @@ export const navGroups: NavGroup[] = [
     label: 'Sermon Prep',
     icon: ScrollText,
     children: [
-      {to: '/sermons/quotes', label: 'Quotes', icon: Quote, end: true},
-      {to: '/sermons/research', label: 'Research', icon: Sparkles},
-      {to: '/sermons/searches', label: 'Search History', icon: History},
-      {to: '/sermons/hymns', label: 'Hymns', icon: Music},
-      {to: '/sermons/hymns/searches', label: 'Hymn History', icon: History},
+      {to: '/sermons/quotes', label: 'All Quotes', icon: Quote, end: true},
+      {to: '/sermons/searches', label: 'Quote Research', icon: Sparkles, matchPaths: ['/sermons/research']},
       {to: '/sermons/verse-strips', label: 'Verse Strips', icon: Scissors},
+    ],
+  },
+  {
+    id: 'music',
+    label: 'Music',
+    icon: Music,
+    children: [
+      {
+        to: '/music/hymns/searches',
+        label: 'Song Services',
+        icon: Music,
+        matchPaths: ['/music/hymns'],
+      },
     ],
   },
   {

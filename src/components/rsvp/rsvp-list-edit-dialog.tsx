@@ -43,6 +43,8 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
   const [standaloneDate, setStandaloneDate] = useState(list.standaloneDate || '')
   const [standaloneTime, setStandaloneTime] = useState(list.standaloneTime || '')
   const [standaloneEndTime, setStandaloneEndTime] = useState(list.standaloneEndTime || '')
+  // In calendar mode this acts as the {{eventTitle}} override.
+  const [eventTitleOverride, setEventTitleOverride] = useState(list.calendarEventId ? list.standaloneTitle || '' : '')
 
   const {data: calendarEvents} = useQuery({
     queryKey: queryKeys.rsvpCalendarEvents,
@@ -92,7 +94,7 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
       updateRsvpList(list.id, {
         name: name.trim(),
         calendarEventId: mode === 'calendar' ? (calendarEventId ? Number(calendarEventId) : null) : null,
-        standaloneTitle: mode === 'standalone' ? name.trim() : null,
+        standaloneTitle: mode === 'calendar' ? eventTitleOverride.trim() || null : name.trim(),
         standaloneDate: standaloneDate || null,
         standaloneTime: standaloneTime || null,
         standaloneEndTime: standaloneEndTime || null,
@@ -120,15 +122,26 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
               Standalone
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="calendar" className="space-y-2 mt-3">
-            <Label htmlFor="rsvp-edit-event">Event</Label>
-            <SearchableSelect
-              value={calendarEventId}
-              onValueChange={setCalendarEventId}
-              options={eventOptions}
-              placeholder="Pick a calendar event"
-              className="w-full"
-            />
+          <TabsContent value="calendar" className="space-y-3 mt-3">
+            <div className="space-y-1">
+              <Label htmlFor="rsvp-edit-event">Event</Label>
+              <SearchableSelect
+                value={calendarEventId}
+                onValueChange={setCalendarEventId}
+                options={eventOptions}
+                placeholder="Pick a calendar event"
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rsvp-edit-title-override">Event title (override, optional)</Label>
+              <Input
+                id="rsvp-edit-title-override"
+                value={eventTitleOverride}
+                onChange={(e) => setEventTitleOverride(e.target.value)}
+                placeholder="Leave blank to use the calendar event title"
+              />
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -137,7 +150,7 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
             <Label htmlFor="rsvp-edit-date">Date{mode === 'calendar' ? ' (override)' : ''}</Label>
             <DatePicker value={standaloneDate} onChange={setStandaloneDate} />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label htmlFor="rsvp-edit-time">Start{mode === 'calendar' ? ' (override)' : ' (optional)'}</Label>
               <Input
@@ -145,6 +158,7 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
                 type="time"
                 value={standaloneTime}
                 onChange={(e) => setStandaloneTime(e.target.value)}
+                className="max-w-[10rem]"
               />
             </div>
             <div className="space-y-1">
@@ -154,6 +168,7 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
                 type="time"
                 value={standaloneEndTime}
                 onChange={(e) => setStandaloneEndTime(e.target.value)}
+                className="max-w-[10rem]"
               />
             </div>
           </div>

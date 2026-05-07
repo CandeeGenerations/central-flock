@@ -66,6 +66,7 @@ export const messages = sqliteTable('messages', {
   batchDelayMs: integer('batch_delay_ms').default(5000).notNull(),
   scheduledAt: text('scheduled_at'),
   templateState: text('template_state'),
+  rsvpListId: integer('rsvp_list_id').references(() => rsvpLists.id, {onDelete: 'set null'}),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

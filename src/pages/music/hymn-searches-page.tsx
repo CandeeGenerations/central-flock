@@ -10,7 +10,7 @@ import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {type HymnSearchListItem, deleteHymnSearch, listHymnSearches} from '@/lib/hymns-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Trash2} from 'lucide-react'
+import {Plus, Trash2} from 'lucide-react'
 import {useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -53,10 +53,15 @@ export function HymnSearchesPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <h2 className="text-2xl font-bold">
-        Hymn History
-        {data ? <span className="ml-2 text-base font-normal text-muted-foreground">({data.total})</span> : null}
-      </h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-2xl font-bold">
+          Suggested Song Services
+          {data ? <span className="ml-2 text-base font-normal text-muted-foreground">({data.total})</span> : null}
+        </h2>
+        <Button onClick={() => navigate('/music/hymns')}>
+          <Plus className="h-4 w-4 mr-1" /> New Song Service
+        </Button>
+      </div>
       <Card size="sm">
         <CardContent>
           <SearchInput
@@ -91,7 +96,7 @@ export function HymnSearchesPage() {
                   <TableRow
                     key={s.id}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/sermons/hymns/searches/${s.id}`)}
+                    onClick={() => navigate(`/music/hymns/searches/${s.id}`)}
                   >
                     <TableCell className="font-medium">{s.title}</TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[20rem] truncate">{s.theme}</TableCell>

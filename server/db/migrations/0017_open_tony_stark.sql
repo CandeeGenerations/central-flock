@@ -1,0 +1,1 @@
+ALTER TABLE `messages` ADD `rsvp_list_id` integer REFERENCES rsvp_lists(id);

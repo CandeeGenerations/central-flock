@@ -67,7 +67,7 @@ export const hymnsProvider: SearchProvider<HymnRow> = {
           ...h.scriptureRefs,
         ].filter(Boolean),
         action: ({navigate, close}) => {
-          navigate(`/sermons/hymns?highlight=${h.id}`)
+          navigate(`/music/hymns?highlight=${h.id}`)
           close()
         },
       }

@@ -191,11 +191,11 @@ export function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Birthdays & Anniversaries</CardTitle>
+            <CardTitle>Send-me-a-text Webhook</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <div className="space-y-2">
-              <Label>Send-me-a-text webhook</Label>
+              <Label>Webhook URL</Label>
               <Input
                 type="url"
                 placeholder="https://..."
@@ -213,7 +213,14 @@ export function SettingsPage() {
                 </Button>
               )}
             </div>
+          </CardContent>
+        </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Birthdays & Anniversaries</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Send Time</Label>
               <div className="flex gap-2">

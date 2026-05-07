@@ -93,6 +93,7 @@ messagesRouter.post(
         status: isScheduled ? 'scheduled' : 'pending',
         scheduledAt: scheduledAtUtc,
         templateState: templateState || null,
+        rsvpListId: rsvpListId ?? null,
       })
       .returning()
       .get()
@@ -376,6 +377,7 @@ messagesRouter.put(
         status: isScheduled ? 'scheduled' : 'pending',
         scheduledAt: scheduledAtUtc,
         templateState: templateState || null,
+        rsvpListId: rsvpListId ?? null,
         completedAt: null,
       })
       .where(eq(schema.messages.id, messageId))
@@ -570,6 +572,7 @@ messagesRouter.post(
         selectedIndividualIds: message.groupId ? null : JSON.stringify(selectedIndividualIds),
         excludeIds: excludeIds.length > 0 ? JSON.stringify(excludeIds) : null,
         templateState: message.templateState,
+        rsvpListId: message.rsvpListId ?? null,
       })
       .returning()
       .get()

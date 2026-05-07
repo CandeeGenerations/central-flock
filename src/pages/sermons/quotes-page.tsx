@@ -78,7 +78,7 @@ export function QuotesPage() {
       <div className="p-4 md:p-6 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-2xl font-bold">
-            Quotes
+            All Quotes
             {data ? <span className="ml-2 text-base font-normal text-muted-foreground">({data.total})</span> : null}
           </h2>
           <Button onClick={() => setAddOpen(true)} size="sm">

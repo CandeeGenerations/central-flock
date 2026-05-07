@@ -48,7 +48,7 @@ export function HymnsPrepPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
-      <h2 className="text-2xl font-bold">Song Service Prep</h2>
+      <h2 className="text-2xl font-bold">Suggest a new song service</h2>
 
       <Card>
         <CardHeader className="pb-3">
@@ -139,7 +139,7 @@ export function HymnsPrepPage() {
               {recentSearches.searches.map((s) => (
                 <Link
                   key={s.id}
-                  to={`/sermons/hymns/searches/${s.id}`}
+                  to={`/music/hymns/searches/${s.id}`}
                   className="text-xs px-2 py-1 rounded-full border border-border hover:bg-muted transition-colors"
                 >
                   {s.title}
@@ -167,7 +167,7 @@ export function HymnsPrepPage() {
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground">
                 Generated in {(result.durationMs / 1000).toFixed(1)}s from {result.candidateCount} hymns ·{' '}
-                <Link to={`/sermons/hymns/searches/${result.searchId}`} className="underline">
+                <Link to={`/music/hymns/searches/${result.searchId}`} className="underline">
                   view saved search
                 </Link>
               </p>

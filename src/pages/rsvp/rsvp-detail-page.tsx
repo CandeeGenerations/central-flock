@@ -10,6 +10,7 @@ import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {formatDate, formatDateTime, localTimeFromUTC} from '@/lib/date'
 import {formatFullName} from '@/lib/format'
@@ -151,7 +152,10 @@ export function RsvpDetailPage() {
   const responded = list.counts.total - list.counts.no_response
   const responseRate = list.counts.total > 0 ? Math.round((responded / list.counts.total) * 100) : 0
 
-  const audienceIds = filteredEntries.map((e) => e.personId)
+  // Audience for the Send buttons: row selection wins when there is one, otherwise the
+  // current filter view. Both narrow scope from the full list.
+  const audienceEntries = selectedIds.size > 0 ? filteredEntries.filter((e) => selectedIds.has(e.id)) : filteredEntries
+  const audienceIds = audienceEntries.map((e) => e.personId)
   const audienceCount = audienceIds.length
 
   const handleSendMessage = () => {
@@ -167,7 +171,8 @@ export function RsvpDetailPage() {
       state: {
         selectedIndividualIds: audienceIds,
         rsvpListId: list.id,
-        content: 'Hey {{firstName}}, RSVP for {{eventTitle}} on {{eventDate}}: {{rsvpLink}}',
+        content:
+          'Hey {{firstName}}, you can RSVP for the {{eventTitle}} on {{eventDate}} from {{eventStartTime}} to {{eventEndTime}} here: {{rsvpLink}}',
       },
     })
   }
@@ -225,7 +230,7 @@ export function RsvpDetailPage() {
             <Pencil className="h-4 w-4 mr-2" />
             Edit
           </Button>
-          <Button variant="outline" onClick={() => setDeleteConfirmOpen(true)}>
+          <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)}>
             <Trash2 className="h-4 w-4 mr-2" />
             Delete
           </Button>
@@ -369,8 +374,21 @@ export function RsvpDetailPage() {
                     </Select>
                   </TableCell>
                   <TableCell className="text-center tabular-nums">{entry.headcount ?? '—'}</TableCell>
-                  <TableCell className="max-w-[20rem] truncate text-sm text-muted-foreground">
-                    {entry.note || '—'}
+                  <TableCell className="max-w-[20rem] text-sm text-muted-foreground">
+                    {entry.note ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="block truncate cursor-help">{entry.note}</span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-md whitespace-pre-wrap text-xs">
+                            {entry.note}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      '—'
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                     {entry.respondedAt ? formatDateTime(entry.respondedAt) : '—'}

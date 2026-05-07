@@ -55,6 +55,7 @@ function CreateForm({
   const [standaloneDate, setStandaloneDate] = useState('')
   const [standaloneTime, setStandaloneTime] = useState('')
   const [standaloneEndTime, setStandaloneEndTime] = useState('')
+  const [eventTitleOverride, setEventTitleOverride] = useState('')
   const [groupIds, setGroupIds] = useState<string[]>(prefillGroupId ? [String(prefillGroupId)] : [])
 
   const {data: groups} = useQuery({queryKey: queryKeys.groups, queryFn: fetchGroups})
@@ -102,7 +103,7 @@ function CreateForm({
       createRsvpList({
         name: name.trim(),
         calendarEventId: mode === 'calendar' && calendarEventId ? Number(calendarEventId) : null,
-        standaloneTitle: mode === 'standalone' ? name.trim() : null,
+        standaloneTitle: mode === 'calendar' ? eventTitleOverride.trim() || null : name.trim(),
         standaloneDate: standaloneDate || null,
         standaloneTime: standaloneTime || null,
         standaloneEndTime: standaloneEndTime || null,
@@ -131,18 +132,29 @@ function CreateForm({
               Standalone
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="calendar" className="space-y-2 mt-3">
-            <Label htmlFor="rsvp-calendar-event">Event</Label>
-            <SearchableSelect
-              value={calendarEventId}
-              onValueChange={setCalendarEventId}
-              options={(calendarEvents || []).map((ev) => ({
-                value: String(ev.id),
-                label: `${ev.title} — ${ev.allDay ? formatDate(ev.startDate) : formatDateTime(ev.startDate)}`,
-              }))}
-              placeholder="Pick a calendar event"
-              className="w-full"
-            />
+          <TabsContent value="calendar" className="space-y-3 mt-3">
+            <div className="space-y-1">
+              <Label htmlFor="rsvp-calendar-event">Event</Label>
+              <SearchableSelect
+                value={calendarEventId}
+                onValueChange={setCalendarEventId}
+                options={(calendarEvents || []).map((ev) => ({
+                  value: String(ev.id),
+                  label: `${ev.title} — ${ev.allDay ? formatDate(ev.startDate) : formatDateTime(ev.startDate)}`,
+                }))}
+                placeholder="Pick a calendar event"
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rsvp-title-override">Event title (override, optional)</Label>
+              <Input
+                id="rsvp-title-override"
+                value={eventTitleOverride}
+                onChange={(e) => setEventTitleOverride(e.target.value)}
+                placeholder="Leave blank to use the calendar event title"
+              />
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -151,7 +163,7 @@ function CreateForm({
             <Label htmlFor="rsvp-date">Date{mode === 'calendar' ? ' (override)' : ''}</Label>
             <DatePicker value={standaloneDate} onChange={setStandaloneDate} />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label htmlFor="rsvp-time">Start{mode === 'calendar' ? ' (override)' : ' (optional)'}</Label>
               <Input
@@ -159,6 +171,7 @@ function CreateForm({
                 type="time"
                 value={standaloneTime}
                 onChange={(e) => setStandaloneTime(e.target.value)}
+                className="max-w-[10rem]"
               />
             </div>
             <div className="space-y-1">
@@ -168,6 +181,7 @@ function CreateForm({
                 type="time"
                 value={standaloneEndTime}
                 onChange={(e) => setStandaloneEndTime(e.target.value)}
+                className="max-w-[10rem]"
               />
             </div>
           </div>

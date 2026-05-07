@@ -262,6 +262,7 @@ export function MessageComposePage() {
     setContent(editMessageData.content || '')
     setSelectedGroupId(editMessageData.groupId ? String(editMessageData.groupId) : '')
     setRecipientMode(editMessageData.groupId ? 'group' : 'individual')
+    setRsvpListId(editMessageData.rsvpListId ?? null)
     // Convert scheduledAt UTC back to local datetime-local format
     if (editMessageData.scheduledAt) {
       const d = new Date(editMessageData.scheduledAt + (editMessageData.scheduledAt.endsWith('Z') ? '' : 'Z'))
@@ -902,7 +903,9 @@ export function MessageComposePage() {
                 </Badge>
                 <span className="truncate">
                   Sending for: <span className="font-medium">{rsvpContext.eventTitle}</span>
-                  {rsvpContext.eventDate && <span className="text-muted-foreground"> ({rsvpContext.eventDate})</span>}
+                  {rsvpContextVarValues.eventDate && (
+                    <span className="text-muted-foreground"> ({rsvpContextVarValues.eventDate})</span>
+                  )}
                 </span>
               </div>
               <Button

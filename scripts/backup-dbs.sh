@@ -20,13 +20,21 @@ done
 rm -rf "$DEST/$DATE"
 mv "$TMP" "$DEST/$DATE"
 
-# Retain 5 newest dated folders. Use `while read` instead of xargs so each
-# deletion logs and a single failure doesn't silently swallow the rest.
-cd "$DEST"
-ls -1d 20*/ 2>/dev/null | sort -r | tail -n +6 | while IFS= read -r OLD; do
-  echo "Pruning old backup: $OLD"
-  rm -rf -- "$OLD"
-done
+# Retain 5 newest dated folders. Use `find` with absolute paths rather than
+# `cd $DEST && ls 20*/`: under launchd at 03:00 the relative glob was returning
+# nothing for this iCloud Drive path, so prunes silently no-op'd and 20+
+# folders accumulated.
+ALL=$(find "$DEST" -mindepth 1 -maxdepth 1 -type d -name '20*' | sort -r)
+COUNT=$(printf '%s\n' "$ALL" | grep -c . || true)
+echo "Found $COUNT dated backup folder(s)."
+
+if [ "$COUNT" -gt 5 ]; then
+  printf '%s\n' "$ALL" | tail -n +6 | while IFS= read -r OLD; do
+    [ -n "$OLD" ] || continue
+    echo "Pruning old backup: $OLD"
+    rm -rf -- "$OLD"
+  done
+fi
 
 echo "Retained backups:"
-ls -1d 20*/ 2>/dev/null | sort -r | head -n 5 | sed 's/^/  /'
+printf '%s\n' "$ALL" | head -n 5 | sed 's|^|  |'

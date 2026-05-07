@@ -90,7 +90,7 @@ export function QuotesResearchPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
-      <h2 className="text-2xl font-bold">Research</h2>
+      <h2 className="text-2xl font-bold">New Quote Research</h2>
 
       {/* Topic input */}
       <Card>

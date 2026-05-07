@@ -37,9 +37,11 @@ function loadEntryByToken(token: string) {
       personFirstName: schema.people.firstName,
       personLastName: schema.people.lastName,
       listName: schema.rsvpLists.name,
+      standaloneTitle: schema.rsvpLists.standaloneTitle,
       standaloneDate: schema.rsvpLists.standaloneDate,
       standaloneTime: schema.rsvpLists.standaloneTime,
       standaloneEndTime: schema.rsvpLists.standaloneEndTime,
+      calendarEventTitle: schema.calendarEvents.title,
       calendarEventStartDate: schema.calendarEvents.startDate,
       calendarEventEndDate: schema.calendarEvents.endDate,
     })
@@ -52,22 +54,27 @@ function loadEntryByToken(token: string) {
 }
 
 function buildResponse(entry: NonNullable<ReturnType<typeof loadEntryByToken>>): GetResponse {
+  // Calendar event datetimes are stored as UTC ISO; convert to server-local for display.
+  const localDate = (utc: string) => {
+    const d = new Date(utc)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  const localTime = (utc: string) => {
+    const d = new Date(utc)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
   // Standalone fields act as overrides; fall back to the linked calendar event.
-  const eventDate = entry.standaloneDate ?? entry.calendarEventStartDate?.slice(0, 10) ?? null
+  const eventTitle = entry.standaloneTitle ?? entry.calendarEventTitle ?? entry.listName
+  const eventDate =
+    entry.standaloneDate ?? (entry.calendarEventStartDate ? localDate(entry.calendarEventStartDate) : null)
   const eventTime =
-    entry.standaloneTime ??
-    (entry.calendarEventStartDate && entry.calendarEventStartDate.length >= 16
-      ? entry.calendarEventStartDate.slice(11, 16)
-      : null)
+    entry.standaloneTime ?? (entry.calendarEventStartDate ? localTime(entry.calendarEventStartDate) : null)
   const eventEndTime =
-    entry.standaloneEndTime ??
-    (entry.calendarEventEndDate && entry.calendarEventEndDate.length >= 16
-      ? entry.calendarEventEndDate.slice(11, 16)
-      : null)
+    entry.standaloneEndTime ?? (entry.calendarEventEndDate ? localTime(entry.calendarEventEndDate) : null)
   const isPast = eventDate ? eventDate < todayIso() : false
   return {
     personFirstName: entry.personFirstName,
-    eventTitle: entry.listName,
+    eventTitle,
     eventDate,
     eventTime,
     eventEndTime,
@@ -120,7 +127,8 @@ function buildDiffMessage(opts: {
   // First response: prev was no_response.
   if (prev.status === 'no_response') {
     const head = next.status === 'yes' && next.headcount ? ` (party of ${next.headcount})` : ''
-    return `${personName} RSVPed ${statusLabel(next.status)}${head} to ${eventLabel}`
+    const noteFragment = nextNote ? `, note: "${nextNote}"` : ''
+    return `${personName} RSVPed ${statusLabel(next.status)}${head} to ${eventLabel}${noteFragment}`
   }
 
   // Multi-field change.
@@ -227,7 +235,7 @@ rsvpWebhookRouter.post(
 
     const diff = buildDiffMessage({
       personName: formatPersonName(entry.personFirstName, entry.personLastName),
-      eventTitle: entry.listName,
+      eventTitle: entry.standaloneTitle ?? entry.calendarEventTitle ?? entry.listName,
       eventDateLabel: formatEventDateLabel(built.eventDate),
       prev,
       next,

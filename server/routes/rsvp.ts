@@ -200,7 +200,7 @@ rsvpRouter.post(
         .values({
           name: body.name.trim(),
           calendarEventId: body.calendarEventId ?? null,
-          standaloneTitle: body.calendarEventId ? null : body.standaloneTitle?.trim() || null,
+          standaloneTitle: body.standaloneTitle?.trim() || null,
           standaloneDate: body.standaloneDate || null,
           standaloneTime: body.standaloneTime || null,
           standaloneEndTime: body.standaloneEndTime || null,
@@ -248,11 +248,6 @@ rsvpRouter.patch(
     if (name !== undefined) update.name = String(name).trim()
     if (calendarEventId !== undefined) {
       update.calendarEventId = calendarEventId
-      // When linking to a calendar event, clear the standalone title (the event title takes over).
-      // Date/time fields are kept as overrides — null'd by the client if not desired.
-      if (calendarEventId !== null) {
-        update.standaloneTitle = null
-      }
     }
     if (standaloneTitle !== undefined) update.standaloneTitle = standaloneTitle
     if (standaloneDate !== undefined) update.standaloneDate = standaloneDate
@@ -484,7 +479,8 @@ rsvpRouter.get(
       return
     }
 
-    const eventTitle = list.calendarEventTitle ?? list.standaloneTitle ?? list.name
+    // Standalone title (when set) acts as an override on top of the linked calendar event's title.
+    const eventTitle = list.standaloneTitle ?? list.calendarEventTitle ?? list.name
     // Calendar event datetimes are stored as UTC ISO; convert to server-local for display.
     const localDate = (utc: string) => {
       const d = new Date(utc)

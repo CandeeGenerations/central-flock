@@ -39,7 +39,7 @@ export function HymnSearchDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['hymns', 'searches']})
       toast.success('Search deleted')
-      navigate('/sermons/hymns/searches')
+      navigate('/music/hymns/searches')
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Delete failed'),
   })
@@ -50,7 +50,7 @@ export function HymnSearchDetailPage() {
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
       <div className="flex items-center justify-between gap-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/sermons/hymns/searches')}>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/music/hymns/searches')}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
         <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>

@@ -1,4 +1,4 @@
-import {CollapsibleNavGroup} from '@/components/collapsible-nav-group'
+import {CollapsibleNavGroup, NavPopoverProvider} from '@/components/collapsible-nav-group'
 import {CommandPaletteProvider} from '@/components/command-palette-provider'
 import {Toaster} from '@/components/ui/sonner'
 import {Spinner} from '@/components/ui/spinner'
@@ -34,6 +34,9 @@ import {LoginPage} from '@/pages/login-page'
 import {MessageComposePage} from '@/pages/message-compose-page'
 import {MessageDetailPage} from '@/pages/message-detail-page'
 import {MessageHistoryPage} from '@/pages/message-history-page'
+import {HymnSearchDetailPage} from '@/pages/music/hymn-search-detail-page'
+import {HymnSearchesPage} from '@/pages/music/hymn-searches-page'
+import {HymnsPrepPage} from '@/pages/music/hymns-prep-page'
 import {NurseryScheduleViewPage} from '@/pages/nursery/nursery-schedule-view-page'
 import {NurserySchedulesPage} from '@/pages/nursery/nursery-schedules-page'
 import {NurserySettingsPage} from '@/pages/nursery/nursery-settings-page'
@@ -42,9 +45,6 @@ import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
 import {RsvpDetailPage} from '@/pages/rsvp/rsvp-detail-page'
 import {RsvpListPage} from '@/pages/rsvp/rsvp-list-page'
-import {HymnSearchDetailPage} from '@/pages/sermons/hymn-search-detail-page'
-import {HymnSearchesPage} from '@/pages/sermons/hymn-searches-page'
-import {HymnsPrepPage} from '@/pages/sermons/hymns-prep-page'
 import {QuoteDetailPage} from '@/pages/sermons/quote-detail-page'
 import {QuoteSearchDetailPage} from '@/pages/sermons/quote-search-detail-page'
 import {QuoteSearchesPage} from '@/pages/sermons/quote-searches-page'
@@ -85,16 +85,18 @@ function AuthGate() {
 
 function SidebarNav({onNavClick, collapsed}: {onNavClick?: () => void; collapsed?: boolean}) {
   return (
-    <nav
-      className={cn(
-        'flex-1 space-y-1 overflow-y-auto overflow-x-hidden',
-        collapsed ? 'p-2 flex flex-col items-center' : 'p-3 md:p-2',
-      )}
-    >
-      {navGroups.map((group) => (
-        <CollapsibleNavGroup key={group.id} group={group} onNavClick={onNavClick} collapsed={collapsed} />
-      ))}
-    </nav>
+    <NavPopoverProvider>
+      <nav
+        className={cn(
+          'flex-1 space-y-1 overflow-y-auto overflow-x-hidden',
+          collapsed ? 'p-2 flex flex-col items-center' : 'p-3 md:p-2',
+        )}
+      >
+        {navGroups.map((group) => (
+          <CollapsibleNavGroup key={group.id} group={group} onNavClick={onNavClick} collapsed={collapsed} />
+        ))}
+      </nav>
+    </NavPopoverProvider>
   )
 }
 
@@ -405,10 +407,10 @@ function AppLayoutInner({
               <Route path="/sermons/research" element={<QuotesResearchPage />} />
               <Route path="/sermons/searches" element={<QuoteSearchesPage />} />
               <Route path="/sermons/searches/:id" element={<QuoteSearchDetailPage />} />
-              <Route path="/sermons/hymns" element={<HymnsPrepPage />} />
-              <Route path="/sermons/hymns/searches" element={<HymnSearchesPage />} />
-              <Route path="/sermons/hymns/searches/:id" element={<HymnSearchDetailPage />} />
               <Route path="/sermons/verse-strips" element={<VerseStripsPage />} />
+              <Route path="/music/hymns" element={<HymnsPrepPage />} />
+              <Route path="/music/hymns/searches" element={<HymnSearchesPage />} />
+              <Route path="/music/hymns/searches/:id" element={<HymnSearchDetailPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/calendar/print" element={<CalendarPrintPage />} />
               <Route path="/rsvp" element={<RsvpListPage />} />

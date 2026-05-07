@@ -6,14 +6,35 @@ import {createJob} from './message-queue.js'
 type ProcessSendJobFn = (job: ReturnType<typeof createJob>) => Promise<void>
 
 let intervalId: ReturnType<typeof setInterval> | null = null
+let initialTimeoutId: ReturnType<typeof setTimeout> | null = null
 
-export function startScheduler(processSendJob: ProcessSendJobFn, pollIntervalMs = 300_000) {
+export function startScheduler(processSendJob: ProcessSendJobFn, pollIntervalMs = 300_000, offsetMs = 60_000) {
+  // Run once immediately so a freshly-restarted server picks up due jobs without waiting.
   checkScheduledMessages(processSendJob)
-  intervalId = setInterval(() => checkScheduledMessages(processSendJob), pollIntervalMs)
-  console.log(`Scheduler started (polling every ${pollIntervalMs / 1000}s)`)
+
+  // Align ticks to (period boundary + offset). 5-min epoch boundaries land on :00/:05/:10/...,
+  // so a 60s offset gives :01/:06/:11/... — picking up messages scheduled at e.g. 5:40 by 5:41.
+  const now = Date.now()
+  const periodBoundary = Math.floor(now / pollIntervalMs) * pollIntervalMs
+  let nextTick = periodBoundary + offsetMs
+  if (nextTick <= now) nextTick += pollIntervalMs
+
+  initialTimeoutId = setTimeout(() => {
+    checkScheduledMessages(processSendJob)
+    intervalId = setInterval(() => checkScheduledMessages(processSendJob), pollIntervalMs)
+  }, nextTick - now)
+
+  console.log(
+    `Scheduler started (polling every ${pollIntervalMs / 1000}s, ` +
+      `next tick at ${new Date(nextTick).toISOString()})`,
+  )
 }
 
 export function stopScheduler() {
+  if (initialTimeoutId) {
+    clearTimeout(initialTimeoutId)
+    initialTimeoutId = null
+  }
   if (intervalId) {
     clearInterval(intervalId)
     intervalId = null

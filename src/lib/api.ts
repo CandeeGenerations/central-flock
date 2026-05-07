@@ -229,6 +229,7 @@ export interface Message {
   batchDelayMs: number
   scheduledAt: string | null
   templateState: string | null
+  rsvpListId: number | null
   createdAt: string
   completedAt: string | null
   source: 'manual' | 'birthday_scheduler'

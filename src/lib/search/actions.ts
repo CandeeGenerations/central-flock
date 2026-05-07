@@ -55,8 +55,8 @@ export function buildNavigationActions(): SearchItem[] {
     nav('/devotions/passages', 'Devotion Passages', Sparkles),
     nav('/sermons/quotes', 'Sermon Quotes', Quote),
     nav('/sermons/research', 'Sermon Research', Sparkles),
-    nav('/sermons/hymns', 'Hymn Prep', Music),
-    nav('/sermons/hymns/searches', 'Hymn Search History', Music),
+    nav('/music/hymns', 'Hymn Prep', Music),
+    nav('/music/hymns/searches', 'Hymn Search History', Music),
     nav('/nursery', 'Nursery Schedules', Baby),
     nav('/nursery/workers', 'Nursery Workers', Users),
     nav('/calendar', 'Calendar', Calendar),
@@ -162,9 +162,9 @@ export function buildCreateActions(): SearchItem[] {
       label: 'New Hymn Search',
       group: 'Create',
       icon: Music,
-      keywords: ['new', 'hymn', 'suggest', 'sermon'],
+      keywords: ['new', 'hymn', 'suggest', 'music', 'sermon'],
       action: ({navigate, close}) => {
-        navigate('/sermons/hymns')
+        navigate('/music/hymns')
         close()
       },
     },

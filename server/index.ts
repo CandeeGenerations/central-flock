@@ -26,6 +26,7 @@ import {peopleRouter} from './routes/people.js'
 import {quotesRouter} from './routes/quotes.js'
 import {rsvpRouter} from './routes/rsvp.js'
 import {settingsRouter} from './routes/settings.js'
+import {specialsRouter} from './routes/specials.js'
 import {statsRouter} from './routes/stats.js'
 import {templatesRouter} from './routes/templates.js'
 import {webhooksRouter} from './routes/webhooks.js'
@@ -71,6 +72,7 @@ app.use('/api/quotes', quotesRouter)
 app.use('/api/hymns', hymnsRouter)
 app.use('/api/rsvp', rsvpRouter)
 app.use('/api/settings', settingsRouter)
+app.use('/api/specials', specialsRouter)
 
 // Serve all uploaded media (scan images, nursery logos, special-music sheets, etc.)
 // Root is configurable via UPLOADS_DIR env var; defaults to ./data/.

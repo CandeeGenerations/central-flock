@@ -33,6 +33,7 @@ import {webhooksRouter} from './routes/webhooks.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
 import {startScheduler} from './services/scheduler.js'
+import {startSpecialsScheduler} from './services/specials-scheduler.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -111,5 +112,6 @@ app.listen(PORT, () => {
   startScheduler(processSendJob)
   startBirthdayScheduler()
   startCalendarSyncScheduler()
+  startSpecialsScheduler()
   cleanupOrphanedScanImages()
 })

@@ -3,15 +3,14 @@ import {Router} from 'express'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {fileURLToPath} from 'url'
 
 import {db, schema} from '../db/index.js'
 import {serviceTypes} from '../db/schema-nursery.js'
 import {asyncHandler} from '../lib/route-helpers.js'
+import {uploadPath, uploadUrl} from '../lib/uploads.js'
 import {sendImageViaUI} from '../services/applescript.js'
 
-const __nurseryDir = path.dirname(fileURLToPath(import.meta.url))
-const LOGOS_DIR = path.join(__nurseryDir, '..', '..', 'data', 'nursery-logos')
+const LOGOS_DIR = uploadPath('nursery-logos')
 
 export const nurseryRouter = Router()
 
@@ -238,7 +237,7 @@ nurseryRouter.post(
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
     fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'))
 
-    const logoPath = `/data/nursery-logos/${filename}`
+    const logoPath = uploadUrl('nursery-logos', filename)
 
     // Clean up old logo
     const oldLogo = db.select().from(schema.nurserySettings).where(eq(schema.nurserySettings.key, 'logoPath')).get()

@@ -5,6 +5,7 @@ import path from 'path'
 import {fileURLToPath} from 'url'
 
 import {sqlite} from './db/index.js'
+import {UPLOADS_DIR} from './lib/uploads.js'
 import {requireAuth} from './middleware/auth.js'
 import {authRouter} from './routes/auth.js'
 import {calendarPrintRouter} from './routes/calendar-print.js'
@@ -71,9 +72,9 @@ app.use('/api/hymns', hymnsRouter)
 app.use('/api/rsvp', rsvpRouter)
 app.use('/api/settings', settingsRouter)
 
-// Serve scan images and nursery logos
-app.use('/data/scan-images', express.static(path.join(__dirname, '..', 'data', 'scan-images')))
-app.use('/data/nursery-logos', express.static(path.join(__dirname, '..', 'data', 'nursery-logos')))
+// Serve all uploaded media (scan images, nursery logos, special-music sheets, etc.)
+// Root is configurable via UPLOADS_DIR env var; defaults to ./data/.
+app.use('/uploads', express.static(UPLOADS_DIR))
 
 // In production, serve the built Vite static files
 const distPath = path.join(__dirname, '..', 'dist')
@@ -89,6 +90,19 @@ sqlite
   )
   .run()
 sqlite.prepare(`DELETE FROM settings WHERE key='devotionAiModel'`).run()
+
+// Idempotent boot-time migration: rewrite stored upload URLs from /data/<subdir>/ → /uploads/<subdir>/
+// (one-time path-prefix flip introduced when uploads moved under UPLOADS_DIR; safe to re-run)
+sqlite
+  .prepare(
+    `UPDATE scan_drafts SET image_path = '/uploads/' || substr(image_path, length('/data/') + 1) WHERE image_path LIKE '/data/%'`,
+  )
+  .run()
+sqlite
+  .prepare(
+    `UPDATE nursery_settings SET value = '/uploads/' || substr(value, length('/data/') + 1) WHERE key = 'logoPath' AND value LIKE '/data/%'`,
+  )
+  .run()
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)

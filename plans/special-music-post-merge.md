@@ -69,7 +69,6 @@ Until this runs, `UPLOADS_DIR` defaults to `./data/` and everything works as bef
    ```
 
 6. **Verify** — open the app:
-
    - `/devotions/scan` — saved scans still render (proves `/uploads/scan-images/...` is served from iCloud).
    - `/nursery/settings` — logo still renders.
    - Upload a fresh sheet music PDF on a Special — file lands at `$ICLOUD_ROOT/special-music/<id>-<ts>-<name>.pdf` and the inline preview renders.

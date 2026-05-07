@@ -161,8 +161,8 @@ hymnsRouter.get(
     const conditions: string[] = []
     const params: unknown[] = []
     if (q) {
-      conditions.push(`(title LIKE ? OR first_line LIKE ?)`)
-      params.push(`%${q}%`, `%${q}%`)
+      conditions.push(`(title LIKE ? OR first_line LIKE ? OR refrain_line LIKE ?)`)
+      params.push(`%${q}%`, `%${q}%`, `%${q}%`)
     }
     if (book === 'burgundy' || book === 'silver') {
       conditions.push(`book = ?`)
@@ -196,6 +196,34 @@ hymnsRouter.get(
       page,
       pageSize,
       totalPages: Math.ceil(countRow.count / pageSize),
+    })
+  }),
+)
+
+// GET /api/hymns/:id — single hymn (used by the special-music hymn picker)
+hymnsRouter.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const id = parseInt(String(req.params.id))
+    if (isNaN(id)) {
+      res.status(400).json({error: 'Invalid id'})
+      return
+    }
+    const row = sqlite
+      .prepare(
+        `SELECT id, book, number, title, first_line AS firstLine, refrain_line AS refrainLine,
+                author, composer, tune, meter, topics, scripture_refs AS scriptureRefs, notes
+         FROM hymns WHERE id = ?`,
+      )
+      .get(id) as Record<string, unknown> | undefined
+    if (!row) {
+      res.status(404).json({error: 'Hymn not found'})
+      return
+    }
+    res.json({
+      ...row,
+      topics: JSON.parse(String(row.topics ?? '[]')) as string[],
+      scriptureRefs: JSON.parse(String(row.scriptureRefs ?? '[]')) as string[],
     })
   }),
 )

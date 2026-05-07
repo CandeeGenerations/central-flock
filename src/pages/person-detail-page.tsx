@@ -1,4 +1,5 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
+import {PersonSpecialsCard} from '@/components/specials/person-specials-card'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -533,6 +534,8 @@ export function PersonDetailPage() {
           </CardContent>
         )}
       </Card>
+
+      <PersonSpecialsCard personId={Number(id)} />
 
       {/* Add to Group Dialog */}
       <Dialog open={addGroupOpen} onOpenChange={setAddGroupOpen}>

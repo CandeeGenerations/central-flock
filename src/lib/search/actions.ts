@@ -55,6 +55,7 @@ export function buildNavigationActions(): SearchItem[] {
     nav('/devotions/passages', 'Devotion Passages', Sparkles),
     nav('/sermons/quotes', 'Sermon Quotes', Quote),
     nav('/sermons/research', 'Sermon Research', Sparkles),
+    nav('/music/specials', 'Specials', Sparkles, ['special music', 'performance', 'solo', 'duet']),
     nav('/music/hymns', 'Hymn Prep', Music),
     nav('/music/hymns/searches', 'Hymn Search History', Music),
     nav('/nursery', 'Nursery Schedules', Baby),
@@ -154,6 +155,17 @@ export function buildCreateActions(): SearchItem[] {
       keywords: ['new', 'quote', 'sermon'],
       action: ({navigate, close}) => {
         navigate('/sermons/quotes?new=1')
+        close()
+      },
+    },
+    {
+      id: 'create-special',
+      label: 'New Special',
+      group: 'Create',
+      icon: Sparkles,
+      keywords: ['new', 'special', 'music', 'performance', 'solo', 'duet', 'trio'],
+      action: ({navigate, close}) => {
+        navigate('/music/specials/new')
         close()
       },
     },

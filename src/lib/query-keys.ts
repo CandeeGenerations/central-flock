@@ -46,4 +46,5 @@ export const queryKeys = {
     if (search !== undefined) return ['rsvpNonEntries', String(listId), search] as const
     return ['rsvpNonEntries', String(listId)] as const
   },
+  specials: ['specials'] as const,
 }

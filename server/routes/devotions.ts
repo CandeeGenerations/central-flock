@@ -3,7 +3,6 @@ import {and, asc, desc, eq, inArray, like, or, sql} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'fs'
 import path from 'path'
-import {fileURLToPath} from 'url'
 import * as XLSX from 'xlsx'
 import {YoutubeTranscript} from 'youtube-transcript'
 
@@ -11,14 +10,14 @@ import {db, schema} from '../db/index.js'
 import {AI_MODELS} from '../lib/ai-models.js'
 import {parseReference, referenceKeys} from '../lib/bible-reference.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
+import {uploadPath, uploadUrl, urlToDiskPath} from '../lib/uploads.js'
 import {generateDevotionPassage} from '../services/devotion-generation.js'
 import {importDevotions, parseSheetRows} from '../services/devotion-import.js'
 import {parseDevotionImage} from '../services/devotion-ocr.js'
 
 const anthropic = new Anthropic()
 
-const __devotionsDir = path.dirname(fileURLToPath(import.meta.url))
-const SCAN_IMAGES_DIR = path.join(__devotionsDir, '..', '..', 'data', 'scan-images')
+const SCAN_IMAGES_DIR = uploadPath('scan-images')
 
 export const devotionsRouter = Router()
 
@@ -33,7 +32,7 @@ export function cleanupOrphanedScanImages(): {deleted: number; kept: number} {
   let deleted = 0
   let kept = 0
   for (const file of files) {
-    const relativePath = `/data/scan-images/${file}`
+    const relativePath = uploadUrl('scan-images', file)
     if (activePaths.has(relativePath)) {
       kept++
     } else {
@@ -1245,11 +1244,11 @@ devotionsRouter.post(
     if (image) {
       fs.mkdirSync(SCAN_IMAGES_DIR, {recursive: true})
       const filename = `scan-${Date.now()}.jpg`
-      imagePath = path.join(SCAN_IMAGES_DIR, filename)
+      const fullPath = path.join(SCAN_IMAGES_DIR, filename)
       // Strip data URL prefix if present
       const base64 = image.includes(',') ? image.split(',')[1] : image
-      fs.writeFileSync(imagePath, Buffer.from(base64, 'base64'))
-      imagePath = `/data/scan-images/${filename}`
+      fs.writeFileSync(fullPath, Buffer.from(base64, 'base64'))
+      imagePath = uploadUrl('scan-images', filename)
     }
 
     const result = db
@@ -1284,7 +1283,7 @@ devotionsRouter.put(
         .get()
 
       if (existing?.imagePath) {
-        const oldPath = path.join(__devotionsDir, '..', '..', existing.imagePath)
+        const oldPath = urlToDiskPath(existing.imagePath)
         try {
           fs.unlinkSync(oldPath)
         } catch {
@@ -1297,7 +1296,7 @@ devotionsRouter.put(
       const fullPath = path.join(SCAN_IMAGES_DIR, filename)
       const base64 = image.includes(',') ? image.split(',')[1] : image
       fs.writeFileSync(fullPath, Buffer.from(base64, 'base64'))
-      imagePath = `/data/scan-images/${filename}`
+      imagePath = uploadUrl('scan-images', filename)
     }
 
     const updates: Record<string, unknown> = {
@@ -1324,7 +1323,7 @@ devotionsRouter.delete(
       .get()
 
     if (draft?.imagePath) {
-      const fullPath = path.join(__devotionsDir, '..', '..', draft.imagePath)
+      const fullPath = urlToDiskPath(draft.imagePath)
       try {
         fs.unlinkSync(fullPath)
       } catch {

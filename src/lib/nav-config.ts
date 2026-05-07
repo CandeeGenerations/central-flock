@@ -102,6 +102,7 @@ export const navGroups: NavGroup[] = [
     label: 'Music',
     icon: Music,
     children: [
+      {to: '/music/specials', label: 'Specials', icon: Sparkles},
       {
         to: '/music/hymns/searches',
         label: 'Song Services',

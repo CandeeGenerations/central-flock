@@ -37,6 +37,9 @@ import {MessageHistoryPage} from '@/pages/message-history-page'
 import {HymnSearchDetailPage} from '@/pages/music/hymn-search-detail-page'
 import {HymnSearchesPage} from '@/pages/music/hymn-searches-page'
 import {HymnsPrepPage} from '@/pages/music/hymns-prep-page'
+import {SpecialDetailPage} from '@/pages/music/special-detail-page'
+import {SpecialNewPage} from '@/pages/music/special-new-page'
+import {SpecialsListPage} from '@/pages/music/specials-list-page'
 import {NurseryScheduleViewPage} from '@/pages/nursery/nursery-schedule-view-page'
 import {NurserySchedulesPage} from '@/pages/nursery/nursery-schedules-page'
 import {NurserySettingsPage} from '@/pages/nursery/nursery-settings-page'
@@ -411,6 +414,9 @@ function AppLayoutInner({
               <Route path="/music/hymns" element={<HymnsPrepPage />} />
               <Route path="/music/hymns/searches" element={<HymnSearchesPage />} />
               <Route path="/music/hymns/searches/:id" element={<HymnSearchDetailPage />} />
+              <Route path="/music/specials" element={<SpecialsListPage />} />
+              <Route path="/music/specials/new" element={<SpecialNewPage />} />
+              <Route path="/music/specials/:id" element={<SpecialDetailPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/calendar/print" element={<CalendarPrintPage />} />
               <Route path="/rsvp" element={<RsvpListPage />} />

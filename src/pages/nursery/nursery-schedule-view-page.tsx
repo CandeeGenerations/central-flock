@@ -139,10 +139,25 @@ export function NurseryScheduleViewPage() {
         toast.error(`Send failed: ${failed[0].error || 'Unknown error'}`)
       }
     } catch (error) {
-      toast.error(`Send failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.error('Send schedule error:', error)
+      toast.error(`Send failed: ${describeError(error)}`)
     } finally {
       setSending(false)
     }
+  }
+
+  function describeError(error: unknown): string {
+    if (error instanceof Error && error.message) return error.message
+    if (typeof error === 'string' && error) return error
+    // html-to-image rejects with a DOM Event when an image fails to load —
+    // surface what we can rather than swallowing it as "Unknown error"
+    if (error && typeof error === 'object') {
+      const target = (error as {target?: HTMLImageElement}).target
+      if (target?.tagName === 'IMG') return `Image failed to load: ${target.src || '(empty src)'}`
+      const type = (error as {type?: string}).type
+      if (type) return `${type} event`
+    }
+    return 'Unknown error (check browser console for details)'
   }
 
   async function generateImage(): Promise<string> {
@@ -150,6 +165,10 @@ export function NurseryScheduleViewPage() {
     await document.fonts.ready
     // Clone into a detached container at natural width so nothing clips it
     const clone = previewRef.current.cloneNode(true) as HTMLElement
+    // Pre-resolve <img> sources to data URLs so html-to-image doesn't have to
+    // fetch them itself — its internal fetch silently swallows failures and
+    // then rejects with a DOM Event we can't surface as a useful message.
+    await inlineImagesAsDataUrls(clone)
     const container = document.createElement('div')
     container.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;background:#fff;'
     container.appendChild(clone)
@@ -160,7 +179,7 @@ export function NurseryScheduleViewPage() {
         quality: 0.95,
         pixelRatio: 2,
         backgroundColor: '#ffffff',
-        cacheBust: true,
+        cacheBust: false,
         skipFonts: true,
         width: 800,
         height: clone.scrollHeight,
@@ -168,6 +187,34 @@ export function NurseryScheduleViewPage() {
     } finally {
       document.body.removeChild(container)
     }
+  }
+
+  async function inlineImagesAsDataUrls(root: HTMLElement) {
+    const imgs = Array.from(root.querySelectorAll('img'))
+    await Promise.all(
+      imgs.map(async (img) => {
+        if (!img.src || img.src.startsWith('data:')) return
+        try {
+          const res = await fetch(img.src, {credentials: 'include'})
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const blob = await res.blob()
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(String(reader.result))
+            reader.onerror = () => reject(new Error('FileReader failed'))
+            reader.readAsDataURL(blob)
+          })
+          img.removeAttribute('crossorigin')
+          img.src = dataUrl
+        } catch (err) {
+          const wrapped = new Error(
+            `Failed to load image ${img.src}: ${err instanceof Error ? err.message : String(err)}`,
+          )
+          ;(wrapped as Error & {cause?: unknown}).cause = err
+          throw wrapped
+        }
+      }),
+    )
   }
 
   async function exportAs(format: 'pdf' | 'jpg') {

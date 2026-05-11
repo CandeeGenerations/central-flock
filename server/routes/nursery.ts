@@ -301,11 +301,20 @@ nurseryRouter.post(
           await sendImageViaUI(r.phoneNumber, tmpPath, caption)
           results.push({id: r.id, name: r.firstName || 'Unknown', success: true})
         } catch (err) {
+          console.error(`[nursery/send-image] send to ${r.phoneNumber} failed:`, err)
+          const cause = err instanceof Error ? (err.cause as unknown) : undefined
+          const message =
+            err instanceof Error && err.message
+              ? err.message
+              : typeof err === 'string' && err
+                ? err
+                : 'Send failed (no error message)'
+          const causeMessage = cause instanceof Error ? cause.message : ''
           results.push({
             id: r.id,
             name: r.firstName || 'Unknown',
             success: false,
-            error: err instanceof Error ? err.message : 'Unknown error',
+            error: causeMessage ? `${message} (${causeMessage})` : message,
           })
         }
       }

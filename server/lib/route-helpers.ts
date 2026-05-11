@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import {eq} from 'drizzle-orm'
 import type {Request, Response} from 'express'
 
@@ -8,6 +9,7 @@ export function asyncHandler(
 ): (req: Request, res: Response) => void {
   return (req, res) => {
     fn(req, res).catch((error) => {
+      Sentry.captureException(error)
       console.error('Unhandled route error:', error)
       const message = parseErrorMessage(error)
       res.status(500).json({error: message})

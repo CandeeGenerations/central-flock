@@ -57,12 +57,34 @@ import {VerseStripsPage} from '@/pages/sermons/verse-strips-page'
 import {SettingsPage} from '@/pages/settings-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
-import {QueryClient, QueryClientProvider, useQuery, useQueryClient} from '@tanstack/react-query'
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import {Home, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun} from 'lucide-react'
 import {BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate} from 'react-router-dom'
 
+import {Sentry} from './lib/sentry'
+
 const queryClient = new QueryClient({
   defaultOptions: {queries: {staleTime: 30_000}},
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      // Skip the existing 401 throw from src/lib/api.ts — handled by AuthGate, not a bug.
+      if (error.message === 'Unauthorized') return
+      Sentry.captureException(error, {tags: {queryKey: String(query.queryKey)}})
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error) => {
+      if (error.message === 'Unauthorized') return
+      Sentry.captureException(error)
+    },
+  }),
 })
 
 const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC')

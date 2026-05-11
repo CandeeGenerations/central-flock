@@ -167,6 +167,39 @@ tail -f ~/Library/Logs/central-flock.log
 tail -f ~/Library/Logs/cloudflared.log
 ```
 
+## Monitoring (Sentry)
+
+Sentry instruments both the Express backend and the React frontend for error tracking, performance traces, and cron monitors on the four background schedulers. PII handling and rationale are in [`docs/adr/0002-sentry-pii-policy.md`](docs/adr/0002-sentry-pii-policy.md); the full implementation plan is in [`plans/sentry-integration.md`](plans/sentry-integration.md).
+
+### Required env vars
+
+| Variable             | Where         | Purpose                                                 |
+| -------------------- | ------------- | ------------------------------------------------------- |
+| `SENTRY_DSN_SERVER`  | launchd plist | Server SDK DSN. Sentry is inert when unset.             |
+| `VITE_SENTRY_DSN`    | build env     | Frontend SDK DSN — baked into the bundle at build time. |
+| `SENTRY_ENVIRONMENT` | launchd plist | `production` / `staging`. Defaults to `development`.    |
+| `SENTRY_RELEASE`     | build env     | Git SHA tagged on each release. See build below.        |
+
+### Source map upload (frontend)
+
+Set these in your shell before running `pnpm build` and source maps will upload to Sentry automatically. Skip them and `pnpm build` still works — it just won't upload maps.
+
+```
+SENTRY_AUTH_TOKEN=...   # Sentry CLI token with project:releases scope
+SENTRY_ORG=...
+SENTRY_PROJECT_WEB=central-flock-web   # optional, defaults to this
+```
+
+### Building with release tagging
+
+```bash
+SENTRY_RELEASE=$(git rev-parse --short HEAD) \
+VITE_SENTRY_RELEASE=$(git rev-parse --short HEAD) \
+pnpm build
+```
+
+Without these, builds work but errors won't be correlated to a specific commit.
+
 ## CSV Import Format
 
 The import feature expects CSV files with the following columns:

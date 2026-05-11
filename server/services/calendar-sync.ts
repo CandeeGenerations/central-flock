@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/node'
+
 import {db, schema, sqlite} from '../db/index.js'
 import {getSetting, setSetting} from '../routes/settings.js'
 import {fetchAvailableCalendars, fetchUpcomingEvents} from './calendar.js'
@@ -101,11 +103,18 @@ export function startCalendarSyncScheduler(intervalMs = 60 * 60_000) {
     .catch((err) => console.error('[calendar-sync] Initial sync error:', err))
 
   intervalId = setInterval(() => {
-    syncCalendarEvents()
-      .then((r) => {
+    Sentry.withMonitor(
+      'calendar-sync-scheduler',
+      async () => {
+        const r = await syncCalendarEvents()
         if (r.ok) console.log(`[calendar-sync] Synced ${r.events} events`)
-      })
-      .catch((err) => console.error('[calendar-sync] Scheduled sync error:', err))
+        else throw new Error(r.error ?? 'Sync failed')
+      },
+      {schedule: {type: 'crontab', value: '0 * * * *'}},
+    ).catch((err) => {
+      console.error('[calendar-sync] Scheduled sync error:', err)
+      Sentry.captureException(err)
+    })
   }, intervalMs)
 
   console.log(`Calendar sync scheduler started (every ${Math.round(intervalMs / 60_000)}m)`)

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Auto-deploy when a commit lands on main. Feature branch commits are skipped.
+# Bypass with: SKIP_DEPLOY=1 git commit ...
+
+if [[ -n "${SKIP_DEPLOY:-}" ]]; then
+  echo "post-commit: SKIP_DEPLOY set, skipping deploy"
+  exit 0
+fi
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$BRANCH" != "main" ]]; then
+  exit 0
+fi
+
+echo "post-commit: on main → running deploy"
+./scripts/deploy.sh

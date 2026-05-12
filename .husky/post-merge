@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Auto-deploy when main is advanced by a merge or pull. Feature branch merges
+# are skipped (they're branch-local).
+# Bypass with: SKIP_DEPLOY=1 git pull / git merge
+
+if [[ -n "${SKIP_DEPLOY:-}" ]]; then
+  echo "post-merge: SKIP_DEPLOY set, skipping deploy"
+  exit 0
+fi
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$BRANCH" != "main" ]]; then
+  exit 0
+fi
+
+echo "post-merge: main advanced → running deploy"
+./scripts/deploy.sh

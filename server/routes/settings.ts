@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import {eq, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
@@ -126,7 +127,10 @@ settingsRouter.put(
       .run()
 
     if (key === 'churchCalendarNames') {
-      syncCalendarEvents().catch((err) => console.error('[settings] Calendar sync after update failed:', err))
+      syncCalendarEvents().catch((err) => {
+        console.error('[settings] Calendar sync after update failed:', err)
+        Sentry.captureException(err, {tags: {source: 'settings-calendar-sync'}})
+      })
     }
 
     res.json({key, value})

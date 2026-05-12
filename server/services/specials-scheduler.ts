@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import {and, eq, sql} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
@@ -38,9 +39,11 @@ function scheduleNext() {
   const delay = next.getTime() - now.getTime()
 
   if (timeoutId) clearTimeout(timeoutId)
-  timeoutId = setTimeout(() => {
+  timeoutId = setTimeout(async () => {
     try {
-      rollWillPerformToReview()
+      await Sentry.withMonitor('specials-scheduler', async () => rollWillPerformToReview(), {
+        schedule: {type: 'crontab', value: '0 3 * * *'},
+      })
     } catch (error) {
       console.error('Specials scheduler: error during roll:', error)
     }

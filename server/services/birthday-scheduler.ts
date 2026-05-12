@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import {and, eq, sql} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
@@ -230,16 +231,24 @@ function scheduleNext() {
   if (timeoutId) clearTimeout(timeoutId)
 
   timeoutId = setTimeout(async () => {
-    try {
-      await checkBirthdays()
-    } catch (error) {
-      console.error('Birthday scheduler: error during check:', error)
-    }
-    try {
-      await checkAnniversaries()
-    } catch (error) {
-      console.error('Anniversary scheduler: error during check:', error)
-    }
+    await Sentry.withMonitor(
+      'birthday-scheduler',
+      async () => {
+        try {
+          await checkBirthdays()
+        } catch (error) {
+          console.error('Birthday scheduler: error during check:', error)
+          Sentry.captureException(error)
+        }
+        try {
+          await checkAnniversaries()
+        } catch (error) {
+          console.error('Anniversary scheduler: error during check:', error)
+          Sentry.captureException(error)
+        }
+      },
+      {schedule: {type: 'crontab', value: `${minutes} ${hours} * * *`}},
+    )
     scheduleNext()
   }, delay)
 

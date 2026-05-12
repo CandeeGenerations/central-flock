@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import {eq, inArray} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'fs'
@@ -302,6 +303,7 @@ nurseryRouter.post(
           results.push({id: r.id, name: r.firstName || 'Unknown', success: true})
         } catch (err) {
           console.error(`[nursery/send-image] send to ${r.phoneNumber} failed:`, err)
+          Sentry.captureException(err, {tags: {source: 'nursery-send-image'}})
           const cause = err instanceof Error ? (err.cause as unknown) : undefined
           const message =
             err instanceof Error && err.message

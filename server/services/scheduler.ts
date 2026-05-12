@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import {eq, sql} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
@@ -43,6 +44,12 @@ export function stopScheduler() {
 }
 
 function checkScheduledMessages(processSendJob: ProcessSendJobFn) {
+  return Sentry.withMonitor('message-send-scheduler', () => doCheckScheduledMessages(processSendJob), {
+    schedule: {type: 'crontab', value: '*/5 * * * *'},
+  })
+}
+
+function doCheckScheduledMessages(processSendJob: ProcessSendJobFn) {
   const dueMessages = db
     .select()
     .from(schema.messages)

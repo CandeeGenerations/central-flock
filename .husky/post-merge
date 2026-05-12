@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Auto-deploy when main is advanced by a merge or pull. Feature branch merges
+# are skipped (they're branch-local).
+# Bypass with: SKIP_DEPLOY=1 git pull / git merge
+
+if [[ -n "${SKIP_DEPLOY:-}" ]]; then
+  echo "post-merge: SKIP_DEPLOY set, skipping deploy"
+  exit 0
+fi
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$BRANCH" != "main" ]]; then
+  exit 0
+fi
+
+# Source .env.deploy if present — needed when invoked from GUI git clients
+# (GitHub Desktop, Tower, etc.) that don't inherit the user's shell env.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+if [[ -f "$REPO_ROOT/.env.deploy" ]]; then
+  # shellcheck disable=SC1091
+  source "$REPO_ROOT/.env.deploy"
+fi
+
+echo "post-merge: main advanced → running deploy"
+"$REPO_ROOT/scripts/deploy.sh"

@@ -1,6 +1,14 @@
+// Sentry init runs first (kept here via .prettierrc importOrder) so its instrumentation
+// can patch http/express before those modules are first used.
+// Sentry is preloaded via Node's --import flag (see package.json scripts +
+// the launchd plist's ProgramArguments). That ensures Sentry.init runs before
+// http/express modules load, which lets the OpenTelemetry instrumentation
+// patch them. Importing './lib/sentry.js' here would be a no-op fallback at
+// best and is omitted intentionally.
+import * as Sentry from '@sentry/node'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
-import express from 'express'
+import express, {type NextFunction, type Request, type Response} from 'express'
 import path from 'path'
 import {fileURLToPath} from 'url'
 
@@ -84,6 +92,19 @@ const distPath = path.join(__dirname, '..', 'dist')
 app.use(express.static(distPath))
 app.get('{*path}', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'))
+})
+
+// Sentry error handler — must come after all route registrations.
+// Captures any error passed via next(err) or thrown in an async route that propagates.
+Sentry.setupExpressErrorHandler(app)
+
+// Final JSON error responder — replaces Express's default HTML error page.
+// Sentry has already captured the exception by this point.
+// Four args required for Express to recognize this as an error handler.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('Unhandled error:', err)
+  res.status(500).json({error: 'Internal server error'})
 })
 
 // Idempotent boot-time migration: rename devotionAiModel → defaultAiModel

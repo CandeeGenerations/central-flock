@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import {desc, eq, inArray, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
@@ -656,6 +657,32 @@ export async function processSendJob(job: SendJob) {
       .set({status: 'completed', completedAt: sql`datetime('now')`})
       .where(eq(schema.messages.id, job.messageId))
       .run()
+  }
+
+  // Aggregate Sentry event when send failure rate exceeds 25% — signals real
+  // outages (Messages.app wedged, permissions revoked, broken template) without
+  // per-recipient noise. Per ADR 0002: attach only ids/counts, never recipient
+  // identities or message bodies.
+  const finalCounts = db
+    .select({
+      total: schema.messages.totalRecipients,
+      sent: schema.messages.sentCount,
+      failed: schema.messages.failedCount,
+    })
+    .from(schema.messages)
+    .where(eq(schema.messages.id, job.messageId))
+    .get()
+  if (finalCounts && finalCounts.total > 0 && finalCounts.failed / finalCounts.total > 0.25) {
+    Sentry.captureMessage('send job failure rate exceeded threshold', {
+      level: 'error',
+      tags: {messageId: String(job.messageId)},
+      extra: {
+        total: finalCounts.total,
+        sent: finalCounts.sent,
+        failed: finalCounts.failed,
+        rate: finalCounts.failed / finalCounts.total,
+      },
+    })
   }
 
   job.status = 'completed'

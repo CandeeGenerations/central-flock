@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import {eq, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
@@ -242,7 +243,10 @@ rsvpWebhookRouter.post(
     })
     if (diff) {
       // Fire-and-forget — don't block the response on n8n.
-      sendNotifyMeText(diff).catch((err) => console.error('rsvp-webhook: notify-me failed', err))
+      sendNotifyMeText(diff).catch((err) => {
+        console.error('rsvp-webhook: notify-me failed', err)
+        Sentry.captureException(err, {tags: {source: 'rsvp-webhook-notify'}})
+      })
     }
 
     const reloaded = loadEntryByToken(token)

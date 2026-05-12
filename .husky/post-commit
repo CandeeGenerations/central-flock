@@ -12,5 +12,13 @@ if [[ "$BRANCH" != "main" ]]; then
   exit 0
 fi
 
+# Source .env.deploy if present — needed when invoked from GUI git clients
+# (GitHub Desktop, Tower, etc.) that don't inherit the user's shell env.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+if [[ -f "$REPO_ROOT/.env.deploy" ]]; then
+  # shellcheck disable=SC1091
+  source "$REPO_ROOT/.env.deploy"
+fi
+
 echo "post-commit: on main → running deploy"
-./scripts/deploy.sh
+"$REPO_ROOT/scripts/deploy.sh"

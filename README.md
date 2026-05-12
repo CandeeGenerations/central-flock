@@ -190,15 +190,23 @@ SENTRY_ORG=...
 SENTRY_PROJECT_WEB=central-flock-web   # optional, defaults to this
 ```
 
-### Building with release tagging
+### Deploying
+
+`scripts/deploy.sh` does the full lint → build → plist update → service restart sequence with the current git SHA tagged as the release:
+
+```bash
+./scripts/deploy.sh
+```
+
+Source maps upload during build when `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` are present in your shell. Without them, the build still runs — source maps just don't ship.
+
+For a manual build without the deploy wrapper:
 
 ```bash
 SENTRY_RELEASE=$(git rev-parse --short HEAD) \
 VITE_SENTRY_RELEASE=$(git rev-parse --short HEAD) \
 pnpm build
 ```
-
-Without these, builds work but errors won't be correlated to a specific commit.
 
 ## CSV Import Format
 

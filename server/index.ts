@@ -1,5 +1,10 @@
 // Sentry init runs first (kept here via .prettierrc importOrder) so its instrumentation
 // can patch http/express before those modules are first used.
+// Sentry is preloaded via Node's --import flag (see package.json scripts +
+// the launchd plist's ProgramArguments). That ensures Sentry.init runs before
+// http/express modules load, which lets the OpenTelemetry instrumentation
+// patch them. Importing './lib/sentry.js' here would be a no-op fallback at
+// best and is omitted intentionally.
 import * as Sentry from '@sentry/node'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
@@ -8,7 +13,6 @@ import path from 'path'
 import {fileURLToPath} from 'url'
 
 import {sqlite} from './db/index.js'
-import './lib/sentry.js'
 import {UPLOADS_DIR} from './lib/uploads.js'
 import {requireAuth} from './middleware/auth.js'
 import {authRouter} from './routes/auth.js'

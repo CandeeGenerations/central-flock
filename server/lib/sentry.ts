@@ -1,15 +1,9 @@
 import * as Sentry from '@sentry/node'
 
-// Sentry initializes on module load. Imported early from server/index.ts.
-//
-// NOTE on ESM auto-instrumentation: in ESM, Sentry's automatic OpenTelemetry
-// instrumentation for http/express requires Node's --import preload flag to
-// wrap modules before they're loaded (see Sentry docs for ESM). Without it,
-// manual error capture (captureException, setupExpressErrorHandler) and cron
-// monitors work fine, but automatic perf spans for HTTP/Express are limited.
-// To enable full auto-instrumentation later: run server via
-//   tsx --import ./server/lib/sentry.ts server/index.ts
-// (updates needed in dev script + the launchd plist).
+// Loaded via Node's --import preload flag (see package.json scripts and the
+// launchd plist's ProgramArguments) so Sentry.init runs before http/express
+// modules load. That's what enables the OpenTelemetry auto-instrumentation
+// to wrap them and emit perf spans automatically.
 const dsn = process.env.SENTRY_DSN_SERVER
 const environment = process.env.SENTRY_ENVIRONMENT ?? 'development'
 const release = process.env.SENTRY_RELEASE

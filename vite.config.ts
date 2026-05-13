@@ -36,8 +36,7 @@ export default defineConfig({
     allowedHosts: ['flock.cgen.cc'],
     proxy: {
       '/api': 'http://localhost:5172',
-      '/data/scan-images': 'http://localhost:5172',
-      '/data/nursery-logos': 'http://localhost:5172',
+      '/uploads': 'http://localhost:5172',
     },
   },
 })

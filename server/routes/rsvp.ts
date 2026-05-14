@@ -539,6 +539,352 @@ rsvpRouter.post(
   }),
 )
 
+type MergeListMeta = {
+  id: number
+  name: string
+  calendarEventId: number | null
+  calendarEventTitle: string | null
+  calendarEventStartDate: string | null
+  standaloneTitle: string | null
+  standaloneDate: string | null
+  standaloneTime: string | null
+}
+
+function loadMergeListsMeta(ids: number[]): MergeListMeta[] {
+  if (ids.length === 0) return []
+  return db
+    .select({
+      id: schema.rsvpLists.id,
+      name: schema.rsvpLists.name,
+      calendarEventId: schema.rsvpLists.calendarEventId,
+      calendarEventTitle: schema.calendarEvents.title,
+      calendarEventStartDate: schema.calendarEvents.startDate,
+      standaloneTitle: schema.rsvpLists.standaloneTitle,
+      standaloneDate: schema.rsvpLists.standaloneDate,
+      standaloneTime: schema.rsvpLists.standaloneTime,
+    })
+    .from(schema.rsvpLists)
+    .leftJoin(schema.calendarEvents, eq(schema.rsvpLists.calendarEventId, schema.calendarEvents.id))
+    .where(inArray(schema.rsvpLists.id, ids))
+    .all()
+}
+
+function eventLabel(meta: MergeListMeta): string {
+  const title = meta.standaloneTitle ?? meta.calendarEventTitle ?? meta.name
+  const dateStr = meta.standaloneDate ?? (meta.calendarEventStartDate ? meta.calendarEventStartDate.slice(0, 10) : null)
+  return dateStr ? `${title} — ${dateStr}` : title
+}
+
+function sameEvent(a: MergeListMeta, b: MergeListMeta): boolean {
+  if (a.calendarEventId !== null && b.calendarEventId !== null) {
+    return a.calendarEventId === b.calendarEventId
+  }
+  if (a.calendarEventId === null && b.calendarEventId === null) {
+    return (
+      (a.standaloneTitle ?? '') === (b.standaloneTitle ?? '') && (a.standaloneDate ?? '') === (b.standaloneDate ?? '')
+    )
+  }
+  return false
+}
+
+type EntryRow = {
+  id: number
+  rsvpListId: number
+  personId: number
+  status: Status
+  headcount: number | null
+  note: string | null
+  respondedAt: string | null
+  firstName: string | null
+  lastName: string | null
+}
+
+function loadEntries(listIds: number[]): EntryRow[] {
+  if (listIds.length === 0) return []
+  return db
+    .select({
+      id: schema.rsvpEntries.id,
+      rsvpListId: schema.rsvpEntries.rsvpListId,
+      personId: schema.rsvpEntries.personId,
+      status: schema.rsvpEntries.status,
+      headcount: schema.rsvpEntries.headcount,
+      note: schema.rsvpEntries.note,
+      respondedAt: schema.rsvpEntries.respondedAt,
+      firstName: schema.people.firstName,
+      lastName: schema.people.lastName,
+    })
+    .from(schema.rsvpEntries)
+    .innerJoin(schema.people, eq(schema.rsvpEntries.personId, schema.people.id))
+    .where(inArray(schema.rsvpEntries.rsvpListId, listIds))
+    .all() as EntryRow[]
+}
+
+function scoreEntry(e: EntryRow): number {
+  return (e.status !== 'no_response' ? 2 : 0) + (e.headcount != null ? 1 : 0) + (e.note ? 1 : 0)
+}
+
+type Resolution = {kind: 'target'} | {kind: 'source'; sourceListId: number}
+
+function computeDefaultKeep(targetEntry: EntryRow | null, sourceEntries: EntryRow[]): Resolution {
+  const candidates: {res: Resolution; entry: EntryRow}[] = []
+  if (targetEntry) candidates.push({res: {kind: 'target'}, entry: targetEntry})
+  for (const s of sourceEntries) candidates.push({res: {kind: 'source', sourceListId: s.rsvpListId}, entry: s})
+  candidates.sort((a, b) => {
+    const sd = scoreEntry(b.entry) - scoreEntry(a.entry)
+    if (sd !== 0) return sd
+    // Tie: target wins if present.
+    if (a.res.kind === 'target') return -1
+    if (b.res.kind === 'target') return 1
+    return a.res.kind === 'source' && b.res.kind === 'source' ? a.res.sourceListId - b.res.sourceListId : 0
+  })
+  return candidates[0]!.res
+}
+
+function validateMergeIds(targetId: number, sourceIds: number[]): string | null {
+  if (!Number.isFinite(targetId)) return 'targetId is required'
+  if (!Array.isArray(sourceIds) || sourceIds.length === 0) return 'sourceIds must be a non-empty array'
+  if (sourceIds.some((id) => !Number.isFinite(id))) return 'sourceIds must be numbers'
+  if (sourceIds.includes(targetId)) return 'targetId cannot be in sourceIds'
+  const set = new Set(sourceIds)
+  if (set.size !== sourceIds.length) return 'sourceIds contains duplicates'
+  return null
+}
+
+// POST /api/rsvp/lists/merge/preview
+rsvpRouter.post(
+  '/lists/merge/preview',
+  asyncHandler(async (req, res) => {
+    const {targetId, sourceIds} = req.body as {targetId: number; sourceIds: number[]}
+    const err = validateMergeIds(targetId, sourceIds)
+    if (err) {
+      res.status(400).json({error: err})
+      return
+    }
+
+    const allIds = [targetId, ...sourceIds]
+    const metas = loadMergeListsMeta(allIds)
+    const metaById = new Map(metas.map((m) => [m.id, m]))
+    for (const id of allIds) {
+      if (!metaById.has(id)) {
+        res.status(404).json({error: `RSVP list ${id} not found`})
+        return
+      }
+    }
+    const target = metaById.get(targetId)!
+
+    const entries = loadEntries(allIds)
+    const byPerson = new Map<number, EntryRow[]>()
+    for (const e of entries) {
+      const arr = byPerson.get(e.personId) ?? []
+      arr.push(e)
+      byPerson.set(e.personId, arr)
+    }
+
+    const conflicts: {
+      personId: number
+      firstName: string | null
+      lastName: string | null
+      target: object | null
+      sources: object[]
+      defaultKeep: Resolution
+    }[] = []
+    let tokenLossDefault = 0
+    let totalEntriesAfter = 0
+
+    for (const [personId, rows] of byPerson) {
+      if (rows.length === 1) {
+        totalEntriesAfter++
+        continue
+      }
+      totalEntriesAfter++
+      const targetEntry = rows.find((r) => r.rsvpListId === targetId) ?? null
+      const sourceEntries = rows.filter((r) => r.rsvpListId !== targetId)
+      const defaultKeep = computeDefaultKeep(targetEntry, sourceEntries)
+      // Loss = all rows minus the surviving one.
+      tokenLossDefault += rows.length - 1
+      const summarize = (e: EntryRow) => ({
+        entryId: e.id,
+        status: e.status,
+        headcount: e.headcount,
+        note: e.note,
+        respondedAt: e.respondedAt,
+      })
+      conflicts.push({
+        personId,
+        firstName: rows[0]!.firstName,
+        lastName: rows[0]!.lastName,
+        target: targetEntry ? summarize(targetEntry) : null,
+        sources: sourceEntries.map((s) => {
+          const sourceMeta = metaById.get(s.rsvpListId)!
+          return {...summarize(s), sourceListId: s.rsvpListId, sourceListName: sourceMeta.name}
+        }),
+        defaultKeep,
+      })
+    }
+
+    const sourceMetas = sourceIds.map((id) => metaById.get(id)!)
+    const sourceEntryCounts = new Map<number, number>()
+    for (const e of entries) {
+      if (e.rsvpListId === targetId) continue
+      sourceEntryCounts.set(e.rsvpListId, (sourceEntryCounts.get(e.rsvpListId) ?? 0) + 1)
+    }
+    const sourcesWithDifferentEvent = sourceMetas
+      .filter((sm) => !sameEvent(target, sm))
+      .map((sm) => ({
+        sourceListId: sm.id,
+        sourceListName: sm.name,
+        sourceEventLabel: eventLabel(sm),
+        sourceEntryCount: sourceEntryCounts.get(sm.id) ?? 0,
+      }))
+
+    conflicts.sort(
+      (a, b) =>
+        (a.lastName ?? '').localeCompare(b.lastName ?? '') || (a.firstName ?? '').localeCompare(b.firstName ?? ''),
+    )
+
+    res.json({
+      targetId,
+      targetName: target.name,
+      targetEventLabel: eventLabel(target),
+      sourceCount: sourceIds.length,
+      sourceNames: sourceMetas.map((sm) => ({id: sm.id, name: sm.name, entryCount: sourceEntryCounts.get(sm.id) ?? 0})),
+      totalEntriesAfter,
+      conflicts,
+      sourcesWithDifferentEvent,
+      tokenLossDefault,
+    })
+  }),
+)
+
+// POST /api/rsvp/lists/merge
+rsvpRouter.post(
+  '/lists/merge',
+  asyncHandler(async (req, res) => {
+    const {targetId, sourceIds, resolutions} = req.body as {
+      targetId: number
+      sourceIds: number[]
+      resolutions: {personId: number; keep: Resolution}[]
+    }
+    const err = validateMergeIds(targetId, sourceIds)
+    if (err) {
+      res.status(400).json({error: err})
+      return
+    }
+
+    const allIds = [targetId, ...sourceIds]
+    const metas = loadMergeListsMeta(allIds)
+    const metaById = new Map(metas.map((m) => [m.id, m]))
+    for (const id of allIds) {
+      if (!metaById.has(id)) {
+        res.status(409).json({error: 'One of the selected lists was deleted; reload and try again'})
+        return
+      }
+    }
+
+    const resolutionByPerson = new Map<number, Resolution>(
+      (resolutions ?? []).map((r) => [r.personId, r.keep] as const),
+    )
+
+    const result = sqlite.transaction(() => {
+      const entries = loadEntries(allIds)
+      const entriesBefore = entries.filter((e) => e.rsvpListId === targetId).length
+      const byPerson = new Map<number, EntryRow[]>()
+      for (const e of entries) {
+        const arr = byPerson.get(e.personId) ?? []
+        arr.push(e)
+        byPerson.set(e.personId, arr)
+      }
+
+      let keepTarget = 0
+      let keepSource = 0
+      let tokensLost = 0
+
+      for (const [personId, rows] of byPerson) {
+        if (rows.length === 1) {
+          const only = rows[0]!
+          if (only.rsvpListId !== targetId) {
+            db.update(schema.rsvpEntries)
+              .set({rsvpListId: targetId, updatedAt: sql`datetime('now')`})
+              .where(eq(schema.rsvpEntries.id, only.id))
+              .run()
+          }
+          continue
+        }
+
+        const targetEntry = rows.find((r) => r.rsvpListId === targetId) ?? null
+        const sourceEntries = rows.filter((r) => r.rsvpListId !== targetId)
+        const fallback = computeDefaultKeep(targetEntry, sourceEntries)
+        let chosen = resolutionByPerson.get(personId) ?? fallback
+
+        // Defensive: if a resolution names a source that's no longer present (e.g. concurrent
+        // delete of that entry), fall back to the default.
+        if (chosen.kind === 'source') {
+          const sid = chosen.sourceListId
+          if (!sourceEntries.some((s) => s.rsvpListId === sid)) {
+            chosen = fallback
+          }
+        }
+        // Defensive: if resolution says "target" but target has no entry, fall back.
+        if (chosen.kind === 'target' && !targetEntry) {
+          chosen = fallback
+        }
+
+        if (chosen.kind === 'target') {
+          keepTarget++
+          // Delete all source-side rows for this person.
+          const sourceIdsToDelete = sourceEntries.map((s) => s.id)
+          if (sourceIdsToDelete.length > 0) {
+            db.delete(schema.rsvpEntries).where(inArray(schema.rsvpEntries.id, sourceIdsToDelete)).run()
+            tokensLost += sourceIdsToDelete.length
+          }
+        } else {
+          keepSource++
+          const chosenSourceListId = chosen.sourceListId
+          const winner = sourceEntries.find((s) => s.rsvpListId === chosenSourceListId)!
+          // Delete target's row first to free the (rsvp_list_id, person_id) unique index slot.
+          if (targetEntry) {
+            db.delete(schema.rsvpEntries).where(eq(schema.rsvpEntries.id, targetEntry.id)).run()
+            tokensLost++
+          }
+          // Delete the other losing source rows.
+          const otherLosers = sourceEntries.filter((s) => s.id !== winner.id).map((s) => s.id)
+          if (otherLosers.length > 0) {
+            db.delete(schema.rsvpEntries).where(inArray(schema.rsvpEntries.id, otherLosers)).run()
+            tokensLost += otherLosers.length
+          }
+          // Re-parent the winner to the target list. Token rides along.
+          db.update(schema.rsvpEntries)
+            .set({rsvpListId: targetId, updatedAt: sql`datetime('now')`})
+            .where(eq(schema.rsvpEntries.id, winner.id))
+            .run()
+        }
+      }
+
+      // Any remaining source rows (defensive — shouldn't exist; non-conflicted source rows were
+      // re-parented above) get hard-deleted with the source list.
+      db.delete(schema.rsvpLists).where(inArray(schema.rsvpLists.id, sourceIds)).run()
+
+      const entriesAfter =
+        db
+          .select({count: sql<number>`count(*)`})
+          .from(schema.rsvpEntries)
+          .where(eq(schema.rsvpEntries.rsvpListId, targetId))
+          .get()?.count ?? 0
+
+      return {
+        targetId,
+        entriesBefore,
+        entriesAfter,
+        conflictsResolved: {keepTarget, keepSource},
+        sourcesDeleted: sourceIds.length,
+        tokensLost,
+      }
+    })()
+
+    res.json(result)
+  }),
+)
+
 // GET /api/rsvp/calendar-events?days=120 — synced calendar events for the create dialog picker
 rsvpRouter.get(
   '/calendar-events',

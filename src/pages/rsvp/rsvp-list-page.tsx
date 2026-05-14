@@ -1,6 +1,8 @@
 import {RsvpListCreateDialog} from '@/components/rsvp/rsvp-list-create-dialog'
+import {RsvpMergeDialog} from '@/components/rsvp/rsvp-merge-dialog'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
+import {Checkbox} from '@/components/ui/checkbox'
 import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
@@ -10,7 +12,7 @@ import {formatDate} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {fetchRsvpLists} from '@/lib/rsvp-api'
 import {useQuery} from '@tanstack/react-query'
-import {Plus} from 'lucide-react'
+import {GitMerge, Plus} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {useNavigate, useSearchParams} from 'react-router-dom'
 
@@ -20,6 +22,8 @@ export function RsvpListPage() {
   const [search, setSearch] = usePersistedState('rsvp.search', '')
   const [showPast, setShowPast] = usePersistedState('rsvp.showPast', false)
   const [createOpen, setCreateOpen] = useState(searchParams.get('new') === '1')
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [mergeOpen, setMergeOpen] = useState(false)
 
   const {data, isLoading} = useQuery({
     queryKey: queryKeys.rsvpLists(showPast),
@@ -31,6 +35,40 @@ export function RsvpListPage() {
     if (!q) return data || []
     return (data || []).filter((l) => l.name.toLowerCase().includes(q))
   }, [data, search])
+
+  // Prune selection when filters hide previously-selected lists. Sync-during-render
+  // pattern (https://react.dev/reference/react/useState#storing-information-from-previous-renders).
+  const filteredIdsKey = filtered.map((l) => l.id).join(',')
+  const [lastFilteredKey, setLastFilteredKey] = useState(filteredIdsKey)
+  if (filteredIdsKey !== lastFilteredKey) {
+    setLastFilteredKey(filteredIdsKey)
+    if (selectedIds.size > 0) {
+      const visible = new Set(filtered.map((l) => l.id))
+      let needsPrune = false
+      for (const id of selectedIds) if (!visible.has(id)) needsPrune = true
+      if (needsPrune) {
+        const next = new Set<number>()
+        for (const id of selectedIds) if (visible.has(id)) next.add(id)
+        setSelectedIds(next)
+      }
+    }
+  }
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((l) => selectedIds.has(l.id))
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (allFilteredSelected) {
+        const next = new Set(prev)
+        for (const l of filtered) next.delete(l.id)
+        return next
+      }
+      const next = new Set(prev)
+      for (const l of filtered) next.add(l.id)
+      return next
+    })
+  }
+
+  const selectedLists = useMemo(() => (data || []).filter((l) => selectedIds.has(l.id)), [data, selectedIds])
 
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -63,6 +101,19 @@ export function RsvpListPage() {
           </div>
         </CardContent>
 
+        {selectedIds.size >= 2 && (
+          <div className="border-t bg-muted/40 px-4 py-2 flex flex-wrap items-center gap-2 sticky top-0 z-10">
+            <span className="text-sm font-medium">{selectedIds.size} lists selected</span>
+            <Button size="sm" onClick={() => setMergeOpen(true)}>
+              <GitMerge className="h-4 w-4 mr-1" />
+              Merge lists…
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+              Clear selection
+            </Button>
+          </div>
+        )}
+
         {isLoading ? (
           <CardContent>
             <PageSpinner />
@@ -72,6 +123,9 @@ export function RsvpListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} />
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Event Date</TableHead>
                   <TableHead className="text-center">Yes</TableHead>
@@ -84,7 +138,7 @@ export function RsvpListPage() {
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       {showPast
                         ? 'No RSVP lists yet.'
                         : 'No active RSVP lists. Start one from the Calendar or a Group.'}
@@ -97,6 +151,19 @@ export function RsvpListPage() {
                     className="cursor-pointer hover:bg-muted"
                     onClick={() => navigate(`/rsvp/${l.id}`)}
                   >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(l.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev)
+                            if (checked) next.add(l.id)
+                            else next.delete(l.id)
+                            return next
+                          })
+                        }}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{l.name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {l.effectiveDate ? formatDate(l.effectiveDate) : '—'}
@@ -123,6 +190,17 @@ export function RsvpListPage() {
             next.delete('new')
             setSearchParams(next, {replace: true})
           }
+        }}
+      />
+
+      <RsvpMergeDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        lists={selectedLists}
+        onMerged={(targetId) => {
+          setMergeOpen(false)
+          setSelectedIds(new Set())
+          navigate(`/rsvp/${targetId}`)
         }}
       />
     </div>

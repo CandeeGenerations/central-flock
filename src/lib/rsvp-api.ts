@@ -209,3 +209,65 @@ export interface MissingEntriesCheckResponse {
 export function checkMissingRsvpEntries(listId: number, personIds: number[]): Promise<MissingEntriesCheckResponse> {
   return request(`/lists/${listId}/missing-entries`, {method: 'POST', body: JSON.stringify({personIds})})
 }
+
+export type MergeKeep = {kind: 'target'} | {kind: 'source'; sourceListId: number}
+
+export interface MergeEntrySummary {
+  entryId: number
+  status: RsvpStatus
+  headcount: number | null
+  note: string | null
+  respondedAt: string | null
+}
+
+export interface MergeSourceEntry extends MergeEntrySummary {
+  sourceListId: number
+  sourceListName: string
+}
+
+export interface MergeConflict {
+  personId: number
+  firstName: string | null
+  lastName: string | null
+  target: MergeEntrySummary | null
+  sources: MergeSourceEntry[]
+  defaultKeep: MergeKeep
+}
+
+export interface MergePreview {
+  targetId: number
+  targetName: string
+  targetEventLabel: string
+  sourceCount: number
+  sourceNames: {id: number; name: string; entryCount: number}[]
+  totalEntriesAfter: number
+  conflicts: MergeConflict[]
+  sourcesWithDifferentEvent: {
+    sourceListId: number
+    sourceListName: string
+    sourceEventLabel: string
+    sourceEntryCount: number
+  }[]
+  tokenLossDefault: number
+}
+
+export interface MergeResult {
+  targetId: number
+  entriesBefore: number
+  entriesAfter: number
+  conflictsResolved: {keepTarget: number; keepSource: number}
+  sourcesDeleted: number
+  tokensLost: number
+}
+
+export function previewMergeRsvpLists(targetId: number, sourceIds: number[]): Promise<MergePreview> {
+  return request('/lists/merge/preview', {method: 'POST', body: JSON.stringify({targetId, sourceIds})})
+}
+
+export function commitMergeRsvpLists(
+  targetId: number,
+  sourceIds: number[],
+  resolutions: {personId: number; keep: MergeKeep}[],
+): Promise<MergeResult> {
+  return request('/lists/merge', {method: 'POST', body: JSON.stringify({targetId, sourceIds, resolutions})})
+}

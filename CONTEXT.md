@@ -187,3 +187,23 @@ Pattern mirrors the **Devotion List page** (referenced elsewhere in this doc).
 - **Add person to list:** `+ Add Person` button on the detail page opens a search dialog modeled after the "Add Members to Group" dialog (`src/pages/group-detail-page.tsx:404`). Excludes people already on the list. Multi-select; new entries default to status = No-Response.
 - **Person deletion behavior:** cascade. `rsvp_entries.person_id` has `onDelete: 'cascade'` to mirror existing patterns (`peopleGroups`, `birthdayMessagesSent`).
 - **Edit list metadata:** a list-edit dialog allows changing the name, standalone date/time, and (re)linking the Calendar event.
+
+### RSVP list merge
+
+Folding multiple RSVP Lists into one. Directional: the user picks one selected list as the **target** (its id, URL, name, and event metadata survive) and the others become **sources** (hard-deleted after their entries are absorbed). N ≥ 2 sources supported in a single merge. Cross-event merges are allowed — target's event link wins regardless of what sources were linked to.
+
+**Trigger:** row checkboxes on `/rsvp`; when ≥2 lists are checked, a sticky toolbar surfaces "Merge lists…" (mirrors the RSVP detail page's bulk-action toolbar pattern). The dialog flow is: target picker (radio, pre-selected to the list with the most entries) → conflict picker (only if any overlapping people) → confirm screen → commit.
+
+**Conflict resolution:** a person on more than one of the selected lists is a conflict. The picker shows one row per conflicted person with a radio per side displaying the full entry summary (`status`, `headcount`, `note`, `respondedAt`). Default pre-selects the **most-informative** side (a real response beats `no_response`; non-null headcount/note breaks further ties; target wins true ties). Selection is **whole-entry** — the chosen side's row survives intact (including its `publicToken`); the other side's row is deleted. No field-mixing.
+
+**Token & URL behavior:** the chosen entry's `publicToken` is what survives the merge for that person. This means any public RSVP URL pointing at a _non-chosen_ entry — including target's own existing URL when the user picks a source-side entry — will 404 after the merge. The confirm screen surfaces a one-line warning ("N public RSVP links from removed entries will stop working") whenever there is at least one conflict or non-empty source.
+
+**Confirm screen contents:**
+
+- Merged-list size (was → will be).
+- Conflict count with target/source split (e.g., "5 conflicts: 3 keep target, 2 keep source").
+- Names of source lists that will be deleted.
+- "Event stays: <event title>" line confirming target's event metadata survives.
+- Cross-event line when any source linked to a different calendar event than target (e.g., "⚠ 'Choir' is linked to a different event (Picnic). Its 12 entries will be folded in.").
+- Broken-URL warning (see above).
+- Hard delete; no soft-delete window, no undo. The multi-step gate (select → target → picker → confirm) is the safety net.

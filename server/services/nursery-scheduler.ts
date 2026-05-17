@@ -25,11 +25,33 @@ export interface ScheduleSlot {
   serviceType: ServiceType
   slot: number
   workerId: number | null
+  isCarryover?: boolean
+}
+
+export interface PriorMonthAssignment {
+  date: string
+  serviceType: ServiceType
+  slot: number
+  workerId: number | null
 }
 
 export interface DatePair {
   sunday: string
   wednesday: string
+}
+
+// Returns the borrowed-pair dates (Sunday + Wednesday) when the target month
+// has fewer than 5 native Sundays and the first pair spills into the prior
+// month. Returns null when no borrow occurs.
+export function getBorrowedPairDates(
+  month: number,
+  year: number,
+): {dates: string[]; priorMonth: number; priorYear: number} | null {
+  const pairs = computeDatePairs(month, year)
+  if (pairs.length === 0) return null
+  const [y, m] = pairs[0].sunday.split('-').map(Number)
+  if (m === month && y === year) return null
+  return {dates: [pairs[0].sunday, pairs[0].wednesday], priorMonth: m, priorYear: y}
 }
 
 function formatDate(d: Date): string {
@@ -100,7 +122,12 @@ export function buildSlots(pairs: DatePair[], serviceConfig: ServiceConfig[]): S
   return slots
 }
 
-export function assignWorkers(slots: ScheduleSlot[], workers: WorkerWithEligibility[]): ScheduleSlot[] {
+export function assignWorkers(
+  slots: ScheduleSlot[],
+  workers: WorkerWithEligibility[],
+  priorMonthAssignments: PriorMonthAssignment[] = [],
+  carryoverDates: Set<string> = new Set(),
+): ScheduleSlot[] {
   const activeWorkers = workers.filter((w) => w.services.length > 0)
 
   // Counters
@@ -120,6 +147,36 @@ export function assignWorkers(slots: ScheduleSlot[], workers: WorkerWithEligibil
   }
 
   for (const slot of slots) {
+    // Carryover slot: copy from prior month's assignment, skip caps, seed only
+    // physical-reality constraints (dayAssignments + assignmentsByServiceDate)
+    // so adjacent native slots still respect the same-day / prev-date rules.
+    if (carryoverDates.has(slot.date)) {
+      const prior = priorMonthAssignments.find(
+        (a) => a.date === slot.date && a.serviceType === slot.serviceType && a.slot === slot.slot,
+      )
+      slot.workerId = prior?.workerId ?? null
+      slot.isCarryover = true
+
+      if (slot.workerId !== null && dayAssignments.has(slot.workerId)) {
+        const dayMap = dayAssignments.get(slot.workerId)!
+        dayMap.set(slot.date, (dayMap.get(slot.date) || 0) + 1)
+      }
+      if (slot.workerId !== null) {
+        let dateMap = assignmentsByServiceDate.get(slot.serviceType)
+        if (!dateMap) {
+          dateMap = new Map()
+          assignmentsByServiceDate.set(slot.serviceType, dateMap)
+        }
+        let dateSet = dateMap.get(slot.date)
+        if (!dateSet) {
+          dateSet = new Set()
+          dateMap.set(slot.date, dateSet)
+        }
+        dateSet.add(slot.workerId)
+      }
+      continue
+    }
+
     // Workers already assigned to another slot of this same service+date (no double-booking)
     const alreadyAssignedSameServiceDate = new Set(
       slots
@@ -266,8 +323,11 @@ export function generateSchedule(
   year: number,
   workers: WorkerWithEligibility[],
   serviceConfig: ServiceConfig[],
+  priorMonthAssignments: PriorMonthAssignment[] = [],
 ): ScheduleSlot[] {
   const pairs = computeDatePairs(month, year)
   const slots = buildSlots(pairs, serviceConfig)
-  return assignWorkers(slots, workers)
+  const borrow = getBorrowedPairDates(month, year)
+  const carryoverDates = new Set(borrow?.dates ?? [])
+  return assignWorkers(slots, workers, priorMonthAssignments, carryoverDates)
 }

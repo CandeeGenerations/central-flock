@@ -63,10 +63,24 @@ export interface NurseryAssignment {
   slot: number
   workerId: number | null
   workerName: string | null
+  isCarryover: boolean
+  sourceScheduleId: number | null
+  sourceMonth: number | null
+  sourceYear: number | null
+}
+
+export interface ScheduleOverlapInfo {
+  borrowDates: string[]
+  priorMonth: number
+  priorYear: number
+  priorScheduleId: number | null
+  priorScheduleStatus: 'draft' | 'final' | null
+  missing: boolean
 }
 
 export interface ScheduleWithAssignments extends NurserySchedule {
   assignments: NurseryAssignment[]
+  overlap: ScheduleOverlapInfo | null
 }
 
 // ── Workers ──────────────────────────────────────────────────────────

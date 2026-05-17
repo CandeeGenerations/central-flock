@@ -1,10 +1,10 @@
-import {desc, eq} from 'drizzle-orm'
+import {and, desc, eq, inArray} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
-import type {ServiceConfig, WorkerWithEligibility} from '../services/nursery-scheduler.js'
-import {generateSchedule} from '../services/nursery-scheduler.js'
+import type {PriorMonthAssignment, ServiceConfig, WorkerWithEligibility} from '../services/nursery-scheduler.js'
+import {generateSchedule, getBorrowedPairDates} from '../services/nursery-scheduler.js'
 
 export const nurserySchedulesRouter = Router()
 
@@ -27,11 +27,60 @@ function loadServiceConfig(): ServiceConfig[] {
   return db.select().from(schema.nurseryServiceConfig).orderBy(schema.nurseryServiceConfig.sortOrder).all()
 }
 
+// Returns the prior month's "canonical" schedule for overlap lookup:
+// prefer status='final', fall back to most-recently-updated 'draft'.
+function findPriorMonthSchedule(priorMonth: number, priorYear: number) {
+  const candidates = db
+    .select()
+    .from(schema.nurserySchedules)
+    .where(and(eq(schema.nurserySchedules.month, priorMonth), eq(schema.nurserySchedules.year, priorYear)))
+    .all()
+  if (candidates.length === 0) return null
+  const finalOne = candidates.find((s) => s.status === 'final')
+  if (finalOne) return finalOne
+  const drafts = candidates.filter((s) => s.status === 'draft').sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+  return drafts[0] ?? null
+}
+
+function loadPriorMonthOverlapAssignments(
+  month: number,
+  year: number,
+): {
+  borrow: NonNullable<ReturnType<typeof getBorrowedPairDates>>
+  priorSchedule: {id: number; status: string} | null
+  assignments: PriorMonthAssignment[]
+} | null {
+  const borrow = getBorrowedPairDates(month, year)
+  if (!borrow) return null
+
+  const priorSchedule = findPriorMonthSchedule(borrow.priorMonth, borrow.priorYear)
+  if (!priorSchedule) {
+    return {borrow, priorSchedule: null, assignments: []}
+  }
+
+  const rows = db
+    .select()
+    .from(schema.nurseryAssignments)
+    .where(
+      and(
+        eq(schema.nurseryAssignments.scheduleId, priorSchedule.id),
+        inArray(schema.nurseryAssignments.date, borrow.dates),
+      ),
+    )
+    .all()
+
+  return {
+    borrow,
+    priorSchedule: {id: priorSchedule.id, status: priorSchedule.status},
+    assignments: rows.map((r) => ({date: r.date, serviceType: r.serviceType, slot: r.slot, workerId: r.workerId})),
+  }
+}
+
 function loadScheduleWithAssignments(scheduleId: number) {
   const schedule = db.select().from(schema.nurserySchedules).where(eq(schema.nurserySchedules.id, scheduleId)).get()
   if (!schedule) return null
 
-  const assignments = db
+  const ownAssignments = db
     .select()
     .from(schema.nurseryAssignments)
     .where(eq(schema.nurseryAssignments.scheduleId, scheduleId))
@@ -40,12 +89,59 @@ function loadScheduleWithAssignments(scheduleId: number) {
   const workers = db.select().from(schema.nurseryWorkers).all()
   const workerMap = new Map(workers.map((w) => [w.id, w]))
 
-  const enrichedAssignments = assignments.map((a) => ({
+  const overlap = loadPriorMonthOverlapAssignments(schedule.month, schedule.year)
+  const carryoverDates = new Set(overlap?.borrow.dates ?? [])
+
+  // Defensive: filter out any persisted rows for carryover dates so live-resolve
+  // is the single source of truth even if a row leaked through.
+  const nativeAssignments = ownAssignments.filter((a) => !carryoverDates.has(a.date))
+
+  let priorRows: (typeof ownAssignments)[number][] = []
+  if (overlap?.priorSchedule) {
+    priorRows = db
+      .select()
+      .from(schema.nurseryAssignments)
+      .where(
+        and(
+          eq(schema.nurseryAssignments.scheduleId, overlap.priorSchedule.id),
+          inArray(schema.nurseryAssignments.date, overlap.borrow.dates),
+        ),
+      )
+      .all()
+  }
+
+  const enrichedNative = nativeAssignments.map((a) => ({
     ...a,
     workerName: a.workerId ? workerMap.get(a.workerId)?.name || null : null,
+    isCarryover: false as const,
+    sourceScheduleId: null as number | null,
+    sourceMonth: null as number | null,
+    sourceYear: null as number | null,
   }))
 
-  return {...schedule, assignments: enrichedAssignments}
+  const enrichedCarryover = priorRows.map((a) => ({
+    ...a,
+    workerName: a.workerId ? workerMap.get(a.workerId)?.name || null : null,
+    isCarryover: true as const,
+    sourceScheduleId: overlap!.priorSchedule!.id,
+    sourceMonth: overlap!.borrow.priorMonth,
+    sourceYear: overlap!.borrow.priorYear,
+  }))
+
+  return {
+    ...schedule,
+    assignments: [...enrichedNative, ...enrichedCarryover],
+    overlap: overlap
+      ? {
+          borrowDates: overlap.borrow.dates,
+          priorMonth: overlap.borrow.priorMonth,
+          priorYear: overlap.borrow.priorYear,
+          priorScheduleId: overlap.priorSchedule?.id ?? null,
+          priorScheduleStatus: overlap.priorSchedule?.status ?? null,
+          missing: overlap.priorSchedule === null,
+        }
+      : null,
+  }
 }
 
 // ── Schedule CRUD ────────────────────────────────────────────────────
@@ -73,7 +169,8 @@ nurserySchedulesRouter.post(
 
     const workers = loadWorkers()
     const serviceConfig = loadServiceConfig()
-    const slots = generateSchedule(month, year, workers, serviceConfig)
+    const overlap = loadPriorMonthOverlapAssignments(month, year)
+    const slots = generateSchedule(month, year, workers, serviceConfig, overlap?.assignments ?? [])
 
     // Delete existing draft for this month if one exists
     const existingDraft = db
@@ -90,8 +187,9 @@ nurserySchedulesRouter.post(
     // Create new schedule
     const schedule = db.insert(schema.nurserySchedules).values({month, year}).returning().get()
 
-    // Bulk insert assignments
+    // Bulk insert assignments — skip carryover slots; they're live-resolved at view time.
     for (const slot of slots) {
+      if (slot.isCarryover) continue
       db.insert(schema.nurseryAssignments)
         .values({
           scheduleId: schedule.id,

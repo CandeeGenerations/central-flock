@@ -1,6 +1,7 @@
-import {HymnSearchPicker} from '@/components/specials/hymn-search-picker'
 import {PerformerMultiPicker} from '@/components/specials/performer-multi-picker'
+import {SongPicker} from '@/components/specials/song-picker'
 import {Button} from '@/components/ui/button'
+import {DatePicker} from '@/components/ui/date-time-picker'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
@@ -15,8 +16,8 @@ import {
   specialsApi,
 } from '@/lib/specials-api'
 import {useQuery} from '@tanstack/react-query'
-import {AlertTriangle} from 'lucide-react'
-import {useEffect, useMemo} from 'react'
+import {AlertTriangle, ChevronDown, ChevronRight} from 'lucide-react'
+import {useEffect, useMemo, useState} from 'react'
 
 export interface SpecialFormState {
   date: string
@@ -90,8 +91,6 @@ export function SpecialForm({state, onChange, excludeSpecialId}: SpecialFormProp
   const debouncedSong = useDebouncedValue(state.songTitle, 400)
   const debouncedPerformers = useDebouncedValue(state.performerIds.join(','), 400)
 
-  // Auto-suggest type when count of performers changes — but never silently
-  // overwrite a manual choice of 'instrumental' or 'other'.
   const lastSuggestedType = useMemo(
     () => deriveType(state.performerIds.length, state.guestPerformers.length),
     [state.performerIds.length, state.guestPerformers.length],
@@ -117,17 +116,22 @@ export function SpecialForm({state, onChange, excludeSpecialId}: SpecialFormProp
     enabled: state.songTitle.trim().length > 0 || state.performerIds.length > 0,
   })
 
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreCount = [state.songArranger, state.songWriter, state.occasion, state.youtubeUrl, state.notes].filter(
+    (v) => v.trim().length > 0,
+  ).length
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <Label htmlFor="date">Date</Label>
-          <Input id="date" type="date" value={state.date} onChange={(e) => set('date', e.target.value)} />
+          <DatePicker value={state.date} onChange={(v) => set('date', v)} />
         </div>
         <div>
           <Label htmlFor="service-type">Service</Label>
           <Select value={state.serviceType} onValueChange={(v) => set('serviceType', v as ServiceType)}>
-            <SelectTrigger id="service-type">
+            <SelectTrigger id="service-type" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -147,46 +151,30 @@ export function SpecialForm({state, onChange, excludeSpecialId}: SpecialFormProp
             />
           )}
         </div>
+        <div>
+          <Label htmlFor="type">Type</Label>
+          <Select value={state.type} onValueChange={(v) => set('type', v as SpecialType)}>
+            <SelectTrigger id="type" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(SPECIAL_TYPE_LABELS) as SpecialType[]).map((t) => (
+                <SelectItem key={t} value={t}>
+                  {SPECIAL_TYPE_LABELS[t]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="song-title">Song title</Label>
-        <Input
-          id="song-title"
-          value={state.songTitle}
-          onChange={(e) => set('songTitle', e.target.value)}
-          placeholder="e.g. Be Thou My Vision"
+        <Label>Song</Label>
+        <SongPicker
+          songTitle={state.songTitle}
+          hymnId={state.hymnId}
+          onChange={({songTitle, hymnId}) => onChange({...state, songTitle, hymnId})}
         />
-        <HymnSearchPicker
-          value={state.hymnId}
-          onSelect={(hymn) => {
-            if (hymn) {
-              onChange({
-                ...state,
-                hymnId: hymn.id,
-                songTitle: state.songTitle.trim() ? state.songTitle : hymn.title,
-              })
-            } else {
-              set('hymnId', null)
-            }
-          }}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="arranger">Arranger</Label>
-          <Input
-            id="arranger"
-            value={state.songArranger}
-            onChange={(e) => set('songArranger', e.target.value)}
-            placeholder='e.g. "arr. Mark Hayes"'
-          />
-        </div>
-        <div>
-          <Label htmlFor="writer">Writer</Label>
-          <Input id="writer" value={state.songWriter} onChange={(e) => set('songWriter', e.target.value)} />
-        </div>
       </div>
 
       <div>
@@ -199,46 +187,57 @@ export function SpecialForm({state, onChange, excludeSpecialId}: SpecialFormProp
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="type">Type</Label>
-          <Select value={state.type} onValueChange={(v) => set('type', v as SpecialType)}>
-            <SelectTrigger id="type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(SPECIAL_TYPE_LABELS) as SpecialType[]).map((t) => (
-                <SelectItem key={t} value={t}>
-                  {SPECIAL_TYPE_LABELS[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="occasion">Occasion</Label>
-          <Input
-            id="occasion"
-            value={state.occasion}
-            onChange={(e) => set('occasion', e.target.value)}
-            placeholder="e.g. Easter, Mother's Day"
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="youtube">YouTube URL</Label>
-        <Input
-          id="youtube"
-          value={state.youtubeUrl}
-          onChange={(e) => set('youtubeUrl', e.target.value)}
-          placeholder="https://www.youtube.com/watch?v=..."
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea id="notes" value={state.notes} onChange={(e) => set('notes', e.target.value)} rows={3} />
+      <div className="rounded-3xl bg-input/50 ring-1 ring-foreground/5 dark:ring-foreground/10 overflow-hidden">
+        <button
+          type="button"
+          className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors cursor-pointer"
+          onClick={() => setMoreOpen(!moreOpen)}
+        >
+          {moreOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          More details
+          {moreCount > 0 && <span className="text-xs text-muted-foreground">({moreCount})</span>}
+        </button>
+        {moreOpen && (
+          <div className="mx-2 mt-2 mb-2 rounded-2xl bg-card p-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="arranger">Arranger</Label>
+                <Input
+                  id="arranger"
+                  value={state.songArranger}
+                  onChange={(e) => set('songArranger', e.target.value)}
+                  placeholder='e.g. "arr. Mark Hayes"'
+                />
+              </div>
+              <div>
+                <Label htmlFor="writer">Writer</Label>
+                <Input id="writer" value={state.songWriter} onChange={(e) => set('songWriter', e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="occasion">Occasion</Label>
+              <Input
+                id="occasion"
+                value={state.occasion}
+                onChange={(e) => set('occasion', e.target.value)}
+                placeholder="e.g. Easter, Mother's Day"
+              />
+            </div>
+            <div>
+              <Label htmlFor="youtube">YouTube URL</Label>
+              <Input
+                id="youtube"
+                value={state.youtubeUrl}
+                onChange={(e) => set('youtubeUrl', e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+              />
+            </div>
+            <div>
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea id="notes" value={state.notes} onChange={(e) => set('notes', e.target.value)} rows={3} />
+            </div>
+          </div>
+        )}
       </div>
 
       {warnings && (warnings.songRepeat || warnings.performerRepeats.length > 0) && (

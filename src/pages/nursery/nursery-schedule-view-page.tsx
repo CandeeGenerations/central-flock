@@ -45,6 +45,7 @@ export function NurseryScheduleViewPage() {
   const queryClient = useQueryClient()
   const previewRef = useRef<HTMLDivElement>(null)
   const [editMode, setEditMode] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const [selectedRecipientId, setSelectedRecipientId] = usePersistedState<string>('nursery.lastRecipientId', '')
@@ -122,8 +123,10 @@ export function NurseryScheduleViewPage() {
     try {
       const wasEditing = editMode
       if (wasEditing) setEditMode(false)
+      setExporting(true)
       await new Promise((r) => setTimeout(r, 100))
       const imageData = await generateImage()
+      setExporting(false)
       if (wasEditing) setEditMode(true)
       const {results} = await sendScheduleImage({
         imageData,
@@ -142,6 +145,7 @@ export function NurseryScheduleViewPage() {
       console.error('Send schedule error:', error)
       toast.error(`Send failed: ${describeError(error)}`)
     } finally {
+      setExporting(false)
       setSending(false)
     }
   }
@@ -225,6 +229,7 @@ export function NurseryScheduleViewPage() {
     try {
       const wasEditing = editMode
       if (wasEditing) setEditMode(false)
+      setExporting(true)
       await new Promise((r) => setTimeout(r, 100))
 
       const dataUrl = await generateImage()
@@ -270,11 +275,13 @@ export function NurseryScheduleViewPage() {
         pdf.save(`${filename}.pdf`)
       }
 
+      setExporting(false)
       if (wasEditing) setEditMode(true)
       toast.success(`Exported as ${format.toUpperCase()}`)
     } catch (error) {
       console.error('Export error:', error)
       toast.error(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setExporting(false)
     }
   }
 
@@ -358,6 +365,26 @@ export function NurseryScheduleViewPage() {
         </Button>
       </div>
 
+      {schedule.overlap?.missing && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          No schedule found for{' '}
+          <strong>
+            {MONTH_NAMES[schedule.overlap.priorMonth - 1]} {schedule.overlap.priorYear}
+          </strong>
+          . The borrowed-pair dates ({schedule.overlap.borrowDates.join(', ')}) have no prior-month continuity.
+        </div>
+      )}
+      {schedule.overlap && !schedule.overlap.missing && (
+        <div className="rounded-md border border-blue-500/30 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 text-sm text-blue-900 dark:text-blue-200">
+          Borrowed-pair dates ({schedule.overlap.borrowDates.join(', ')}) are carried over from{' '}
+          <strong>
+            {MONTH_NAMES[schedule.overlap.priorMonth - 1]} {schedule.overlap.priorYear}
+          </strong>{' '}
+          ({schedule.overlap.priorScheduleStatus}). Edit those cells from the{' '}
+          {MONTH_NAMES[schedule.overlap.priorMonth - 1]} schedule.
+        </div>
+      )}
+
       <Card>
         <CardContent className="overflow-x-auto">
           <NurserySchedulePreview
@@ -370,6 +397,8 @@ export function NurseryScheduleViewPage() {
             editMode={isDraft && editMode}
             workers={workers}
             onAssignmentChange={handleAssignmentChange}
+            exporting={exporting}
+            onCarryoverClick={(a) => a.sourceScheduleId && navigate(`/nursery/${a.sourceScheduleId}`)}
           />
         </CardContent>
       </Card>

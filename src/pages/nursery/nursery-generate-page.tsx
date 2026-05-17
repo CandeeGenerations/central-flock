@@ -50,6 +50,7 @@ export function NurseryGeneratePage() {
   const [selectedYear, setSelectedYear] = useState(String(defaults.year))
   const [schedule, setSchedule] = useState<ScheduleWithAssignments | null>(null)
   const [editMode, setEditMode] = useState(true)
+  const [exporting, setExporting] = useState(false)
 
   const {data: serviceConfig} = useQuery({queryKey: nurseryKeys.serviceConfig, queryFn: fetchServiceConfig})
   const {data: workers} = useQuery({queryKey: nurseryKeys.workers, queryFn: fetchNurseryWorkers})
@@ -105,8 +106,9 @@ export function NurseryGeneratePage() {
     const filename = `Nursery Schedule - ${monthName} ${selectedYear}`
 
     try {
-      // Temporarily disable edit mode for clean export
+      // Temporarily disable edit mode + suppress carryover badges for clean export
       setEditMode(false)
+      setExporting(true)
 
       // Wait for re-render
       await new Promise((r) => setTimeout(r, 100))
@@ -152,6 +154,7 @@ export function NurseryGeneratePage() {
       toast.error(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setEditMode(true)
+      setExporting(false)
     }
   }
 
@@ -197,6 +200,28 @@ export function NurseryGeneratePage() {
         </Button>
       </div>
 
+      {/* Overlap warning when prior month schedule is missing */}
+      {schedule?.overlap?.missing && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          No schedule found for{' '}
+          <strong>
+            {MONTH_NAMES[schedule.overlap.priorMonth - 1]} {schedule.overlap.priorYear}
+          </strong>
+          . The borrowed-pair dates ({schedule.overlap.borrowDates.join(', ')}) were generated from scratch — there's no
+          prior-month continuity.
+        </div>
+      )}
+      {schedule?.overlap && !schedule.overlap.missing && (
+        <div className="rounded-md border border-blue-500/30 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 text-sm text-blue-900 dark:text-blue-200">
+          Borrowed-pair dates ({schedule.overlap.borrowDates.join(', ')}) are carried over from{' '}
+          <strong>
+            {MONTH_NAMES[schedule.overlap.priorMonth - 1]} {schedule.overlap.priorYear}
+          </strong>{' '}
+          ({schedule.overlap.priorScheduleStatus}). Edit those cells from the{' '}
+          {MONTH_NAMES[schedule.overlap.priorMonth - 1]} schedule.
+        </div>
+      )}
+
       {/* Schedule Preview */}
       {schedule && serviceConfig && (
         <>
@@ -229,6 +254,8 @@ export function NurseryGeneratePage() {
               editMode={editMode}
               workers={workers}
               onAssignmentChange={handleAssignmentChange}
+              exporting={exporting}
+              onCarryoverClick={(a) => a.sourceScheduleId && navigate(`/nursery/${a.sourceScheduleId}`)}
             />
           </div>
         </>

@@ -293,6 +293,67 @@ New dependencies: `html2canvas`, `jspdf`
 
 ---
 
+## Cross-Month Overlap
+
+When a target month has fewer than 5 Sundays, `computeDatePairs` borrows the last Sunday of the previous month. That borrowed Sunday — and its paired Wednesday (`Sunday + 3`) — typically already appears on the prior month's schedule. The new schedule must reconcile with the prior month's assignments rather than re-generating those slots from scratch. See `docs/adr/0003-nursery-cross-month-overlap.md`.
+
+### Overlap dates
+
+For each borrowed pair, **both** the Sunday and the paired Wednesday are overlap dates. (Example: generating June 2026 borrows May 31; the paired Wednesday is June 3, which was on May's schedule as the 5th-pair Wednesday.)
+
+### Lookup rules
+
+1. Look up the prior month's schedule. **Prefer `final`; fall back to `draft`.**
+2. If neither exists, generate the borrowed pair from scratch and surface a non-blocking UI warning on the generate page: _"No prior month schedule found — borrowed-pair dates were generated fresh."_
+3. For each overlap date, read all `nursery_assignments` rows belonging to the prior month's schedule.
+
+### Cap accounting
+
+For workers carried over from the prior month:
+
+- **Bypass** `totalAssignments` (overall `maxPerMonth`).
+- **Bypass** `serviceAssignments` (per-service `maxPerMonth`).
+- **Keep** `dayAssignments` active for the overlap dates — physical-reality constraints (same-day work limits, double-booking, first-name pairing) still apply for that date regardless of which month "owns" it.
+
+The `prevDateWorkers` / `prevSlotWorker` / `siblingFirstNames` penalties continue to work because carryover slots are present in the in-memory `slots[]` array during generation, even though they aren't persisted (see Storage below).
+
+### Null pre-fills
+
+If a prior-month overlap slot has `workerId = null`, it carries over as null on the new schedule. Do **not** try to backfill via the new month's generator — fixing it is the prior month's responsibility. The UI flags it with the usual unassigned-slot warning plus a tooltip: _"Carried over from {Month} — fix that schedule to update."_
+
+### Storage (live-resolve)
+
+- **Generate-time:** the scheduler does **not** persist `nursery_assignments` rows for overlap dates. It does seed `dayAssignments` (only) with the prior month's workers so the rest of the schedule respects same-day constraints.
+- **Load-time:** `loadScheduleWithAssignments` queries the schedule's own rows **plus** the prior month's rows for any overlap dates. Merged-in rows are tagged `isCarryover: true` and include `sourceScheduleId` for the badge link.
+
+### Edit behavior
+
+- Carryover cells are **read-only** in the in-app view. They render with a "From {Month}" badge and a link to the prior month's schedule.
+- `PATCH /api/nursery/assignments/:id` rejects edits to carryover rows. (The carryover row doesn't have its own id in the new schedule — the frontend resolves the click to the prior month's assignment id and navigates rather than editing in place.)
+
+### Export
+
+The exported PDF/JPG renders carryover cells **identically** to native rows. No badge, no marker, no visual distinction. Editorial state belongs in the editor; parishioners see a clean lobby copy.
+
+### Algorithm changes (`server/services/nursery-scheduler.ts`)
+
+`generateSchedule` gains a new parameter: `priorMonthAssignments: ScheduleSlot[]` (loaded from the prior month's schedule by the route handler). Inside `assignWorkers`:
+
+- Compute the overlap-date set from `computeDatePairs` (first pair's Sunday + Wednesday, when fewer than 5 Sundays were native to the target month).
+- For slots whose date is in the overlap set: set `workerId` from `priorMonthAssignments`, mark `isCarryover: true`, and update `dayAssignments` only (skip `totalAssignments` / `serviceAssignments` updates).
+- For all other slots: run the existing eligibility + scoring loop unchanged. The carryover slots are present in `slots[]` so the `prevDate` / `siblingFirstName` logic naturally sees them.
+
+After generation, the route handler filters `slots` to drop carryover entries before bulk-inserting `nursery_assignments`.
+
+### Verification additions
+
+- Generate a month with 4 Sundays where the prior month was finalized → confirm the borrowed pair renders the prior month's workers, marked with a badge, and not persisted in `nursery_assignments`.
+- Same scenario, then edit the prior month's overlap-date assignment → reload the new month → confirm the change appears (live-resolve working).
+- Generate a month with 4 Sundays where the prior month doesn't exist → confirm the warning shows and the borrowed pair is generated fresh.
+- Carla (maxPerMonth = 1, morning-only) was scheduled May 31 morning in May's schedule → generate June → confirm Carla appears on May 31 (carryover, not counted) **and** can still be assigned once more in June proper.
+- Click a carryover cell in the in-app view → confirm it navigates to the prior month's schedule rather than opening an editor.
+- Export the PDF → confirm the borrowed-pair row looks identical to native rows (no badge, no marker).
+
 ## Verification
 
 1. **Database**: Run `pnpm db:nursery:migrate` → confirm `nursery.db` created with all tables

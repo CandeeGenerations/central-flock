@@ -13,6 +13,10 @@ interface SchedulePreviewProps {
   editMode?: boolean
   workers?: NurseryWorker[]
   onAssignmentChange?: (assignmentId: number, workerId: number | null) => void
+  // When true, suppress carryover badges so html-to-image captures the clean
+  // parishioner-facing layout. Defaults to false.
+  exporting?: boolean
+  onCarryoverClick?: (assignment: NurseryAssignment) => void
 }
 
 interface DateGroup {
@@ -49,7 +53,18 @@ function formatDisplayDate(dateStr: string): string {
 }
 
 export const NurserySchedulePreview = forwardRef<HTMLDivElement, SchedulePreviewProps>(function NurserySchedulePreview(
-  {assignments, serviceConfig, logoPath, month, year, editMode, workers, onAssignmentChange},
+  {
+    assignments,
+    serviceConfig,
+    logoPath,
+    month,
+    year,
+    editMode,
+    workers,
+    onAssignmentChange,
+    exporting,
+    onCarryoverClick,
+  },
   ref,
 ) {
   const configMap = useMemo(() => {
@@ -212,7 +227,8 @@ export const NurserySchedulePreview = forwardRef<HTMLDivElement, SchedulePreview
                         </td>
                       )
                     }
-                    if (editMode && slotAssignment && onAssignmentChange) {
+                    const isCarryover = slotAssignment?.isCarryover ?? false
+                    if (editMode && slotAssignment && onAssignmentChange && !isCarryover) {
                       return (
                         <td key={slotNum} className="px-1 py-1 text-sm" style={cellStyle}>
                           <SearchableSelect
@@ -234,7 +250,35 @@ export const NurserySchedulePreview = forwardRef<HTMLDivElement, SchedulePreview
                           ...(!slotAssignment?.workerName ? {color: '#ef4444', fontStyle: 'italic'} : {}),
                         }}
                       >
-                        {slotAssignment?.workerName || (slotAssignment?.workerId ? 'Unknown' : 'Unassigned')}
+                        <span>
+                          {slotAssignment?.workerName || (slotAssignment?.workerId ? 'Unknown' : 'Unassigned')}
+                        </span>
+                        {isCarryover && !exporting && slotAssignment ? (
+                          <button
+                            type="button"
+                            onClick={() => onCarryoverClick?.(slotAssignment)}
+                            title={
+                              slotAssignment.sourceMonth
+                                ? `From ${MONTH_NAMES[slotAssignment.sourceMonth - 1]} ${slotAssignment.sourceYear} — click to open that schedule`
+                                : 'Carried over from prior month'
+                            }
+                            style={{
+                              marginLeft: 6,
+                              fontSize: 10,
+                              fontWeight: 600,
+                              color: '#1e3a8a',
+                              backgroundColor: '#dbeafe',
+                              border: '1px solid #93c5fd',
+                              borderRadius: 4,
+                              padding: '1px 5px',
+                              cursor: onCarryoverClick ? 'pointer' : 'default',
+                              verticalAlign: 'middle',
+                            }}
+                          >
+                            from{' '}
+                            {slotAssignment.sourceMonth ? MONTH_NAMES[slotAssignment.sourceMonth - 1].slice(0, 3) : '?'}
+                          </button>
+                        ) : null}
                       </td>
                     )
                   })}

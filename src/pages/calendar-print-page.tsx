@@ -4,7 +4,11 @@ import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
   getAvailablePlacements,
+  parseInlineItemIds,
 } from '@/components/calendar-print/calendar-grid'
+import {CalendarGridEditor} from '@/components/calendar-print/calendar-grid-editor'
+import {DayEditorDialog} from '@/components/calendar-print/day-editor-dialog'
+import {ScheduleEditorDialog} from '@/components/calendar-print/schedule-editor-dialog'
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -16,20 +20,29 @@ import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
-import type {CalendarPrintEvent, CalendarPrintEventStyle, CalendarPrintPage} from '@/lib/api'
+import type {
+  CalendarPrintDayOverride,
+  CalendarPrintEvent,
+  CalendarPrintEventStyle,
+  CalendarPrintPage,
+  NormalScheduleItem,
+  NormalScheduleItemInput,
+} from '@/lib/api'
 import {
   createCalendarPrintEvent,
+  deleteCalendarPrintDayOverride,
   deleteCalendarPrintEvent,
   fetchCalendarPrintDefaultSchedule,
   fetchCalendarPrintPage,
   updateCalendarPrintDefaultSchedule,
   updateCalendarPrintEvent,
   updateCalendarPrintPage,
+  upsertCalendarPrintDayOverride,
 } from '@/lib/api'
 import {type CalendarExportFormat, generateCalendarExport} from '@/lib/calendar-pdf'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ChevronLeft, ChevronRight, Copy, Download, Pencil, Plus, Trash2} from 'lucide-react'
+import {ChevronDown, ChevronLeft, ChevronRight, Download} from 'lucide-react'
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {toast} from 'sonner'
 
@@ -53,7 +66,6 @@ interface EventFormState {
   date: string
   title: string
   style: CalendarPrintEventStyle
-  suppressNormalSchedule: boolean
 }
 
 const styleOptions: {value: CalendarPrintEventStyle; label: string; description: string}[] = [
@@ -62,7 +74,6 @@ const styleOptions: {value: CalendarPrintEventStyle; label: string; description:
     label: 'Bold',
     description: 'Highlights the entire cell — for special days like Mother’s Day, Memorial Day',
   },
-  {value: 'no_kaya', label: 'No KAYA / Choir', description: 'Suppresses Normal Schedule for the day'},
   {value: 'regular', label: 'Regular', description: 'Plain text — events like Bible Study, National Day of Prayer'},
 ]
 
@@ -111,7 +122,6 @@ function LightboxPreview({children}: {children: React.ReactNode}) {
 
 function styleBadgeColor(style: CalendarPrintEventStyle) {
   if (style === 'bold') return 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-100'
-  if (style === 'no_kaya') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100'
   return 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'
 }
 
@@ -205,11 +215,6 @@ export function CalendarPrintPage() {
     queryFn: () => fetchCalendarPrintPage(year, month),
   })
 
-  const scheduleQuery = useQuery({
-    queryKey: queryKeys.calendarPrintDefaultSchedule,
-    queryFn: fetchCalendarPrintDefaultSchedule,
-  })
-
   const navigateMonth = (delta: number) => {
     let m = month + delta
     let y = year
@@ -250,9 +255,9 @@ export function CalendarPrintPage() {
         </div>
       </header>
 
-      {pageQuery.isLoading || scheduleQuery.isLoading ? (
+      {pageQuery.isLoading ? (
         <PageSpinner />
-      ) : !pageQuery.data || !scheduleQuery.data ? (
+      ) : !pageQuery.data ? (
         <div className="p-6">Failed to load.</div>
       ) : (
         <CalendarPrintEditor
@@ -261,7 +266,8 @@ export function CalendarPrintPage() {
           month={month}
           page={pageQuery.data.page}
           events={pageQuery.data.events}
-          defaultSchedule={scheduleQuery.data.value}
+          scheduleItems={pageQuery.data.scheduleItems}
+          dayOverrides={pageQuery.data.dayOverrides}
           isFetching={pageQuery.isFetching}
         />
       )}
@@ -274,11 +280,12 @@ interface EditorProps {
   month: number
   page: CalendarPrintPage
   events: CalendarPrintEvent[]
-  defaultSchedule: string
+  scheduleItems: NormalScheduleItem[]
+  dayOverrides: CalendarPrintDayOverride[]
   isFetching: boolean
 }
 
-function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetching}: EditorProps) {
+function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverrides, isFetching}: EditorProps) {
   const queryClient = useQueryClient()
   const captureRef = useRef<HTMLDivElement>(null)
 
@@ -290,16 +297,55 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
   const [versePlacement, setVersePlacement] = useState(page.versePlacement ?? DEFAULT_PLACEMENT)
   const [verseText, setVerseText] = useState(page.verseText ?? '')
   const [verseReference, setVerseReference] = useState(page.verseReference ?? '')
-  const [normalScheduleText, setNormalScheduleText] = useState(page.normalScheduleText ?? '')
+  const [hideNormalScheduleFooter, setHideNormalScheduleFooter] = useState(page.hideNormalScheduleFooter)
 
   const placementOptions = useMemo(() => getAvailablePlacements(year, month), [year, month])
 
   const [eventForm, setEventForm] = useState<EventFormState | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<CalendarPrintEvent | null>(null)
-  const [scheduleEditorOpen, setScheduleEditorOpen] = useState(false)
-  const [defaultScheduleDraft, setDefaultScheduleDraft] = useState('')
-  const [overrideOpen, setOverrideOpen] = useState(Boolean(page.normalScheduleText))
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [eventsOpen, setEventsOpen] = useState(false)
+  const [defaultScheduleOpen, setDefaultScheduleOpen] = useState(false)
+  const [overrideOpen, setOverrideOpen] = useState(false)
+  const [pendingOverrideSave, setPendingOverrideSave] = useState<NormalScheduleItemInput[] | null>(null)
+  const [pendingRevert, setPendingRevert] = useState(false)
+  const [dayEditorDate, setDayEditorDate] = useState<string | null>(null)
+
+  const inlineSelectionByDate = useMemo(() => {
+    const map = new Map<string, number[]>()
+    for (const ov of dayOverrides) {
+      map.set(ov.date, parseInlineItemIds(ov.inlineItemIds))
+    }
+    return map
+  }, [dayOverrides])
+  const showNoKayaByDate = useMemo(() => {
+    const map = new Map<string, boolean>()
+    for (const ov of dayOverrides) {
+      if (ov.showNoKaya) map.set(ov.date, true)
+    }
+    return map
+  }, [dayOverrides])
+  const showLabelByDate = useMemo(() => {
+    const map = new Map<string, boolean>()
+    for (const ov of dayOverrides) {
+      map.set(ov.date, ov.showNormalScheduleLabel)
+    }
+    return map
+  }, [dayOverrides])
+
+  const isOverriding = scheduleItems.some((it) => it.scopeType === 'page')
+  const hasInlineSelections = dayOverrides.some((ov) => {
+    try {
+      return Array.isArray(JSON.parse(ov.inlineItemIds)) && JSON.parse(ov.inlineItemIds).length > 0
+    } catch {
+      return false
+    }
+  })
+
+  const defaultScheduleQuery = useQuery({
+    queryKey: queryKeys.calendarPrintDefaultSchedule,
+    queryFn: fetchCalendarPrintDefaultSchedule,
+  })
 
   const updatePageMutation = useMutation({
     mutationFn: () =>
@@ -310,7 +356,7 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
         versePlacement: versePlacement === DEFAULT_PLACEMENT ? null : versePlacement,
         verseText: verseText || null,
         verseReference: verseReference || null,
-        normalScheduleText: normalScheduleText || null,
+        hideNormalScheduleFooter,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
@@ -320,12 +366,8 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
   })
 
   const createEventMutation = useMutation({
-    mutationFn: (data: {
-      date: string
-      title: string
-      style: CalendarPrintEventStyle
-      suppressNormalSchedule: boolean
-    }) => createCalendarPrintEvent(year, month, data),
+    mutationFn: (data: {date: string; title: string; style: CalendarPrintEventStyle}) =>
+      createCalendarPrintEvent(year, month, data),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
     },
@@ -333,13 +375,8 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
   })
 
   const updateEventMutation = useMutation({
-    mutationFn: ({
-      id,
-      data,
-    }: {
-      id: number
-      data: {date: string; title: string; style: CalendarPrintEventStyle; suppressNormalSchedule: boolean}
-    }) => updateCalendarPrintEvent(id, data),
+    mutationFn: ({id, data}: {id: number; data: {date: string; title: string; style: CalendarPrintEventStyle}}) =>
+      updateCalendarPrintEvent(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
     },
@@ -355,17 +392,112 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
   })
 
   const updateDefaultScheduleMutation = useMutation({
-    mutationFn: () => updateCalendarPrintDefaultSchedule(defaultScheduleDraft),
+    mutationFn: (items: NormalScheduleItemInput[]) => updateCalendarPrintDefaultSchedule(items),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintDefaultSchedule})
       queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
-      setScheduleEditorOpen(false)
+      setDefaultScheduleOpen(false)
       toast.success('Default schedule saved')
     },
     onError: (err: Error) => toast.error(err.message),
   })
 
-  const defaultEventDate = useMemo(() => `${year}-${String(month).padStart(2, '0')}-01`, [year, month])
+  const saveOverrideMutation = useMutation({
+    mutationFn: (items: NormalScheduleItemInput[] | null) =>
+      updateCalendarPrintPage(year, month, {scheduleItems: items}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+      setOverrideOpen(false)
+      setPendingOverrideSave(null)
+      setPendingRevert(false)
+      toast.success('Schedule saved')
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const handleOverrideSave = (items: NormalScheduleItemInput[]) => {
+    // Scope change (default -> page) clears inline selections. Confirm if any exist.
+    if (!isOverriding && hasInlineSelections) {
+      setPendingOverrideSave(items)
+      return
+    }
+    saveOverrideMutation.mutate(items)
+  }
+
+  const handleOverrideRevert = () => {
+    if (isOverriding && hasInlineSelections) {
+      setPendingRevert(true)
+      return
+    }
+    saveOverrideMutation.mutate(null)
+  }
+
+  const upsertOverrideMutation = useMutation({
+    mutationFn: (data: {
+      date: string
+      inlineItemIds: number[]
+      showNoKaya?: boolean
+      showNormalScheduleLabel?: boolean
+    }) => upsertCalendarPrintDayOverride(year, month, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const deleteOverrideMutation = useMutation({
+    mutationFn: (id: number) => deleteCalendarPrintDayOverride(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const saveInlineSelection = (date: string, ids: number[], showNoKaya: boolean, showNormalScheduleLabel: boolean) => {
+    upsertOverrideMutation.mutate(
+      {date, inlineItemIds: ids, showNoKaya, showNormalScheduleLabel},
+      {onSuccess: () => setDayEditorDate(null)},
+    )
+  }
+
+  const revertToDefaultLabel = (date: string) => {
+    const existing = dayOverrides.find((ov) => ov.date === date)
+    if (existing) deleteOverrideMutation.mutate(existing.id, {onSuccess: () => setDayEditorDate(null)})
+    else setDayEditorDate(null)
+  }
+
+  const applyToAllSlot = (sourceDate: string, ids: number[], showNoKaya: boolean, showNormalScheduleLabel: boolean) => {
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const sourceDow = new Date(year, month - 1, Number(sourceDate.split('-')[2])).getDay()
+    const targets: string[] = []
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(year, month - 1, d)
+      if (dt.getDay() !== sourceDow) continue
+      const iso = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      targets.push(iso)
+    }
+    Promise.all(
+      targets.map((iso) =>
+        ids.length === 0 && !showNoKaya
+          ? (() => {
+              const existing = dayOverrides.find((ov) => ov.date === iso)
+              return existing ? deleteCalendarPrintDayOverride(existing.id) : Promise.resolve()
+            })()
+          : upsertCalendarPrintDayOverride(year, month, {
+              date: iso,
+              inlineItemIds: ids,
+              showNoKaya,
+              showNormalScheduleLabel,
+            }),
+      ),
+    )
+      .then(() => {
+        queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+        setDayEditorDate(null)
+        toast.success(`Applied to ${targets.length} day(s)`)
+      })
+      .catch((err: Error) => toast.error(err.message))
+  }
 
   const eventsByDate = useMemo(
     () =>
@@ -381,12 +513,11 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
   const submitEventForm = () => {
     if (!eventForm) return
     if (!eventForm.date) return
-    if (eventForm.style !== 'no_kaya' && !eventForm.title.trim()) return
+    if (!eventForm.title.trim()) return
     const data = {
       date: eventForm.date,
       title: eventForm.title.trim(),
       style: eventForm.style,
-      suppressNormalSchedule: eventForm.suppressNormalSchedule,
     }
     if (eventForm.id == null) {
       createEventMutation.mutate(data, {onSuccess: () => setEventForm(null)})
@@ -421,8 +552,8 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
         </DropdownMenu>
       </div>
 
-      <div className="grid lg:grid-cols-[420px_1fr] 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-6">
-        <div className="space-y-4 2xl:contents">
+      <div className="grid lg:grid-cols-[420px_1fr] gap-6">
+        <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Page Details</CardTitle>
@@ -532,63 +663,32 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                {!overrideOpen ? (
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>
-                      Schedule:{' '}
-                      <span className={normalScheduleText ? 'text-foreground' : ''}>
-                        {normalScheduleText ? 'Custom (this month)' : 'Using default'}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      className="underline hover:text-foreground"
-                      onClick={() => setOverrideOpen(true)}
-                    >
-                      {normalScheduleText ? 'Edit override' : 'Override for this month'}
-                    </button>
-                    <button
-                      type="button"
-                      className="underline hover:text-foreground"
-                      onClick={() => {
-                        setDefaultScheduleDraft(defaultSchedule)
-                        setScheduleEditorOpen(true)
-                      }}
-                    >
-                      Edit default
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5 rounded-md border border-dashed p-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="schedule-override" className="text-xs">
-                        Normal Schedule (override for {MONTH_NAMES[month - 1]})
-                      </Label>
-                      <button
-                        type="button"
-                        className="text-xs text-muted-foreground underline hover:text-foreground"
-                        onClick={() => {
-                          setNormalScheduleText('')
-                          setOverrideOpen(false)
-                        }}
-                      >
-                        Use default
-                      </button>
-                    </div>
-                    <Textarea
-                      id="schedule-override"
-                      rows={8}
-                      value={normalScheduleText}
-                      onChange={(e) => setNormalScheduleText(e.target.value)}
-                      placeholder={`Leave blank to use the default.\n\nLine 1\nLine 2\n---\nLine in column 2`}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Use <code>**text**</code> for bold. <code>---</code> on its own line splits into two columns.
-                    </p>
-                  </div>
-                )}
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span>
+                  Schedule:{' '}
+                  <span className={isOverriding ? 'text-foreground' : ''}>
+                    {isOverriding ? 'Custom (this month)' : 'Using default'}
+                  </span>
+                </span>
+                <button type="button" className="underline hover:text-foreground" onClick={() => setOverrideOpen(true)}>
+                  {isOverriding ? 'Edit override' : 'Override for this month'}
+                </button>
+                <button
+                  type="button"
+                  className="underline hover:text-foreground"
+                  onClick={() => setDefaultScheduleOpen(true)}
+                >
+                  Edit default
+                </button>
               </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hideNormalScheduleFooter}
+                  onChange={(e) => setHideNormalScheduleFooter(e.target.checked)}
+                />
+                <span>Hide Normal Schedule block in footer (this month)</span>
+              </label>
               <Button onClick={() => updatePageMutation.mutate()} disabled={updatePageMutation.isPending}>
                 Save Page Details
               </Button>
@@ -596,133 +696,74 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-base">Events</CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  setEventForm({
-                    id: null,
-                    date: defaultEventDate,
-                    title: '',
-                    style: 'regular',
-                    suppressNormalSchedule: false,
-                  })
-                }
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {sortedDates.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No events yet.</p>
-              ) : (
-                sortedDates.map((date) => (
-                  <div key={date} className="space-y-1.5">
-                    <div className="text-sm font-medium text-muted-foreground">{date}</div>
-                    {eventsByDate[date].map((event) => (
-                      <div key={event.id} className="flex items-start gap-2 p-2 rounded-md border bg-card text-sm">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${styleBadgeColor(event.style)}`}
-                        >
-                          {event.style.replace('_', ' ')}
-                        </span>
-                        <span className="flex-1 break-words">
-                          {event.title || <span className="italic text-muted-foreground">NO KAYA or Choir</span>}
-                        </span>
-                        <button
-                          type="button"
-                          className="opacity-60 hover:opacity-100"
-                          title="Edit"
-                          onClick={() =>
-                            setEventForm({
-                              id: event.id,
-                              date: event.date,
-                              title: event.title,
-                              style: event.style,
-                              suppressNormalSchedule: event.suppressNormalSchedule,
-                            })
-                          }
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          className="opacity-60 hover:opacity-100"
-                          title="Duplicate"
-                          onClick={() =>
-                            setEventForm({
-                              id: null,
-                              date: event.date,
-                              title: event.title,
-                              style: event.style,
-                              suppressNormalSchedule: event.suppressNormalSchedule,
-                            })
-                          }
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          className="opacity-60 hover:opacity-100 text-destructive"
-                          title="Delete"
-                          onClick={() => setDeleteTarget(event)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ))
-              )}
-            </CardContent>
+            <button
+              type="button"
+              onClick={() => setEventsOpen((v) => !v)}
+              className="w-full"
+              aria-expanded={eventsOpen}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 cursor-pointer hover:bg-muted/40 rounded-t-lg">
+                <CardTitle className="text-base flex items-center gap-2">
+                  {eventsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  Events this month
+                  <span className="text-xs font-normal text-muted-foreground">({sortedDates.length})</span>
+                </CardTitle>
+              </CardHeader>
+            </button>
+            {eventsOpen && (
+              <CardContent className="space-y-3">
+                {sortedDates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No events yet.</p>
+                ) : (
+                  sortedDates.map((date) => (
+                    <div key={date} className="space-y-1">
+                      <div className="text-xs font-medium text-muted-foreground">{date}</div>
+                      {eventsByDate[date].map((event) => (
+                        <div key={event.id} className="flex items-center gap-2 text-sm">
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${styleBadgeColor(event.style)}`}
+                          >
+                            {event.style.replace('_', ' ')}
+                          </span>
+                          <span className="flex-1 break-words text-left">
+                            {event.title || <span className="italic text-muted-foreground">NO KAYA or Choir</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            )}
           </Card>
         </div>
 
         <div className="space-y-2">
-          <div className="text-sm text-muted-foreground">Preview (click to expand)</div>
-          <button
-            type="button"
-            onClick={() => setLightboxOpen(true)}
-            aria-label="Expand preview"
-            className="block w-full bg-zinc-100 dark:bg-zinc-900 rounded-md p-4 overflow-hidden cursor-zoom-in hover:ring-2 hover:ring-primary/40 transition-shadow"
-          >
-            <div
-              style={{
-                width: `${PAGE_WIDTH * 0.7}px`,
-                height: `${PAGE_HEIGHT * 0.7}px`,
-                position: 'relative',
-                margin: '0 auto',
-                pointerEvents: 'none',
-              }}
-            >
-              <div
-                style={{
-                  transform: 'scale(0.7)',
-                  transformOrigin: 'top left',
-                  width: `${PAGE_WIDTH}px`,
-                  height: `${PAGE_HEIGHT}px`,
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-                }}
-              >
-                <CalendarGrid
-                  year={year}
-                  month={month}
-                  theme={theme || null}
-                  themeColor={themeColor || null}
-                  themePlacement={themePlacement}
-                  versePlacement={versePlacement}
-                  verseText={verseText || null}
-                  verseReference={verseReference || null}
-                  normalScheduleText={normalScheduleText || null}
-                  defaultSchedule={defaultSchedule}
-                  events={events}
-                />
-              </div>
-            </div>
-          </button>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">Preview (click a day to edit)</div>
+            <Button size="sm" variant="outline" onClick={() => setLightboxOpen(true)}>
+              Expand
+            </Button>
+          </div>
+          <div className="block w-full bg-zinc-100 dark:bg-zinc-900 rounded-md p-4 overflow-hidden">
+            <LightboxPreview>
+              <CalendarGridEditor
+                year={year}
+                month={month}
+                theme={theme || null}
+                themeColor={themeColor || null}
+                themePlacement={themePlacement}
+                versePlacement={versePlacement}
+                verseText={verseText || null}
+                verseReference={verseReference || null}
+                scheduleItems={scheduleItems}
+                dayOverrides={dayOverrides}
+                events={events}
+                hideNormalScheduleFooter={hideNormalScheduleFooter}
+                onCellClick={(d) => setDayEditorDate(d)}
+              />
+            </LightboxPreview>
+          </div>
         </div>
       </div>
 
@@ -732,7 +773,7 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
           <DialogTitle className="sr-only">Calendar Preview</DialogTitle>
           {lightboxOpen && (
             <LightboxPreview>
-              <CalendarGrid
+              <CalendarGridEditor
                 year={year}
                 month={month}
                 theme={theme || null}
@@ -741,9 +782,14 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                 versePlacement={versePlacement}
                 verseText={verseText || null}
                 verseReference={verseReference || null}
-                normalScheduleText={normalScheduleText || null}
-                defaultSchedule={defaultSchedule}
+                scheduleItems={scheduleItems}
+                dayOverrides={dayOverrides}
                 events={events}
+                hideNormalScheduleFooter={hideNormalScheduleFooter}
+                onCellClick={(d) => {
+                  setLightboxOpen(false)
+                  setDayEditorDate(d)
+                }}
               />
             </LightboxPreview>
           )}
@@ -785,9 +831,10 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
             versePlacement={versePlacement}
             verseText={verseText || null}
             verseReference={verseReference || null}
-            normalScheduleText={normalScheduleText || null}
-            defaultSchedule={defaultSchedule}
+            scheduleItems={scheduleItems}
+            dayOverrides={dayOverrides}
             events={events}
+            hideNormalScheduleFooter={hideNormalScheduleFooter}
           />
         </div>
       </div>
@@ -814,18 +861,10 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                   rows={2}
                   value={eventForm.title}
                   onChange={(e) => setEventForm({...eventForm, title: e.target.value})}
-                  placeholder={
-                    eventForm.style === 'no_kaya'
-                      ? "Optional — leave blank for just 'NO KAYA or Choir'"
-                      : "Mother's Day"
-                  }
+                  placeholder="Mother's Day"
                   autoFocus
                 />
-                <p className="text-xs text-muted-foreground">
-                  {eventForm.style === 'no_kaya'
-                    ? 'Leave blank to show only "NO KAYA or Choir" at the bottom of the cell. Press Enter for a line break.'
-                    : 'Press Enter to add a line break.'}
-                </p>
+                <p className="text-xs text-muted-foreground">Press Enter to add a line break.</p>
               </div>
               <div className="space-y-1.5">
                 <Label>Style</Label>
@@ -848,21 +887,6 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
                   ))}
                 </div>
               </div>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={eventForm.suppressNormalSchedule}
-                  onChange={(e) => setEventForm({...eventForm, suppressNormalSchedule: e.target.checked})}
-                  className="mt-1"
-                />
-                <div>
-                  <div className="text-sm font-medium">Override Normal Schedule</div>
-                  <div className="text-xs text-muted-foreground">
-                    Hides the &ldquo;Normal Schedule&rdquo; label in this cell. Useful when a special event replaces the
-                    normal services.
-                  </div>
-                </div>
-              </label>
             </div>
           )}
           <DialogFooter>
@@ -871,11 +895,7 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
             </Button>
             <Button
               onClick={submitEventForm}
-              disabled={
-                (eventForm?.style !== 'no_kaya' && !eventForm?.title.trim()) ||
-                createEventMutation.isPending ||
-                updateEventMutation.isPending
-              }
+              disabled={!eventForm?.title.trim() || createEventMutation.isPending || updateEventMutation.isPending}
             >
               {eventForm?.id == null ? 'Add' : 'Save'}
             </Button>
@@ -897,34 +917,94 @@ function CalendarPrintEditor({year, month, page, events, defaultSchedule, isFetc
         }}
       />
 
-      <Dialog open={scheduleEditorOpen} onOpenChange={setScheduleEditorOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Default Normal Schedule</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Used on every month unless overridden. Use <code>**text**</code> for bold portions.
-            </p>
-            <Textarea
-              rows={12}
-              value={defaultScheduleDraft}
-              onChange={(e) => setDefaultScheduleDraft(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setScheduleEditorOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => updateDefaultScheduleMutation.mutate()}
-              disabled={updateDefaultScheduleMutation.isPending}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DayEditorDialog
+        open={dayEditorDate !== null}
+        onOpenChange={(open) => !open && setDayEditorDate(null)}
+        date={dayEditorDate}
+        monthLabel={dayEditorDate ? MONTH_NAMES[Number(dayEditorDate.split('-')[1]) - 1] : ''}
+        dayEvents={dayEditorDate ? (eventsByDate[dayEditorDate] ?? []) : []}
+        scheduleItems={scheduleItems}
+        inlineItemIds={dayEditorDate ? (inlineSelectionByDate.get(dayEditorDate) ?? null) : null}
+        hasOverride={dayEditorDate ? dayOverrides.some((ov) => ov.date === dayEditorDate) : false}
+        showNoKaya={dayEditorDate ? (showNoKayaByDate.get(dayEditorDate) ?? false) : false}
+        showNormalScheduleLabel={dayEditorDate ? (showLabelByDate.get(dayEditorDate) ?? true) : true}
+        onAddEvent={() => {
+          if (!dayEditorDate) return
+          setEventForm({
+            id: null,
+            date: dayEditorDate,
+            title: '',
+            style: 'regular',
+          })
+        }}
+        onEditEvent={(event) =>
+          setEventForm({
+            id: event.id,
+            date: event.date,
+            title: event.title,
+            style: event.style,
+          })
+        }
+        onDuplicateEvent={(event) =>
+          setEventForm({
+            id: null,
+            date: event.date,
+            title: event.title,
+            style: event.style,
+          })
+        }
+        onDeleteEvent={(event) => setDeleteTarget(event)}
+        onSaveInlineSelection={(ids, showNoKaya, showLabel) => {
+          if (dayEditorDate) saveInlineSelection(dayEditorDate, ids, showNoKaya, showLabel)
+        }}
+        onApplyToAll={(ids, showNoKaya, showLabel) => {
+          if (dayEditorDate) applyToAllSlot(dayEditorDate, ids, showNoKaya, showLabel)
+        }}
+        onUseDefaultLabel={() => {
+          if (dayEditorDate) revertToDefaultLabel(dayEditorDate)
+        }}
+        isSavingInline={upsertOverrideMutation.isPending || deleteOverrideMutation.isPending}
+      />
+
+      <ScheduleEditorDialog
+        open={defaultScheduleOpen}
+        onOpenChange={setDefaultScheduleOpen}
+        title="Default Normal Schedule"
+        initialItems={defaultScheduleQuery.data?.items ?? []}
+        isSaving={updateDefaultScheduleMutation.isPending}
+        onSave={(items) => updateDefaultScheduleMutation.mutate(items)}
+      />
+
+      <ScheduleEditorDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        title={`Normal Schedule — override for ${MONTH_NAMES[month - 1]} ${year}`}
+        initialItems={scheduleItems}
+        isSaving={saveOverrideMutation.isPending}
+        onSave={handleOverrideSave}
+        showRevert={isOverriding}
+        onRevert={handleOverrideRevert}
+      />
+
+      <ConfirmDialog
+        open={pendingOverrideSave !== null}
+        onOpenChange={(open) => !open && setPendingOverrideSave(null)}
+        title="Clear inline schedule selections?"
+        description={`This page has inline schedule selections on individual cells that reference the current default-schedule items. Switching to a custom override for this month will clear those selections.`}
+        confirmLabel="Save override and clear"
+        onConfirm={() => {
+          if (pendingOverrideSave) saveOverrideMutation.mutate(pendingOverrideSave)
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingRevert}
+        onOpenChange={(open) => !open && setPendingRevert(false)}
+        title="Clear inline schedule selections?"
+        description={`Reverting to the default schedule will clear any inline schedule selections on this month's cells (they reference override items).`}
+        confirmLabel="Revert and clear"
+        onConfirm={() => saveOverrideMutation.mutate(null)}
+      />
     </>
   )
 }

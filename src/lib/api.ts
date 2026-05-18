@@ -1,7 +1,29 @@
 const BASE_URL = '/api'
 
+// Read a response as JSON, but if the body isn't JSON (HTML error page, empty body,
+// proxy/tunnel error) treat it as the server being unreachable. Prevents noisy
+// "JSON.parse: unexpected character" / generic network errors in Sentry when the
+// origin is down — surfaces a clear, single message instead.
+async function readJson(res: Response): Promise<unknown> {
+  const text = await res.text()
+  if (!text) return {}
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error('Server unreachable')
+  }
+}
+
+async function fetchOrUnreachable(input: RequestInfo, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch {
+    throw new Error('Server unreachable')
+  }
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${url}`, {
+  const res = await fetchOrUnreachable(`${BASE_URL}${url}`, {
     credentials: 'include',
     headers: {'Content-Type': 'application/json'},
     ...options,
@@ -10,11 +32,16 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     window.location.href = '/login'
     throw new Error('Unauthorized')
   }
+  // Treat 5xx (origin down, Cloudflare 502/504, etc.) as "Server unreachable" so
+  // the error is grouped under one clear message in Sentry rather than per-status.
+  if (res.status >= 500) {
+    throw new Error('Server unreachable')
+  }
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
+    const body = (await readJson(res).catch(() => ({}))) as {error?: string}
     throw new Error(body.error || `Request failed: ${res.status}`)
   }
-  return res.json()
+  return (await readJson(res)) as T
 }
 
 function buildQueryString(params?: Record<string, string | number | undefined>): string {
@@ -45,8 +72,9 @@ export function logout() {
 }
 
 export async function checkAuthStatus(): Promise<AuthStatus> {
-  const res = await fetch(`${BASE_URL}/auth/status`, {credentials: 'include'})
-  return res.json()
+  const res = await fetchOrUnreachable(`${BASE_URL}/auth/status`, {credentials: 'include'})
+  if (res.status >= 500) throw new Error('Server unreachable')
+  return (await readJson(res)) as AuthStatus
 }
 
 // People
@@ -769,7 +797,7 @@ export function triggerCalendarSync() {
 }
 
 // Calendar Print
-export type CalendarPrintEventStyle = 'bold' | 'no_kaya' | 'regular'
+export type CalendarPrintEventStyle = 'bold' | 'regular'
 
 export interface CalendarPrintPage {
   id: number
@@ -781,7 +809,7 @@ export interface CalendarPrintPage {
   versePlacement: string | null
   verseText: string | null
   verseReference: string | null
-  normalScheduleText: string | null
+  hideNormalScheduleFooter: boolean
   createdAt: string
   updatedAt: string
 }
@@ -792,15 +820,54 @@ export interface CalendarPrintEvent {
   date: string
   title: string
   style: CalendarPrintEventStyle
-  suppressNormalSchedule: boolean
   sortOrder: number
   createdAt: string
+}
+
+export type NormalScheduleItemType = 'line' | 'spacer'
+export type NormalScheduleItemScope = 'default' | 'page'
+
+export interface NormalScheduleItem {
+  id: number
+  scopeType: NormalScheduleItemScope
+  scopeId: number | null
+  type: NormalScheduleItemType
+  text: string
+  bold: boolean
+  column: number
+  eligibleDays: string
+  hidden: boolean
+  sortOrder: number
+  createdAt: string
+}
+
+export interface NormalScheduleItemInput {
+  id?: number // when present, preserve identity (update in place); otherwise insert new
+  type: NormalScheduleItemType
+  text: string
+  bold: boolean
+  column: number
+  eligibleDays: string
+  hidden?: boolean
+  sortOrder?: number
+}
+
+export interface CalendarPrintDayOverride {
+  id: number
+  pageId: number
+  date: string
+  inlineItemIds: string // JSON-encoded number[]
+  showNoKaya: boolean
+  showNormalScheduleLabel: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export interface CalendarPrintPageResponse {
   page: CalendarPrintPage
   events: CalendarPrintEvent[]
-  defaultSchedule: string
+  scheduleItems: NormalScheduleItem[]
+  dayOverrides: CalendarPrintDayOverride[]
 }
 
 export function fetchCalendarPrintPage(year: number, month: number) {
@@ -817,7 +884,8 @@ export function updateCalendarPrintPage(
     versePlacement?: string | null
     verseText?: string | null
     verseReference?: string | null
-    normalScheduleText?: string | null
+    hideNormalScheduleFooter?: boolean
+    scheduleItems?: NormalScheduleItemInput[] | null
   },
 ) {
   return request<CalendarPrintPage>(`/calendar-print/${year}/${month}`, {
@@ -834,7 +902,6 @@ export function createCalendarPrintEvent(
     title: string
     style: CalendarPrintEventStyle
     sortOrder?: number
-    suppressNormalSchedule?: boolean
   },
 ) {
   return request<CalendarPrintEvent>(`/calendar-print/${year}/${month}/events`, {
@@ -850,7 +917,6 @@ export function updateCalendarPrintEvent(
     title?: string
     style?: CalendarPrintEventStyle
     sortOrder?: number
-    suppressNormalSchedule?: boolean
   },
 ) {
   return request<CalendarPrintEvent>(`/calendar-print/events/${id}`, {
@@ -864,12 +930,27 @@ export function deleteCalendarPrintEvent(id: number) {
 }
 
 export function fetchCalendarPrintDefaultSchedule() {
-  return request<{value: string}>('/calendar-print/default-schedule')
+  return request<{items: NormalScheduleItem[]}>('/calendar-print/default-schedule')
 }
 
-export function updateCalendarPrintDefaultSchedule(value: string) {
-  return request<{value: string}>('/calendar-print/default-schedule', {
+export function updateCalendarPrintDefaultSchedule(items: NormalScheduleItemInput[]) {
+  return request<{items: NormalScheduleItem[]}>('/calendar-print/default-schedule', {
     method: 'PUT',
-    body: JSON.stringify({value}),
+    body: JSON.stringify({items}),
   })
+}
+
+export function upsertCalendarPrintDayOverride(
+  year: number,
+  month: number,
+  data: {date: string; inlineItemIds: number[]; showNoKaya?: boolean; showNormalScheduleLabel?: boolean},
+) {
+  return request<CalendarPrintDayOverride>(`/calendar-print/${year}/${month}/day-overrides`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteCalendarPrintDayOverride(id: number) {
+  return request<{success: boolean}>(`/calendar-print/day-overrides/${id}`, {method: 'DELETE'})
 }

@@ -38,7 +38,7 @@ if (dsn) {
     sendDefaultPii: false,
     integrations: [Sentry.browserTracingIntegration()],
     // Aborted fetches and the existing 401 throw from src/lib/api.ts are not bugs.
-    ignoreErrors: ['AbortError', 'Unauthorized'],
+    ignoreErrors: ['AbortError', 'Unauthorized', 'Invalid password'],
     beforeSend: scrubEvent,
     beforeSendTransaction: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,

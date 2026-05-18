@@ -207,3 +207,54 @@ Folding multiple RSVP Lists into one. Directional: the user picks one selected l
 - Cross-event line when any source linked to a different calendar event than target (e.g., "⚠ 'Choir' is linked to a different event (Picnic). Its 12 entries will be folded in.").
 - Broken-URL warning (see above).
 - Hard delete; no soft-delete window, no undo. The multi-step gate (select → target → picker → confirm) is the safety net.
+
+### Normal Schedule
+
+The recurring weekly service schedule printed on the church's monthly calendar (e.g. "Sunday School 9:30", "Wednesday Prayer 7:00"). Rendered in the **footer** of every printed page. Three weekday slots — **Sunday, Wednesday, Saturday** — also get a small italic "Normal Schedule" label in their calendar cell pointing at the footer (`calendar-grid.tsx:245-250`).
+
+The Normal Schedule has a **default** (used every month unless overridden) and an optional **per-month override** stored on `calendar_print_pages.normalScheduleText`.
+
+### Schedule item
+
+A single line on the Normal Schedule. Structured (not freeform text). Fields: `text`, `bold`, `column` (1 or 2 in the footer's two-column layout), `eligibleDays` (subset of `['sun','wed','sat']` indicating which weekday slots this item is allowed to appear in as an inline override), plus a `sortOrder`. A `spacer` item type preserves blank-line spacing in the footer. Replaces the prior freeform-text representation in a one-time migration that diff-checks footer HTML output to guarantee visual fidelity.
+
+### Inline schedule override
+
+A per-cell override of the small "Normal Schedule" label on a Sun/Wed/Sat cell. Instead of the label (which points at the footer), the cell renders a selected subset of Schedule items inline. Stored as `inlineItemIds: number[] | null` on a `calendar_print_day_overrides` row keyed by date — `null` (or no row) means "use default label behavior"; a non-empty array means "render these items inline, suppress the label." An empty array collapses back to the default (saving zero items is treated as a no-op; explicit silence uses the existing `suppressNormalSchedule`/`no_kaya` event mechanism).
+
+**Snapshot semantics:** master-schedule edits to an item's `text` flow through; master-schedule additions/deletions do not retroactively change existing cell selections.
+
+**Eligibility:** the per-cell picker only shows Schedule items whose `eligibleDays` includes that cell's weekday (e.g. Saturday cells only see items tagged `sat` — typically cleaning and visitation). Default for a new item is all three slots checked.
+
+**Inline render:** items are pinned to the bottom of the cell (same anchor as today's "Normal Schedule" label, `marginTop: 'auto'`) at 9pt, line-height 1.15, centered. Each item's `bold` flag carries through inline. `column` is ignored inline (cells are single-column). No truncation or auto-shrink — overflow risk is surfaced at edit time, not render time.
+
+**Overflow warning:** the picker shows a live "fits / borderline / will clip" indicator based on selected item count vs. a known per-cell line ceiling (~3 comfortable, 4 tight, 5+ likely clipped). The user chooses to accept the risk.
+
+**Bulk apply:** the picker includes "Apply this selection to all [Sundays|Wednesdays|Saturdays] in [Month]". Confirms loudly when some target cells already have overrides ("3 already customized — overwrite?"). No top-level "edit all" entry — bulk apply is always launched from a single cell.
+
+**Interaction with events:** event-level `suppressNormalSchedule` and `no_kaya` continue to win — a cell with either of those hides the inline schedule the same way it hides today's label.
+
+### Day editor
+
+The single dialog that opens when a Sun/Wed/Sat (or any) cell in the calendar print preview is tapped. Replaces the per-date entry points scattered across the old left-column Events card. Two sections inside:
+
+- **Events** — same form fields and add/edit/duplicate/delete actions that exist today, scoped to this date.
+- **Inline Schedule** — only shown for Sun/Wed/Sat. The picker described in `Inline schedule override`. Hidden on Mon/Tue/Thu/Fri.
+
+Title shows the weekday and full date (e.g. "Sun, May 17, 2026"). One entry point, all per-day concerns in one place.
+
+### Calendar print editor (interactive preview)
+
+The Calendar Print Page's preview is the primary editing surface, not a passive render. Every in-month cell is tappable (the whole cell — no persistent affordance chrome; cursor change on desktop, `:active` flash on tap). Tapping opens the Day editor.
+
+The page must continue to work on iPad — affordances are touch-first (no hover-only reveals), reorder uses up/down arrow buttons (not drag-and-drop), and tap targets stay at full cell size.
+
+**Capture-target split:** the visible interactive preview is a wrapper component (`CalendarGridEditor`) around the existing pure-render `CalendarGrid`. PDF/JPG export still captures the hidden offscreen `CalendarGrid` directly via `captureRef` — editor chrome, hover states, and click handlers exist only on the visible copy and never reach the print output.
+
+**All-events overview:** a small read-only collapsible "Events this month" section persists in the left column for skimming a sorted-by-date list of events (catches typos and wrong dates faster than visual grid scan). No edit affordances — all editing flows through the Day editor.
+
+### Schedule master editor
+
+Replaces the current freeform-text editor (today's "Edit default" and per-month "Override" textareas). A row-based form: each row is one Schedule item with inline-edit `text`, `bold` toggle, `column` picker (1/2), `eligibleDays` checkboxes, and up/down arrow reorder. "+ Add item" and "+ Add spacer" at the bottom. A live footer preview renders alongside the editor — the same `FooterContent` component fed by the in-progress rows — so visual fidelity is verifiable as you edit.
+
+Same editor reused for the default schedule and per-month overrides (only `scopeType`/`scopeId` differs). The textarea is gone — no fallback path. Migration is one-way.

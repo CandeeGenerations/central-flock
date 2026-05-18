@@ -1,4 +1,4 @@
-import type {CalendarPrintEvent} from '@/lib/api'
+import type {CalendarPrintDayOverride, CalendarPrintEvent, NormalScheduleItem} from '@/lib/api'
 import type {CSSProperties, ReactNode} from 'react'
 
 const MONTH_NAMES = [
@@ -35,9 +35,12 @@ interface CalendarGridProps {
   versePlacement: string | null
   verseText: string | null
   verseReference: string | null
-  normalScheduleText: string | null
-  defaultSchedule: string
+  scheduleItems: NormalScheduleItem[]
+  dayOverrides: CalendarPrintDayOverride[]
   events: CalendarPrintEvent[]
+  hideNormalScheduleFooter?: boolean
+  // When set, in-month cells become tappable. Export path leaves this undefined.
+  onCellClick?: (date: string) => void
 }
 
 export const FOOTER_CENTER_PLACEMENT = 'footer-center'
@@ -223,6 +226,23 @@ function buildRenderRows(layout: GridLayout): RenderCell[][] {
   })
 }
 
+export function weekdaySlug(dayOfWeek: number): 'sun' | 'wed' | 'sat' | null {
+  if (dayOfWeek === 0) return 'sun'
+  if (dayOfWeek === 3) return 'wed'
+  if (dayOfWeek === 6) return 'sat'
+  return null
+}
+
+export function parseInlineItemIds(json: string): number[] {
+  try {
+    const arr = JSON.parse(json)
+    if (Array.isArray(arr)) return arr.map((n) => Number(n)).filter((n) => Number.isInteger(n))
+  } catch {
+    /* ignore */
+  }
+  return []
+}
+
 function eventsByIso(events: CalendarPrintEvent[]): Map<string, CalendarPrintEvent[]> {
   const map = new Map<string, CalendarPrintEvent[]>()
   for (const e of events) {
@@ -242,19 +262,12 @@ function eventsByIso(events: CalendarPrintEvent[]): Map<string, CalendarPrintEve
   return map
 }
 
-function shouldShowNormalScheduleLabel(dayOfWeek: number, dayEvents: CalendarPrintEvent[]): boolean {
-  if (dayOfWeek !== 0 && dayOfWeek !== 3 && dayOfWeek !== 6) return false
-  if (dayEvents.some((e) => e.style === 'no_kaya')) return false
-  if (dayEvents.some((e) => e.suppressNormalSchedule)) return false
-  return true
+function shouldShowNormalScheduleLabel(dayOfWeek: number): boolean {
+  return dayOfWeek === 0 || dayOfWeek === 3 || dayOfWeek === 6
 }
 
-function cellIsHighlighted(dayEvents: CalendarPrintEvent[]): boolean {
-  return dayEvents.some((e) => e.style === 'bold' || e.style === 'no_kaya')
-}
-
-function cellHasNoKaya(dayEvents: CalendarPrintEvent[]): boolean {
-  return dayEvents.some((e) => e.style === 'no_kaya')
+function cellIsHighlighted(dayEvents: CalendarPrintEvent[], showNoKaya: boolean): boolean {
+  return showNoKaya || dayEvents.some((e) => e.style === 'bold')
 }
 
 interface ScheduleSegment {
@@ -262,7 +275,7 @@ interface ScheduleSegment {
   bold: boolean
 }
 
-function parseScheduleLine(line: string): ScheduleSegment[] {
+export function parseScheduleLine(line: string): ScheduleSegment[] {
   const segments: ScheduleSegment[] = []
   const regex = /\*\*([^*]+)\*\*/g
   let lastIndex = 0
@@ -280,13 +293,26 @@ function parseScheduleLine(line: string): ScheduleSegment[] {
   return segments
 }
 
-// Split schedule text by a `---` line (3+ dashes) into [col1, col2].
-// If no separator, everything is col1 and col2 is empty.
-function splitScheduleColumns(text: string): {col1: string[]; col2: string[]} {
-  const lines = text.split('\n')
-  const sepIndex = lines.findIndex((l) => /^-{3,}\s*$/.test(l.trim()))
-  if (sepIndex === -1) return {col1: lines, col2: []}
-  return {col1: lines.slice(0, sepIndex), col2: lines.slice(sepIndex + 1)}
+// Build the two column-string arrays expected by ScheduleColumn / FooterContent
+// from the structured items. Spacers emit '' lines. Bold-flagged line items wrap
+// their text in `**…**` if not already marked so parseScheduleLine renders bold.
+export function buildFooterFromItems(items: NormalScheduleItem[]): {col1: string[]; col2: string[]} {
+  const col1: string[] = []
+  const col2: string[] = []
+  for (const it of items) {
+    if (it.hidden) continue
+    const target = it.column === 2 ? col2 : col1
+    if (it.type === 'spacer') {
+      target.push('')
+      continue
+    }
+    if (it.bold && !/\*\*/.test(it.text)) {
+      target.push(`**${it.text}**`)
+    } else {
+      target.push(it.text)
+    }
+  }
+  return {col1, col2}
 }
 
 interface ScheduleColumnProps {
@@ -316,7 +342,7 @@ function ScheduleColumn({lines}: ScheduleColumnProps) {
 }
 
 interface FooterContentProps {
-  scheduleText: string
+  scheduleItems: NormalScheduleItem[]
   theme: string | null
   verseText: string | null
   verseReference: string | null
@@ -328,10 +354,11 @@ interface FooterContentExtraProps extends FooterContentProps {
   showVerseInFooter: boolean
   themeAlign: 'left' | 'center' | 'right'
   verseAlign: 'left' | 'center' | 'right'
+  hideSchedule: boolean
 }
 
 function FooterContent({
-  scheduleText,
+  scheduleItems,
   theme,
   verseText,
   verseReference,
@@ -340,9 +367,64 @@ function FooterContent({
   showVerseInFooter,
   themeAlign,
   verseAlign,
+  hideSchedule,
 }: FooterContentExtraProps) {
-  const {col1, col2} = splitScheduleColumns(scheduleText)
+  const {col1, col2} = buildFooterFromItems(scheduleItems)
   const hasRightCol = (showThemeInFooter && theme) || (showVerseInFooter && (verseText || verseReference))
+  if (hideSchedule) {
+    // Preserve the same 3-column grid layout — just blank the schedule columns.
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          padding: '8px 12px',
+          boxSizing: 'border-box',
+          display: 'grid',
+          gridTemplateColumns: 'auto auto 1fr',
+          columnGap: '24px',
+          fontFamily: 'Montserrat, sans-serif',
+          fontSize: '10px',
+          color: '#000',
+        }}
+      >
+        <div />
+        <div />
+        {hasRightCol ? (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'stretch',
+              fontFamily: '"DM Serif Display", serif',
+              fontStyle: 'italic',
+              color: accentColor,
+              gap: '4px',
+            }}
+          >
+            {showThemeInFooter && theme && (
+              <div style={{fontSize: '14px', lineHeight: 1.2, whiteSpace: 'pre-wrap', textAlign: themeAlign}}>
+                {theme}
+              </div>
+            )}
+            {showVerseInFooter && verseText && (
+              <div style={{fontSize: '12px', lineHeight: 1.3, whiteSpace: 'pre-wrap', textAlign: verseAlign}}>
+                &ldquo;{verseText}&rdquo;
+              </div>
+            )}
+            {showVerseInFooter && verseReference && (
+              <div style={{fontSize: '12px', lineHeight: 1.3, whiteSpace: 'pre-wrap', textAlign: verseAlign}}>
+                {verseReference}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div />
+        )}
+      </div>
+    )
+  }
   return (
     <div
       style={{
@@ -414,13 +496,30 @@ interface InMonthCellProps {
   cell: CellMeta
   dayEvents: CalendarPrintEvent[]
   showNormalSchedule: boolean
+  // null = no override row → fall back to "Normal Schedule" label.
+  // array (even empty) = explicit override → render items (or nothing if empty).
+  inlineItems: NormalScheduleItem[] | null
+  showNoKaya: boolean
+  // When override exists with empty inline items, this flag decides whether the
+  // "Normal Schedule" label still shows.
+  overrideShowsLabel: boolean
   isLastRowInMonth: boolean
   isLastColInMonth: boolean
+  onClick?: () => void
 }
 
-function InMonthCell({cell, dayEvents, showNormalSchedule, isLastRowInMonth, isLastColInMonth}: InMonthCellProps) {
-  const highlight = cellIsHighlighted(dayEvents)
-  const hasNoKaya = cellHasNoKaya(dayEvents)
+function InMonthCell({
+  cell,
+  dayEvents,
+  showNormalSchedule,
+  inlineItems,
+  showNoKaya,
+  overrideShowsLabel,
+  isLastRowInMonth,
+  isLastColInMonth,
+  onClick,
+}: InMonthCellProps) {
+  const highlight = cellIsHighlighted(dayEvents, showNoKaya)
   const cellTextColor = highlight ? HIGHLIGHT_PINK : '#000'
 
   const cellStyle: CSSProperties = {
@@ -433,6 +532,7 @@ function InMonthCell({cell, dayEvents, showNormalSchedule, isLastRowInMonth, isL
     color: cellTextColor,
     display: 'flex',
     flexDirection: 'column',
+    ...(onClick ? {cursor: 'pointer'} : {}),
   }
 
   // All events render in the center. no_kaya is styled like bold; the fixed
@@ -441,7 +541,7 @@ function InMonthCell({cell, dayEvents, showNormalSchedule, isLastRowInMonth, isL
   const titledEvents = dayEvents.filter((e) => e.title.trim().length > 0)
 
   return (
-    <div style={cellStyle}>
+    <div style={cellStyle} onClick={onClick} role={onClick ? 'button' : undefined}>
       <div
         style={{
           fontWeight: 700,
@@ -466,15 +566,15 @@ function InMonthCell({cell, dayEvents, showNormalSchedule, isLastRowInMonth, isL
         }}
       >
         {titledEvents.map((event) => {
-          const boldLike = event.style === 'bold' || event.style === 'no_kaya'
+          const isBold = event.style === 'bold'
           return (
             <div
               key={event.id}
               style={{
-                fontWeight: boldLike ? 700 : 500,
-                fontSize: boldLike ? '12px' : '11px',
+                fontWeight: isBold ? 700 : 500,
+                fontSize: isBold ? '12px' : '11px',
                 lineHeight: 1.2,
-                color: boldLike || highlight ? HIGHLIGHT_PINK : '#000',
+                color: isBold || highlight ? HIGHLIGHT_PINK : '#000',
                 whiteSpace: 'pre-wrap',
               }}
             >
@@ -483,44 +583,86 @@ function InMonthCell({cell, dayEvents, showNormalSchedule, isLastRowInMonth, isL
           )
         })}
       </div>
-      {(showNormalSchedule || hasNoKaya) && (
-        <div
-          style={{
-            marginTop: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
-          }}
-        >
-          {showNormalSchedule && (
-            <div
-              style={{
-                fontWeight: 500,
-                fontStyle: 'italic',
-                fontSize: '11px',
-                lineHeight: 1.15,
-                color: highlight ? HIGHLIGHT_PINK : NEUTRAL_DEFAULT_GRAY,
-              }}
-            >
-              Normal Schedule
-            </div>
-          )}
-          {hasNoKaya && (
-            <div
-              style={{
-                fontWeight: 700,
-                fontStyle: 'italic',
-                fontSize: '11px',
-                lineHeight: 1.15,
-                color: HIGHLIGHT_PINK,
-              }}
-            >
-              NO KAYA or Choir
-            </div>
-          )}
-        </div>
-      )}
+      {(() => {
+        const hasOverride = inlineItems !== null
+        const itemsToShow = inlineItems ?? []
+        // Label shows when: cell is Sun/Wed/Sat AND no items rendering AND (no override OR override opted-in to label).
+        const showLabel =
+          showNormalSchedule && itemsToShow.length === 0 && !showNoKaya && (!hasOverride || overrideShowsLabel)
+        const showInline = hasOverride && itemsToShow.length > 0
+        if (!showLabel && !showInline && !showNoKaya) return null
+        return (
+          <div
+            style={{
+              marginTop: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+            }}
+          >
+            {showInline && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '1px',
+                  color: '#000',
+                }}
+              >
+                {itemsToShow.map((item) => {
+                  const segments = parseScheduleLine(item.text)
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        fontSize: '9px',
+                        lineHeight: 1.15,
+                        fontWeight: item.bold ? 700 : 500,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {segments.map((seg, j) => (
+                        <span key={j} style={{fontWeight: seg.bold || item.bold ? 700 : 500}}>
+                          {seg.text}
+                        </span>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {showLabel && (
+              <div
+                style={{
+                  fontWeight: 500,
+                  fontStyle: 'italic',
+                  fontSize: '11px',
+                  lineHeight: 1.15,
+                  color: highlight ? HIGHLIGHT_PINK : NEUTRAL_DEFAULT_GRAY,
+                }}
+              >
+                Normal Schedule
+              </div>
+            )}
+            {showNoKaya && (
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontStyle: 'italic',
+                  fontSize: '11px',
+                  lineHeight: 1.15,
+                  color: HIGHLIGHT_PINK,
+                  marginTop: '6px',
+                }}
+              >
+                NO KAYA or Choir
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -563,9 +705,11 @@ export function CalendarGrid({
   versePlacement,
   verseText,
   verseReference,
-  normalScheduleText,
-  defaultSchedule,
+  scheduleItems,
+  dayOverrides,
   events,
+  hideNormalScheduleFooter = false,
+  onCellClick,
 }: CalendarGridProps) {
   const accentColor = themeColor || DEFAULT_ACCENT
 
@@ -578,6 +722,25 @@ export function CalendarGrid({
     if (!cell.isInMonth) continue
     const list = allEventsByIso.get(cell.iso)
     if (list) inMonthEventsByIso.set(cell.iso, list)
+  }
+
+  const itemById = new Map<number, NormalScheduleItem>()
+  for (const it of scheduleItems) itemById.set(it.id, it)
+
+  // null entry = no override row; array (even empty) = override row exists.
+  const inlineByIso = new Map<string, NormalScheduleItem[]>()
+  const showNoKayaByIso = new Map<string, boolean>()
+  const showLabelByIso = new Map<string, boolean>()
+  for (const ov of dayOverrides) {
+    const ids = parseInlineItemIds(ov.inlineItemIds)
+    const items: NormalScheduleItem[] = []
+    for (const id of ids) {
+      const it = itemById.get(id)
+      if (it) items.push(it)
+    }
+    inlineByIso.set(ov.date, items)
+    if (ov.showNoKaya) showNoKayaByIso.set(ov.date, true)
+    showLabelByIso.set(ov.date, ov.showNormalScheduleLabel)
   }
 
   // Title placement
@@ -594,10 +757,9 @@ export function CalendarGrid({
   const effVersePlacement = versePlacement || DEFAULT_PLACEMENT
 
   // Footer placement
-  const scheduleText = (normalScheduleText && normalScheduleText.trim()) || defaultSchedule
   const footerNode = (
     <FooterContent
-      scheduleText={scheduleText}
+      scheduleItems={scheduleItems}
       theme={theme}
       verseText={verseText}
       verseReference={verseReference}
@@ -606,6 +768,7 @@ export function CalendarGrid({
       showVerseInFooter={isFooterPlacement(effVersePlacement)}
       themeAlign={footerAlignment(effThemePlacement)}
       verseAlign={footerAlignment(effVersePlacement)}
+      hideSchedule={hideNormalScheduleFooter}
     />
   )
   const footerWrapper = <div style={{position: 'absolute', inset: 0, zIndex: 2, display: 'flex'}}>{footerNode}</div>
@@ -775,15 +938,22 @@ export function CalendarGrid({
           if (rc.type === 'in_month') {
             const cell = rc.cells[0]
             const dayEvents = inMonthEventsByIso.get(cell.iso) ?? []
-            const showNormal = shouldShowNormalScheduleLabel(cell.dayOfWeek, dayEvents)
+            const showNormal = shouldShowNormalScheduleLabel(cell.dayOfWeek)
+            const inlineItems = inlineByIso.has(cell.iso) ? (inlineByIso.get(cell.iso) as NormalScheduleItem[]) : null
+            const showNoKaya = showNoKayaByIso.get(cell.iso) ?? false
+            const overrideShowsLabel = showLabelByIso.get(cell.iso) ?? true
             return (
               <InMonthCell
                 key={`${rc.weekIndex}-${rc.colIndex}`}
                 cell={cell}
                 dayEvents={dayEvents}
                 showNormalSchedule={showNormal}
+                inlineItems={inlineItems}
+                showNoKaya={showNoKaya}
+                overrideShowsLabel={overrideShowsLabel}
                 isLastRowInMonth={isLastRendered}
                 isLastColInMonth={lastCol}
+                onClick={onCellClick ? () => onCellClick(cell.iso) : undefined}
               />
             )
           }

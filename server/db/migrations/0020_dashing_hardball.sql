@@ -1,0 +1,1 @@
+ALTER TABLE `calendar_print_pages` DROP COLUMN `normal_schedule_text`;

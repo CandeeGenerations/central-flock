@@ -89,6 +89,15 @@ fi
 echo "==> Reload $SERVICE (bootout + bootstrap to pick up plist env changes)"
 DOMAIN="gui/$(id -u)"
 launchctl bootout "$DOMAIN/$SERVICE" 2>/dev/null || true
+
+# `bootout` is async — wait until the service is fully gone from the domain
+# before bootstrapping, otherwise bootstrap fails and `set -e` leaves the
+# service unloaded.
+for _ in {1..30}; do
+  launchctl print "$DOMAIN/$SERVICE" >/dev/null 2>&1 || break
+  sleep 0.5
+done
+
 launchctl bootstrap "$DOMAIN" "$PLIST"
 
 # Verify the new SENTRY_RELEASE is in the running process's environment

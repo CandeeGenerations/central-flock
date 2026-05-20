@@ -46,6 +46,11 @@ export function stopScheduler() {
 function checkScheduledMessages(processSendJob: ProcessSendJobFn) {
   return Sentry.withMonitor('message-send-scheduler', () => doCheckScheduledMessages(processSendJob), {
     schedule: {type: 'crontab', value: '*/5 * * * *'},
+    // Scheduler ticks at +60s after each :05 boundary (see startScheduler offset) to pick up
+    // just-scheduled messages. That puts check-ins right on Sentry's default 1-min grace edge,
+    // so any event-loop jitter during heavy sends gets flagged as missed. 2 min absorbs the
+    // intentional offset; a truly stuck scheduler still misses by minutes.
+    checkinMargin: 2,
   })
 }
 

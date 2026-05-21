@@ -64,7 +64,20 @@ export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFr
             {title}
           </h2>
         )}
-        {subtitle ? <div style={{color: '#000', fontSize: 18, fontWeight: 700, marginTop: 4}}>{subtitle}</div> : null}
+        {subtitle ? (
+          <div
+            style={{
+              color: '#000',
+              fontFamily: '"DM Serif Display", serif',
+              fontStyle: 'italic',
+              fontSize: 28,
+              lineHeight: 1.1,
+              marginTop: 4,
+            }}
+          >
+            {subtitle}
+          </div>
+        ) : null}
       </div>
 
       {children}

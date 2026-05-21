@@ -114,7 +114,8 @@ export function SpecialMusicSchedulesPage() {
     onSuccess: (created) => {
       queryClient.invalidateQueries({queryKey: schedulesKeys.list('special_music')})
       setDuplicateTarget(null)
-      toast.success(`Duplicated — ${created.cellsCopied} cell(s) copied`)
+      const skipped = created.cellsSkipped ? ` (${created.cellsSkipped} skipped — existing cell on that date)` : ''
+      toast.success(`Duplicated — ${created.cellsCopied} cell(s) copied${skipped}`)
       navigate(`/special-music/${created.id}`)
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to duplicate'),

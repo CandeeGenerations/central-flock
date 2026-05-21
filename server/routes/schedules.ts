@@ -274,7 +274,6 @@ schedulesRouter.post(
       .returning()
       .get()
 
-    const deltaDays = dayDelta(source.scopeStart, b.scopeStart)
     const todayStr = new Date().toISOString().slice(0, 10)
 
     const sourceCells = db
@@ -288,10 +287,30 @@ schedulesRouter.post(
       )
       .all()
 
+    // Align by Sunday, not by raw date delta. We pick the *earliest cell
+    // date* in the source and the *first Sunday on/after new.scopeStart*,
+    // and shift every cell by that day delta — guaranteed multiple of 7,
+    // so Sunday cells stay on Sundays even if the user picks a mid-week
+    // newScopeStart.
+    const earliestCellDate = sourceCells.length > 0 ? sourceCells.map((c) => c.date).sort()[0] : source.scopeStart
+    const deltaDays = dayDelta(earliestCellDate, firstSundayOnOrAfter(b.scopeStart))
+
     let copied = 0
+    let skippedExisting = 0
     for (const cell of sourceCells) {
       const newDate = shiftDate(cell.date, deltaDays)
       if (newDate < b.scopeStart || newDate > b.scopeEnd) continue
+      // Skip if a cell already exists at (newDate, service_type) — avoids
+      // duplicate rows when the new scope overlaps the source scope.
+      const existing = db
+        .select({id: schema.specialMusic.id})
+        .from(schema.specialMusic)
+        .where(and(eq(schema.specialMusic.date, newDate), eq(schema.specialMusic.serviceType, cell.serviceType)))
+        .get()
+      if (existing) {
+        skippedExisting += 1
+        continue
+      }
       const newStatus: 'will_perform' | 'needs_review' = newDate > todayStr ? 'will_perform' : 'needs_review'
       const inserted = db
         .insert(schema.specialMusic)
@@ -333,7 +352,7 @@ schedulesRouter.post(
       copied += 1
     }
 
-    res.status(201).json({...newEnv, cellsCopied: copied})
+    res.status(201).json({...newEnv, cellsCopied: copied, cellsSkipped: skippedExisting})
   }),
 )
 
@@ -346,6 +365,15 @@ function dayDelta(fromIso: string, toIso: string): number {
 function shiftDate(iso: string, deltaDays: number): string {
   const d = new Date(iso + 'T12:00:00')
   d.setDate(d.getDate() + deltaDays)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function firstSundayOnOrAfter(iso: string): string {
+  const d = new Date(iso + 'T12:00:00')
+  while (d.getDay() !== 0) d.setDate(d.getDate() + 1)
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')

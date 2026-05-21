@@ -112,31 +112,36 @@ export function SchedulesSettingsPage() {
               titlePrefix={settings.nursery.titlePrefix}
               footerBlocks={settings.nursery.footerBlocks}
               onSave={(p) => saveType(queryClient, {nursery: p})}
-            />
-            <div>
-              <Label className="mb-2 block text-sm font-medium">Service worker counts</Label>
-              {serviceConfig?.map((svc) => (
-                <div key={svc.serviceType} className="flex items-center justify-between border-b py-2 last:border-0">
-                  <span className="text-sm">{svc.label}</span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant={svc.workerCount === 1 ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => updateConfigMutation.mutate({type: svc.serviceType, workerCount: 1})}
+              middleSlot={
+                <div>
+                  <Label className="mb-2 block text-sm font-medium">Service worker counts</Label>
+                  {serviceConfig?.map((svc) => (
+                    <div
+                      key={svc.serviceType}
+                      className="flex items-center justify-between border-b py-2 last:border-0"
                     >
-                      1
-                    </Button>
-                    <Button
-                      variant={svc.workerCount === 2 ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => updateConfigMutation.mutate({type: svc.serviceType, workerCount: 2})}
-                    >
-                      2
-                    </Button>
-                  </div>
+                      <span className="text-sm">{svc.label}</span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant={svc.workerCount === 1 ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => updateConfigMutation.mutate({type: svc.serviceType, workerCount: 1})}
+                        >
+                          1
+                        </Button>
+                        <Button
+                          variant={svc.workerCount === 2 ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => updateConfigMutation.mutate({type: svc.serviceType, workerCount: 2})}
+                        >
+                          2
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              }
+            />
           </CardContent>
         </Card>
 
@@ -151,21 +156,26 @@ export function SchedulesSettingsPage() {
               titlePrefix={settings.specialMusic.titlePrefix}
               footerBlocks={settings.specialMusic.footerBlocks}
               onSave={(p) => saveType(queryClient, {specialMusic: p})}
+              middleSlot={
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Singer pool (groups)</Label>
+                  <p className="text-muted-foreground text-xs">
+                    Cell editor's people picker filters to members of these groups, deduplicated.
+                  </p>
+                  <MultiSelect
+                    value={settings.specialMusic.singerGroupIds.map(String)}
+                    onValueChange={(v) =>
+                      saveType(queryClient, {
+                        specialMusic: {singerGroupIds: v.map(Number).filter((n) => !Number.isNaN(n))},
+                      })
+                    }
+                    options={(groups ?? []).map((g) => ({value: String(g.id), label: g.name}))}
+                    placeholder="Pick groups"
+                    className="w-full"
+                  />
+                </div>
+              }
             />
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Singer pool (groups)</Label>
-              <p className="text-muted-foreground text-xs">
-                Cell editor's people picker filters to members of these groups, deduplicated.
-              </p>
-              <MultiSelect
-                value={settings.specialMusic.singerGroupIds.map(String)}
-                onValueChange={(v) =>
-                  saveType(queryClient, {specialMusic: {singerGroupIds: v.map(Number).filter((n) => !Number.isNaN(n))}})
-                }
-                options={(groups ?? []).map((g) => ({value: String(g.id), label: g.name}))}
-                placeholder="Pick groups"
-              />
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -192,12 +202,16 @@ interface TypeDefaultsCardProps {
   titleLabel: string
   titlePrefix: string
   footerBlocks: FooterBlock[]
+  // Rendered between the title prefix and the footer-blocks editor — used to
+  // tuck type-specific config (nursery worker counts, special music singer
+  // pool) above the footer per UX preference.
+  middleSlot?: React.ReactNode
   onSave: (
     patch: Partial<SchedulesSettings['nursery']> | Partial<SchedulesSettings['specialMusic']>,
   ) => Promise<void> | void
 }
 
-function TypeDefaultsCard({titleLabel, titlePrefix, footerBlocks, onSave}: TypeDefaultsCardProps) {
+function TypeDefaultsCard({titleLabel, titlePrefix, footerBlocks, middleSlot, onSave}: TypeDefaultsCardProps) {
   const [prefix, setPrefix] = useState(titlePrefix)
   const [blocks, setBlocks] = useState<FooterBlock[]>(footerBlocks)
 
@@ -216,6 +230,8 @@ function TypeDefaultsCard({titleLabel, titlePrefix, footerBlocks, onSave}: TypeD
         <Label className="text-sm font-medium">{titleLabel}</Label>
         <Input value={prefix} onChange={(e) => setPrefix(e.target.value)} />
       </div>
+
+      {middleSlot}
 
       <div className="space-y-2">
         <Label className="text-sm font-medium">Footer blocks</Label>

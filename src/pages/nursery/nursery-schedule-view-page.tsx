@@ -1,4 +1,5 @@
 import {NurserySchedulePreview} from '@/components/nursery/nursery-schedule-preview'
+import {ExportSchedulePdfDialog} from '@/components/schedule/export-schedule-pdf-dialog'
 import {ScheduleActionsToolbar} from '@/components/schedule/schedule-actions-toolbar'
 import {SchedulePreviewFrame} from '@/components/schedule/schedule-preview-frame'
 import {SendScheduleDialog} from '@/components/schedule/send-schedule-dialog'
@@ -23,6 +24,7 @@ import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 interface NurseryRecipient {
+  key: string
   name: string
   assignmentIds: Set<number>
   dates: Set<string>
@@ -37,7 +39,7 @@ function buildNurseryRecipients(assignments: NurseryAssignment[]): NurseryRecipi
     if (a.workerId == null || !a.workerName) continue
     let r = byKey.get(a.workerId)
     if (!r) {
-      r = {name: a.workerName, assignmentIds: new Set(), dates: new Set()}
+      r = {key: `worker:${a.workerId}`, name: a.workerName, assignmentIds: new Set(), dates: new Set()}
       byKey.set(a.workerId, r)
     }
     r.assignmentIds.add(a.id)
@@ -68,6 +70,7 @@ export function NurseryScheduleViewPage() {
   const previewRef = useRef<HTMLDivElement>(null)
   const [editMode, setEditMode] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
+  const [pdfOpen, setPdfOpen] = useState(false)
   const [highlightAssignmentIds, setHighlightAssignmentIds] = useState<Set<number>>(new Set())
   const [highlightDates, setHighlightDates] = useState<Set<string>>(new Set())
 
@@ -123,30 +126,50 @@ export function NurseryScheduleViewPage() {
     if (!schedule) return
     const monthName = MONTH_NAMES[schedule.month - 1]
     const filename = `Nursery Schedule - ${monthName} ${schedule.year}`
+    if (format === 'jpg') {
+      const wasEditing = editMode
+      try {
+        if (wasEditing) setEditMode(false)
+        await exportAs('jpg', {filename})
+        toast.success('Exported as JPG')
+      } catch (error) {
+        console.error('Export error:', error)
+        toast.error(`Export failed: ${describeExportError(error)}`)
+      } finally {
+        if (wasEditing) setEditMode(true)
+      }
+      return
+    }
+    setPdfOpen(true)
+  }
+
+  type NurseryPagePlan = {assignmentIds: Set<number>; dates: Set<string>}
+  async function runPdfExport(opts: {unhighlightedCopies: number; selectedRecipientKeys: string[]}) {
+    if (!schedule) return
+    const monthName = MONTH_NAMES[schedule.month - 1]
+    const filename = `Nursery Schedule - ${monthName} ${schedule.year}`
+    const allRecipients = buildNurseryRecipients(schedule.assignments)
+    const selectedSet = new Set(opts.selectedRecipientKeys)
+    const recipients = allRecipients.filter((r) => selectedSet.has(r.key))
+    const blank: NurseryPagePlan = {assignmentIds: new Set(), dates: new Set()}
+    const pages: NurseryPagePlan[] = [
+      ...Array.from({length: opts.unhighlightedCopies}, () => blank),
+      ...recipients.map((r) => ({assignmentIds: r.assignmentIds, dates: r.dates}) as NurseryPagePlan),
+    ]
+    if (pages.length === 0) return
     const wasEditing = editMode
     try {
       if (wasEditing) setEditMode(false)
-      if (format === 'jpg') {
-        await exportAs('jpg', {filename})
-        toast.success('Exported as JPG')
-        return
-      }
-      const recipients = buildNurseryRecipients(schedule.assignments)
-      if (recipients.length === 0) {
-        await exportAs('pdf', {filename})
-        toast.success('Exported as PDF')
-        return
-      }
-      await exportMultiPagePdf(recipients, {
+      await exportMultiPagePdf(pages, {
         filename,
-        prepare: (r) => {
-          setHighlightAssignmentIds(r.assignmentIds)
-          setHighlightDates(r.dates)
+        prepare: (p) => {
+          setHighlightAssignmentIds(p.assignmentIds)
+          setHighlightDates(p.dates)
         },
       })
       setHighlightAssignmentIds(new Set())
       setHighlightDates(new Set())
-      toast.success(`Exported ${recipients.length} page PDF`)
+      toast.success(`Exported ${pages.length} page PDF`)
     } catch (error) {
       console.error('Export error:', error)
       toast.error(`Export failed: ${describeExportError(error)}`)
@@ -159,6 +182,7 @@ export function NurseryScheduleViewPage() {
   if (!schedule || !serviceConfig) return <div className="p-6 text-muted-foreground">Schedule not found</div>
 
   const isDraft = schedule.status === 'draft'
+  const pdfRecipients = buildNurseryRecipients(schedule.assignments).map((r) => ({key: r.key, name: r.name}))
   const title = `${settings?.nursery.titlePrefix ?? 'Nursery Schedule'} - ${MONTH_NAMES[schedule.month - 1]} ${schedule.year}`
 
   return (
@@ -228,6 +252,13 @@ export function NurseryScheduleViewPage() {
           </SchedulePreviewFrame>
         </CardContent>
       </Card>
+
+      <ExportSchedulePdfDialog
+        open={pdfOpen}
+        onOpenChange={setPdfOpen}
+        recipients={pdfRecipients}
+        onConfirm={runPdfExport}
+      />
 
       <SendScheduleDialog
         open={sendOpen}

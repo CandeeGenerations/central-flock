@@ -1,3 +1,4 @@
+import {ExportSchedulePdfDialog} from '@/components/schedule/export-schedule-pdf-dialog'
 import {ScheduleActionsToolbar} from '@/components/schedule/schedule-actions-toolbar'
 import {ScheduleCellEditor} from '@/components/schedule/schedule-cell-editor'
 import {SchedulePreviewFrame} from '@/components/schedule/schedule-preview-frame'
@@ -27,6 +28,7 @@ interface OpenCell {
 }
 
 interface Recipient {
+  key: string
   name: string
   cellIds: Set<number>
   dates: Set<string>
@@ -40,7 +42,7 @@ function buildSpecialMusicRecipients(cells: SpecialMusicCell[]): Recipient[] {
   const upsert = (key: string, name: string, cellId: number, date: string) => {
     let r = byKey.get(key)
     if (!r) {
-      r = {name, cellIds: new Set(), dates: new Set()}
+      r = {key, name, cellIds: new Set(), dates: new Set()}
       byKey.set(key, r)
     }
     r.cellIds.add(cellId)
@@ -76,6 +78,7 @@ export function SpecialMusicScheduleViewPage() {
   const previewRef = useRef<HTMLDivElement>(null)
   const [editMode, setEditMode] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
+  const [pdfOpen, setPdfOpen] = useState(false)
   const [openCell, setOpenCell] = useState<OpenCell | null>(null)
   const [highlightCellIds, setHighlightCellIds] = useState<Set<number>>(new Set())
   const [highlightDates, setHighlightDates] = useState<Set<string>>(new Set())
@@ -112,34 +115,52 @@ export function SpecialMusicScheduleViewPage() {
 
   async function handleExport(format: 'pdf' | 'jpg') {
     if (!data) return
+    if (format === 'jpg') {
+      const filename = `Special Music Schedule - ${data.schedule.scopeLabel}`
+      const wasEditing = editMode
+      try {
+        if (wasEditing) setEditMode(false)
+        await exportAs('jpg', {filename})
+        toast.success('Exported as JPG')
+      } catch (e) {
+        console.error('Export error:', e)
+        toast.error(`Export failed: ${describeExportError(e)}`)
+      } finally {
+        if (wasEditing) setEditMode(true)
+      }
+      return
+    }
+    // PDF flows through the export dialog so the user picks unhighlighted
+    // copies + whether to include per-recipient highlighted pages.
+    setPdfOpen(true)
+  }
+
+  type PagePlan = {cellIds: Set<number>; dates: Set<string>}
+  async function runPdfExport(opts: {unhighlightedCopies: number; selectedRecipientKeys: string[]}) {
+    if (!data) return
     const filename = `Special Music Schedule - ${data.schedule.scopeLabel}`
+    const allRecipients = buildSpecialMusicRecipients(data.cells)
+    const selectedSet = new Set(opts.selectedRecipientKeys)
+    const recipients = allRecipients.filter((r) => selectedSet.has(r.key))
+    const blank: PagePlan = {cellIds: new Set(), dates: new Set()}
+    const pages: PagePlan[] = [
+      ...Array.from({length: opts.unhighlightedCopies}, () => blank),
+      ...recipients.map((r) => ({cellIds: r.cellIds, dates: r.dates}) as PagePlan),
+    ]
+    if (pages.length === 0) return
     const wasEditing = editMode
     try {
       if (wasEditing) setEditMode(false)
-      if (format === 'jpg') {
-        await exportAs('jpg', {filename})
-        toast.success('Exported as JPG')
-        return
-      }
-      // PDF: one page per recipient with their cells + dates highlighted.
-      const recipients = buildSpecialMusicRecipients(data.cells)
-      if (recipients.length === 0) {
-        // Fall back to single-page export when nothing's scheduled yet.
-        await exportAs('pdf', {filename})
-        toast.success('Exported as PDF')
-        return
-      }
-      await exportMultiPagePdf(recipients, {
+      await exportMultiPagePdf(pages, {
         filename,
-        prepare: (r) => {
-          setHighlightCellIds(r.cellIds)
-          setHighlightDates(r.dates)
+        prepare: (p) => {
+          setHighlightCellIds(p.cellIds)
+          setHighlightDates(p.dates)
         },
       })
-      // Clear after export so the editing view returns to normal.
       setHighlightCellIds(new Set())
       setHighlightDates(new Set())
-      toast.success(`Exported ${recipients.length} page PDF`)
+      toast.success(`Exported ${pages.length} page PDF`)
     } catch (e) {
       console.error('Export error:', e)
       toast.error(`Export failed: ${describeExportError(e)}`)
@@ -152,6 +173,7 @@ export function SpecialMusicScheduleViewPage() {
   if (!data) return <div className="text-muted-foreground p-6">Schedule not found</div>
 
   const {schedule, cells} = data
+  const pdfRecipients = buildSpecialMusicRecipients(cells).map((r) => ({key: r.key, name: r.name}))
   const titlePrefix = settings?.specialMusic.titlePrefix ?? 'CBC Special Music Schedule'
   const title = `${titlePrefix} ${schedule.scopeLabel}`
   const openCellModel: SpecialMusicCell | null = openCell
@@ -202,6 +224,13 @@ export function SpecialMusicScheduleViewPage() {
           </SchedulePreviewFrame>
         </CardContent>
       </Card>
+
+      <ExportSchedulePdfDialog
+        open={pdfOpen}
+        onOpenChange={setPdfOpen}
+        recipients={pdfRecipients}
+        onConfirm={runPdfExport}
+      />
 
       <SendScheduleDialog
         open={sendOpen}

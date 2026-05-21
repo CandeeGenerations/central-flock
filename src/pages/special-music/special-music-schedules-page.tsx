@@ -11,6 +11,7 @@ import {SearchInput} from '@/components/ui/search-input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
+import {formatDate} from '@/lib/date'
 import {
   type Schedule,
   createSpecialMusicSchedule,
@@ -146,7 +147,7 @@ export function SpecialMusicSchedulesPage() {
                 >
                   <TableCell className="font-medium">{s.scopeLabel}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {s.scopeStart} → {s.scopeEnd}
+                    {s.scopeStart ? formatDate(s.scopeStart) : '—'} → {s.scopeEnd ? formatDate(s.scopeEnd) : '—'}
                   </TableCell>
                   <TableCell>
                     <Badge variant={s.status === 'final' ? 'default' : 'secondary'}>

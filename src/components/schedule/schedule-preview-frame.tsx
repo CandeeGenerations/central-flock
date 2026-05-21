@@ -76,9 +76,10 @@ export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFr
                   key={i}
                   className="text-center"
                   style={{
+                    fontFamily: '"DM Serif Display", serif',
                     fontStyle: 'italic',
-                    fontSize: 14,
-                    lineHeight: 1.4,
+                    fontSize: 16,
+                    lineHeight: 1.35,
                     marginBottom: 8,
                     fontWeight: b.bold ? 700 : 400,
                     whiteSpace: 'pre-wrap',

@@ -88,7 +88,61 @@ export function useScheduleExport(previewRef: React.RefObject<HTMLDivElement | n
     [generateImage],
   )
 
-  return {exporting, generateImage, exportAs, setExporting}
+  // Multi-page PDF: one page per "page descriptor". Caller passes an array
+  // and a `prepare(page)` callback that mutates React state to highlight or
+  // re-scope the preview for that page. The hook waits a tick for React to
+  // flush, captures the image, appends to a single jsPDF, and saves.
+  //
+  // Used for the per-recipient print pack: one page per scheduled
+  // person/group with their cells + dates highlighted.
+  const exportMultiPagePdf = useCallback(
+    async <T>(pages: T[], opts: {filename: string; prepare: (page: T) => void}) => {
+      if (pages.length === 0) return
+      setExporting(true)
+      try {
+        const {jsPDF} = await import('jspdf')
+        const pdf = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'letter'})
+        const pageWidth = 215.9
+        const pageHeight = 279.4
+        const margin = 10
+        const maxWidth = pageWidth - margin * 2
+        const maxHeight = pageHeight - margin * 2
+        for (let i = 0; i < pages.length; i++) {
+          opts.prepare(pages[i])
+          // Let React flush state + paint before we capture.
+          await new Promise((r) => setTimeout(r, 120))
+          const dataUrl = await generateImage()
+          const img = new Image()
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve()
+            img.onerror = reject
+            img.src = dataUrl
+          })
+          const imgRatio = img.width / img.height
+          const pageRatio = maxWidth / maxHeight
+          let renderWidth: number
+          let renderHeight: number
+          if (imgRatio > pageRatio) {
+            renderWidth = maxWidth
+            renderHeight = maxWidth / imgRatio
+          } else {
+            renderHeight = maxHeight
+            renderWidth = maxHeight * imgRatio
+          }
+          const x = (pageWidth - renderWidth) / 2
+          const y = (pageHeight - renderHeight) / 2
+          if (i > 0) pdf.addPage()
+          pdf.addImage(dataUrl, 'JPEG', x, y, renderWidth, renderHeight)
+        }
+        pdf.save(`${opts.filename}.pdf`)
+      } finally {
+        setExporting(false)
+      }
+    },
+    [generateImage],
+  )
+
+  return {exporting, generateImage, exportAs, exportMultiPagePdf, setExporting}
 }
 
 async function inlineImagesAsDataUrls(root: HTMLElement) {

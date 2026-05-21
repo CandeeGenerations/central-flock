@@ -14,6 +14,10 @@ interface SchedulePreviewProps {
   // parishioner-facing layout. Defaults to false.
   exporting?: boolean
   onCarryoverClick?: (assignment: NurseryAssignment) => void
+  // Per-recipient PDF highlighting. assignment ids = worker slot cells;
+  // dates = the date column on the matching rows.
+  highlightAssignmentIds?: Set<number>
+  highlightDates?: Set<string>
 }
 
 interface DateGroup {
@@ -52,6 +56,8 @@ function formatDisplayDate(dateStr: string): string {
 // Renders only the schedule's table body. The surrounding logo/title header
 // and footer text blocks live in `SchedulePreviewFrame` so every Schedule
 // type prints with the same envelope.
+const HIGHLIGHT = '#fde68a'
+
 export function NurserySchedulePreview({
   assignments,
   serviceConfig,
@@ -60,6 +66,8 @@ export function NurserySchedulePreview({
   onAssignmentChange,
   exporting,
   onCarryoverClick,
+  highlightAssignmentIds,
+  highlightDates,
 }: SchedulePreviewProps) {
   const configMap = useMemo(() => {
     const map = new Map<ServiceType, ServiceConfig>()
@@ -146,6 +154,7 @@ export function NurserySchedulePreview({
         <tbody>
           {dateGroups.map((group, groupIdx) => {
             const totalRows = group.services.length
+            const dateHighlighted = highlightDates?.has(group.date) ?? false
             return group.services.map((svc, svcIdx) => (
               <tr key={`${group.date}-${svc.serviceType}`}>
                 {svcIdx === 0 && (
@@ -154,7 +163,7 @@ export function NurserySchedulePreview({
                     rowSpan={totalRows}
                     style={{
                       borderTop: groupIdx > 0 ? '1.5px solid #000' : undefined,
-                      backgroundColor: '#f3f4f6',
+                      backgroundColor: dateHighlighted ? HIGHLIGHT : '#f3f4f6',
                     }}
                   >
                     {group.displayDate}
@@ -172,6 +181,7 @@ export function NurserySchedulePreview({
                 </td>
                 {[1, 2].map((slotNum) => {
                   const slotAssignment = svc.slots.find((s) => s.slot === slotNum)
+                  const assignmentHighlighted = slotAssignment && highlightAssignmentIds?.has(slotAssignment.id)
                   const cellStyle = {
                     borderLeft: '1.5px solid #000' as const,
                     borderTop:
@@ -180,6 +190,7 @@ export function NurserySchedulePreview({
                         : svcIdx > 0
                           ? ('1px solid #d1d5db' as const)
                           : undefined,
+                    ...(assignmentHighlighted ? {backgroundColor: HIGHLIGHT} : {}),
                   }
                   if (slotNum > svc.workerCount) {
                     return (

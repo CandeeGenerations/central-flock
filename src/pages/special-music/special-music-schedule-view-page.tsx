@@ -26,6 +26,48 @@ interface OpenCell {
   serviceType: 'sunday_am' | 'sunday_pm'
 }
 
+interface Recipient {
+  name: string
+  cellIds: Set<number>
+  dates: Set<string>
+}
+
+// Build the per-recipient page list. One Recipient = one unique scheduled
+// performer / guest name / override-label. Each recipient's page highlights
+// the cells where they appear and the date column on those rows.
+function buildSpecialMusicRecipients(cells: SpecialMusicCell[]): Recipient[] {
+  const byKey = new Map<string, Recipient>()
+  const upsert = (key: string, name: string, cellId: number, date: string) => {
+    let r = byKey.get(key)
+    if (!r) {
+      r = {name, cellIds: new Set(), dates: new Set()}
+      byKey.set(key, r)
+    }
+    r.cellIds.add(cellId)
+    r.dates.add(date)
+  }
+  for (const c of cells) {
+    for (const p of c.performers) {
+      const name = p.displayFirstNameOnly
+        ? (p.firstName ?? '').trim() || `Person ${p.personId}`
+        : [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || `Person ${p.personId}`
+      upsert(`person:${p.personId}`, name, c.id, c.date)
+    }
+    for (const g of c.guestPerformers) {
+      const name = g.trim()
+      if (!name) continue
+      upsert(`guest:${name.toLowerCase()}`, name, c.id, c.date)
+    }
+    // Override label is a recipient only when the cell has no other
+    // performers (e.g. "MEN'S GROUP – TBA" pages go to the men's group).
+    if (c.performers.length === 0 && c.guestPerformers.length === 0 && c.serviceLabel?.trim()) {
+      const name = c.serviceLabel.trim()
+      upsert(`label:${name.toLowerCase()}`, name, c.id, c.date)
+    }
+  }
+  return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
 export function SpecialMusicScheduleViewPage() {
   const {id} = useParams<{id: string}>()
   const scheduleId = Number(id)
@@ -35,8 +77,10 @@ export function SpecialMusicScheduleViewPage() {
   const [editMode, setEditMode] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [openCell, setOpenCell] = useState<OpenCell | null>(null)
+  const [highlightCellIds, setHighlightCellIds] = useState<Set<number>>(new Set())
+  const [highlightDates, setHighlightDates] = useState<Set<string>>(new Set())
 
-  const {exporting, setExporting, generateImage, exportAs} = useScheduleExport(previewRef)
+  const {exporting, setExporting, generateImage, exportAs, exportMultiPagePdf} = useScheduleExport(previewRef)
 
   const {data, isLoading} = useQuery({
     queryKey: schedulesKeys.cells(scheduleId),
@@ -69,15 +113,38 @@ export function SpecialMusicScheduleViewPage() {
   async function handleExport(format: 'pdf' | 'jpg') {
     if (!data) return
     const filename = `Special Music Schedule - ${data.schedule.scopeLabel}`
+    const wasEditing = editMode
     try {
-      const wasEditing = editMode
       if (wasEditing) setEditMode(false)
-      await exportAs(format, {filename})
-      if (wasEditing) setEditMode(true)
-      toast.success(`Exported as ${format.toUpperCase()}`)
+      if (format === 'jpg') {
+        await exportAs('jpg', {filename})
+        toast.success('Exported as JPG')
+        return
+      }
+      // PDF: one page per recipient with their cells + dates highlighted.
+      const recipients = buildSpecialMusicRecipients(data.cells)
+      if (recipients.length === 0) {
+        // Fall back to single-page export when nothing's scheduled yet.
+        await exportAs('pdf', {filename})
+        toast.success('Exported as PDF')
+        return
+      }
+      await exportMultiPagePdf(recipients, {
+        filename,
+        prepare: (r) => {
+          setHighlightCellIds(r.cellIds)
+          setHighlightDates(r.dates)
+        },
+      })
+      // Clear after export so the editing view returns to normal.
+      setHighlightCellIds(new Set())
+      setHighlightDates(new Set())
+      toast.success(`Exported ${recipients.length} page PDF`)
     } catch (e) {
       console.error('Export error:', e)
       toast.error(`Export failed: ${describeExportError(e)}`)
+    } finally {
+      if (wasEditing) setEditMode(true)
     }
   }
 
@@ -129,6 +196,8 @@ export function SpecialMusicScheduleViewPage() {
               editMode={schedule.status === 'draft' && editMode}
               exporting={exporting}
               onCellClick={(date, serviceType) => setOpenCell({date, serviceType})}
+              highlightCellIds={highlightCellIds}
+              highlightDates={highlightDates}
             />
           </SchedulePreviewFrame>
         </CardContent>

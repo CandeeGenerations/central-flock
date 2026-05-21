@@ -7,6 +7,7 @@ import {Card, CardContent} from '@/components/ui/card'
 import {PageSpinner} from '@/components/ui/spinner'
 import {describeExportError, useScheduleExport} from '@/hooks/use-schedule-export'
 import {
+  type NurseryAssignment,
   fetchNurserySchedule,
   fetchNurseryWorkers,
   fetchServiceConfig,
@@ -20,6 +21,30 @@ import {ArrowLeft} from 'lucide-react'
 import {useCallback, useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
+
+interface NurseryRecipient {
+  name: string
+  assignmentIds: Set<number>
+  dates: Set<string>
+}
+
+// One page per unique scheduled worker. Their assignments + the date column
+// on the matching dates are highlighted. Workers carried over from a prior
+// month are still page-worthy — they're the ones being notified.
+function buildNurseryRecipients(assignments: NurseryAssignment[]): NurseryRecipient[] {
+  const byKey = new Map<number, NurseryRecipient>()
+  for (const a of assignments) {
+    if (a.workerId == null || !a.workerName) continue
+    let r = byKey.get(a.workerId)
+    if (!r) {
+      r = {name: a.workerName, assignmentIds: new Set(), dates: new Set()}
+      byKey.set(a.workerId, r)
+    }
+    r.assignmentIds.add(a.id)
+    r.dates.add(a.date)
+  }
+  return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
 
 const MONTH_NAMES = [
   'January',
@@ -43,8 +68,10 @@ export function NurseryScheduleViewPage() {
   const previewRef = useRef<HTMLDivElement>(null)
   const [editMode, setEditMode] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
+  const [highlightAssignmentIds, setHighlightAssignmentIds] = useState<Set<number>>(new Set())
+  const [highlightDates, setHighlightDates] = useState<Set<string>>(new Set())
 
-  const {exporting, setExporting, generateImage, exportAs} = useScheduleExport(previewRef)
+  const {exporting, setExporting, generateImage, exportAs, exportMultiPagePdf} = useScheduleExport(previewRef)
 
   const {data: schedule, isLoading} = useQuery({
     queryKey: nurseryKeys.schedule(Number(id)),
@@ -96,15 +123,35 @@ export function NurseryScheduleViewPage() {
     if (!schedule) return
     const monthName = MONTH_NAMES[schedule.month - 1]
     const filename = `Nursery Schedule - ${monthName} ${schedule.year}`
+    const wasEditing = editMode
     try {
-      const wasEditing = editMode
       if (wasEditing) setEditMode(false)
-      await exportAs(format, {filename})
-      if (wasEditing) setEditMode(true)
-      toast.success(`Exported as ${format.toUpperCase()}`)
+      if (format === 'jpg') {
+        await exportAs('jpg', {filename})
+        toast.success('Exported as JPG')
+        return
+      }
+      const recipients = buildNurseryRecipients(schedule.assignments)
+      if (recipients.length === 0) {
+        await exportAs('pdf', {filename})
+        toast.success('Exported as PDF')
+        return
+      }
+      await exportMultiPagePdf(recipients, {
+        filename,
+        prepare: (r) => {
+          setHighlightAssignmentIds(r.assignmentIds)
+          setHighlightDates(r.dates)
+        },
+      })
+      setHighlightAssignmentIds(new Set())
+      setHighlightDates(new Set())
+      toast.success(`Exported ${recipients.length} page PDF`)
     } catch (error) {
       console.error('Export error:', error)
       toast.error(`Export failed: ${describeExportError(error)}`)
+    } finally {
+      if (wasEditing) setEditMode(true)
     }
   }
 
@@ -175,6 +222,8 @@ export function NurseryScheduleViewPage() {
               onAssignmentChange={handleAssignmentChange}
               exporting={exporting}
               onCarryoverClick={(a) => a.sourceScheduleId && navigate(`/nursery/${a.sourceScheduleId}`)}
+              highlightAssignmentIds={highlightAssignmentIds}
+              highlightDates={highlightDates}
             />
           </SchedulePreviewFrame>
         </CardContent>

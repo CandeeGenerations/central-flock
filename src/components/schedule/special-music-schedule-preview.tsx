@@ -8,6 +8,10 @@ interface Props {
   editMode?: boolean
   onCellClick?: (date: string, serviceType: 'sunday_am' | 'sunday_pm') => void
   exporting?: boolean
+  // When set, render those cells + the date column on those rows with a
+  // highlight background. Used by the per-recipient PDF pages.
+  highlightCellIds?: Set<number>
+  highlightDates?: Set<string>
 }
 
 const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -86,10 +90,20 @@ function cellPrefix(cell: SpecialMusicCell): string {
   return cell.type.toUpperCase()
 }
 
-export function SpecialMusicSchedulePreview({scopeStart, scopeEnd, cells, editMode, onCellClick, exporting}: Props) {
+export function SpecialMusicSchedulePreview({
+  scopeStart,
+  scopeEnd,
+  cells,
+  editMode,
+  onCellClick,
+  exporting,
+  highlightCellIds,
+  highlightDates,
+}: Props) {
   const sundays = sundaysBetween(scopeStart, scopeEnd)
   const byKey = new Map<string, SpecialMusicCell>()
   for (const c of cells) byKey.set(`${c.date}:${c.serviceType}`, c)
+  const HIGHLIGHT = '#fde68a' // amber-200; readable against black text in print
 
   const cellWidth = '290px'
   return (
@@ -132,21 +146,28 @@ export function SpecialMusicSchedulePreview({scopeStart, scopeEnd, cells, editMo
             const am = byKey.get(`${d}:sunday_am`)
             const pm = byKey.get(`${d}:sunday_pm`)
             const rowBorder = rowIdx > 0 ? ('1.5px solid #000' as const) : undefined
+            const dateHighlighted = highlightDates?.has(d) ?? false
             return (
               <tr key={d} style={{height: 52}}>
                 <td
                   className="px-3 py-2 text-sm font-medium"
-                  style={{borderTop: rowBorder, backgroundColor: '#f3f4f6', verticalAlign: 'middle'}}
+                  style={{
+                    borderTop: rowBorder,
+                    backgroundColor: dateHighlighted ? HIGHLIGHT : '#f3f4f6',
+                    verticalAlign: 'middle',
+                  }}
                 >
                   {formatDate(d)}
                 </td>
                 {(['sunday_am', 'sunday_pm'] as const).map((slot) => {
                   const cell = slot === 'sunday_am' ? am : pm
                   const clickable = editMode && !exporting && onCellClick
+                  const cellHighlighted = cell && highlightCellIds?.has(cell.id)
                   const baseStyle = {
                     borderLeft: '1.5px solid #000' as const,
                     borderTop: rowBorder,
                     verticalAlign: 'middle' as const,
+                    ...(cellHighlighted ? {backgroundColor: HIGHLIGHT} : {}),
                   }
                   if (!cell) {
                     return (

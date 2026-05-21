@@ -97,6 +97,12 @@ export const updateSchedule = (id: number, body: {scopeLabel?: string; status?: 
 
 export const deleteSchedule = (id: number) => request<{success: true}>(`/schedules/${id}`, {method: 'DELETE'})
 
+export const duplicateSchedule = (id: number, body: {scopeStart: string; scopeEnd: string; scopeLabel?: string}) =>
+  request<Schedule & {cellsCopied: number}>(`/schedules/${id}/duplicate`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+
 // ── Special-Music Schedule cells (date-range view over special_music) ──
 
 export interface SpecialMusicCellPerformer {

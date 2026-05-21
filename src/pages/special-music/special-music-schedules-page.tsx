@@ -16,11 +16,12 @@ import {
   type Schedule,
   createSpecialMusicSchedule,
   deleteSchedule,
+  duplicateSchedule,
   fetchSchedules,
   schedulesKeys,
 } from '@/lib/schedules-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Plus, Trash2} from 'lucide-react'
+import {Copy, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -46,10 +47,27 @@ function autoLabel(start: string, end: string): string {
   return sy === ey ? sy : `${sy}–${ey}`
 }
 
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(iso + 'T12:00:00')
+  d.setDate(d.getDate() + days)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function dayDelta(fromIso: string, toIso: string): number {
+  return Math.round((new Date(toIso + 'T12:00:00').getTime() - new Date(fromIso + 'T12:00:00').getTime()) / 86400000)
+}
+
 export function SpecialMusicSchedulesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [deleteTarget, setDeleteTarget] = useState<Schedule | null>(null)
+  const [duplicateTarget, setDuplicateTarget] = useState<Schedule | null>(null)
+  const [dupStart, setDupStart] = useState('')
+  const [dupEnd, setDupEnd] = useState('')
+  const [dupLabel, setDupLabel] = useState('')
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 250)
   const [page, setPage] = useState(1)
@@ -85,6 +103,34 @@ export function SpecialMusicSchedulesPage() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to delete'),
   })
+
+  const duplicateMutation = useMutation({
+    mutationFn: () =>
+      duplicateSchedule(duplicateTarget!.id, {
+        scopeStart: dupStart,
+        scopeEnd: dupEnd,
+        scopeLabel: dupLabel.trim() || autoLabel(dupStart, dupEnd),
+      }),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({queryKey: schedulesKeys.list('special_music')})
+      setDuplicateTarget(null)
+      toast.success(`Duplicated — ${created.cellsCopied} cell(s) copied`)
+      navigate(`/special-music/${created.id}`)
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to duplicate'),
+  })
+
+  function openDuplicate(s: Schedule) {
+    setDuplicateTarget(s)
+    // Default: continuation — start the day after source ends, span the same duration.
+    if (s.scopeStart && s.scopeEnd) {
+      const start = addDaysIso(s.scopeEnd, 1)
+      const span = dayDelta(s.scopeStart, s.scopeEnd)
+      setDupStart(start)
+      setDupEnd(addDaysIso(start, span))
+    }
+    setDupLabel('')
+  }
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -135,7 +181,7 @@ export function SpecialMusicSchedulesPage() {
                 <TableHead>Dates</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="w-16" />
+                <TableHead className="w-24" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -156,16 +202,30 @@ export function SpecialMusicSchedulesPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{new Date(s.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setDeleteTarget(s)
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Duplicate"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openDuplicate(s)
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Delete"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setDeleteTarget(s)
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -236,6 +296,44 @@ export function SpecialMusicSchedulesPage() {
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
         loading={deleteMutation.isPending}
       />
+
+      <Dialog open={!!duplicateTarget} onOpenChange={(v) => !v && setDuplicateTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Duplicate Schedule</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-muted-foreground text-sm">
+              Performers, override labels, and last-name overrides copy across. Song titles and YouTube links don't —
+              those belong to the original performance.
+            </p>
+            <div className="space-y-1.5">
+              <Label>From</Label>
+              <DatePicker value={dupStart} onChange={setDupStart} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>To</Label>
+              <DatePicker value={dupEnd} onChange={setDupEnd} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Label (optional)</Label>
+              <Input
+                value={dupLabel}
+                onChange={(e) => setDupLabel(e.target.value)}
+                placeholder={dupStart && dupEnd ? autoLabel(dupStart, dupEnd) : ''}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDuplicateTarget(null)}>
+              Cancel
+            </Button>
+            <Button onClick={() => duplicateMutation.mutate()} disabled={duplicateMutation.isPending}>
+              {duplicateMutation.isPending ? 'Duplicating...' : 'Duplicate'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

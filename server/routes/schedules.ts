@@ -226,6 +226,132 @@ schedulesRouter.delete(
   }),
 )
 
+// POST /api/schedules/:id/duplicate
+// Clones the envelope at the supplied new scope and shifts each cell's date
+// by the delta between old.scopeStart and new.scopeStart. Cells outside the
+// new scope are dropped. Status resets per date (will_perform when future,
+// needs_review when past). Song details (title/hymn/youtube/sheet music/
+// notes) are NOT copied — the new schedule is a forward-looking plan, not
+// a performance log. Performer links + displayFirstNameOnly overrides are.
+schedulesRouter.post(
+  '/:id/duplicate',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const b = req.body as {scopeStart?: string; scopeEnd?: string; scopeLabel?: string}
+    if (
+      !b.scopeStart ||
+      !b.scopeEnd ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(b.scopeStart) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(b.scopeEnd)
+    ) {
+      res.status(400).json({error: 'scopeStart and scopeEnd are required (YYYY-MM-DD)'})
+      return
+    }
+    if (b.scopeStart > b.scopeEnd) {
+      res.status(400).json({error: 'scopeStart must be on or before scopeEnd'})
+      return
+    }
+    const source = db.select().from(schema.schedules).where(eq(schema.schedules.id, id)).get()
+    if (!source) {
+      res.status(404).json({error: 'Schedule not found'})
+      return
+    }
+    if (source.scheduleType !== 'special_music' || !source.scopeStart) {
+      res.status(400).json({error: 'Only special_music schedules can be duplicated'})
+      return
+    }
+
+    const label = b.scopeLabel?.trim() || String(Number(b.scopeStart.slice(0, 4)))
+    const newEnv = db
+      .insert(schema.schedules)
+      .values({
+        scheduleType: 'special_music',
+        scopeKind: 'date_range',
+        scopeStart: b.scopeStart,
+        scopeEnd: b.scopeEnd,
+        scopeLabel: label,
+      })
+      .returning()
+      .get()
+
+    const deltaDays = dayDelta(source.scopeStart, b.scopeStart)
+    const todayStr = new Date().toISOString().slice(0, 10)
+
+    const sourceCells = db
+      .select()
+      .from(schema.specialMusic)
+      .where(
+        and(
+          between(schema.specialMusic.date, source.scopeStart, source.scopeEnd!),
+          inArray(schema.specialMusic.serviceType, ['sunday_am', 'sunday_pm']),
+        ),
+      )
+      .all()
+
+    let copied = 0
+    for (const cell of sourceCells) {
+      const newDate = shiftDate(cell.date, deltaDays)
+      if (newDate < b.scopeStart || newDate > b.scopeEnd) continue
+      const newStatus: 'will_perform' | 'needs_review' = newDate > todayStr ? 'will_perform' : 'needs_review'
+      const inserted = db
+        .insert(schema.specialMusic)
+        .values({
+          date: newDate,
+          serviceType: cell.serviceType,
+          serviceLabel: cell.serviceLabel,
+          songTitle: null,
+          hymnId: null,
+          songArranger: null,
+          songWriter: null,
+          type: cell.type,
+          status: newStatus,
+          occasion: null,
+          guestPerformers: cell.guestPerformers,
+          youtubeUrl: null,
+          sheetMusicPath: null,
+          notes: null,
+        })
+        .returning({id: schema.specialMusic.id})
+        .get()
+      const links = db
+        .select()
+        .from(schema.specialMusicPerformers)
+        .where(eq(schema.specialMusicPerformers.specialMusicId, cell.id))
+        .all()
+      if (links.length > 0) {
+        db.insert(schema.specialMusicPerformers)
+          .values(
+            links.map((l) => ({
+              specialMusicId: inserted.id,
+              personId: l.personId,
+              ordering: l.ordering,
+              displayFirstNameOnly: l.displayFirstNameOnly,
+            })),
+          )
+          .run()
+      }
+      copied += 1
+    }
+
+    res.status(201).json({...newEnv, cellsCopied: copied})
+  }),
+)
+
+function dayDelta(fromIso: string, toIso: string): number {
+  const a = new Date(fromIso + 'T12:00:00').getTime()
+  const b = new Date(toIso + 'T12:00:00').getTime()
+  return Math.round((b - a) / 86400000)
+}
+
+function shiftDate(iso: string, deltaDays: number): string {
+  const d = new Date(iso + 'T12:00:00')
+  d.setDate(d.getDate() + deltaDays)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 // ── Special Music body: cells in scope ─────────────────────────────────
 // Returns the special_music rows that the schedule's date range
 // (Sundays only, AM + PM) is a view over, decorated with performers and

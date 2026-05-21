@@ -73,6 +73,7 @@ export function NurseryScheduleViewPage() {
   const [pdfOpen, setPdfOpen] = useState(false)
   const [highlightAssignmentIds, setHighlightAssignmentIds] = useState<Set<number>>(new Set())
   const [highlightDates, setHighlightDates] = useState<Set<string>>(new Set())
+  const [recipientSubtitle, setRecipientSubtitle] = useState<string>('')
 
   const {exporting, setExporting, generateImage, exportAs, exportMultiPagePdf} = useScheduleExport(previewRef)
 
@@ -143,7 +144,7 @@ export function NurseryScheduleViewPage() {
     setPdfOpen(true)
   }
 
-  type NurseryPagePlan = {assignmentIds: Set<number>; dates: Set<string>}
+  type NurseryPagePlan = {assignmentIds: Set<number>; dates: Set<string>; subtitle: string}
   async function runPdfExport(opts: {unhighlightedCopies: number; selectedRecipientKeys: string[]}) {
     if (!schedule) return
     const monthName = MONTH_NAMES[schedule.month - 1]
@@ -151,10 +152,13 @@ export function NurseryScheduleViewPage() {
     const allRecipients = buildNurseryRecipients(schedule.assignments)
     const selectedSet = new Set(opts.selectedRecipientKeys)
     const recipients = allRecipients.filter((r) => selectedSet.has(r.key))
-    const blank: NurseryPagePlan = {assignmentIds: new Set(), dates: new Set()}
     const pages: NurseryPagePlan[] = [
-      ...Array.from({length: opts.unhighlightedCopies}, () => blank),
-      ...recipients.map((r) => ({assignmentIds: r.assignmentIds, dates: r.dates}) as NurseryPagePlan),
+      ...Array.from({length: opts.unhighlightedCopies}, () => ({
+        assignmentIds: new Set<number>(),
+        dates: new Set<string>(),
+        subtitle: '',
+      })),
+      ...recipients.map((r) => ({assignmentIds: r.assignmentIds, dates: r.dates, subtitle: r.name}) as NurseryPagePlan),
     ]
     if (pages.length === 0) return
     const wasEditing = editMode
@@ -165,10 +169,12 @@ export function NurseryScheduleViewPage() {
         prepare: (p) => {
           setHighlightAssignmentIds(p.assignmentIds)
           setHighlightDates(p.dates)
+          setRecipientSubtitle(p.subtitle)
         },
       })
       setHighlightAssignmentIds(new Set())
       setHighlightDates(new Set())
+      setRecipientSubtitle('')
       toast.success(`Exported ${pages.length} page PDF`)
     } catch (error) {
       console.error('Export error:', error)
@@ -236,6 +242,7 @@ export function NurseryScheduleViewPage() {
             title={title}
             logoPath={settings?.logoPath}
             footerBlocks={settings?.nursery.footerBlocks}
+            subtitle={recipientSubtitle}
             exporting={exporting}
           >
             <NurserySchedulePreview

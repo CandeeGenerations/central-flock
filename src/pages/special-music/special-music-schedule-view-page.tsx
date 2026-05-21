@@ -82,6 +82,7 @@ export function SpecialMusicScheduleViewPage() {
   const [openCell, setOpenCell] = useState<OpenCell | null>(null)
   const [highlightCellIds, setHighlightCellIds] = useState<Set<number>>(new Set())
   const [highlightDates, setHighlightDates] = useState<Set<string>>(new Set())
+  const [recipientSubtitle, setRecipientSubtitle] = useState<string>('')
 
   const {exporting, setExporting, generateImage, exportAs, exportMultiPagePdf} = useScheduleExport(previewRef)
 
@@ -135,17 +136,20 @@ export function SpecialMusicScheduleViewPage() {
     setPdfOpen(true)
   }
 
-  type PagePlan = {cellIds: Set<number>; dates: Set<string>}
+  type PagePlan = {cellIds: Set<number>; dates: Set<string>; subtitle: string}
   async function runPdfExport(opts: {unhighlightedCopies: number; selectedRecipientKeys: string[]}) {
     if (!data) return
     const filename = `Special Music Schedule - ${data.schedule.scopeLabel}`
     const allRecipients = buildSpecialMusicRecipients(data.cells)
     const selectedSet = new Set(opts.selectedRecipientKeys)
     const recipients = allRecipients.filter((r) => selectedSet.has(r.key))
-    const blank: PagePlan = {cellIds: new Set(), dates: new Set()}
     const pages: PagePlan[] = [
-      ...Array.from({length: opts.unhighlightedCopies}, () => blank),
-      ...recipients.map((r) => ({cellIds: r.cellIds, dates: r.dates}) as PagePlan),
+      ...Array.from({length: opts.unhighlightedCopies}, () => ({
+        cellIds: new Set<number>(),
+        dates: new Set<string>(),
+        subtitle: '',
+      })),
+      ...recipients.map((r) => ({cellIds: r.cellIds, dates: r.dates, subtitle: r.name}) as PagePlan),
     ]
     if (pages.length === 0) return
     const wasEditing = editMode
@@ -156,10 +160,12 @@ export function SpecialMusicScheduleViewPage() {
         prepare: (p) => {
           setHighlightCellIds(p.cellIds)
           setHighlightDates(p.dates)
+          setRecipientSubtitle(p.subtitle)
         },
       })
       setHighlightCellIds(new Set())
       setHighlightDates(new Set())
+      setRecipientSubtitle('')
       toast.success(`Exported ${pages.length} page PDF`)
     } catch (e) {
       console.error('Export error:', e)
@@ -209,6 +215,7 @@ export function SpecialMusicScheduleViewPage() {
             title={title}
             logoPath={settings?.logoPath}
             footerBlocks={settings?.specialMusic.footerBlocks}
+            subtitle={recipientSubtitle}
             exporting={exporting}
           >
             <SpecialMusicSchedulePreview

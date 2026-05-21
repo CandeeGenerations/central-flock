@@ -26,6 +26,9 @@ interface SchedulePreviewFrameProps {
   logoPath?: string | null
   footerBlocks?: FooterBlock[]
   children: ReactNode
+  // Optional centered line under the logo/title — used by the per-recipient
+  // PDF page to display whose copy this is.
+  subtitle?: string
   // When true (during JPG/PDF capture), suppress edit-affordance chrome
   // in the body. Body components inspect this if they care.
   exporting?: boolean
@@ -36,7 +39,7 @@ interface SchedulePreviewFrameProps {
 // configured footer text blocks at the bottom. This is the html-to-image
 // capture target.
 export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFrameProps>(function SchedulePreviewFrame(
-  {title, logoPath, footerBlocks, children},
+  {title, logoPath, footerBlocks, children, subtitle},
   ref,
 ) {
   return (
@@ -61,6 +64,7 @@ export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFr
             {title}
           </h2>
         )}
+        {subtitle ? <div style={{color: '#000', fontSize: 18, fontWeight: 700, marginTop: 4}}>{subtitle}</div> : null}
       </div>
 
       {children}

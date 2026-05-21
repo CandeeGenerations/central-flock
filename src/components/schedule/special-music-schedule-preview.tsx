@@ -35,12 +35,42 @@ function formatDate(d: string): string {
   return `${MONTH_NAMES_SHORT[m - 1]} ${day}`
 }
 
+// Collapse consecutive linked performers who share a last name into
+// "First and First Last" (or "First, First, and First Last" for 3+).
+// Examples: Tyler Candee + Carissa Candee -> "Tyler and Carissa Candee".
+// Mirrors the printed sheet's convention.
+function renderLinkedNames(performers: SpecialMusicCell['performers']): string[] {
+  const sorted = performers.slice().sort((a, b) => a.ordering - b.ordering)
+  const out: string[] = []
+  let i = 0
+  while (i < sorted.length) {
+    const startLast = sorted[i].lastName?.trim() ?? ''
+    if (!startLast) {
+      out.push((sorted[i].firstName ?? '').trim())
+      i += 1
+      continue
+    }
+    // Find the run of consecutive performers sharing this last name.
+    let j = i
+    const firsts: string[] = []
+    while (j < sorted.length && (sorted[j].lastName?.trim() ?? '') === startLast) {
+      firsts.push((sorted[j].firstName ?? '').trim())
+      j += 1
+    }
+    if (firsts.length === 1) {
+      out.push(`${firsts[0]} ${startLast}`)
+    } else if (firsts.length === 2) {
+      out.push(`${firsts[0]} and ${firsts[1]} ${startLast}`)
+    } else {
+      out.push(`${firsts.slice(0, -1).join(', ')}, and ${firsts[firsts.length - 1]} ${startLast}`)
+    }
+    i = j
+  }
+  return out.filter(Boolean)
+}
+
 function performerListText(cell: SpecialMusicCell): string {
-  const linked = cell.performers
-    .slice()
-    .sort((a, b) => a.ordering - b.ordering)
-    .map((p) => [p.firstName, p.lastName].filter(Boolean).join(' ').trim())
-    .filter(Boolean)
+  const linked = renderLinkedNames(cell.performers)
   const all = [...linked, ...cell.guestPerformers]
   if (all.length === 0) return 'TBA'
   if (all.length === 1) return all[0]

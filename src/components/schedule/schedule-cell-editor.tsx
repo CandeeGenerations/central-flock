@@ -4,10 +4,11 @@ import {DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {fetchGroup} from '@/lib/api'
 import {formatDate} from '@/lib/date'
-import type {SpecialMusicCell} from '@/lib/schedules-api'
+import {type SpecialMusicCell, fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
 import {SPECIAL_TYPE_LABELS, type Special, type SpecialType, specialsApi} from '@/lib/specials-api'
-import {useMutation, useQueryClient} from '@tanstack/react-query'
+import {useMutation, useQueries, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ExternalLink, Trash2} from 'lucide-react'
 import {useState} from 'react'
 import {useNavigate} from 'react-router-dom'
@@ -43,6 +44,19 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
 
   const derivedType = deriveType(performerIds.length, guests.length)
   const effectiveType: SpecialType = typeTouched ? type : derivedType
+
+  // Build the restricted person-id set from the configured singer Groups.
+  const {data: settings} = useQuery({queryKey: schedulesKeys.settings, queryFn: fetchSchedulesSettings})
+  const singerGroupIds = settings?.specialMusic.singerGroupIds ?? []
+  const groupQueries = useQueries({
+    queries: singerGroupIds.map((gid) => ({
+      queryKey: ['group', gid],
+      queryFn: () => fetchGroup(gid),
+    })),
+  })
+  const restrictToPersonIds: number[] | undefined = singerGroupIds.length
+    ? [...new Set(groupQueries.flatMap((q) => (q.data?.members ?? []).map((m) => m.id)))]
+    : undefined
 
   const invalidate = () => queryClient.invalidateQueries({queryKey: ['schedules', 'cells', scheduleId]})
 
@@ -95,6 +109,7 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
             onChange={setPerformerIds}
             guestPerformers={guests}
             onGuestChange={setGuests}
+            restrictToPersonIds={restrictToPersonIds}
           />
         </div>
 

@@ -2,6 +2,7 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
+import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
@@ -194,11 +195,11 @@ export function SpecialMusicSchedulesPage() {
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>From</Label>
-              <Input type="date" value={scopeStart} onChange={(e) => setScopeStart(e.target.value)} />
+              <DatePicker value={scopeStart} onChange={setScopeStart} />
             </div>
             <div className="space-y-1.5">
               <Label>To</Label>
-              <Input type="date" value={scopeEnd} onChange={(e) => setScopeEnd(e.target.value)} />
+              <DatePicker value={scopeEnd} onChange={setScopeEnd} />
             </div>
             <div className="space-y-1.5">
               <Label>Label (optional)</Label>

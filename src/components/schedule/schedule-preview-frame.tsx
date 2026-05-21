@@ -1,5 +1,22 @@
 import type {FooterBlock} from '@/lib/schedules-api'
-import {type ReactNode, forwardRef} from 'react'
+import {Fragment, type ReactNode, forwardRef} from 'react'
+
+// Renders the text with _underscores_ converted into <u>underlines</u>.
+// Pairs of underscores; lone underscores render literally. No nesting.
+function renderWithUnderlines(text: string): ReactNode {
+  const parts: ReactNode[] = []
+  const regex = /_([^_]+)_/g
+  let last = 0
+  let m: RegExpExecArray | null
+  let key = 0
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) parts.push(<Fragment key={key++}>{text.slice(last, m.index)}</Fragment>)
+    parts.push(<u key={key++}>{m[1]}</u>)
+    last = m.index + m[0].length
+  }
+  if (last < text.length) parts.push(<Fragment key={key++}>{text.slice(last)}</Fragment>)
+  return parts.length > 0 ? parts : text
+}
 
 interface SchedulePreviewFrameProps {
   // Full computed title (e.g., "Nursery Schedule - January 2026" or
@@ -66,12 +83,12 @@ export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFr
                     fontWeight: b.bold ? 700 : 400,
                   }}
                 >
-                  {b.text}
+                  {renderWithUnderlines(b.text)}
                 </div>
               )
             return (
-              <div key={i} style={{fontSize: 11, lineHeight: 1.4, marginBottom: 4, fontWeight: b.bold ? 700 : 400}}>
-                &bull; {b.text}
+              <div key={i} style={{fontSize: 12, lineHeight: 1.4, marginBottom: 4, fontWeight: b.bold ? 700 : 400}}>
+                &bull; {renderWithUnderlines(b.text)}
               </div>
             )
           })}

@@ -14,7 +14,7 @@ function renderWithUnderlines(text: string): ReactNode {
     parts.push(<u key={key++}>{m[1]}</u>)
     last = m.index + m[0].length
   }
-  if (last < text.length) parts.push(<Fragment key={key++}>{text.slice(last)}</Fragment>)
+  if (last < text.length) parts.push(<Fragment key={key}>{text.slice(last)}</Fragment>)
   return parts.length > 0 ? parts : text
 }
 

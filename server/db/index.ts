@@ -48,5 +48,51 @@ sqlite.exec(`
     ('wednesday_evening', 'Wednesday Evening Service', 2, 4)
 `)
 
+// Seed per-schedule-type settings defaults (idempotent). See ADR 0006.
+{
+  const seed = sqlite.prepare(`INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))`)
+  seed.run('schedules.nursery.titlePrefix', 'Nursery Schedule')
+  seed.run('schedules.nursery.footerBlocks', '[]')
+  seed.run('schedules.specialMusic.titlePrefix', 'CBC Special Music Schedule')
+  seed.run(
+    'schedules.specialMusic.footerBlocks',
+    JSON.stringify([
+      {
+        kind: 'quote',
+        text:
+          '"I will praise thee, O LORD, with my whole heart; I will shew forth all thy marvellous works. ' +
+          'I will be glad and rejoice in thee; I will sing praise to thy name, O thou most High." (Psalm 9:1-2)',
+      },
+      {kind: 'spacer', text: ''},
+      {
+        kind: 'note',
+        text:
+          'If you cannot present your special number when scheduled, contact Preacher in a timely manner ' +
+          'and he will handle all adjustments. Thank you!',
+      },
+      {
+        kind: 'note',
+        text:
+          "Remember, we're singing (or playing) first, to the Lord; second, about the Lord; and third, " +
+          'about what the Lord has done for us. Our spirit and our attitude must be right with God :)',
+      },
+    ]),
+  )
+  seed.run('schedules.specialMusic.singerGroupIds', '[]')
+}
+
+// Idempotent boot-time migration: add display_first_name_only columns for
+// the schedule rendering toggle. See ADR 0006 follow-up.
+function hasColumn(table: string, column: string): boolean {
+  const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{name: string}>
+  return rows.some((r) => r.name === column)
+}
+if (!hasColumn('people', 'display_first_name_only')) {
+  sqlite.exec(`ALTER TABLE people ADD COLUMN display_first_name_only integer NOT NULL DEFAULT 0`)
+}
+if (!hasColumn('special_music_performers', 'display_first_name_only')) {
+  sqlite.exec(`ALTER TABLE special_music_performers ADD COLUMN display_first_name_only integer`)
+}
+
 export const db = drizzle(sqlite, {schema})
 export {schema, sqlite}

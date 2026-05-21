@@ -34,7 +34,7 @@ function detailToFormState(d: SpecialDetail): SpecialFormState {
     date: d.date,
     serviceType: d.serviceType,
     serviceLabel: d.serviceLabel ?? '',
-    songTitle: d.songTitle,
+    songTitle: d.songTitle ?? '',
     hymnId: d.hymnId,
     songArranger: d.songArranger ?? '',
     songWriter: d.songWriter ?? '',

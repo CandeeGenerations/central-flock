@@ -8,10 +8,7 @@ import path from 'path'
 import {db, schema} from '../db/index.js'
 import {serviceTypes} from '../db/schema-nursery.js'
 import {asyncHandler} from '../lib/route-helpers.js'
-import {uploadPath, uploadUrl} from '../lib/uploads.js'
 import {sendImageViaUI} from '../services/applescript.js'
-
-const LOGOS_DIR = uploadPath('nursery-logos')
 
 export const nurseryRouter = Router()
 
@@ -186,80 +183,8 @@ nurseryRouter.put(
   }),
 )
 
-// ── Settings ─────────────────────────────────────────────────────────
-
-nurseryRouter.get(
-  '/settings',
-  asyncHandler(async (_req, res) => {
-    const settings = db.select().from(schema.nurserySettings).all()
-    const result: Record<string, string> = {}
-    for (const s of settings) {
-      result[s.key] = s.value
-    }
-    res.json(result)
-  }),
-)
-
-nurseryRouter.put(
-  '/settings/:key',
-  asyncHandler(async (req, res) => {
-    const key = String(req.params.key)
-    const {value} = req.body
-
-    db.insert(schema.nurserySettings)
-      .values({key, value, updatedAt: new Date().toISOString()})
-      .onConflictDoUpdate({
-        target: schema.nurserySettings.key,
-        set: {value, updatedAt: new Date().toISOString()},
-      })
-      .run()
-
-    res.json({key, value})
-  }),
-)
-
-nurseryRouter.post(
-  '/settings/logo',
-  asyncHandler(async (req, res) => {
-    const {imageData} = req.body as {imageData: string}
-    if (!imageData) {
-      res.status(400).json({error: 'Image data is required'})
-      return
-    }
-
-    if (!fs.existsSync(LOGOS_DIR)) {
-      fs.mkdirSync(LOGOS_DIR, {recursive: true})
-    }
-
-    const filename = `logo-${Date.now()}.png`
-    const filePath = path.join(LOGOS_DIR, filename)
-
-    // Remove base64 prefix if present
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
-    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'))
-
-    const logoPath = uploadUrl('nursery-logos', filename)
-
-    // Clean up old logo
-    const oldLogo = db.select().from(schema.nurserySettings).where(eq(schema.nurserySettings.key, 'logoPath')).get()
-    if (oldLogo) {
-      const oldFullPath = path.join(LOGOS_DIR, path.basename(oldLogo.value))
-      if (fs.existsSync(oldFullPath)) {
-        fs.unlinkSync(oldFullPath)
-      }
-    }
-
-    db.insert(schema.nurserySettings)
-      .values({key: 'logoPath', value: logoPath, updatedAt: new Date().toISOString()})
-      .onConflictDoUpdate({
-        target: schema.nurserySettings.key,
-        set: {value: logoPath, updatedAt: new Date().toISOString()},
-      })
-      .run()
-
-    res.json({logoPath})
-  }),
-)
+// Settings (logo + footer text + title prefix) moved to /api/schedules.
+// See server/routes/schedules.ts and ADR 0006.
 
 // ── Send Schedule as Image ──────────────────────────────────────────
 // Accepts a base64 JPEG image and a list of recipient person IDs, then sends

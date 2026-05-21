@@ -78,13 +78,14 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    id: 'nursery',
-    label: 'Nursery',
-    icon: Baby,
+    id: 'schedules',
+    label: 'Schedules',
+    icon: Calendar,
     children: [
-      {to: '/nursery', label: 'Schedules', icon: Calendar, end: true},
-      {to: '/nursery/workers', label: 'Workers', icon: Users},
-      {to: '/nursery/settings', label: 'Settings', icon: Settings},
+      {to: '/nursery', label: 'Nursery', icon: Baby, end: true},
+      {to: '/nursery/workers', label: 'Nursery Workers', icon: Users},
+      {to: '/special-music', label: 'Special Music', icon: Music, end: true},
+      {to: '/schedules/settings', label: 'Settings', icon: Settings, matchPaths: ['/nursery/settings']},
     ],
   },
   {

@@ -88,7 +88,7 @@ export function SongPicker({songTitle, hymnId, onChange, className}: SongPickerP
     const map = new Map<string, string>()
     for (const s of specials) {
       if (s.hymnId != null) continue
-      const t = s.songTitle.trim()
+      const t = s.songTitle?.trim() ?? ''
       if (!t) continue
       const key = t.toLowerCase()
       const existing = map.get(key)
@@ -97,7 +97,7 @@ export function SongPicker({songTitle, hymnId, onChange, className}: SongPickerP
     const arr: {title: string; lastDate: string}[] = []
     for (const [key, lastDate] of map) {
       // preserve original casing — find first matching
-      const orig = specials.find((s) => s.songTitle.trim().toLowerCase() === key)?.songTitle.trim() ?? key
+      const orig = specials.find((s) => (s.songTitle?.trim().toLowerCase() ?? '') === key)?.songTitle?.trim() ?? key
       arr.push({title: orig, lastDate})
     }
     return arr.sort((a, b) => b.lastDate.localeCompare(a.lastDate))

@@ -177,7 +177,9 @@ type CreateBody = {
   date: string
   serviceType: ServiceType
   serviceLabel?: string | null
-  songTitle: string
+  // Nullable: Special Music schedule cells can be created as
+  // scheduled-but-unsung placeholders (no song yet). See ADR 0006.
+  songTitle?: string | null
   hymnId?: number | null
   songArranger?: string | null
   songWriter?: string | null
@@ -195,7 +197,8 @@ function validateCreate(body: unknown): CreateBody | string {
   if (typeof b.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return 'date must be YYYY-MM-DD'
   if (typeof b.serviceType !== 'string') return 'serviceType required'
   if (!['sunday_am', 'sunday_pm', 'wednesday_pm', 'other'].includes(b.serviceType)) return 'invalid serviceType'
-  if (typeof b.songTitle !== 'string' || !b.songTitle.trim()) return 'songTitle required'
+  if (b.songTitle !== undefined && b.songTitle !== null && typeof b.songTitle !== 'string')
+    return 'songTitle must be a string or null'
   if (typeof b.type !== 'string') return 'type required'
   if (!['solo', 'duet', 'trio', 'group', 'instrumental', 'other'].includes(b.type)) return 'invalid type'
   return b as CreateBody
@@ -218,7 +221,7 @@ specialsRouter.post(
         date: parsed.date,
         serviceType: parsed.serviceType,
         serviceLabel: parsed.serviceLabel ?? null,
-        songTitle: parsed.songTitle,
+        songTitle: parsed.songTitle?.trim() ? parsed.songTitle.trim() : null,
         hymnId: parsed.hymnId ?? null,
         songArranger: parsed.songArranger ?? null,
         songWriter: parsed.songWriter ?? null,
@@ -233,12 +236,21 @@ specialsRouter.post(
       .get()
 
     if (parsed.performerIds && parsed.performerIds.length > 0) {
+      const overrideMap = new Map<number, boolean | null>()
+      const overrides = (req.body as {performerOverrides?: {personId: number; displayFirstNameOnly: boolean | null}[]})
+        .performerOverrides
+      if (Array.isArray(overrides)) {
+        for (const o of overrides) {
+          if (typeof o?.personId === 'number') overrideMap.set(o.personId, o.displayFirstNameOnly ?? null)
+        }
+      }
       db.insert(schema.specialMusicPerformers)
         .values(
           parsed.performerIds.map((pid, idx) => ({
             specialMusicId: inserted.id,
             personId: pid,
             ordering: idx,
+            displayFirstNameOnly: overrideMap.get(pid) ?? null,
           })),
         )
         .run()
@@ -274,7 +286,7 @@ specialsRouter.patch(
     }
     if (typeof b.serviceType === 'string') updates.serviceType = b.serviceType as ServiceType
     if ('serviceLabel' in b) updates.serviceLabel = (b.serviceLabel as string | null) ?? null
-    if (typeof b.songTitle === 'string') updates.songTitle = b.songTitle
+    if ('songTitle' in b) updates.songTitle = (b.songTitle as string | null) ?? null
     if ('hymnId' in b) updates.hymnId = (b.hymnId as number | null) ?? null
     if ('songArranger' in b) updates.songArranger = (b.songArranger as string | null) ?? null
     if ('songWriter' in b) updates.songWriter = (b.songWriter as string | null) ?? null
@@ -293,6 +305,14 @@ specialsRouter.patch(
     if (Array.isArray(b.performerIds)) {
       const ids = b.performerIds as unknown[]
       const cleanIds = ids.filter((x): x is number => typeof x === 'number')
+      const overrideMap = new Map<number, boolean | null>()
+      const overrides = (b as {performerOverrides?: {personId: number; displayFirstNameOnly: boolean | null}[]})
+        .performerOverrides
+      if (Array.isArray(overrides)) {
+        for (const o of overrides) {
+          if (typeof o?.personId === 'number') overrideMap.set(o.personId, o.displayFirstNameOnly ?? null)
+        }
+      }
       db.delete(schema.specialMusicPerformers).where(eq(schema.specialMusicPerformers.specialMusicId, id)).run()
       if (cleanIds.length > 0) {
         db.insert(schema.specialMusicPerformers)
@@ -301,6 +321,7 @@ specialsRouter.patch(
               specialMusicId: id,
               personId: pid,
               ordering: idx,
+              displayFirstNameOnly: overrideMap.get(pid) ?? null,
             })),
           )
           .run()

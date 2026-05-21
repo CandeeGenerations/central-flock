@@ -27,7 +27,7 @@ export const specialsProvider: SearchProvider<Special> = {
   toItems: (rows) =>
     rows.map((s) => ({
       id: `special-${s.id}`,
-      label: s.songTitle,
+      label: s.songTitle ?? '(no song)',
       subtitle: [
         formatDate(s.date),
         SERVICE_TYPE_LABELS[s.serviceType],
@@ -39,7 +39,7 @@ export const specialsProvider: SearchProvider<Special> = {
       group: 'Music',
       icon: Sparkles,
       keywords: [
-        s.songTitle,
+        s.songTitle ?? '',
         'special',
         'music',
         SERVICE_TYPE_LABELS[s.serviceType],

@@ -1,6 +1,8 @@
 import {sql} from 'drizzle-orm'
 import {integer, sqliteTable, text, unique} from 'drizzle-orm/sqlite-core'
 
+import {schedules} from './schema-schedules.js'
+
 export const serviceTypes = ['sunday_school', 'morning', 'evening', 'wednesday_evening'] as const
 export type ServiceType = (typeof serviceTypes)[number]
 
@@ -38,20 +40,9 @@ export const nurseryServiceConfig = sqliteTable('nursery_service_config', {
   sortOrder: integer('sort_order').notNull(),
 })
 
-export const nurserySchedules = sqliteTable('nursery_schedules', {
-  id: integer('id').primaryKey({autoIncrement: true}),
-  month: integer('month').notNull(),
-  year: integer('year').notNull(),
-  status: text('status', {enum: ['draft', 'final']})
-    .notNull()
-    .default('draft'),
-  createdAt: text('created_at')
-    .default(sql`(datetime('now'))`)
-    .notNull(),
-  updatedAt: text('updated_at')
-    .default(sql`(datetime('now'))`)
-    .notNull(),
-})
+// nursery_schedules was merged into the shared `schedules` envelope table
+// (see docs/adr/0006-multi-type-schedule-envelope.md). Nursery assignments
+// now FK directly to schedules.id with schedule_type='nursery'.
 
 export const nurseryAssignments = sqliteTable(
   'nursery_assignments',
@@ -59,7 +50,7 @@ export const nurseryAssignments = sqliteTable(
     id: integer('id').primaryKey({autoIncrement: true}),
     scheduleId: integer('schedule_id')
       .notNull()
-      .references(() => nurserySchedules.id, {onDelete: 'cascade'}),
+      .references(() => schedules.id, {onDelete: 'cascade'}),
     date: text('date').notNull(),
     serviceType: text('service_type', {enum: serviceTypes}).notNull(),
     slot: integer('slot').notNull(),

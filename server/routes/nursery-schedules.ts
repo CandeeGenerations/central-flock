@@ -8,6 +8,25 @@ import {generateSchedule, getBorrowedPairDates} from '../services/nursery-schedu
 
 export const nurserySchedulesRouter = Router()
 
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+
+function scopeLabelFor(month: number, year: number): string {
+  return `${MONTH_NAMES[month - 1]} ${year}`
+}
+
 function loadWorkers(): WorkerWithEligibility[] {
   const workers = db.select().from(schema.nurseryWorkers).where(eq(schema.nurseryWorkers.isActive, true)).all()
   const allServices = db.select().from(schema.nurseryWorkerServices).all()
@@ -32,8 +51,14 @@ function loadServiceConfig(): ServiceConfig[] {
 function findPriorMonthSchedule(priorMonth: number, priorYear: number) {
   const candidates = db
     .select()
-    .from(schema.nurserySchedules)
-    .where(and(eq(schema.nurserySchedules.month, priorMonth), eq(schema.nurserySchedules.year, priorYear)))
+    .from(schema.schedules)
+    .where(
+      and(
+        eq(schema.schedules.scheduleType, 'nursery'),
+        eq(schema.schedules.month, priorMonth),
+        eq(schema.schedules.year, priorYear),
+      ),
+    )
     .all()
   if (candidates.length === 0) return null
   const finalOne = candidates.find((s) => s.status === 'final')
@@ -77,8 +102,12 @@ function loadPriorMonthOverlapAssignments(
 }
 
 function loadScheduleWithAssignments(scheduleId: number) {
-  const schedule = db.select().from(schema.nurserySchedules).where(eq(schema.nurserySchedules.id, scheduleId)).get()
-  if (!schedule) return null
+  const schedule = db
+    .select()
+    .from(schema.schedules)
+    .where(and(eq(schema.schedules.id, scheduleId), eq(schema.schedules.scheduleType, 'nursery')))
+    .get()
+  if (!schedule || schedule.month == null || schedule.year == null) return null
 
   const ownAssignments = db
     .select()
@@ -151,8 +180,9 @@ nurserySchedulesRouter.get(
   asyncHandler(async (_req, res) => {
     const schedules = db
       .select()
-      .from(schema.nurserySchedules)
-      .orderBy(desc(schema.nurserySchedules.year), desc(schema.nurserySchedules.month))
+      .from(schema.schedules)
+      .where(eq(schema.schedules.scheduleType, 'nursery'))
+      .orderBy(desc(schema.schedules.year), desc(schema.schedules.month))
       .all()
     res.json(schedules)
   }),
@@ -175,17 +205,27 @@ nurserySchedulesRouter.post(
     // Delete existing draft for this month if one exists
     const existingDraft = db
       .select()
-      .from(schema.nurserySchedules)
-      .where(eq(schema.nurserySchedules.month, month))
+      .from(schema.schedules)
+      .where(and(eq(schema.schedules.scheduleType, 'nursery'), eq(schema.schedules.month, month)))
       .all()
       .find((s) => s.year === year && s.status === 'draft')
 
     if (existingDraft) {
-      db.delete(schema.nurserySchedules).where(eq(schema.nurserySchedules.id, existingDraft.id)).run()
+      db.delete(schema.schedules).where(eq(schema.schedules.id, existingDraft.id)).run()
     }
 
-    // Create new schedule
-    const schedule = db.insert(schema.nurserySchedules).values({month, year}).returning().get()
+    // Create new schedule envelope
+    const schedule = db
+      .insert(schema.schedules)
+      .values({
+        scheduleType: 'nursery',
+        scopeKind: 'monthly',
+        month,
+        year,
+        scopeLabel: scopeLabelFor(month, year),
+      })
+      .returning()
+      .get()
 
     // Bulk insert assignments — skip carryover slots; they're live-resolved at view time.
     for (const slot of slots) {
@@ -231,9 +271,9 @@ nurserySchedulesRouter.put(
     }
 
     const updated = db
-      .update(schema.nurserySchedules)
+      .update(schema.schedules)
       .set({status, updatedAt: new Date().toISOString()})
-      .where(eq(schema.nurserySchedules.id, id))
+      .where(and(eq(schema.schedules.id, id), eq(schema.schedules.scheduleType, 'nursery')))
       .returning()
       .get()
 
@@ -250,7 +290,9 @@ nurserySchedulesRouter.delete(
   '/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
-    db.delete(schema.nurserySchedules).where(eq(schema.nurserySchedules.id, id)).run()
+    db.delete(schema.schedules)
+      .where(and(eq(schema.schedules.id, id), eq(schema.schedules.scheduleType, 'nursery')))
+      .run()
     res.json({success: true})
   }),
 )
@@ -271,11 +313,7 @@ nurserySchedulesRouter.patch(
     }
 
     // Check schedule is still a draft
-    const schedule = db
-      .select()
-      .from(schema.nurserySchedules)
-      .where(eq(schema.nurserySchedules.id, assignment.scheduleId))
-      .get()
+    const schedule = db.select().from(schema.schedules).where(eq(schema.schedules.id, assignment.scheduleId)).get()
 
     if (schedule?.status === 'final') {
       res.status(400).json({error: 'Cannot edit a finalized schedule'})

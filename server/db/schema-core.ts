@@ -17,6 +17,10 @@ export const people = sqliteTable('people', {
   anniversaryDay: integer('anniversary_day'),
   anniversaryYear: integer('anniversary_year'),
   notes: text('notes'),
+  // When true, schedules render this person as just their first name
+  // ("Madeline" instead of "Madeline Turner"). Can be overridden per cell
+  // via special_music_performers.display_first_name_only.
+  displayFirstNameOnly: integer('display_first_name_only', {mode: 'boolean'}).notNull().default(false),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

@@ -31,7 +31,7 @@ export const nurserySchedulesProvider: SearchProvider<NurserySchedule> = {
         id: `nursery-${s.id}`,
         label: `${monthName} ${s.year}`,
         subtitle: s.status === 'final' ? 'Final' : 'Draft',
-        group: 'Nursery',
+        group: 'Schedules',
         icon: Calendar,
         keywords: [monthName, String(s.year), s.status],
         action: ({navigate, close}) => {

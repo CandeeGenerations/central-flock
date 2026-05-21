@@ -15,6 +15,10 @@ interface PerformerMultiPickerProps {
   guestPerformers: string[]
   onGuestChange: (names: string[]) => void
   className?: string
+  // When provided, the people-search dropdown only shows results whose id is
+  // in this set. Used by Special Music schedule to restrict the picker to
+  // the configured singer pool.
+  restrictToPersonIds?: number[]
 }
 
 function nameOf(p: {firstName: string | null; lastName: string | null}): string {
@@ -27,6 +31,7 @@ export function PerformerMultiPicker({
   guestPerformers,
   onGuestChange,
   className,
+  restrictToPersonIds,
 }: PerformerMultiPickerProps) {
   const [search, setSearch] = useState('')
   const [highlight, setHighlight] = useState(-1)
@@ -48,7 +53,10 @@ export function PerformerMultiPicker({
     enabled: value.length > 0,
   })
 
-  const filteredResults = (results?.data ?? []).filter((p) => !value.includes(p.id))
+  const allowedSet = restrictToPersonIds ? new Set(restrictToPersonIds) : null
+  const filteredResults = (results?.data ?? [])
+    .filter((p) => !value.includes(p.id))
+    .filter((p) => (allowedSet ? allowedSet.has(p.id) : true))
 
   const remove = (id: number) => onChange(value.filter((i) => i !== id))
   const add = (id: number) => {

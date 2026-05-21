@@ -33,6 +33,7 @@ import {nurseryRouter} from './routes/nursery.js'
 import {peopleRouter} from './routes/people.js'
 import {quotesRouter} from './routes/quotes.js'
 import {rsvpRouter} from './routes/rsvp.js'
+import {schedulesRouter} from './routes/schedules.js'
 import {settingsRouter} from './routes/settings.js'
 import {specialsRouter} from './routes/specials.js'
 import {statsRouter} from './routes/stats.js'
@@ -75,6 +76,7 @@ app.use('/api/stats', statsRouter)
 app.use('/api/home', homeRouter)
 app.use('/api/devotions', devotionsRouter)
 app.use('/api/gwendolyn-devotions', gwendolynDevotionsRouter)
+app.use('/api/schedules', schedulesRouter)
 app.use('/api/nursery/schedules', nurserySchedulesRouter)
 app.use('/api/nursery', nurseryRouter)
 app.use('/api/quotes', quotesRouter)

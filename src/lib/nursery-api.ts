@@ -152,19 +152,10 @@ export function updateAssignment(id: number, workerId: number | null): Promise<N
   return request(`/nursery/schedules/assignments/${id}`, {method: 'PATCH', body: JSON.stringify({workerId})})
 }
 
-// ── Settings ─────────────────────────────────────────────────────────
-
-export function fetchNurserySettings(): Promise<Record<string, string>> {
-  return request('/nursery/settings')
-}
-
-export function updateNurserySetting(key: string, value: string): Promise<{key: string; value: string}> {
-  return request(`/nursery/settings/${key}`, {method: 'PUT', body: JSON.stringify({value})})
-}
-
-export function uploadNurseryLogo(imageData: string): Promise<{logoPath: string}> {
-  return request('/nursery/settings/logo', {method: 'POST', body: JSON.stringify({imageData})})
-}
+// Nursery-specific settings (logo + footer + title prefix) consolidated
+// into the shared /schedules/* settings endpoints. See ADR 0006. Old
+// fetchNurserySettings / updateNurserySetting / uploadNurseryLogo removed;
+// callers use schedules-api.ts.
 
 // ── Send Schedule as Image ───────────────────────────────────────────
 

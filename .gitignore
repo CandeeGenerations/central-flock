@@ -27,6 +27,7 @@ dist-ssr
 *.db
 *.db-wal
 *.db-shm
+*.db.pre-*-bak
 
 .claude/settings.local.json
 .env

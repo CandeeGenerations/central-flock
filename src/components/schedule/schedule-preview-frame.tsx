@@ -77,17 +77,27 @@ export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFr
                   className="text-center"
                   style={{
                     fontStyle: 'italic',
-                    fontSize: 12,
+                    fontSize: 14,
                     lineHeight: 1.4,
                     marginBottom: 8,
                     fontWeight: b.bold ? 700 : 400,
+                    whiteSpace: 'pre-wrap',
                   }}
                 >
                   {renderWithUnderlines(b.text)}
                 </div>
               )
             return (
-              <div key={i} style={{fontSize: 12, lineHeight: 1.4, marginBottom: 4, fontWeight: b.bold ? 700 : 400}}>
+              <div
+                key={i}
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.4,
+                  marginBottom: 4,
+                  fontWeight: b.bold ? 700 : 400,
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
                 &bull; {renderWithUnderlines(b.text)}
               </div>
             )

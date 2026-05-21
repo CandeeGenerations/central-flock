@@ -93,12 +93,18 @@ export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFr
                 style={{
                   fontSize: 14,
                   lineHeight: 1.4,
-                  marginBottom: 4,
+                  marginBottom: 8,
                   fontWeight: b.bold ? 700 : 400,
-                  whiteSpace: 'pre-wrap',
+                  display: 'grid',
+                  gridTemplateColumns: '1.25em 1fr',
+                  columnGap: 4,
+                  paddingLeft: 12,
                 }}
               >
-                &bull; {renderWithUnderlines(b.text)}
+                <span aria-hidden style={{textAlign: 'center'}}>
+                  ▪
+                </span>
+                <span style={{whiteSpace: 'pre-wrap'}}>{renderWithUnderlines(b.text)}</span>
               </div>
             )
           })}

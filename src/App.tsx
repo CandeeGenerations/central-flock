@@ -42,7 +42,6 @@ import {SpecialNewPage} from '@/pages/music/special-new-page'
 import {SpecialsListPage} from '@/pages/music/specials-list-page'
 import {NurseryScheduleViewPage} from '@/pages/nursery/nursery-schedule-view-page'
 import {NurserySchedulesPage} from '@/pages/nursery/nursery-schedules-page'
-import {NurserySettingsPage} from '@/pages/nursery/nursery-settings-page'
 import {NurseryWorkersPage} from '@/pages/nursery/nursery-workers-page'
 import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
@@ -69,7 +68,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import {Home, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun} from 'lucide-react'
-import {BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate} from 'react-router-dom'
+import {BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate} from 'react-router-dom'
 
 import {Sentry} from './lib/sentry'
 
@@ -428,7 +427,7 @@ function AppLayoutInner({
               <Route path="/devotions/:id" element={<DevotionDetailPage />} />
               <Route path="/nursery" element={<NurserySchedulesPage />} />
               <Route path="/nursery/workers" element={<NurseryWorkersPage />} />
-              <Route path="/nursery/settings" element={<NurserySettingsPage />} />
+              <Route path="/nursery/settings" element={<Navigate to="/schedules/settings" replace />} />
               <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
               <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
               <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />

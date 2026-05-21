@@ -186,7 +186,7 @@ schedulesRouter.post(
 )
 
 schedulesRouter.get(
-  '/:id(\\d+)',
+  '/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
     const row = db.select().from(schema.schedules).where(eq(schema.schedules.id, id)).get()
@@ -199,7 +199,7 @@ schedulesRouter.get(
 )
 
 schedulesRouter.patch(
-  '/:id(\\d+)',
+  '/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
     const b = req.body as Partial<{scopeLabel: string; status: 'draft' | 'final'}>
@@ -218,7 +218,7 @@ schedulesRouter.patch(
 )
 
 schedulesRouter.delete(
-  '/:id(\\d+)',
+  '/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
     db.delete(schema.schedules).where(eq(schema.schedules.id, id)).run()
@@ -232,7 +232,7 @@ schedulesRouter.delete(
 // each performer's "weeks since last special_music" hint.
 
 schedulesRouter.get(
-  '/:id(\\d+)/cells',
+  '/:id/cells',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
     const schedule = db.select().from(schema.schedules).where(eq(schema.schedules.id, id)).get()

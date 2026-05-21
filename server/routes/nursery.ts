@@ -8,14 +8,7 @@ import path from 'path'
 import {db, schema} from '../db/index.js'
 import {serviceTypes} from '../db/schema-nursery.js'
 import {asyncHandler} from '../lib/route-helpers.js'
-import {uploadPath, uploadUrl} from '../lib/uploads.js'
 import {sendImageViaUI} from '../services/applescript.js'
-
-// Logo storage moved from `nursery-logos/` to `schedule-logos/` and the DB key
-// from `nursery_settings.logoPath` to `settings.schedulesLogoPath` as part of
-// the schedules consolidation. See ADR 0006.
-const LOGOS_DIR = uploadPath('schedule-logos')
-const LOGO_SETTINGS_KEY = 'schedulesLogoPath'
 
 export const nurseryRouter = Router()
 
@@ -190,58 +183,8 @@ nurseryRouter.put(
   }),
 )
 
-// ── Settings ─────────────────────────────────────────────────────────
-
-nurseryRouter.get(
-  '/settings',
-  asyncHandler(async (_req, res) => {
-    const row = db.select().from(schema.settings).where(eq(schema.settings.key, LOGO_SETTINGS_KEY)).get()
-    res.json({logoPath: row?.value ?? null})
-  }),
-)
-
-nurseryRouter.post(
-  '/settings/logo',
-  asyncHandler(async (req, res) => {
-    const {imageData} = req.body as {imageData: string}
-    if (!imageData) {
-      res.status(400).json({error: 'Image data is required'})
-      return
-    }
-
-    if (!fs.existsSync(LOGOS_DIR)) {
-      fs.mkdirSync(LOGOS_DIR, {recursive: true})
-    }
-
-    const filename = `logo-${Date.now()}.png`
-    const filePath = path.join(LOGOS_DIR, filename)
-
-    // Remove base64 prefix if present
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
-    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'))
-
-    const logoPath = uploadUrl('schedule-logos', filename)
-
-    // Clean up old logo
-    const oldLogo = db.select().from(schema.settings).where(eq(schema.settings.key, LOGO_SETTINGS_KEY)).get()
-    if (oldLogo) {
-      const oldFullPath = path.join(LOGOS_DIR, path.basename(oldLogo.value))
-      if (fs.existsSync(oldFullPath)) {
-        fs.unlinkSync(oldFullPath)
-      }
-    }
-
-    db.insert(schema.settings)
-      .values({key: LOGO_SETTINGS_KEY, value: logoPath, updatedAt: new Date().toISOString()})
-      .onConflictDoUpdate({
-        target: schema.settings.key,
-        set: {value: logoPath, updatedAt: new Date().toISOString()},
-      })
-      .run()
-
-    res.json({logoPath})
-  }),
-)
+// Settings (logo + footer text + title prefix) moved to /api/schedules.
+// See server/routes/schedules.ts and ADR 0006.
 
 // ── Send Schedule as Image ──────────────────────────────────────────
 // Accepts a base64 JPEG image and a list of recipient person IDs, then sends

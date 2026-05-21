@@ -30,9 +30,13 @@ function isoToday(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function endOfYearIso(): string {
-  const y = new Date().getFullYear()
-  return `${y}-12-31`
+function threeMonthsOutIso(): string {
+  const d = new Date()
+  d.setMonth(d.getMonth() + 3)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function autoLabel(start: string, end: string): string {
@@ -51,7 +55,7 @@ export function SpecialMusicSchedulesPage() {
   const [createOpen, setCreateOpen] = useState(false)
 
   const [scopeStart, setScopeStart] = useState(isoToday())
-  const [scopeEnd, setScopeEnd] = useState(endOfYearIso())
+  const [scopeEnd, setScopeEnd] = useState(threeMonthsOutIso())
   const [scopeLabel, setScopeLabel] = useState('')
 
   const {data: schedules, isLoading} = useQuery({

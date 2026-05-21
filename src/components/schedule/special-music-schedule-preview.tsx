@@ -79,7 +79,7 @@ export function SpecialMusicSchedulePreview({scopeStart, scopeEnd, cells, editMo
                 backgroundColor: '#f3f4f6',
               }}
             >
-              SUNDAY A.M.
+              SUNDAY AM
             </th>
             <th
               className="px-3 py-2 text-left text-sm font-bold"
@@ -90,7 +90,7 @@ export function SpecialMusicSchedulePreview({scopeStart, scopeEnd, cells, editMo
                 backgroundColor: '#f3f4f6',
               }}
             >
-              SUNDAY P.M.
+              SUNDAY PM
             </th>
           </tr>
         </thead>

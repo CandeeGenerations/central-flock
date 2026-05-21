@@ -83,7 +83,7 @@ export function ScheduleCellEditorPopover({date, serviceType, cell, scheduleId, 
   return (
     <div className="w-[420px] space-y-3 p-3">
       <div className="text-muted-foreground text-xs">
-        {date} · {serviceType === 'sunday_am' ? 'Sunday A.M.' : 'Sunday P.M.'}
+        {date} · {serviceType === 'sunday_am' ? 'Sunday AM' : 'Sunday PM'}
       </div>
 
       <div className="space-y-1.5">

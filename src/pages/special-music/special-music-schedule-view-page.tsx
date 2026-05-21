@@ -5,7 +5,7 @@ import {SendScheduleDialog} from '@/components/schedule/send-schedule-dialog'
 import {SpecialMusicSchedulePreview} from '@/components/schedule/special-music-schedule-preview'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
-import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {PageSpinner} from '@/components/ui/spinner'
 import {describeExportError, useScheduleExport} from '@/hooks/use-schedule-export'
 import {
@@ -153,19 +153,20 @@ export function SpecialMusicScheduleViewPage() {
         describeError={describeExportError}
       />
 
-      {/* Anchored popover for the active cell. Rendered offscreen-anchored;
-          we use Popover with a virtual trigger button positioned in the
-          page so the popover sits centered. */}
-      <Popover
+      {/* Cell editor as a centered Dialog. Tried a Popover anchored to a
+          virtual trigger but it floated to the page corner; the editor's
+          contents (multi-select + textareas) are big enough that a modal
+          is the better fit anyway. */}
+      <Dialog
         open={!!openCell}
         onOpenChange={(o) => {
           if (!o) setOpenCell(null)
         }}
       >
-        <PopoverTrigger asChild>
-          <span className="sr-only" />
-        </PopoverTrigger>
-        <PopoverContent className="p-0" align="center" sideOffset={8}>
+        <DialogContent className="max-w-md p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Edit cell</DialogTitle>
+          </DialogHeader>
           {openCell ? (
             <ScheduleCellEditorPopover
               date={openCell.date}
@@ -178,8 +179,8 @@ export function SpecialMusicScheduleViewPage() {
               }}
             />
           ) : null}
-        </PopoverContent>
-      </Popover>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

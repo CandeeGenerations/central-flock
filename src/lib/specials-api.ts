@@ -64,7 +64,9 @@ export interface Special {
   date: string
   serviceType: ServiceType
   serviceLabel: string | null
-  songTitle: string
+  // Nullable when this row represents a scheduled-but-unsung Special Music
+  // schedule cell (no song chosen yet).
+  songTitle: string | null
   hymnId: number | null
   songArranger: string | null
   songWriter: string | null
@@ -88,7 +90,7 @@ export interface CreateSpecialBody {
   date: string
   serviceType: ServiceType
   serviceLabel?: string | null
-  songTitle: string
+  songTitle?: string | null
   hymnId?: number | null
   songArranger?: string | null
   songWriter?: string | null
@@ -115,7 +117,7 @@ export interface YoutubeExtraction {
 }
 
 export interface RepeatWarnings {
-  songRepeat?: {specialId: number; date: string; songTitle: string}
+  songRepeat?: {specialId: number; date: string; songTitle: string | null}
   performerRepeats: {personId: number; specialId: number; date: string}[]
 }
 

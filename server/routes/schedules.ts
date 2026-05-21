@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node'
-import {eq, inArray} from 'drizzle-orm'
+import {and, asc, between, desc, eq, inArray, lt, sql} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'fs'
 import os from 'os'
@@ -123,6 +123,218 @@ schedulesRouter.post(
     res.json({logoPath})
   }),
 )
+
+// ── Envelope CRUD (any type) ───────────────────────────────────────────
+
+schedulesRouter.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const type = typeof req.query.type === 'string' ? req.query.type : undefined
+    const where = type === 'nursery' || type === 'special_music' ? eq(schema.schedules.scheduleType, type) : undefined
+    const rows = db
+      .select()
+      .from(schema.schedules)
+      .where(where)
+      .orderBy(desc(schema.schedules.scopeStart), desc(schema.schedules.year), desc(schema.schedules.month))
+      .all()
+    res.json(rows)
+  }),
+)
+
+schedulesRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const b = req.body as {
+      scheduleType: 'nursery' | 'special_music'
+      scopeStart?: string
+      scopeEnd?: string
+      scopeLabel?: string
+    }
+    if (b.scheduleType !== 'special_music') {
+      // Nursery uses its own /api/nursery/schedules/generate flow.
+      res.status(400).json({error: 'Use /api/nursery/schedules/generate for nursery schedules'})
+      return
+    }
+    if (
+      !b.scopeStart ||
+      !b.scopeEnd ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(b.scopeStart) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(b.scopeEnd)
+    ) {
+      res.status(400).json({error: 'scopeStart and scopeEnd are required (YYYY-MM-DD)'})
+      return
+    }
+    if (b.scopeStart > b.scopeEnd) {
+      res.status(400).json({error: 'scopeStart must be on or before scopeEnd'})
+      return
+    }
+    const startYear = Number(b.scopeStart.slice(0, 4))
+    const label = b.scopeLabel?.trim() || String(startYear)
+    const row = db
+      .insert(schema.schedules)
+      .values({
+        scheduleType: 'special_music',
+        scopeKind: 'date_range',
+        scopeStart: b.scopeStart,
+        scopeEnd: b.scopeEnd,
+        scopeLabel: label,
+      })
+      .returning()
+      .get()
+    res.status(201).json(row)
+  }),
+)
+
+schedulesRouter.get(
+  '/:id(\\d+)',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const row = db.select().from(schema.schedules).where(eq(schema.schedules.id, id)).get()
+    if (!row) {
+      res.status(404).json({error: 'Schedule not found'})
+      return
+    }
+    res.json(row)
+  }),
+)
+
+schedulesRouter.patch(
+  '/:id(\\d+)',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const b = req.body as Partial<{scopeLabel: string; status: 'draft' | 'final'}>
+    const updates: Partial<typeof schema.schedules.$inferInsert> = {
+      updatedAt: new Date().toISOString(),
+    }
+    if (typeof b.scopeLabel === 'string') updates.scopeLabel = b.scopeLabel
+    if (b.status === 'draft' || b.status === 'final') updates.status = b.status
+    const row = db.update(schema.schedules).set(updates).where(eq(schema.schedules.id, id)).returning().get()
+    if (!row) {
+      res.status(404).json({error: 'Schedule not found'})
+      return
+    }
+    res.json(row)
+  }),
+)
+
+schedulesRouter.delete(
+  '/:id(\\d+)',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    db.delete(schema.schedules).where(eq(schema.schedules.id, id)).run()
+    res.json({success: true})
+  }),
+)
+
+// ── Special Music body: cells in scope ─────────────────────────────────
+// Returns the special_music rows that the schedule's date range
+// (Sundays only, AM + PM) is a view over, decorated with performers and
+// each performer's "weeks since last special_music" hint.
+
+schedulesRouter.get(
+  '/:id(\\d+)/cells',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const schedule = db.select().from(schema.schedules).where(eq(schema.schedules.id, id)).get()
+    if (!schedule) {
+      res.status(404).json({error: 'Schedule not found'})
+      return
+    }
+    if (schedule.scheduleType !== 'special_music' || !schedule.scopeStart || !schedule.scopeEnd) {
+      res.status(400).json({error: 'Schedule is not a special_music date-range schedule'})
+      return
+    }
+
+    const rows = db
+      .select()
+      .from(schema.specialMusic)
+      .where(
+        and(
+          between(schema.specialMusic.date, schedule.scopeStart, schedule.scopeEnd),
+          inArray(schema.specialMusic.serviceType, ['sunday_am', 'sunday_pm']),
+        ),
+      )
+      .orderBy(asc(schema.specialMusic.date), asc(schema.specialMusic.serviceType))
+      .all()
+
+    // Performers joined to people
+    const ids = rows.map((r) => r.id)
+    const performerRows =
+      ids.length > 0
+        ? db
+            .select({
+              specialMusicId: schema.specialMusicPerformers.specialMusicId,
+              personId: schema.specialMusicPerformers.personId,
+              ordering: schema.specialMusicPerformers.ordering,
+              firstName: schema.people.firstName,
+              lastName: schema.people.lastName,
+            })
+            .from(schema.specialMusicPerformers)
+            .innerJoin(schema.people, eq(schema.specialMusicPerformers.personId, schema.people.id))
+            .where(inArray(schema.specialMusicPerformers.specialMusicId, ids))
+            .orderBy(asc(schema.specialMusicPerformers.specialMusicId), asc(schema.specialMusicPerformers.ordering))
+            .all()
+        : []
+    const perfBySpecial = new Map<number, typeof performerRows>()
+    for (const p of performerRows) {
+      const list = perfBySpecial.get(p.specialMusicId) ?? []
+      list.push(p)
+      perfBySpecial.set(p.specialMusicId, list)
+    }
+
+    // "Last sang" hint per person: most-recent special_music.date strictly
+    // before the schedule's scope_start. Computed once across all unique
+    // performer person ids referenced by the schedule's cells.
+    const personIds = [...new Set(performerRows.map((p) => p.personId))]
+    const lastSangByPerson = new Map<number, string>()
+    if (personIds.length > 0) {
+      const lastRows = db
+        .select({
+          personId: schema.specialMusicPerformers.personId,
+          lastDate: sql<string>`MAX(${schema.specialMusic.date})`,
+        })
+        .from(schema.specialMusicPerformers)
+        .innerJoin(schema.specialMusic, eq(schema.specialMusicPerformers.specialMusicId, schema.specialMusic.id))
+        .where(
+          and(
+            inArray(schema.specialMusicPerformers.personId, personIds),
+            lt(schema.specialMusic.date, schedule.scopeStart),
+          ),
+        )
+        .groupBy(schema.specialMusicPerformers.personId)
+        .all()
+      for (const r of lastRows) {
+        if (r.lastDate) lastSangByPerson.set(r.personId, r.lastDate)
+      }
+    }
+
+    const decorated = rows.map((r) => {
+      const performers = (perfBySpecial.get(r.id) ?? []).map((p) => ({
+        personId: p.personId,
+        ordering: p.ordering,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        lastSangDate: lastSangByPerson.get(p.personId) ?? null,
+      }))
+      return {
+        ...r,
+        guestPerformers: parseGuests(r.guestPerformers),
+        performers,
+      }
+    })
+
+    res.json({schedule, cells: decorated})
+  }),
+)
+
+function parseGuests(raw: string): string[] {
+  try {
+    const v = JSON.parse(raw)
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 // ── Generic Send-Image ──────────────────────────────────────────────────
 // Accepts a base64 JPEG image + recipient person ids; sends via Messages

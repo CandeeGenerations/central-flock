@@ -55,6 +55,8 @@ import {QuotesPage} from '@/pages/sermons/quotes-page'
 import {QuotesResearchPage} from '@/pages/sermons/quotes-research-page'
 import {VerseStripsPage} from '@/pages/sermons/verse-strips-page'
 import {SettingsPage} from '@/pages/settings-page'
+import {SpecialMusicScheduleViewPage} from '@/pages/special-music/special-music-schedule-view-page'
+import {SpecialMusicSchedulesPage} from '@/pages/special-music/special-music-schedules-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
 import {
@@ -427,6 +429,8 @@ function AppLayoutInner({
               <Route path="/nursery/workers" element={<NurseryWorkersPage />} />
               <Route path="/nursery/settings" element={<NurserySettingsPage />} />
               <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
+              <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
+              <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
               <Route path="/sermons/quotes" element={<QuotesPage />} />
               <Route path="/sermons/quotes/:id" element={<QuoteDetailPage />} />
               <Route path="/sermons/research" element={<QuotesResearchPage />} />

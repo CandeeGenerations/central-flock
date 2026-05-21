@@ -1,13 +1,11 @@
 import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Label} from '@/components/ui/label'
-import {SearchableSelect} from '@/components/ui/searchable-select'
+import {PersonPicker} from '@/components/ui/person-picker'
 import {Textarea} from '@/components/ui/textarea'
 import {usePersistedState} from '@/hooks/use-persisted-state'
-import {fetchPeople} from '@/lib/api'
 import {sendScheduleImage} from '@/lib/schedules-api'
-import {useQuery} from '@tanstack/react-query'
-import {useMemo, useState} from 'react'
+import {useState} from 'react'
 import {toast} from 'sonner'
 
 interface SendScheduleDialogProps {
@@ -34,28 +32,12 @@ export function SendScheduleDialog({
   onBeforeSend,
   describeError,
 }: SendScheduleDialogProps) {
-  const [selectedRecipientId, setSelectedRecipientId] = usePersistedState<string>(recipientStorageKey, '')
+  const [recipientId, setRecipientId] = usePersistedState<number | null>(recipientStorageKey, null)
   const [caption, setCaption] = useState('')
   const [sending, setSending] = useState(false)
 
-  const {data: peopleData} = useQuery({
-    queryKey: ['people', 'schedule-send-all'],
-    queryFn: () => fetchPeople({status: 'active', limit: 500, page: 1}),
-    enabled: open,
-  })
-
-  const recipientOptions = useMemo(() => {
-    if (!peopleData?.data) return []
-    return peopleData.data
-      .filter((p) => p.phoneNumber)
-      .map((p) => ({
-        value: String(p.id),
-        label: [p.firstName, p.lastName].filter(Boolean).join(' ') || p.phoneDisplay || 'Unknown',
-      }))
-  }, [peopleData])
-
   async function handleSend() {
-    if (!selectedRecipientId) {
+    if (recipientId == null) {
       toast.error('Pick a recipient')
       return
     }
@@ -65,7 +47,7 @@ export function SendScheduleDialog({
       const imageData = await getImage()
       const {results} = await sendScheduleImage({
         imageData,
-        recipientIds: [Number(selectedRecipientId)],
+        recipientIds: [recipientId],
         caption: caption.trim() || undefined,
       })
       const failed = results.filter((r) => !r.success)
@@ -93,11 +75,10 @@ export function SendScheduleDialog({
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Recipient</Label>
-            <SearchableSelect
-              value={selectedRecipientId}
-              onValueChange={setSelectedRecipientId}
-              options={recipientOptions}
-              placeholder="Select a person..."
+            <PersonPicker
+              value={recipientId}
+              onChange={setRecipientId}
+              placeholder="Search people..."
               className="w-full"
             />
           </div>
@@ -115,7 +96,7 @@ export function SendScheduleDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
             Cancel
           </Button>
-          <Button onClick={handleSend} disabled={sending || !selectedRecipientId}>
+          <Button onClick={handleSend} disabled={sending || recipientId == null}>
             {sending ? 'Sending...' : 'Send'}
           </Button>
         </DialogFooter>

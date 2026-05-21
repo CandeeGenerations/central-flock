@@ -4,7 +4,7 @@ import {DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {fetchGroup} from '@/lib/api'
+import {fetchGroup, fetchPerson} from '@/lib/api'
 import {formatDate} from '@/lib/date'
 import {type SpecialMusicCell, fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
 import {SPECIAL_TYPE_LABELS, type Special, type SpecialType, specialsApi} from '@/lib/specials-api'
@@ -41,6 +41,13 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
   const [overrideLabel, setOverrideLabel] = useState<string>(cell?.serviceLabel ?? '')
   const [type, setType] = useState<SpecialType>(cell?.type ?? 'solo')
   const [typeTouched, setTypeTouched] = useState(false)
+  // Per-performer override of the schedule render flag. null = inherit from
+  // the person's own displayFirstNameOnly setting.
+  const [overrides, setOverrides] = useState<Record<number, boolean | null>>(() => {
+    const out: Record<number, boolean | null> = {}
+    for (const p of cell?.performers ?? []) out[p.personId] = p.cellOverride
+    return out
+  })
 
   const derivedType = deriveType(performerIds.length, guests.length)
   const effectiveType: SpecialType = typeTouched ? type : derivedType
@@ -58,6 +65,24 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
     ? [...new Set(groupQueries.flatMap((q) => (q.data?.members ?? []).map((m) => m.id)))]
     : undefined
 
+  // Fetch the linked performers so we can render the per-performer
+  // last-name-display row even for performers that were just added.
+  const personQueries = useQueries({
+    queries: performerIds.map((pid) => ({
+      queryKey: ['person', pid],
+      queryFn: () => fetchPerson(pid),
+    })),
+  })
+  const performerInfo = performerIds.map((pid, i) => {
+    const data = personQueries[i]?.data
+    return {
+      personId: pid,
+      firstName: data?.firstName ?? null,
+      lastName: data?.lastName ?? null,
+      personDefault: data?.displayFirstNameOnly ?? false,
+    }
+  })
+
   const invalidate = () => queryClient.invalidateQueries({queryKey: ['schedules', 'cells', scheduleId]})
 
   const saveMutation = useMutation({
@@ -68,8 +93,12 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
         serviceLabel: overrideLabel.trim() || null,
         type: effectiveType,
       }
-      if (cell) return specialsApi.update(cell.id, body)
-      return specialsApi.create({date, serviceType, ...body})
+      const performerOverrides = performerIds
+        .filter((pid) => overrides[pid] !== undefined && overrides[pid] !== null)
+        .map((pid) => ({personId: pid, displayFirstNameOnly: overrides[pid] as boolean}))
+      const bodyWithOverrides = {...body, performerOverrides}
+      if (cell) return specialsApi.update(cell.id, bodyWithOverrides)
+      return specialsApi.create({date, serviceType, ...bodyWithOverrides})
     },
     onSuccess: () => {
       invalidate()
@@ -112,6 +141,44 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
             restrictToPersonIds={restrictToPersonIds}
           />
         </div>
+
+        {performerInfo.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Last name on this cell</Label>
+            <div className="bg-muted/30 space-y-1 rounded border p-2">
+              {performerInfo.map((p) => {
+                const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.personId}`
+                const override = overrides[p.personId] ?? null
+                const value = override === null ? 'inherit' : override ? 'hide' : 'show'
+                return (
+                  <div key={p.personId} className="flex items-center gap-2 text-sm">
+                    <span className="flex-1 truncate">{fullName}</span>
+                    <Select
+                      value={value}
+                      onValueChange={(v) =>
+                        setOverrides((prev) => ({
+                          ...prev,
+                          [p.personId]: v === 'inherit' ? null : v === 'hide',
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-7 w-44 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inherit">
+                          Inherit ({p.personDefault ? 'first name only' : 'show last name'})
+                        </SelectItem>
+                        <SelectItem value="show">Show last name</SelectItem>
+                        <SelectItem value="hide">First name only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label>Override Label</Label>

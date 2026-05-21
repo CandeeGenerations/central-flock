@@ -236,12 +236,21 @@ specialsRouter.post(
       .get()
 
     if (parsed.performerIds && parsed.performerIds.length > 0) {
+      const overrideMap = new Map<number, boolean | null>()
+      const overrides = (req.body as {performerOverrides?: {personId: number; displayFirstNameOnly: boolean | null}[]})
+        .performerOverrides
+      if (Array.isArray(overrides)) {
+        for (const o of overrides) {
+          if (typeof o?.personId === 'number') overrideMap.set(o.personId, o.displayFirstNameOnly ?? null)
+        }
+      }
       db.insert(schema.specialMusicPerformers)
         .values(
           parsed.performerIds.map((pid, idx) => ({
             specialMusicId: inserted.id,
             personId: pid,
             ordering: idx,
+            displayFirstNameOnly: overrideMap.get(pid) ?? null,
           })),
         )
         .run()
@@ -296,6 +305,14 @@ specialsRouter.patch(
     if (Array.isArray(b.performerIds)) {
       const ids = b.performerIds as unknown[]
       const cleanIds = ids.filter((x): x is number => typeof x === 'number')
+      const overrideMap = new Map<number, boolean | null>()
+      const overrides = (b as {performerOverrides?: {personId: number; displayFirstNameOnly: boolean | null}[]})
+        .performerOverrides
+      if (Array.isArray(overrides)) {
+        for (const o of overrides) {
+          if (typeof o?.personId === 'number') overrideMap.set(o.personId, o.displayFirstNameOnly ?? null)
+        }
+      }
       db.delete(schema.specialMusicPerformers).where(eq(schema.specialMusicPerformers.specialMusicId, id)).run()
       if (cleanIds.length > 0) {
         db.insert(schema.specialMusicPerformers)
@@ -304,6 +321,7 @@ specialsRouter.patch(
               specialMusicId: id,
               personId: pid,
               ordering: idx,
+              displayFirstNameOnly: overrideMap.get(pid) ?? null,
             })),
           )
           .run()

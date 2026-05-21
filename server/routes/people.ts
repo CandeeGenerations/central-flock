@@ -395,6 +395,7 @@ peopleRouter.put(
       anniversaryMonth,
       anniversaryDay,
       anniversaryYear,
+      displayFirstNameOnly,
     } = req.body
 
     if (birthMonth !== undefined || birthDay !== undefined) {
@@ -428,6 +429,7 @@ peopleRouter.put(
         anniversaryMonth: anniversaryMonth !== undefined ? (anniversaryMonth ?? null) : undefined,
         anniversaryDay: anniversaryDay !== undefined ? (anniversaryDay ?? null) : undefined,
         anniversaryYear: anniversaryYear !== undefined ? (anniversaryYear ?? null) : undefined,
+        displayFirstNameOnly: typeof displayFirstNameOnly === 'boolean' ? displayFirstNameOnly : undefined,
         updatedAt: sql`datetime('now')`,
       })
       .where(eq(schema.people.id, Number(req.params.id)))

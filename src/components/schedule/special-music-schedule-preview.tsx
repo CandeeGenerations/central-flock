@@ -35,26 +35,29 @@ function formatDate(d: string): string {
   return `${MONTH_NAMES_SHORT[m - 1]} ${day}`
 }
 
-// Collapse consecutive linked performers who share a last name into
-// "First and First Last" (or "First, First, and First Last" for 3+).
-// Examples: Tyler Candee + Carissa Candee -> "Tyler and Carissa Candee".
-// Mirrors the printed sheet's convention.
+// Collapse consecutive linked performers who share a last name AND both want
+// the last name shown, into "First and First Last". Performers with
+// displayFirstNameOnly = true render bare ("Madeline"). Mirrors the
+// printed-sheet convention.
 function renderLinkedNames(performers: SpecialMusicCell['performers']): string[] {
   const sorted = performers.slice().sort((a, b) => a.ordering - b.ordering)
   const out: string[] = []
   let i = 0
   while (i < sorted.length) {
-    const startLast = sorted[i].lastName?.trim() ?? ''
-    if (!startLast) {
-      out.push((sorted[i].firstName ?? '').trim())
+    const p = sorted[i]
+    const startLast = p.lastName?.trim() ?? ''
+    if (p.displayFirstNameOnly || !startLast) {
+      out.push((p.firstName ?? '').trim())
       i += 1
       continue
     }
-    // Find the run of consecutive performers sharing this last name.
+    // Find run of consecutive show-last-name performers sharing this last name.
     let j = i
     const firsts: string[] = []
-    while (j < sorted.length && (sorted[j].lastName?.trim() ?? '') === startLast) {
-      firsts.push((sorted[j].firstName ?? '').trim())
+    while (j < sorted.length) {
+      const q = sorted[j]
+      if (q.displayFirstNameOnly || (q.lastName?.trim() ?? '') !== startLast) break
+      firsts.push((q.firstName ?? '').trim())
       j += 1
     }
     if (firsts.length === 1) {

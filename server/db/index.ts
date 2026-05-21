@@ -81,5 +81,18 @@ sqlite.exec(`
   seed.run('schedules.specialMusic.singerGroupIds', '[]')
 }
 
+// Idempotent boot-time migration: add display_first_name_only columns for
+// the schedule rendering toggle. See ADR 0006 follow-up.
+function hasColumn(table: string, column: string): boolean {
+  const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{name: string}>
+  return rows.some((r) => r.name === column)
+}
+if (!hasColumn('people', 'display_first_name_only')) {
+  sqlite.exec(`ALTER TABLE people ADD COLUMN display_first_name_only integer NOT NULL DEFAULT 0`)
+}
+if (!hasColumn('special_music_performers', 'display_first_name_only')) {
+  sqlite.exec(`ALTER TABLE special_music_performers ADD COLUMN display_first_name_only integer`)
+}
+
 export const db = drizzle(sqlite, {schema})
 export {schema, sqlite}

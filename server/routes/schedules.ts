@@ -268,6 +268,8 @@ schedulesRouter.get(
               ordering: schema.specialMusicPerformers.ordering,
               firstName: schema.people.firstName,
               lastName: schema.people.lastName,
+              personDisplayFirstNameOnly: schema.people.displayFirstNameOnly,
+              cellDisplayFirstNameOnly: schema.specialMusicPerformers.displayFirstNameOnly,
             })
             .from(schema.specialMusicPerformers)
             .innerJoin(schema.people, eq(schema.specialMusicPerformers.personId, schema.people.id))
@@ -314,6 +316,10 @@ schedulesRouter.get(
         ordering: p.ordering,
         firstName: p.firstName,
         lastName: p.lastName,
+        // Effective render flag: cell override wins over person default.
+        displayFirstNameOnly: p.cellDisplayFirstNameOnly ?? p.personDisplayFirstNameOnly ?? false,
+        cellOverride: p.cellDisplayFirstNameOnly,
+        personDefault: p.personDisplayFirstNameOnly,
         lastSangDate: lastSangByPerson.get(p.personId) ?? null,
       }))
       return {

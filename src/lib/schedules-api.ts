@@ -104,6 +104,11 @@ export interface SpecialMusicCellPerformer {
   ordering: number
   firstName: string | null
   lastName: string | null
+  // Effective render flag — cell override wins over person default.
+  displayFirstNameOnly: boolean
+  // Underlying values so the editor can show "auto / show / hide" tri-state.
+  cellOverride: boolean | null
+  personDefault: boolean
   lastSangDate: string | null
 }
 

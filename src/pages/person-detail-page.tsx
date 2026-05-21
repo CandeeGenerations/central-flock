@@ -3,6 +3,7 @@ import {PersonSpecialsCard} from '@/components/specials/person-specials-card'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Checkbox} from '@/components/ui/checkbox'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
@@ -151,6 +152,7 @@ export function PersonDetailPage() {
         anniversaryMonth: person.anniversaryMonth,
         anniversaryDay: person.anniversaryDay,
         anniversaryYear: person.anniversaryYear,
+        displayFirstNameOnly: person.displayFirstNameOnly,
       })
       setEditing(true)
     }
@@ -364,6 +366,16 @@ export function PersonDetailPage() {
                   onChange={(e) => setForm((f) => ({...f, notes: e.target.value}))}
                   rows={3}
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="display-first-name-only"
+                  checked={!!form.displayFirstNameOnly}
+                  onCheckedChange={(v) => setForm((f) => ({...f, displayFirstNameOnly: v === true}))}
+                />
+                <Label htmlFor="display-first-name-only" className="cursor-pointer text-sm font-normal">
+                  Show only first name on schedules
+                </Label>
               </div>
               <div className="flex gap-2">
                 <Button

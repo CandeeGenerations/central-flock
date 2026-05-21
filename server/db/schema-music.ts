@@ -46,6 +46,9 @@ export const specialMusicPerformers = sqliteTable(
       .notNull()
       .references(() => people.id, {onDelete: 'cascade'}),
     ordering: integer('ordering').notNull().default(0),
+    // Per-cell override of the person's displayFirstNameOnly default.
+    // null = inherit from people.display_first_name_only.
+    displayFirstNameOnly: integer('display_first_name_only', {mode: 'boolean'}),
   },
   (t) => [primaryKey({columns: [t.specialMusicId, t.personId]})],
 )

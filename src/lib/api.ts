@@ -92,6 +92,10 @@ export interface Person {
   anniversaryDay: number | null
   anniversaryYear: number | null
   notes: string | null
+  // When true, schedules render this person as just their first name
+  // ("Madeline" instead of "Madeline Turner"). Per-cell override on the
+  // Special Music schedule can flip this on or off for a specific cell.
+  displayFirstNameOnly: boolean
   createdAt: string
   updatedAt: string
   groups?: {id: number; name: string}[]

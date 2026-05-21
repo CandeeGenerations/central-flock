@@ -42,9 +42,15 @@ export const schedules = sqliteTable('schedules', {
   scopeEnd: text('scope_end'),
   // both
   scopeLabel: text('scope_label').notNull(),
-  status: text('status', {enum: ['draft', 'final']}).notNull().default('draft'),
-  createdAt: text('created_at').default(sql`(datetime('now'))`).notNull(),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`).notNull(),
+  status: text('status', {enum: ['draft', 'final']})
+    .notNull()
+    .default('draft'),
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+  updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
 })
 ```
 
@@ -171,7 +177,7 @@ Modeled on nursery view page after its refactor. Sequence:
 Table layout matching the printed image:
 
 | DATE | SUNDAY A.M. | SUNDAY P.M. |
-|---|---|---|
+| ---- | ----------- | ----------- |
 
 Each cell renders:
 
@@ -256,11 +262,11 @@ Route: `/schedules/settings`. Delete the old `/nursery/settings` route once veri
 
 ## Risks + mitigations
 
-- **FK retarget on `nursery_assignments`.**  SQLite forces a table recreate. Test the migration on a copy of the production DB before deploying. Back up `central-flock.db` to `central-flock.db.pre-schedules-bak` as a pre-step in the migration script (mirrors the existing `central-flock.db.pre-0014-bak` convention seen in the repo).
-- **`special_music.song_title` nullable spreads further than expected.**  Grep before changing the type — every TS site that touches the field needs a null guard.
-- **Footer text is settings-only.**  Re-exporting an old finalized schedule renders the *current* footer. Document this on the Schedules settings page (a one-line note: "Changes here affect all printed schedules, including past-finalized ones if reprinted.").
-- **`<SchedulePreviewFrame>` reading settings inside the capture target.**  If the settings query is in flight when html-to-image runs, the footer renders empty. Mitigate by gating the export buttons until both the schedule data and the settings query are settled (similar to today's nursery preview gating on workers + serviceConfig).
-- **Special-music popover save race.**  Rapid edit/close on multiple cells could race the optimistic update. Use TanStack Query's mutation queue + per-cell mutation keys; tested in the existing Specials new-page flow.
+- **FK retarget on `nursery_assignments`.** SQLite forces a table recreate. Test the migration on a copy of the production DB before deploying. Back up `central-flock.db` to `central-flock.db.pre-schedules-bak` as a pre-step in the migration script (mirrors the existing `central-flock.db.pre-0014-bak` convention seen in the repo).
+- **`special_music.song_title` nullable spreads further than expected.** Grep before changing the type — every TS site that touches the field needs a null guard.
+- **Footer text is settings-only.** Re-exporting an old finalized schedule renders the _current_ footer. Document this on the Schedules settings page (a one-line note: "Changes here affect all printed schedules, including past-finalized ones if reprinted.").
+- **`<SchedulePreviewFrame>` reading settings inside the capture target.** If the settings query is in flight when html-to-image runs, the footer renders empty. Mitigate by gating the export buttons until both the schedule data and the settings query are settled (similar to today's nursery preview gating on workers + serviceConfig).
+- **Special-music popover save race.** Rapid edit/close on multiple cells could race the optimistic update. Use TanStack Query's mutation queue + per-cell mutation keys; tested in the existing Specials new-page flow.
 
 ---
 

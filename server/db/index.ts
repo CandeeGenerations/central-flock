@@ -48,5 +48,38 @@ sqlite.exec(`
     ('wednesday_evening', 'Wednesday Evening Service', 2, 4)
 `)
 
+// Seed per-schedule-type settings defaults (idempotent). See ADR 0006.
+{
+  const seed = sqlite.prepare(`INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))`)
+  seed.run('schedules.nursery.titlePrefix', 'Nursery Schedule')
+  seed.run('schedules.nursery.footerBlocks', '[]')
+  seed.run('schedules.specialMusic.titlePrefix', 'CBC Special Music Schedule')
+  seed.run(
+    'schedules.specialMusic.footerBlocks',
+    JSON.stringify([
+      {
+        kind: 'quote',
+        text:
+          '"I will praise thee, O LORD, with my whole heart; I will shew forth all thy marvellous works. ' +
+          'I will be glad and rejoice in thee; I will sing praise to thy name, O thou most High." (Psalm 9:1-2)',
+      },
+      {kind: 'spacer', text: ''},
+      {
+        kind: 'note',
+        text:
+          'If you cannot present your special number when scheduled, contact Preacher in a timely manner ' +
+          'and he will handle all adjustments. Thank you!',
+      },
+      {
+        kind: 'note',
+        text:
+          "Remember, we're singing (or playing) first, to the Lord; second, about the Lord; and third, " +
+          'about what the Lord has done for us. Our spirit and our attitude must be right with God :)',
+      },
+    ]),
+  )
+  seed.run('schedules.specialMusic.singerGroupIds', '[]')
+}
+
 export const db = drizzle(sqlite, {schema})
 export {schema, sqlite}

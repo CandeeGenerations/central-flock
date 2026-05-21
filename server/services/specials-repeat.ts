@@ -12,7 +12,7 @@ function daysAgoIso(days: number): string {
 }
 
 export type RepeatWarning = {
-  songRepeat?: {specialId: number; date: string; songTitle: string}
+  songRepeat?: {specialId: number; date: string; songTitle: string | null}
   performerRepeats: {personId: number; specialId: number; date: string}[]
 }
 

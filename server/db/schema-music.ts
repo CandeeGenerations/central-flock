@@ -11,7 +11,9 @@ export const specialMusic = sqliteTable('special_music', {
     enum: ['sunday_am', 'sunday_pm', 'wednesday_pm', 'other'],
   }).notNull(),
   serviceLabel: text('service_label'),
-  songTitle: text('song_title').notNull(),
+  // Nullable so Special Music schedule cells can exist as "scheduled, not yet
+  // sung" placeholders without a song chosen. See ADR 0006.
+  songTitle: text('song_title'),
   hymnId: integer('hymn_id').references(() => hymns.id, {onDelete: 'set null'}),
   songArranger: text('song_arranger'),
   songWriter: text('song_writer'),

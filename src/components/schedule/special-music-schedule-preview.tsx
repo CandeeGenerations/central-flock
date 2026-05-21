@@ -133,10 +133,10 @@ export function SpecialMusicSchedulePreview({scopeStart, scopeEnd, cells, editMo
             const pm = byKey.get(`${d}:sunday_pm`)
             const rowBorder = rowIdx > 0 ? ('1.5px solid #000' as const) : undefined
             return (
-              <tr key={d}>
+              <tr key={d} style={{height: 52}}>
                 <td
                   className="px-3 py-2 text-sm font-medium"
-                  style={{borderTop: rowBorder, backgroundColor: '#f3f4f6'}}
+                  style={{borderTop: rowBorder, backgroundColor: '#f3f4f6', verticalAlign: 'middle'}}
                 >
                   {formatDate(d)}
                 </td>
@@ -146,6 +146,7 @@ export function SpecialMusicSchedulePreview({scopeStart, scopeEnd, cells, editMo
                   const baseStyle = {
                     borderLeft: '1.5px solid #000' as const,
                     borderTop: rowBorder,
+                    verticalAlign: 'middle' as const,
                   }
                   if (!cell) {
                     return (

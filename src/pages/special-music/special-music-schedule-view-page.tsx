@@ -1,11 +1,11 @@
 import {ScheduleActionsToolbar} from '@/components/schedule/schedule-actions-toolbar'
-import {ScheduleCellEditorPopover} from '@/components/schedule/schedule-cell-editor-popover'
+import {ScheduleCellEditor} from '@/components/schedule/schedule-cell-editor'
 import {SchedulePreviewFrame} from '@/components/schedule/schedule-preview-frame'
 import {SendScheduleDialog} from '@/components/schedule/send-schedule-dialog'
 import {SpecialMusicSchedulePreview} from '@/components/schedule/special-music-schedule-preview'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {Dialog, DialogContent} from '@/components/ui/dialog'
 import {PageSpinner} from '@/components/ui/spinner'
 import {describeExportError, useScheduleExport} from '@/hooks/use-schedule-export'
 import {
@@ -163,12 +163,9 @@ export function SpecialMusicScheduleViewPage() {
           if (!o) setOpenCell(null)
         }}
       >
-        <DialogContent className="max-w-md p-0">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Edit cell</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-md">
           {openCell ? (
-            <ScheduleCellEditorPopover
+            <ScheduleCellEditor
               date={openCell.date}
               serviceType={openCell.serviceType}
               cell={openCellModel}

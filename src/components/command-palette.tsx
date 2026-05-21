@@ -26,7 +26,7 @@ const GROUP_ORDER = [
   'Templates',
   'Quotes',
   'Hymns',
-  'Nursery',
+  'Schedules',
   'Calendar',
 ]
 
@@ -71,7 +71,11 @@ const PREFIX_TO_GROUP: Record<string, string> = {
   h: 'Hymns',
   hymn: 'Hymns',
   hymns: 'Hymns',
-  nursery: 'Nursery',
+  nursery: 'Schedules',
+  schedule: 'Schedules',
+  schedules: 'Schedules',
+  'special-music': 'Schedules',
+  specialmusic: 'Schedules',
   cal: 'Calendar',
   calendar: 'Calendar',
   rsvp: 'Calendar',

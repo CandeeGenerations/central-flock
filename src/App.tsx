@@ -48,6 +48,7 @@ import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
 import {RsvpDetailPage} from '@/pages/rsvp/rsvp-detail-page'
 import {RsvpListPage} from '@/pages/rsvp/rsvp-list-page'
+import {SchedulesSettingsPage} from '@/pages/schedules-settings-page'
 import {QuoteDetailPage} from '@/pages/sermons/quote-detail-page'
 import {QuoteSearchDetailPage} from '@/pages/sermons/quote-search-detail-page'
 import {QuoteSearchesPage} from '@/pages/sermons/quote-searches-page'
@@ -431,6 +432,7 @@ function AppLayoutInner({
               <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
               <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
               <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
+              <Route path="/schedules/settings" element={<SchedulesSettingsPage />} />
               <Route path="/sermons/quotes" element={<QuotesPage />} />
               <Route path="/sermons/quotes/:id" element={<QuoteDetailPage />} />
               <Route path="/sermons/research" element={<QuotesResearchPage />} />

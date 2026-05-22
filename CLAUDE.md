@@ -10,8 +10,13 @@ Central Flock is a macOS desktop app for managing contacts and sending personali
 - `pnpm build` — TypeScript compile + Vite production build
 - `pnpm lint` — Run ESLint + TypeScript type checking (both `tsconfig.app.json` and `tsconfig.server.json`)
 - `pnpm db:generate` — Generate Drizzle migration files
-- `pnpm db:migrate` — Push schema changes to SQLite database
+- `pnpm db:migrate` — Apply pending migration files (idempotent; ledger in `__drizzle_migrations`)
+- `pnpm db:push` — Diff schema and push directly (skips migration files; dev convenience, not for prod)
 - `pnpm db:studio` — Open Drizzle Studio for visual DB management
+
+## Operations
+
+See [RUNBOOK.md](./RUNBOOK.md) for the deploy procedure, destructive-migration handling, and rollback steps. There is no dev/test DB — production is the only DB.
 
 ## Architecture
 

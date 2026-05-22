@@ -45,6 +45,38 @@ fi
 echo "==> Lint + typecheck"
 pnpm eslint
 
+# 2b. Apply any pending DB migrations.
+#
+# Idempotent — drizzle-kit migrate consults __drizzle_migrations and skips
+# already-applied tags, so this no-ops on a clean DB. For migrations that
+# DROP/rebuild tables, stop the service before running deploy: the running
+# process will keep prepared statements bound to old table OIDs and start
+# throwing "no such table" until restarted.
+#
+# Production DB is the only DB — there is no dev/test environment. Always
+# take an atomic backup before migrating so we can roll back if a migration
+# corrupts data. The sqlite3 `.backup` command is WAL-safe (online backup)
+# and finishes in well under a second on this DB size.
+DB_PATH="./central-flock.db"
+BACKUP_DIR="./backups"
+BACKUP_TAG="pre-migrate-$(date -u +%Y%m%dT%H%M%SZ)-$SHA"
+BACKUP_PATH="$BACKUP_DIR/central-flock.db.$BACKUP_TAG"
+
+if [[ -f "$DB_PATH" ]]; then
+  echo "==> Backup DB → $BACKUP_PATH"
+  mkdir -p "$BACKUP_DIR"
+  sqlite3 "$DB_PATH" ".backup '$BACKUP_PATH'"
+  if [[ ! -s "$BACKUP_PATH" ]]; then
+    echo "    ERROR: backup file is empty or missing — refusing to migrate"
+    exit 1
+  fi
+  # Prune: keep the newest 10 pre-migrate snapshots, drop the rest.
+  ls -1t "$BACKUP_DIR"/central-flock.db.pre-migrate-* 2>/dev/null | tail -n +11 | xargs -I{} rm -f "{}"
+fi
+
+echo "==> Apply pending DB migrations"
+pnpm db:migrate
+
 # 3. Build
 #
 # Read per-project DSN from the installed plist so the bundle bakes in the

@@ -29,6 +29,9 @@ dist-ssr
 *.db-shm
 *.db.pre-*-bak
 
+# DB snapshots (taken by scripts/deploy.sh before each migrate)
+/backups/
+
 .claude/settings.local.json
 .env
 

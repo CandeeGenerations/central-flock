@@ -333,3 +333,32 @@ Nursery uses `scope_kind='monthly'` because its generator semantics depend on mo
 Replaces the current freeform-text editor (today's "Edit default" and per-month "Override" textareas). A row-based form: each row is one Schedule item with inline-edit `text`, `bold` toggle, `column` picker (1/2), `eligibleDays` checkboxes, and up/down arrow reorder. "+ Add item" and "+ Add spacer" at the bottom. A live footer preview renders alongside the editor — the same `FooterContent` component fed by the in-progress rows — so visual fidelity is verifiable as you edit.
 
 Same editor reused for the default schedule and per-month overrides (only `scopeType`/`scopeId` differs). The textarea is gone — no fallback path. Migration is one-way.
+
+### Message recipients
+
+The audience for a draft, scheduled send, or sent message. Composed from three sources:
+
+- **Groups** — zero or more [[Group]]s, joined via the `message_groups` / `draft_groups` junction tables. Selecting multiple groups _unions_ their memberships; a person in both "Singers" and "Nursery Workers" appears once.
+- **Individuals (`selectedIndividualIds`)** — people added on top of the group union. In Group mode they are "extras outside the groups"; in Individual mode they are the entire audience.
+- **Excludes (`excludeIds`)** — people removed from the union. Global, not per-group: an exclude removes the person regardless of which group brought them in.
+
+Final audience = `(union of all selected groups' members) ∪ selectedIndividualIds − excludeIds`. Set semantics; dedup automatic.
+
+**Snapshot timing.** Recipients are resolved to a fixed `recipientIds` list **at the moment Send or Schedule is clicked**, not at fire time. A scheduled send freezes its audience when scheduled. Reopening a draft re-derives live counts from the current group memberships, but those counts are advisory until commit.
+
+### Recipient mode
+
+Discriminator on `drafts.recipient_mode` selecting how the compose UI assembles the audience. Two values:
+
+- **`group`** — picker shows the multi-select group chips with associated extras (`selectedIndividualIds` outside any selected group) and excludes (`excludeIds` from within the union). Zero groups picked = empty audience, Send disabled (mirrors Individual mode's empty state).
+- **`individual`** — picker is a flat people search; `selectedIndividualIds` is the entire audience. No group or exclude semantics.
+
+Mode is sticky: removing the last group chip does not auto-switch the user to Individual mode — they explicitly picked Group mode and the mode choice survives an empty chip list.
+
+### Message recipient label
+
+The "Recipients" cell on the message history table renders the audience compactly:
+
+- **0 groups, ≤ 2 individuals:** comma-joined names.
+- **0 groups, ≥ 3 individuals:** first 2 names + "+ N more" with a tooltip listing all names.
+- **Group send:** comma-joined group names. When the rendered line would overflow or when extras exist, a single merged "+ N more" affordance ends the line; its tooltip is sectioned ("Groups: …", "Extras: …").

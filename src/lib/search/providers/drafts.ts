@@ -13,13 +13,14 @@ export const draftsProvider: SearchProvider<Draft> = {
   toItems: (rows) =>
     rows.map((d) => {
       const label = d.name?.trim() || d.content.slice(0, 60) || `Draft #${d.id}`
+      const groupLabel = d.groupNames.join(', ')
       return {
         id: `drafts-${d.id}`,
         label,
-        subtitle: d.groupName ? `to ${d.groupName}` : d.content.slice(0, 80),
+        subtitle: groupLabel ? `to ${groupLabel}` : d.content.slice(0, 80),
         group: 'Drafts',
         icon: FileEdit,
-        keywords: [d.name ?? '', d.content.slice(0, 200), d.groupName ?? ''].filter(Boolean),
+        keywords: [d.name ?? '', d.content.slice(0, 200), groupLabel].filter(Boolean),
         action: ({navigate, close}) => {
           navigate(`/messages/compose?draftId=${d.id}`)
           close()

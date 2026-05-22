@@ -250,8 +250,8 @@ export interface Message {
   id: number
   content: string
   renderedPreview: string | null
-  groupId: number | null
-  groupName?: string | null
+  groupIds: number[]
+  groupNames: string[]
   totalRecipients: number
   sentCount: number
   failedCount: number
@@ -289,7 +289,7 @@ export function sendMessage(data: {
   content: string
   recipientIds: number[]
   excludeIds?: number[]
-  groupId?: number
+  groupIds?: number[]
   batchSize?: number
   batchDelayMs?: number
   customVarValues?: Record<string, string>
@@ -351,7 +351,7 @@ export function updateMessage(
     content: string
     recipientIds: number[]
     excludeIds?: number[]
-    groupId?: number
+    groupIds?: number[]
     batchSize?: number
     batchDelayMs?: number
     customVarValues?: Record<string, string>
@@ -372,8 +372,8 @@ export interface Draft {
   name: string | null
   content: string
   recipientMode: 'group' | 'individual'
-  groupId: number | null
-  groupName?: string | null
+  groupIds: number[]
+  groupNames: string[]
   selectedIndividualIds: string | null
   excludeIds: string | null
   batchSize: number
@@ -652,7 +652,8 @@ export interface StatsResponse {
       totalRecipients: number
       sentCount: number
       failedCount: number
-      groupName: string | null
+      groupIds: number[]
+      groupNames: string[]
       createdAt: string
       completedAt: string | null
     }[]
@@ -662,7 +663,8 @@ export interface StatsResponse {
       renderedPreview: string | null
       status: string
       totalRecipients: number
-      groupName: string | null
+      groupIds: number[]
+      groupNames: string[]
       scheduledAt: string | null
     }[]
   }

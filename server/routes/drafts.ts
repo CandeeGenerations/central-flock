@@ -5,7 +5,7 @@ import {Router} from 'express'
 import {db, schema} from '../db/index.js'
 import {BATCH_DEFAULTS} from '../lib/constants.js'
 import {renderTemplate} from '../lib/format.js'
-import {asyncHandler, getGroupName} from '../lib/route-helpers.js'
+import {asyncHandler, getDraftGroupIds, getGroupNames} from '../lib/route-helpers.js'
 import {buildRsvpLinkMap, rsvpLinkFor} from '../services/rsvp-link.js'
 
 export const draftsRouter = Router()
@@ -37,24 +37,21 @@ draftsRouter.get(
           /* ignore */
         }
       }
-      const groupName = draft.groupId ? getGroupName(draft.groupId) : null
-      if (draft.groupId) {
-        const count = db
-          .select({count: sql<number>`count(*)`})
+      const groupIds = getDraftGroupIds(draft.id)
+      const groupNames = getGroupNames(groupIds)
+      if (groupIds.length > 0) {
+        // Deduped union of members across all selected groups.
+        const memberRows = db
+          .selectDistinct({personId: schema.peopleGroups.personId})
           .from(schema.peopleGroups)
-          .where(eq(schema.peopleGroups.groupId, draft.groupId))
-          .get()
-        recipientCount = Math.max(0, (count?.count || 0) - excludeCount)
-        // Add extra individuals not in the group
+          .where(inArray(schema.peopleGroups.groupId, groupIds))
+          .all()
+        const groupMemberIds = memberRows.map((r) => r.personId)
+        recipientCount = Math.max(0, groupMemberIds.length - excludeCount)
+        // Add extra individuals not in any selected group
         if (draft.selectedIndividualIds) {
           try {
             const extraIds: number[] = JSON.parse(draft.selectedIndividualIds)
-            const groupMemberIds = db
-              .select({personId: schema.peopleGroups.personId})
-              .from(schema.peopleGroups)
-              .where(eq(schema.peopleGroups.groupId, draft.groupId))
-              .all()
-              .map((r) => r.personId)
             const groupSet = new Set(groupMemberIds)
             const actualExtraIds = extraIds.filter((id) => !groupSet.has(id))
             recipientCount += actualExtraIds.length
@@ -109,12 +106,12 @@ draftsRouter.get(
           firstName: null,
           lastName: null,
         }
-        if (draft.groupId) {
+        if (groupIds.length > 0) {
           const member = db
             .select({id: schema.people.id, firstName: schema.people.firstName, lastName: schema.people.lastName})
             .from(schema.peopleGroups)
             .innerJoin(schema.people, eq(schema.peopleGroups.personId, schema.people.id))
-            .where(eq(schema.peopleGroups.groupId, draft.groupId))
+            .where(inArray(schema.peopleGroups.groupId, groupIds))
             .limit(1)
             .get()
           if (member) samplePerson = member
@@ -145,7 +142,7 @@ draftsRouter.get(
         )
       }
 
-      return {...draft, groupName, recipientCount, renderedPreview, extraNames}
+      return {...draft, groupIds, groupNames, recipientCount, renderedPreview, extraNames}
     })
 
     if (search && typeof search === 'string') {
@@ -154,7 +151,7 @@ draftsRouter.get(
         (draft) =>
           draft.content?.toLowerCase().includes(term) ||
           draft.name?.toLowerCase().includes(term) ||
-          draft.groupName?.toLowerCase().includes(term),
+          draft.groupNames.some((name) => name.toLowerCase().includes(term)),
       )
     }
 
@@ -177,9 +174,10 @@ draftsRouter.get(
       return
     }
 
-    const groupName = draft.groupId ? getGroupName(draft.groupId) : null
+    const groupIds = getDraftGroupIds(draft.id)
+    const groupNames = getGroupNames(groupIds)
 
-    res.json({...draft, groupName})
+    res.json({...draft, groupIds, groupNames})
   }),
 )
 
@@ -191,7 +189,7 @@ draftsRouter.post(
       name,
       content,
       recipientMode,
-      groupId,
+      groupIds,
       selectedIndividualIds,
       excludeIds,
       batchSize,
@@ -199,7 +197,19 @@ draftsRouter.post(
       scheduledAt,
       templateState,
       rsvpListId,
-    } = req.body
+    } = req.body as {
+      name?: string | null
+      content?: string
+      recipientMode?: 'group' | 'individual'
+      groupIds?: number[]
+      selectedIndividualIds?: string | null
+      excludeIds?: string | null
+      batchSize?: number
+      batchDelayMs?: number
+      scheduledAt?: string | null
+      templateState?: string | null
+      rsvpListId?: number | null
+    }
 
     const draft = db
       .insert(schema.drafts)
@@ -207,7 +217,6 @@ draftsRouter.post(
         name: name || null,
         content: content || '',
         recipientMode: recipientMode || 'group',
-        groupId: groupId || null,
         selectedIndividualIds: selectedIndividualIds || null,
         excludeIds: excludeIds || null,
         batchSize: batchSize ?? BATCH_DEFAULTS.batchSize,
@@ -218,6 +227,12 @@ draftsRouter.post(
       })
       .returning()
       .get()
+
+    if (groupIds && groupIds.length > 0) {
+      db.insert(schema.draftGroups)
+        .values(groupIds.map((gid) => ({draftId: draft.id, groupId: gid})))
+        .run()
+    }
 
     res.status(201).json(draft)
   }),
@@ -232,7 +247,7 @@ draftsRouter.put(
       name,
       content,
       recipientMode,
-      groupId,
+      groupIds,
       selectedIndividualIds,
       excludeIds,
       batchSize,
@@ -240,7 +255,19 @@ draftsRouter.put(
       scheduledAt,
       templateState,
       rsvpListId,
-    } = req.body
+    } = req.body as {
+      name?: string | null
+      content?: string
+      recipientMode?: 'group' | 'individual'
+      groupIds?: number[]
+      selectedIndividualIds?: string | null
+      excludeIds?: string | null
+      batchSize?: number
+      batchDelayMs?: number
+      scheduledAt?: string | null
+      templateState?: string | null
+      rsvpListId?: number | null
+    }
 
     const draft = db
       .update(schema.drafts)
@@ -248,7 +275,6 @@ draftsRouter.put(
         name: name ?? null,
         content: content ?? '',
         recipientMode: recipientMode ?? 'group',
-        groupId: groupId ?? null,
         selectedIndividualIds: selectedIndividualIds ?? null,
         excludeIds: excludeIds ?? null,
         batchSize: batchSize ?? BATCH_DEFAULTS.batchSize,
@@ -265,6 +291,15 @@ draftsRouter.put(
     if (!draft) {
       res.status(404).json({error: 'Draft not found'})
       return
+    }
+
+    if (groupIds !== undefined) {
+      db.delete(schema.draftGroups).where(eq(schema.draftGroups.draftId, id)).run()
+      if (groupIds.length > 0) {
+        db.insert(schema.draftGroups)
+          .values(groupIds.map((gid) => ({draftId: id, groupId: gid})))
+          .run()
+      }
     }
 
     res.json(draft)
@@ -292,7 +327,6 @@ draftsRouter.post(
         name: original.name ? `${original.name} (copy)` : null,
         content: original.content,
         recipientMode: original.recipientMode,
-        groupId: original.groupId,
         selectedIndividualIds: original.selectedIndividualIds,
         excludeIds: original.excludeIds,
         batchSize: original.batchSize,
@@ -302,6 +336,13 @@ draftsRouter.post(
       })
       .returning()
       .get()
+
+    const originalGroupIds = getDraftGroupIds(original.id)
+    if (originalGroupIds.length > 0) {
+      db.insert(schema.draftGroups)
+        .values(originalGroupIds.map((gid) => ({draftId: copy.id, groupId: gid})))
+        .run()
+    }
 
     res.status(201).json(copy)
   }),

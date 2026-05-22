@@ -329,7 +329,7 @@ export function MessageDetailPage() {
               navigate('/messages/compose', {
                 state: {
                   content: message.content,
-                  groupId: message.groupId,
+                  groupIds: message.groupIds,
                   excludeIds: message.recipients.filter((r) => r.status === 'skipped').map((r) => r.personId),
                 },
               })
@@ -359,8 +359,8 @@ export function MessageDetailPage() {
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-muted-foreground">Group</span>
-              <p>{message.groupName || '—'}</p>
+              <span className="text-muted-foreground">{message.groupNames.length > 1 ? 'Groups' : 'Group'}</span>
+              <p>{message.groupNames.length > 0 ? message.groupNames.join(', ') : '—'}</p>
             </div>
             <div>
               <span className="text-muted-foreground">Date</span>

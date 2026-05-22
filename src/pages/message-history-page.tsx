@@ -41,23 +41,44 @@ const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'ou
   past_due: 'destructive',
 }
 
+// Merged-tooltip overflow: when group names overflow OR extras exist, surface a single
+// "+ N more" affordance whose tooltip sections groups and extras separately.
+const INLINE_GROUPS_LIMIT = 2
 function MessageRecipientsCell({msg}: {msg: Message}) {
-  if (msg.groupName) {
-    const extraNames = msg.extraNames ?? []
-    if (extraNames.length === 0) return <>{msg.groupName}</>
+  const groupNames = msg.groupNames ?? []
+  const extraNames = msg.extraNames ?? []
+  if (groupNames.length > 0) {
+    const overflowGroupCount = Math.max(0, groupNames.length - INLINE_GROUPS_LIMIT)
+    const inlineGroups = groupNames.slice(0, INLINE_GROUPS_LIMIT)
+    const overflowGroups = groupNames.slice(INLINE_GROUPS_LIMIT)
+    const moreCount = overflowGroupCount + extraNames.length
+    if (moreCount === 0) return <>{inlineGroups.join(', ')}</>
     return (
       <>
-        {msg.groupName} +{' '}
+        {inlineGroups.join(', ')} +{' '}
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="underline decoration-dotted cursor-default">{extraNames.length} extra</span>
+              <span className="underline decoration-dotted cursor-default">{moreCount} more</span>
             </TooltipTrigger>
             <TooltipContent>
-              <div className="text-sm">
-                {extraNames.map((name, i) => (
-                  <div key={i}>{name}</div>
-                ))}
+              <div className="text-sm space-y-2">
+                {overflowGroups.length > 0 && (
+                  <div>
+                    <div className="text-muted-foreground text-xs uppercase tracking-wide mb-0.5">Groups</div>
+                    {overflowGroups.map((name, i) => (
+                      <div key={`g-${i}`}>{name}</div>
+                    ))}
+                  </div>
+                )}
+                {extraNames.length > 0 && (
+                  <div>
+                    <div className="text-muted-foreground text-xs uppercase tracking-wide mb-0.5">Extras</div>
+                    {extraNames.map((name, i) => (
+                      <div key={`e-${i}`}>{name}</div>
+                    ))}
+                  </div>
+                )}
               </div>
             </TooltipContent>
           </Tooltip>
@@ -338,31 +359,47 @@ export function MessageHistoryPage() {
 
   const getDraftRecipientInfo = (draft: Draft) => {
     const count = draft.recipientCount ?? 0
+    const groupNames = draft.groupNames ?? []
     if (draft.recipientMode === 'group') {
-      if (!draft.groupName) return 'No group selected'
+      if (groupNames.length === 0) return 'No group selected'
       const extraNames = draft.extraNames ?? []
-      if (extraNames.length > 0) {
-        return (
-          <>
-            {draft.groupName} ({count}) +{' '}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="underline decoration-dotted cursor-default">{extraNames.length} extra</span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-sm">
-                    {extraNames.map((name, i) => (
-                      <div key={i}>{name}</div>
-                    ))}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </>
-        )
-      }
-      return `${draft.groupName} (${count})`
+      const inlineGroups = groupNames.slice(0, INLINE_GROUPS_LIMIT)
+      const overflowGroups = groupNames.slice(INLINE_GROUPS_LIMIT)
+      const moreCount = overflowGroups.length + extraNames.length
+      const prefix = `${inlineGroups.join(', ')} (${count})`
+      if (moreCount === 0) return prefix
+      return (
+        <>
+          {prefix} +{' '}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="underline decoration-dotted cursor-default">{moreCount} more</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm space-y-2">
+                  {overflowGroups.length > 0 && (
+                    <div>
+                      <div className="text-muted-foreground text-xs uppercase tracking-wide mb-0.5">Groups</div>
+                      {overflowGroups.map((name, i) => (
+                        <div key={`g-${i}`}>{name}</div>
+                      ))}
+                    </div>
+                  )}
+                  {extraNames.length > 0 && (
+                    <div>
+                      <div className="text-muted-foreground text-xs uppercase tracking-wide mb-0.5">Extras</div>
+                      {extraNames.map((name, i) => (
+                        <div key={`e-${i}`}>{name}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </>
+      )
     }
     if (count > 0) {
       return `${count} individual${count !== 1 ? 's' : ''}`
@@ -378,7 +415,7 @@ export function MessageHistoryPage() {
   } => {
     const hasContent = !!draft.content?.trim()
     const hasRecipients =
-      (draft.recipientMode === 'group' && !!draft.groupId) ||
+      (draft.recipientMode === 'group' && (draft.groupIds?.length ?? 0) > 0) ||
       (draft.recipientMode === 'individual' && !!draft.selectedIndividualIds)
     if (hasContent && hasRecipients && draft.scheduledAt) return {label: 'Scheduled', variant: 'secondary'}
     if (hasContent && hasRecipients) return {label: 'Ready', variant: 'default'}

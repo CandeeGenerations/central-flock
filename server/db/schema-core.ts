@@ -54,11 +54,36 @@ export const peopleGroups = sqliteTable(
   (table) => [primaryKey({columns: [table.personId, table.groupId]})],
 )
 
+export const messageGroups = sqliteTable(
+  'message_groups',
+  {
+    messageId: integer('message_id')
+      .notNull()
+      .references(() => messages.id, {onDelete: 'cascade'}),
+    groupId: integer('group_id')
+      .notNull()
+      .references(() => groups.id, {onDelete: 'cascade'}),
+  },
+  (table) => [primaryKey({columns: [table.messageId, table.groupId]})],
+)
+
+export const draftGroups = sqliteTable(
+  'draft_groups',
+  {
+    draftId: integer('draft_id')
+      .notNull()
+      .references(() => drafts.id, {onDelete: 'cascade'}),
+    groupId: integer('group_id')
+      .notNull()
+      .references(() => groups.id, {onDelete: 'cascade'}),
+  },
+  (table) => [primaryKey({columns: [table.draftId, table.groupId]})],
+)
+
 export const messages = sqliteTable('messages', {
   id: integer('id').primaryKey({autoIncrement: true}),
   content: text('content').notNull(),
   renderedPreview: text('rendered_preview'),
-  groupId: integer('group_id').references(() => groups.id),
   totalRecipients: integer('total_recipients').notNull(),
   sentCount: integer('sent_count').default(0).notNull(),
   failedCount: integer('failed_count').default(0).notNull(),
@@ -87,7 +112,6 @@ export const drafts = sqliteTable('drafts', {
   recipientMode: text('recipient_mode', {enum: ['group', 'individual']})
     .default('group')
     .notNull(),
-  groupId: integer('group_id').references(() => groups.id, {onDelete: 'set null'}),
   selectedIndividualIds: text('selected_individual_ids'),
   excludeIds: text('exclude_ids'),
   batchSize: integer('batch_size').default(1).notNull(),

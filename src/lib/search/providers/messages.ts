@@ -13,13 +13,14 @@ export const messagesProvider: SearchProvider<Message> = {
   toItems: (rows) =>
     rows.map((m) => {
       const preview = m.renderedPreview?.trim() || m.content?.slice(0, 120) || `Message #${m.id}`
+      const groupLabel = m.groupNames.join(', ')
       return {
         id: `messages-${m.id}`,
         label: preview.length > 80 ? `${preview.slice(0, 80)}…` : preview,
-        subtitle: m.groupName ? `to ${m.groupName}` : `${m.totalRecipients} recipients`,
+        subtitle: groupLabel ? `to ${groupLabel}` : `${m.totalRecipients} recipients`,
         group: 'Messages',
         icon: MessageSquare,
-        keywords: [preview, m.groupName ?? '', m.status].filter(Boolean),
+        keywords: [preview, groupLabel, m.status].filter(Boolean),
         action: ({navigate, close}) => {
           navigate(`/messages/${m.id}`)
           close()

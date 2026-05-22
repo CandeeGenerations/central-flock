@@ -262,7 +262,6 @@ gwendolynDevotionsRouter.post(
       .values({
         content: messageContent,
         renderedPreview: messageContent,
-        groupId: null,
         totalRecipients: 1,
         skippedCount: 0,
         status: 'scheduled',

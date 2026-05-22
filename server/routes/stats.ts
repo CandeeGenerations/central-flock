@@ -2,7 +2,7 @@ import {type SQL, and, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
-import {asyncHandler} from '../lib/route-helpers.js'
+import {asyncHandler, getGroupNames, getMessageGroupIds} from '../lib/route-helpers.js'
 
 export const statsRouter = Router()
 
@@ -48,7 +48,7 @@ statsRouter.get(
       .get()!
 
     // Recent messages (last 5, all-time)
-    const recentMessages = db
+    const recentMessagesRaw = db
       .select({
         id: schema.messages.id,
         content: schema.messages.content,
@@ -57,34 +57,37 @@ statsRouter.get(
         totalRecipients: schema.messages.totalRecipients,
         sentCount: schema.messages.sentCount,
         failedCount: schema.messages.failedCount,
-        groupId: schema.messages.groupId,
-        groupName: schema.groups.name,
         createdAt: schema.messages.createdAt,
         completedAt: schema.messages.completedAt,
       })
       .from(schema.messages)
-      .leftJoin(schema.groups, sql`${schema.messages.groupId} = ${schema.groups.id}`)
       .where(sql`${schema.messages.status} IN ('completed', 'sending', 'pending', 'cancelled')`)
       .orderBy(sql`${schema.messages.createdAt} DESC`)
       .limit(5)
       .all()
+    const recentMessages = recentMessagesRaw.map((m) => {
+      const groupIds = getMessageGroupIds(m.id)
+      return {...m, groupIds, groupNames: getGroupNames(groupIds)}
+    })
 
     // Scheduled messages (all-time)
-    const scheduledMessages = db
+    const scheduledMessagesRaw = db
       .select({
         id: schema.messages.id,
         content: schema.messages.content,
         renderedPreview: schema.messages.renderedPreview,
         status: schema.messages.status,
         totalRecipients: schema.messages.totalRecipients,
-        groupName: schema.groups.name,
         scheduledAt: schema.messages.scheduledAt,
       })
       .from(schema.messages)
-      .leftJoin(schema.groups, sql`${schema.messages.groupId} = ${schema.groups.id}`)
       .where(sql`${schema.messages.status} IN ('scheduled', 'past_due')`)
       .orderBy(sql`${schema.messages.scheduledAt} ASC`)
       .all()
+    const scheduledMessages = scheduledMessagesRaw.map((m) => {
+      const groupIds = getMessageGroupIds(m.id)
+      return {...m, groupIds, groupNames: getGroupNames(groupIds)}
+    })
 
     // All-time drafts count
     const draftsTotal = db

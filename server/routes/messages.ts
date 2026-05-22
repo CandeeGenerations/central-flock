@@ -4,7 +4,7 @@ import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
 import {renderTemplate} from '../lib/format.js'
-import {asyncHandler, getGroupName} from '../lib/route-helpers.js'
+import {asyncHandler, getGroupNames, getMessageGroupIds} from '../lib/route-helpers.js'
 import {sendMessageViaUI} from '../services/applescript.js'
 import {type SendJob, cancelJob, createJob, getJob} from '../services/message-queue.js'
 import {buildRsvpLinkMap, rsvpLinkFor} from '../services/rsvp-link.js'
@@ -19,7 +19,7 @@ messagesRouter.post(
       content,
       recipientIds,
       excludeIds = [],
-      groupId,
+      groupIds = [],
       customVarValues,
       scheduledAt,
       templateState,
@@ -28,7 +28,7 @@ messagesRouter.post(
       content: string
       recipientIds: number[]
       excludeIds?: number[]
-      groupId?: number
+      groupIds?: number[]
       customVarValues?: Record<string, string>
       scheduledAt?: string
       templateState?: string
@@ -88,7 +88,6 @@ messagesRouter.post(
           mergedVarValues,
           previewPerson ? rsvpLinkFor(previewPerson.id, linkMap) : undefined,
         ),
-        groupId: groupId || null,
         totalRecipients: activeRecipients.length,
         skippedCount: skippedRecipients.length,
         status: isScheduled ? 'scheduled' : 'pending',
@@ -98,6 +97,12 @@ messagesRouter.post(
       })
       .returning()
       .get()
+
+    if (groupIds.length > 0) {
+      db.insert(schema.messageGroups)
+        .values(groupIds.map((gid) => ({messageId: message.id, groupId: gid})))
+        .run()
+    }
 
     // Create recipient records
     for (const person of activeRecipients) {
@@ -162,14 +167,15 @@ messagesRouter.get(
 
     // Attach group names and extra recipient names
     let result = messagesList.map((msg) => {
-      const groupName = msg.groupId ? getGroupName(msg.groupId) : null
+      const groupIds = getMessageGroupIds(msg.id)
+      const groupNames = getGroupNames(groupIds)
       let extraNames: string[] = []
-      if (msg.groupId) {
+      if (groupIds.length > 0) {
         const groupMemberIds = new Set(
           db
             .select({personId: schema.peopleGroups.personId})
             .from(schema.peopleGroups)
-            .where(eq(schema.peopleGroups.groupId, msg.groupId))
+            .where(inArray(schema.peopleGroups.groupId, groupIds))
             .all()
             .map((r) => r.personId),
         )
@@ -191,7 +197,7 @@ messagesRouter.get(
       }
       // For non-group messages, fetch individual recipient names
       let recipientNames: string[] = []
-      if (!msg.groupId) {
+      if (groupIds.length === 0) {
         recipientNames = db
           .select({firstName: schema.people.firstName, lastName: schema.people.lastName})
           .from(schema.messageRecipients)
@@ -200,7 +206,7 @@ messagesRouter.get(
           .all()
           .map((p) => [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unknown')
       }
-      return {...msg, groupName, extraNames, recipientNames}
+      return {...msg, groupIds, groupNames, extraNames, recipientNames}
     })
 
     if (search && typeof search === 'string') {
@@ -208,7 +214,7 @@ messagesRouter.get(
       result = result.filter(
         (msg) =>
           msg.content.toLowerCase().includes(term) ||
-          msg.groupName?.toLowerCase().includes(term) ||
+          msg.groupNames.some((name) => name.toLowerCase().includes(term)) ||
           msg.status.toLowerCase().includes(term) ||
           msg.recipientNames.some((name) => name.toLowerCase().includes(term)),
       )
@@ -249,9 +255,10 @@ messagesRouter.get(
       .where(eq(schema.messageRecipients.messageId, message.id))
       .all()
 
-    const groupName = message.groupId ? getGroupName(message.groupId) : null
+    const groupIds = getMessageGroupIds(message.id)
+    const groupNames = getGroupNames(groupIds)
 
-    res.json({...message, groupName, recipients})
+    res.json({...message, groupIds, groupNames, recipients})
   }),
 )
 
@@ -302,7 +309,7 @@ messagesRouter.put(
       content,
       recipientIds,
       excludeIds = [],
-      groupId,
+      groupIds = [],
       customVarValues,
       scheduledAt,
       templateState,
@@ -311,7 +318,7 @@ messagesRouter.put(
       content: string
       recipientIds: number[]
       excludeIds?: number[]
-      groupId?: number
+      groupIds?: number[]
       customVarValues?: Record<string, string>
       scheduledAt?: string
       templateState?: string
@@ -370,7 +377,6 @@ messagesRouter.put(
           mergedVarValues,
           previewPerson ? rsvpLinkFor(previewPerson.id, linkMap) : undefined,
         ),
-        groupId: groupId || null,
         totalRecipients: activeRecipients.length,
         skippedCount: skippedRecipients.length,
         sentCount: 0,
@@ -383,6 +389,14 @@ messagesRouter.put(
       })
       .where(eq(schema.messages.id, messageId))
       .run()
+
+    // Replace junction rows
+    db.delete(schema.messageGroups).where(eq(schema.messageGroups.messageId, messageId)).run()
+    if (groupIds.length > 0) {
+      db.insert(schema.messageGroups)
+        .values(groupIds.map((gid) => ({messageId, groupId: gid})))
+        .run()
+    }
 
     // Delete existing recipients and recreate
     db.delete(schema.messageRecipients).where(eq(schema.messageRecipients.messageId, messageId)).run()
@@ -441,6 +455,8 @@ messagesRouter.post(
         .where(eq(schema.messageRecipients.messageId, messageId))
         .all()
 
+      const msgGroupIds = getMessageGroupIds(messageId)
+      const hasGroups = msgGroupIds.length > 0
       const excludeIds = recipients.filter((r) => r.status === 'skipped').map((r) => r.personId)
       const selectedIndividualIds = recipients.filter((r) => r.status !== 'skipped').map((r) => r.personId)
 
@@ -448,9 +464,8 @@ messagesRouter.post(
         .insert(schema.drafts)
         .values({
           content: message.content,
-          recipientMode: message.groupId ? 'group' : 'individual',
-          groupId: message.groupId,
-          selectedIndividualIds: message.groupId ? null : JSON.stringify(selectedIndividualIds),
+          recipientMode: hasGroups ? 'group' : 'individual',
+          selectedIndividualIds: hasGroups ? null : JSON.stringify(selectedIndividualIds),
           excludeIds: excludeIds.length > 0 ? JSON.stringify(excludeIds) : null,
           batchSize: message.batchSize,
           batchDelayMs: message.batchDelayMs,
@@ -459,6 +474,12 @@ messagesRouter.post(
         })
         .returning()
         .get()
+
+      if (hasGroups) {
+        db.insert(schema.draftGroups)
+          .values(msgGroupIds.map((gid) => ({draftId: draft.id, groupId: gid})))
+          .run()
+      }
 
       // Delete the message and its recipients
       db.delete(schema.messageRecipients).where(eq(schema.messageRecipients.messageId, messageId)).run()
@@ -561,6 +582,8 @@ messagesRouter.post(
       .where(eq(schema.messageRecipients.messageId, messageId))
       .all()
 
+    const msgGroupIds = getMessageGroupIds(messageId)
+    const hasGroups = msgGroupIds.length > 0
     const excludeIds = recipients.filter((r) => r.status === 'skipped').map((r) => r.personId)
     const selectedIndividualIds = recipients.filter((r) => r.status !== 'skipped').map((r) => r.personId)
 
@@ -568,15 +591,20 @@ messagesRouter.post(
       .insert(schema.drafts)
       .values({
         content: message.content,
-        recipientMode: message.groupId ? 'group' : 'individual',
-        groupId: message.groupId,
-        selectedIndividualIds: message.groupId ? null : JSON.stringify(selectedIndividualIds),
+        recipientMode: hasGroups ? 'group' : 'individual',
+        selectedIndividualIds: hasGroups ? null : JSON.stringify(selectedIndividualIds),
         excludeIds: excludeIds.length > 0 ? JSON.stringify(excludeIds) : null,
         templateState: message.templateState,
         rsvpListId: message.rsvpListId ?? null,
       })
       .returning()
       .get()
+
+    if (hasGroups) {
+      db.insert(schema.draftGroups)
+        .values(msgGroupIds.map((gid) => ({draftId: draft.id, groupId: gid})))
+        .run()
+    }
 
     res.json(draft)
   }),

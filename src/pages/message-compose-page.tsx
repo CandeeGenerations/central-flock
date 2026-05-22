@@ -7,6 +7,7 @@ import {DateTimePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {MultiSelect} from '@/components/ui/multi-select'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {SearchInput} from '@/components/ui/search-input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
@@ -36,7 +37,7 @@ import {queryKeys} from '@/lib/query-keys'
 import {addRsvpEntries, checkMissingRsvpEntries, fetchRsvpListContext} from '@/lib/rsvp-api'
 import type {RsvpListContext} from '@/lib/rsvp-api'
 import {cn} from '@/lib/utils'
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {useMutation, useQueries, useQuery, useQueryClient} from '@tanstack/react-query'
 import {format} from 'date-fns'
 import {CalendarIcon, ChevronDown, ChevronRight, Globe, Save, Send, Trash2, Type, Users, X, Zap} from 'lucide-react'
 import {type ReactNode, useCallback, useMemo, useRef, useState} from 'react'
@@ -88,7 +89,7 @@ export function MessageComposePage() {
   const queryClient = useQueryClient()
   const dupState = location.state as {
     content?: string
-    groupId?: number
+    groupIds?: number[]
     excludeIds?: number[]
     selectedIndividualIds?: number[]
     rsvpListId?: number
@@ -96,7 +97,12 @@ export function MessageComposePage() {
 
   const draftIdParam = searchParams.get('draftId')
   const editMessageId = searchParams.get('editMessageId')
-  const presetGroupId = searchParams.get('groupId') || (dupState?.groupId ? String(dupState.groupId) : '')
+  const presetGroupIdParam = searchParams.get('groupId')
+  const initialGroupIds: number[] = (() => {
+    if (dupState?.groupIds?.length) return dupState.groupIds
+    if (presetGroupIdParam && Number.isFinite(Number(presetGroupIdParam))) return [Number(presetGroupIdParam)]
+    return []
+  })()
   const presetRecipientId = searchParams.get('recipientId')
   const presetPersonIds = (searchParams.get('personIds') || '')
     .split(',')
@@ -108,7 +114,7 @@ export function MessageComposePage() {
   const [recipientMode, setRecipientMode] = useState<'group' | 'individual'>(
     presetRecipientId || presetPersonIds.length > 0 || dupState?.selectedIndividualIds?.length ? 'individual' : 'group',
   )
-  const [selectedGroupId, setSelectedGroupId] = useState(presetGroupId || '')
+  const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>(initialGroupIds)
   const [content, setContent] = useState(dupState?.content || '')
   const [messageTab, setMessageTab] = useState<'edit' | 'preview'>('edit')
   const [excludeIds, setExcludeIds] = useState<Set<number>>(() => new Set(dupState?.excludeIds || []))
@@ -194,7 +200,7 @@ export function MessageComposePage() {
     setLoadedDraftId(draftData.id)
     setContent(draftData.content || '')
     setRecipientMode(draftData.recipientMode || 'group')
-    setSelectedGroupId(draftData.groupId ? String(draftData.groupId) : '')
+    setSelectedGroupIds(draftData.groupIds ?? [])
     setScheduledAt(draftData.scheduledAt || '')
     setRsvpListId(draftData.rsvpListId ?? null)
     if (draftData.scheduledAt) setSendTimeMode('schedule')
@@ -260,8 +266,8 @@ export function MessageComposePage() {
   if (editMessageData && templatesList && loadedEditMessageId !== editMessageData.id) {
     setLoadedEditMessageId(editMessageData.id)
     setContent(editMessageData.content || '')
-    setSelectedGroupId(editMessageData.groupId ? String(editMessageData.groupId) : '')
-    setRecipientMode(editMessageData.groupId ? 'group' : 'individual')
+    setSelectedGroupIds(editMessageData.groupIds ?? [])
+    setRecipientMode(editMessageData.groupIds.length > 0 ? 'group' : 'individual')
     setRsvpListId(editMessageData.rsvpListId ?? null)
     // Convert scheduledAt UTC back to local datetime-local format
     if (editMessageData.scheduledAt) {
@@ -273,7 +279,7 @@ export function MessageComposePage() {
     // Derive exclude/include from recipients
     const pendingIds = editMessageData.recipients.filter((r) => r.status === 'pending').map((r) => r.personId)
     const skippedIds = editMessageData.recipients.filter((r) => r.status === 'skipped').map((r) => r.personId)
-    if (editMessageData.groupId) {
+    if (editMessageData.groupIds.length > 0) {
       setExcludeIds(new Set(skippedIds))
     } else {
       setSelectedIndividualIds(new Set(pendingIds))
@@ -319,11 +325,30 @@ export function MessageComposePage() {
   const isEditMode = !!editMessageId
 
   const {data: groups} = useQuery({queryKey: queryKeys.groups, queryFn: fetchGroups})
-  const {data: groupDetail} = useQuery({
-    queryKey: queryKeys.group(selectedGroupId),
-    queryFn: () => fetchGroup(Number(selectedGroupId)),
-    enabled: recipientMode === 'group' && !!selectedGroupId,
+  const groupDetailQueries = useQueries({
+    queries: selectedGroupIds.map((id) => ({
+      queryKey: queryKeys.group(String(id)),
+      queryFn: () => fetchGroup(id),
+      enabled: recipientMode === 'group',
+    })),
   })
+  const selectedGroupDetails = useMemo(
+    () => groupDetailQueries.map((q) => q.data).filter((g): g is NonNullable<typeof g> => !!g),
+    [groupDetailQueries],
+  )
+  // Deduped union of members across all selected groups (a person in two groups appears once).
+  const unionedMembers = useMemo(() => {
+    const seen = new Set<number>()
+    const out: NonNullable<(typeof selectedGroupDetails)[number]>['members'] = []
+    for (const g of selectedGroupDetails) {
+      for (const m of g.members) {
+        if (seen.has(m.id)) continue
+        seen.add(m.id)
+        out.push(m)
+      }
+    }
+    return out
+  }, [selectedGroupDetails])
   const {data: allPeople} = useQuery({
     queryKey: [...queryKeys.people, 'all'],
     queryFn: () => fetchPeople({limit: 1000}),
@@ -365,11 +390,12 @@ export function MessageComposePage() {
     setDateFormats(defaultFormats)
   }
 
-  const groupMemberIds = useMemo(() => new Set(groupDetail?.members.map((m) => m.id) || []), [groupDetail])
+  const groupMemberIds = useMemo(() => new Set(unionedMembers.map((m) => m.id)), [unionedMembers])
+  const hasSelectedGroups = recipientMode === 'group' && selectedGroupIds.length > 0
 
   const recipients = useMemo(() => {
-    if (recipientMode === 'group' && groupDetail) {
-      const groupRecipients = groupDetail.members.filter((m) => !excludeIds.has(m.id))
+    if (hasSelectedGroups) {
+      const groupRecipients = unionedMembers.filter((m) => !excludeIds.has(m.id))
       if (selectedIndividualIds.size > 0 && allPeople) {
         const extras = allPeople.data.filter((p) => selectedIndividualIds.has(p.id) && !groupMemberIds.has(p.id))
         return [...groupRecipients, ...extras]
@@ -380,30 +406,30 @@ export function MessageComposePage() {
       return allPeople.data.filter((p) => selectedIndividualIds.has(p.id))
     }
     return []
-  }, [recipientMode, groupDetail, allPeople, excludeIds, selectedIndividualIds, groupMemberIds])
+  }, [hasSelectedGroups, recipientMode, unionedMembers, allPeople, excludeIds, selectedIndividualIds, groupMemberIds])
 
   const allRecipientIds = useMemo(() => {
-    if (recipientMode === 'group' && groupDetail) {
-      const ids = groupDetail.members.map((m) => m.id)
+    if (hasSelectedGroups) {
+      const ids = unionedMembers.map((m) => m.id)
       for (const id of selectedIndividualIds) {
         if (!groupMemberIds.has(id)) ids.push(id)
       }
       return ids
     }
     return [...selectedIndividualIds]
-  }, [recipientMode, groupDetail, selectedIndividualIds, groupMemberIds])
+  }, [hasSelectedGroups, unionedMembers, selectedIndividualIds, groupMemberIds])
 
   const excludeResults = useMemo(() => {
-    if (!groupDetail) return []
+    if (!hasSelectedGroups) return []
     const q = debouncedExcludeSearch?.toLowerCase()
-    return groupDetail.members.filter((m) => {
+    return unionedMembers.filter((m) => {
       if (excludeIds.has(m.id)) return false
       if (!q) return true
       const name = formatFullName(m, '').toLowerCase()
       const phone = (m.phoneDisplay || m.phoneNumber || '').toLowerCase()
       return name.includes(q) || phone.includes(q)
     })
-  }, [debouncedExcludeSearch, groupDetail, excludeIds])
+  }, [debouncedExcludeSearch, hasSelectedGroups, unionedMembers, excludeIds])
 
   const handleExcludeKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -563,7 +589,7 @@ export function MessageComposePage() {
         content,
         recipientIds: allRecipientIds,
         excludeIds: [...excludeIds],
-        groupId: recipientMode === 'group' ? Number(selectedGroupId) : undefined,
+        groupIds: recipientMode === 'group' ? selectedGroupIds : [],
         batchSize,
         batchDelayMs,
         customVarValues: cvv,
@@ -627,7 +653,7 @@ export function MessageComposePage() {
     return {
       content,
       recipientMode,
-      groupId: recipientMode === 'group' && selectedGroupId ? Number(selectedGroupId) : null,
+      groupIds: recipientMode === 'group' ? selectedGroupIds : [],
       selectedIndividualIds: selectedIndividualIds.size > 0 ? JSON.stringify([...selectedIndividualIds]) : null,
       excludeIds: excludeIds.size > 0 ? JSON.stringify([...excludeIds]) : null,
       batchSize,
@@ -722,11 +748,12 @@ export function MessageComposePage() {
                     </SelectContent>
                   </Select>
                   {recipientMode === 'group' && (
-                    <SearchableSelect
-                      value={selectedGroupId}
-                      onValueChange={setSelectedGroupId}
+                    <MultiSelect
+                      value={selectedGroupIds.map(String)}
+                      onValueChange={(vals) => setSelectedGroupIds(vals.map(Number))}
                       options={groups?.map((g) => ({value: String(g.id), label: `${g.name} (${g.memberCount})`})) || []}
-                      placeholder="Choose a group..."
+                      placeholder="Choose groups..."
+                      allLabel="All groups"
                       className="w-full"
                     />
                   )}
@@ -811,12 +838,16 @@ export function MessageComposePage() {
 
                 {/* Recipient tags */}
                 <div className="flex flex-wrap gap-1.5">
-                  {recipientMode === 'group' && groupDetail && (
-                    <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:hover:bg-teal-800 border-0">
-                      <Users className="h-3 w-3 mr-1" />
-                      {groupDetail.name} ({groupDetail.members.filter((m) => !excludeIds.has(m.id)).length})
-                    </Badge>
-                  )}
+                  {hasSelectedGroups &&
+                    selectedGroupDetails.map((g) => (
+                      <Badge
+                        key={g.id}
+                        className="bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-200 dark:hover:bg-teal-800 border-0"
+                      >
+                        <Users className="h-3 w-3 mr-1" />
+                        {g.name} ({g.members.filter((m) => !excludeIds.has(m.id)).length})
+                      </Badge>
+                    ))}
                   {excludeIds.size > 0 && (
                     <Badge variant="outline" className="text-muted-foreground">
                       {excludeIds.size} excluded
@@ -825,7 +856,7 @@ export function MessageComposePage() {
                 </div>
 
                 {/* Exclusion list for group mode */}
-                {recipientMode === 'group' && groupDetail && groupDetail.members.length > 0 && (
+                {hasSelectedGroups && unionedMembers.length > 0 && (
                   <VariableDropdown label="Exclude from send" count={excludeIds.size}>
                     <div className="space-y-2">
                       <SearchInput
@@ -873,7 +904,7 @@ export function MessageComposePage() {
                       </div>
                       {excludeIds.size > 0 && (
                         <div className="flex flex-wrap gap-1.5">
-                          {groupDetail.members
+                          {unionedMembers
                             .filter((m) => excludeIds.has(m.id))
                             .map((m) => (
                               <Badge
@@ -1415,10 +1446,10 @@ export function MessageComposePage() {
         }}
       >
         <div className="space-y-3 text-sm">
-          {recipientMode === 'group' && groupDetail && (
+          {hasSelectedGroups && selectedGroupDetails.length > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Group</span>
-              <span className="font-medium">{groupDetail.name}</span>
+              <span className="text-muted-foreground">{selectedGroupDetails.length > 1 ? 'Groups' : 'Group'}</span>
+              <span className="font-medium">{selectedGroupDetails.map((g) => g.name).join(', ')}</span>
             </div>
           )}
           <div className="flex justify-between">

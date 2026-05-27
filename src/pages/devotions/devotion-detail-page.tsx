@@ -6,6 +6,7 @@ import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Checkbox} from '@/components/ui/checkbox'
 import {DatePicker} from '@/components/ui/date-time-picker'
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
@@ -15,8 +16,11 @@ import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useProgressOperation} from '@/hooks/use-sse'
 import {
   type Devotion,
+  type PoolPassage,
+  assignPoolPassage,
   createDevotion,
   deleteDevotion,
+  fetchAvailablePassages,
   fetchDevotion,
   fetchNextDevotionNumber,
   generateFacebookDescription,
@@ -37,6 +41,7 @@ import {
   Copy,
   ExternalLink,
   Flag,
+  Library,
   Loader2,
   Maximize2,
   Save,
@@ -233,6 +238,95 @@ function formToPayload(form: DevotionForm): Partial<Devotion> {
   }
 }
 
+function PassagePickerModal({
+  open,
+  currentPassageId,
+  onClose,
+  onSelect,
+}: {
+  open: boolean
+  currentPassageId: number | undefined
+  onClose: () => void
+  onSelect: (passage: PoolPassage) => void
+}) {
+  const [search, setSearch] = useState('')
+  const {data: passages = [], isLoading} = useQuery({
+    queryKey: ['available-passages-picker'],
+    queryFn: fetchAvailablePassages,
+    enabled: open,
+  })
+
+  const filtered = passages.filter((p) => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      p.title.toLowerCase().includes(q) ||
+      p.bibleReference.toLowerCase().includes(q) ||
+      p.subcode?.toLowerCase().includes(q)
+    )
+  })
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.recorded !== b.recorded) return a.recorded ? -1 : 1
+    return 0
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Select Passage</DialogTitle>
+        </DialogHeader>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by title, reference, or notes…"
+          className="mb-2"
+          autoFocus
+        />
+        <div className="overflow-y-auto flex-1 -mx-6 px-6">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : sorted.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No available passages found.</p>
+          ) : (
+            <div className="space-y-1">
+              {sorted.map((p) => (
+                <button
+                  key={p.id}
+                  className={`w-full text-left rounded-lg border p-3 hover:bg-muted/50 transition-colors cursor-pointer ${
+                    p.id === currentPassageId ? 'border-primary bg-primary/5' : 'border-border'
+                  }`}
+                  onClick={() => onSelect(p)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm truncate">{p.title}</span>
+                    {p.recorded && (
+                      <Badge variant="outline" className="text-green-700 border-green-300 shrink-0">
+                        Recorded
+                      </Badge>
+                    )}
+                    {p.id === currentPassageId && (
+                      <Badge variant="secondary" className="shrink-0">
+                        Current
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">{p.bibleReference}</div>
+                  {p.subcode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{p.subcode}</div>}
+                  <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.talkingPoints}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function DevotionDetailPage() {
   const {id} = useParams<{id: string}>()
   const navigate = useNavigate()
@@ -250,6 +344,7 @@ export function DevotionDetailPage() {
   ])
   const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false)
   const [presenterOpen, setPresenterOpen] = useState(false)
+  const [passagePickerOpen, setPassagePickerOpen] = useState(false)
 
   const {data: devotion, isLoading} = useQuery({
     queryKey: ['devotion', id],
@@ -345,6 +440,25 @@ export function DevotionDetailPage() {
     },
     onError: (err: Error) => toast.error(err.message),
   })
+
+  const handlePassagePick = async (passage: PoolPassage) => {
+    if (!devotion) return
+    try {
+      const result = await assignPoolPassage(passage.id, devotion.id)
+      update({
+        title: result.devotion.title ?? '',
+        bibleReference: result.devotion.bibleReference ?? '',
+        talkingPoints: result.devotion.talkingPoints ?? '',
+        subcode: result.devotion.subcode ?? '',
+      })
+      queryClient.invalidateQueries({queryKey: ['devotion', id]})
+      queryClient.invalidateQueries({queryKey: ['available-passages-picker']})
+      setPassagePickerOpen(false)
+      toast.success('Passage assigned')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to assign passage')
+    }
+  }
 
   const handleSave = () => {
     const payload = formToPayload(form)
@@ -672,19 +786,27 @@ export function DevotionDetailPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label>Devotion Passage</Label>
-                    <Button variant="outline" size="sm" onClick={handleGenerate} disabled={genState.isRunning}>
-                      {genState.isRunning ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-1.5" />
-                          {form.talkingPoints ? 'Regenerate' : 'Generate Passage'}
-                        </>
+                    <div className="flex items-center gap-2">
+                      {!isNew && (
+                        <Button variant="outline" size="sm" onClick={() => setPassagePickerOpen(true)}>
+                          <Library className="h-4 w-4 mr-1.5" />
+                          Pick from Pool
+                        </Button>
                       )}
-                    </Button>
+                      <Button variant="outline" size="sm" onClick={handleGenerate} disabled={genState.isRunning}>
+                        {genState.isRunning ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-1.5" />
+                            {form.talkingPoints ? 'Regenerate' : 'Generate Passage'}
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   {genState.isRunning && <AIProgress message={genState.message} progress={genState.progress} />}
                   <div>
@@ -1227,6 +1349,13 @@ export function DevotionDetailPage() {
         subcode={form.subcode}
         reference={form.bibleReference}
         content={form.talkingPoints}
+      />
+
+      <PassagePickerModal
+        open={passagePickerOpen}
+        currentPassageId={devotion?.linkedPassageId ?? undefined}
+        onClose={() => setPassagePickerOpen(false)}
+        onSelect={handlePassagePick}
       />
     </div>
   )

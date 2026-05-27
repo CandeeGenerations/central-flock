@@ -1434,7 +1434,7 @@ devotionsRouter.get(
   }),
 )
 
-// POST /api/devotions/pool/assign - Assign pool passage to a devotion
+// POST /api/devotions/pool/assign - Assign pool passage to a devotion (handles swap)
 devotionsRouter.post(
   '/pool/assign',
   asyncHandler(async (req, res) => {
@@ -1446,6 +1446,14 @@ devotionsRouter.post(
       res.status(404).json({error: 'Passage not found'})
       return
     }
+
+    // Unlink any existing passage for this devotion
+    db.update(schema.generatedPassages)
+      .set({used: false, devotionId: null, usedAt: null})
+      .where(
+        and(eq(schema.generatedPassages.devotionId, devotionId), sql`${schema.generatedPassages.id} != ${passageId}`),
+      )
+      .run()
 
     // Update devotion with passage content
     db.update(schema.devotions)
@@ -1487,12 +1495,12 @@ devotionsRouter.post(
   asyncHandler(async (req, res) => {
     const count = Math.min(Math.max(Number(req.body.count) || 1, 1), 30)
 
-    // Pull available passages from pool
+    // Pull available passages from pool, preferring recorded ones first
     const available = db
       .select()
       .from(schema.generatedPassages)
       .where(eq(schema.generatedPassages.used, false))
-      .orderBy(asc(schema.generatedPassages.createdAt))
+      .orderBy(desc(schema.generatedPassages.recorded), asc(schema.generatedPassages.createdAt))
       .limit(count)
       .all()
 
@@ -1502,6 +1510,7 @@ devotionsRouter.post(
       bibleReference: p.bibleReference,
       talkingPoints: p.talkingPoints,
       subcode: p.subcode,
+      recorded: p.recorded,
     }))
 
     // If not enough in pool, generate the remainder
@@ -1525,6 +1534,7 @@ devotionsRouter.post(
           bibleReference: inserted.bibleReference,
           talkingPoints: inserted.talkingPoints,
           subcode: inserted.subcode,
+          recorded: inserted.recorded,
         })
       }
     }
@@ -1993,7 +2003,14 @@ devotionsRouter.get(
       res.status(404).json({error: 'Devotion not found'})
       return
     }
-    res.json(devotion)
+
+    const linkedPassage = db
+      .select({id: schema.generatedPassages.id})
+      .from(schema.generatedPassages)
+      .where(eq(schema.generatedPassages.devotionId, devotion.id))
+      .get()
+
+    res.json({...devotion, linkedPassageId: linkedPassage?.id ?? null})
   }),
 )
 

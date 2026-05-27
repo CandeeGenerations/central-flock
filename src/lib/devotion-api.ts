@@ -71,6 +71,7 @@ export interface Devotion {
   notes: string | null
   flagged: boolean
   chainAuditStatus?: 'ok' | 'issues' | null
+  linkedPassageId?: number | null
   createdAt: string
   updatedAt: string
 }
@@ -375,8 +376,19 @@ export function setPoolPassageRecorded(id: number, recorded: boolean) {
 
 export function pullPassagesForScan(count: number) {
   return request<{
-    passages: Array<GeneratedPassage & {id: number; subcode: string | null}>
+    passages: Array<GeneratedPassage & {id: number; subcode: string | null; recorded: boolean}>
     generated: number
     fromPool: number
   }>('/devotions/pool/pull-for-scan', {method: 'POST', body: JSON.stringify({count})})
+}
+
+export function fetchAvailablePassages() {
+  return request<PoolPassage[]>('/devotions/pool?used=false')
+}
+
+export function assignPoolPassage(passageId: number, devotionId: number) {
+  return request<{passage: PoolPassage; devotion: Devotion}>('/devotions/pool/assign', {
+    method: 'POST',
+    body: JSON.stringify({passageId, devotionId}),
+  })
 }

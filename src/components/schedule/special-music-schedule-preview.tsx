@@ -49,18 +49,22 @@ function renderLinkedNames(performers: SpecialMusicCell['performers']): string[]
   let i = 0
   while (i < sorted.length) {
     const p = sorted[i]
+    if (p.displayName) {
+      out.push(p.displayName)
+      i += 1
+      continue
+    }
     const startLast = p.lastName?.trim() ?? ''
     if (p.displayFirstNameOnly || !startLast) {
       out.push((p.firstName ?? '').trim())
       i += 1
       continue
     }
-    // Find run of consecutive show-last-name performers sharing this last name.
     let j = i
     const firsts: string[] = []
     while (j < sorted.length) {
       const q = sorted[j]
-      if (q.displayFirstNameOnly || (q.lastName?.trim() ?? '') !== startLast) break
+      if (q.displayName || q.displayFirstNameOnly || (q.lastName?.trim() ?? '') !== startLast) break
       firsts.push((q.firstName ?? '').trim())
       j += 1
     }

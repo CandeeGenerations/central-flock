@@ -48,6 +48,11 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
     for (const p of cell?.performers ?? []) out[p.personId] = p.cellOverride
     return out
   })
+  const [displayNames, setDisplayNames] = useState<Record<number, string>>(() => {
+    const out: Record<number, string> = {}
+    for (const p of cell?.performers ?? []) if (p.displayName) out[p.personId] = p.displayName
+    return out
+  })
 
   const derivedType = deriveType(performerIds.length, guests.length)
   const effectiveType: SpecialType = typeTouched ? type : derivedType
@@ -94,8 +99,12 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
         type: effectiveType,
       }
       const performerOverrides = performerIds
-        .filter((pid) => overrides[pid] !== undefined && overrides[pid] !== null)
-        .map((pid) => ({personId: pid, displayFirstNameOnly: overrides[pid] as boolean}))
+        .filter((pid) => (overrides[pid] !== undefined && overrides[pid] !== null) || displayNames[pid])
+        .map((pid) => ({
+          personId: pid,
+          displayFirstNameOnly: overrides[pid] ?? null,
+          displayName: displayNames[pid]?.trim() || null,
+        }))
       const bodyWithOverrides = {...body, performerOverrides}
       if (cell) return specialsApi.update(cell.id, bodyWithOverrides)
       return specialsApi.create({date, serviceType, ...bodyWithOverrides})
@@ -144,35 +153,43 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
 
         {performerInfo.length > 0 && (
           <div className="space-y-1.5">
-            <Label className="text-xs">Last name on this cell</Label>
-            <div className="bg-muted/30 space-y-1 rounded border p-2">
+            <Label className="text-xs">Display name overrides</Label>
+            <div className="bg-muted/30 space-y-2 rounded border p-2">
               {performerInfo.map((p) => {
                 const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.personId}`
                 const override = overrides[p.personId] ?? null
                 const value = override === null ? 'inherit' : override ? 'hide' : 'show'
                 return (
-                  <div key={p.personId} className="flex items-center gap-2 text-sm">
-                    <span className="flex-1 truncate">{fullName}</span>
-                    <Select
-                      value={value}
-                      onValueChange={(v) =>
-                        setOverrides((prev) => ({
-                          ...prev,
-                          [p.personId]: v === 'inherit' ? null : v === 'hide',
-                        }))
-                      }
-                    >
-                      <SelectTrigger className="h-7 w-44 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="inherit">
-                          Inherit ({p.personDefault ? 'first name only' : 'show last name'})
-                        </SelectItem>
-                        <SelectItem value="show">Show last name</SelectItem>
-                        <SelectItem value="hide">First name only</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div key={p.personId} className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="flex-1 truncate">{fullName}</span>
+                      <Select
+                        value={value}
+                        onValueChange={(v) =>
+                          setOverrides((prev) => ({
+                            ...prev,
+                            [p.personId]: v === 'inherit' ? null : v === 'hide',
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-7 w-44 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inherit">
+                            Inherit ({p.personDefault ? 'first name only' : 'show last name'})
+                          </SelectItem>
+                          <SelectItem value="show">Show last name</SelectItem>
+                          <SelectItem value="hide">First name only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Input
+                      value={displayNames[p.personId] ?? ''}
+                      onChange={(e) => setDisplayNames((prev) => ({...prev, [p.personId]: e.target.value}))}
+                      placeholder="Display name override"
+                      className="h-7 text-xs"
+                    />
                   </div>
                 )
               })}

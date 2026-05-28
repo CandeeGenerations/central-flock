@@ -66,6 +66,25 @@ export interface SendResult {
 export const sendScheduleImage = (input: SendScheduleImageInput) =>
   request<SendResult>('/schedules/send-image', {method: 'POST', body: JSON.stringify(input)})
 
+// ── Households ────────────────────────────────────────────────────────
+
+export interface Household {
+  id: number
+  name: string
+  members: {personId: number; firstName: string | null; lastName: string | null}[]
+}
+
+export const fetchHouseholds = () => request<Household[]>('/schedules/households')
+
+export const createHousehold = (memberIds: number[], name?: string) =>
+  request<Household>('/schedules/households', {method: 'POST', body: JSON.stringify({memberIds, name})})
+
+export const updateHousehold = (id: number, body: {memberIds?: number[]; name?: string}) =>
+  request<Household>(`/schedules/households/${id}`, {method: 'PUT', body: JSON.stringify(body)})
+
+export const deleteHousehold = (id: number) =>
+  request<{success: true}>(`/schedules/households/${id}`, {method: 'DELETE'})
+
 // ── Envelope CRUD ──────────────────────────────────────────────────────
 
 export interface Schedule {
@@ -115,6 +134,7 @@ export interface SpecialMusicCellPerformer {
   // Underlying values so the editor can show "auto / show / hide" tri-state.
   cellOverride: boolean | null
   personDefault: boolean
+  displayName: string | null
   lastSangDate: string | null
 }
 
@@ -135,6 +155,7 @@ export const fetchSpecialMusicCells = (scheduleId: number) =>
 
 export const schedulesKeys = {
   settings: ['schedules', 'settings'] as const,
+  households: ['schedules', 'households'] as const,
   list: (type?: ScheduleType) => ['schedules', 'list', type ?? 'all'] as const,
   schedule: (id: number) => ['schedules', 'detail', id] as const,
   cells: (id: number) => ['schedules', 'cells', id] as const,

@@ -10,7 +10,9 @@ import {Dialog, DialogContent} from '@/components/ui/dialog'
 import {PageSpinner} from '@/components/ui/spinner'
 import {describeExportError, useScheduleExport} from '@/hooks/use-schedule-export'
 import {
+  type Household,
   type SpecialMusicCell,
+  fetchHouseholds,
   fetchSchedulesSettings,
   fetchSpecialMusicCells,
   schedulesKeys,
@@ -34,10 +36,7 @@ interface Recipient {
   dates: Set<string>
 }
 
-// Build the per-recipient page list. One Recipient = one unique scheduled
-// performer / guest name / override-label. Each recipient's page highlights
-// the cells where they appear and the date column on those rows.
-function buildSpecialMusicRecipients(cells: SpecialMusicCell[]): Recipient[] {
+function buildSpecialMusicRecipients(cells: SpecialMusicCell[], households: Household[]): Recipient[] {
   const byKey = new Map<string, Recipient>()
   const upsert = (key: string, name: string, cellId: number, date: string) => {
     let r = byKey.get(key)
@@ -50,9 +49,11 @@ function buildSpecialMusicRecipients(cells: SpecialMusicCell[]): Recipient[] {
   }
   for (const c of cells) {
     for (const p of c.performers) {
-      const name = p.displayFirstNameOnly
-        ? (p.firstName ?? '').trim() || `Person ${p.personId}`
-        : [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || `Person ${p.personId}`
+      const name = p.displayName
+        ? p.displayName
+        : p.displayFirstNameOnly
+          ? (p.firstName ?? '').trim() || `Person ${p.personId}`
+          : [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || `Person ${p.personId}`
       upsert(`person:${p.personId}`, name, c.id, c.date)
     }
     for (const g of c.guestPerformers) {
@@ -60,14 +61,46 @@ function buildSpecialMusicRecipients(cells: SpecialMusicCell[]): Recipient[] {
       if (!name) continue
       upsert(`guest:${name.toLowerCase()}`, name, c.id, c.date)
     }
-    // Override label is a recipient only when the cell has no other
-    // performers (e.g. "MEN'S GROUP – TBA" pages go to the men's group).
     if (c.performers.length === 0 && c.guestPerformers.length === 0 && c.serviceLabel?.trim()) {
       const name = c.serviceLabel.trim()
       upsert(`label:${name.toLowerCase()}`, name, c.id, c.date)
     }
   }
-  return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name))
+
+  // Merge household members into a single recipient
+  const personToHousehold = new Map<number, Household>()
+  for (const h of households) {
+    for (const m of h.members) personToHousehold.set(m.personId, h)
+  }
+  const mergedByHousehold = new Map<number, Recipient>()
+  const consumed = new Set<string>()
+  for (const h of households) {
+    const memberKeys = h.members.map((m) => `person:${m.personId}`)
+    const present = memberKeys.filter((k) => byKey.has(k))
+    if (present.length === 0) continue
+    const merged: Recipient = {
+      key: `household:${h.id}`,
+      name: h.name,
+      cellIds: new Set(),
+      dates: new Set(),
+    }
+    for (const k of memberKeys) {
+      const r = byKey.get(k)
+      if (r) {
+        for (const id of r.cellIds) merged.cellIds.add(id)
+        for (const d of r.dates) merged.dates.add(d)
+        consumed.add(k)
+      }
+    }
+    mergedByHousehold.set(h.id, merged)
+  }
+
+  const result: Recipient[] = []
+  for (const r of byKey.values()) {
+    if (!consumed.has(r.key)) result.push(r)
+  }
+  for (const r of mergedByHousehold.values()) result.push(r)
+  return result.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export function SpecialMusicScheduleViewPage() {
@@ -92,6 +125,7 @@ export function SpecialMusicScheduleViewPage() {
     enabled: !!scheduleId,
   })
   const {data: settings} = useQuery({queryKey: schedulesKeys.settings, queryFn: fetchSchedulesSettings})
+  const {data: households} = useQuery({queryKey: schedulesKeys.households, queryFn: fetchHouseholds})
 
   const finalizeMutation = useMutation({
     mutationFn: () => updateSchedule(scheduleId, {status: 'final'}),
@@ -140,7 +174,7 @@ export function SpecialMusicScheduleViewPage() {
   async function runPdfExport(opts: {unhighlightedCopies: number; selectedRecipientKeys: string[]}) {
     if (!data) return
     const filename = `Special Music Schedule - ${data.schedule.scopeLabel}`
-    const allRecipients = buildSpecialMusicRecipients(data.cells)
+    const allRecipients = buildSpecialMusicRecipients(data.cells, households ?? [])
     const selectedSet = new Set(opts.selectedRecipientKeys)
     const recipients = allRecipients.filter((r) => selectedSet.has(r.key))
     const pages: PagePlan[] = [
@@ -179,9 +213,9 @@ export function SpecialMusicScheduleViewPage() {
   if (!data) return <div className="text-muted-foreground p-6">Schedule not found</div>
 
   const {schedule, cells} = data
-  const pdfRecipients = buildSpecialMusicRecipients(cells).map((r) => ({key: r.key, name: r.name}))
-  const titlePrefix = settings?.specialMusic.titlePrefix ?? 'CBC Special Music Schedule'
-  const title = `${titlePrefix} ${schedule.scopeLabel}`
+  const pdfRecipients = buildSpecialMusicRecipients(cells, households ?? []).map((r) => ({key: r.key, name: r.name}))
+  const titlePrefix = settings?.specialMusic.titlePrefix ?? 'Special Music Schedule'
+  const title = `${titlePrefix} - ${schedule.scopeLabel}`
   const openCellModel: SpecialMusicCell | null = openCell
     ? (cells.find((c) => c.date === openCell.date && c.serviceType === openCell.serviceType) ?? null)
     : null

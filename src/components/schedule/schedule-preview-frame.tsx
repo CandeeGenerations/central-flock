@@ -45,7 +45,7 @@ export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFr
   return (
     <div
       ref={ref}
-      className="mx-auto px-4 py-6"
+      className="mx-auto px-2 py-3"
       style={{
         fontFamily: 'Arial, sans-serif',
         backgroundColor: '#ffffff',
@@ -59,11 +59,10 @@ export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFr
       <div className="mb-6 text-center">
         {logoPath ? (
           <img src={logoPath} alt="" className="mx-auto mb-2 max-h-20 object-contain" crossOrigin="anonymous" />
-        ) : (
-          <h2 className="mb-2 text-xl font-bold" style={{color: '#000'}}>
-            {title}
-          </h2>
-        )}
+        ) : null}
+        <h2 className="text-xl font-bold" style={{color: '#000', marginBottom: subtitle ? 2 : 0}}>
+          {title}
+        </h2>
         {subtitle ? (
           <div
             style={{

@@ -56,7 +56,7 @@ function readSettings(): SchedulesSettings {
       footerBlocks: parseJson<FooterBlock[]>('schedules.nursery.footerBlocks', []),
     },
     specialMusic: {
-      titlePrefix: map.get('schedules.specialMusic.titlePrefix') ?? 'CBC Special Music Schedule',
+      titlePrefix: map.get('schedules.specialMusic.titlePrefix') ?? 'Special Music Schedule',
       footerBlocks: parseJson<FooterBlock[]>('schedules.specialMusic.footerBlocks', []),
       singerGroupIds: parseJson<number[]>('schedules.specialMusic.singerGroupIds', []),
     },
@@ -121,6 +121,125 @@ schedulesRouter.post(
     }
     upsert('schedulesLogoPath', logoPath)
     res.json({logoPath})
+  }),
+)
+
+// ── Households ─────────────────────────────────────────────────────────
+
+schedulesRouter.get(
+  '/households',
+  asyncHandler(async (_req, res) => {
+    const allHouseholds = db.select().from(schema.households).orderBy(asc(schema.households.id)).all()
+    const memberRows = db
+      .select({
+        householdId: schema.householdMembers.householdId,
+        personId: schema.householdMembers.personId,
+        firstName: schema.people.firstName,
+        lastName: schema.people.lastName,
+      })
+      .from(schema.householdMembers)
+      .innerJoin(schema.people, eq(schema.householdMembers.personId, schema.people.id))
+      .orderBy(asc(schema.householdMembers.householdId), asc(schema.people.firstName))
+      .all()
+    const byId = new Map<number, {personId: number; firstName: string | null; lastName: string | null}[]>()
+    for (const r of memberRows) {
+      const list = byId.get(r.householdId) ?? []
+      list.push({personId: r.personId, firstName: r.firstName, lastName: r.lastName})
+      byId.set(r.householdId, list)
+    }
+    res.json(allHouseholds.map((h) => ({id: h.id, name: h.name, members: byId.get(h.id) ?? []})))
+  }),
+)
+
+schedulesRouter.post(
+  '/households',
+  asyncHandler(async (req, res) => {
+    const {memberIds, name} = req.body as {memberIds: number[]; name?: string}
+    if (!Array.isArray(memberIds) || memberIds.length < 2) {
+      res.status(400).json({error: 'At least 2 members required'})
+      return
+    }
+    const existing = db
+      .select({personId: schema.householdMembers.personId})
+      .from(schema.householdMembers)
+      .where(inArray(schema.householdMembers.personId, memberIds))
+      .all()
+    if (existing.length > 0) {
+      res
+        .status(409)
+        .json({error: 'One or more people already belong to a household', personIds: existing.map((e) => e.personId)})
+      return
+    }
+    const members = db
+      .select({personId: schema.people.id, firstName: schema.people.firstName, lastName: schema.people.lastName})
+      .from(schema.people)
+      .where(inArray(schema.people.id, memberIds))
+      .all()
+    const autoName = members.map((m) => m.firstName || 'Unknown').join(' & ')
+    const household = db
+      .insert(schema.households)
+      .values({name: name?.trim() || autoName})
+      .returning()
+      .get()
+    db.insert(schema.householdMembers)
+      .values(memberIds.map((personId) => ({householdId: household.id, personId})))
+      .run()
+    res.status(201).json({id: household.id, name: household.name, members})
+  }),
+)
+
+schedulesRouter.put(
+  '/households/:hid',
+  asyncHandler(async (req, res) => {
+    const hid = Number(req.params.hid)
+    const {memberIds, name} = req.body as {memberIds?: number[]; name?: string}
+    if (memberIds !== undefined) {
+      if (!Array.isArray(memberIds) || memberIds.length < 2) {
+        res.status(400).json({error: 'At least 2 members required'})
+        return
+      }
+      const existing = db
+        .select({personId: schema.householdMembers.personId})
+        .from(schema.householdMembers)
+        .where(
+          and(
+            inArray(schema.householdMembers.personId, memberIds),
+            sql`${schema.householdMembers.householdId} != ${hid}`,
+          ),
+        )
+        .all()
+      if (existing.length > 0) {
+        res.status(409).json({
+          error: 'One or more people already belong to another household',
+          personIds: existing.map((e) => e.personId),
+        })
+        return
+      }
+      db.delete(schema.householdMembers).where(eq(schema.householdMembers.householdId, hid)).run()
+      db.insert(schema.householdMembers)
+        .values(memberIds.map((personId) => ({householdId: hid, personId})))
+        .run()
+    }
+    if (name !== undefined) {
+      db.update(schema.households).set({name: name.trim()}).where(eq(schema.households.id, hid)).run()
+    }
+    const household = db.select().from(schema.households).where(eq(schema.households.id, hid)).get()
+    const members = db
+      .select({personId: schema.people.id, firstName: schema.people.firstName, lastName: schema.people.lastName})
+      .from(schema.people)
+      .innerJoin(schema.householdMembers, eq(schema.people.id, schema.householdMembers.personId))
+      .where(eq(schema.householdMembers.householdId, hid))
+      .all()
+    res.json({id: hid, name: household?.name ?? '', members})
+  }),
+)
+
+schedulesRouter.delete(
+  '/households/:hid',
+  asyncHandler(async (req, res) => {
+    const hid = Number(req.params.hid)
+    db.delete(schema.households).where(eq(schema.households.id, hid)).run()
+    res.json({success: true})
   }),
 )
 
@@ -345,6 +464,7 @@ schedulesRouter.post(
               personId: l.personId,
               ordering: l.ordering,
               displayFirstNameOnly: l.displayFirstNameOnly,
+              displayName: l.displayName,
             })),
           )
           .run()
@@ -424,6 +544,7 @@ schedulesRouter.get(
               lastName: schema.people.lastName,
               personDisplayFirstNameOnly: schema.people.displayFirstNameOnly,
               cellDisplayFirstNameOnly: schema.specialMusicPerformers.displayFirstNameOnly,
+              displayName: schema.specialMusicPerformers.displayName,
             })
             .from(schema.specialMusicPerformers)
             .innerJoin(schema.people, eq(schema.specialMusicPerformers.personId, schema.people.id))
@@ -474,6 +595,7 @@ schedulesRouter.get(
         displayFirstNameOnly: p.cellDisplayFirstNameOnly ?? p.personDisplayFirstNameOnly ?? false,
         cellOverride: p.cellDisplayFirstNameOnly,
         personDefault: p.personDisplayFirstNameOnly,
+        displayName: p.displayName,
         lastSangDate: lastSangByPerson.get(p.personId) ?? null,
       }))
       return {

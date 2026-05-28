@@ -1,5 +1,5 @@
 import {sql} from 'drizzle-orm'
-import {integer, primaryKey, sqliteTable, text} from 'drizzle-orm/sqlite-core'
+import {integer, primaryKey, sqliteTable, text, unique} from 'drizzle-orm/sqlite-core'
 
 import {people} from './schema-core.js'
 import {hymns} from './schema-hymns.js'
@@ -49,6 +49,28 @@ export const specialMusicPerformers = sqliteTable(
     // Per-cell override of the person's displayFirstNameOnly default.
     // null = inherit from people.display_first_name_only.
     displayFirstNameOnly: integer('display_first_name_only', {mode: 'boolean'}),
+    displayName: text('display_name'),
   },
   (t) => [primaryKey({columns: [t.specialMusicId, t.personId]})],
+)
+
+export const households = sqliteTable('households', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  name: text('name').notNull(),
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})
+
+export const householdMembers = sqliteTable(
+  'household_members',
+  {
+    householdId: integer('household_id')
+      .notNull()
+      .references(() => households.id, {onDelete: 'cascade'}),
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id, {onDelete: 'cascade'}),
+  },
+  (t) => [primaryKey({columns: [t.householdId, t.personId]}), unique().on(t.personId)],
 )

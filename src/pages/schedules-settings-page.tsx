@@ -6,20 +6,25 @@ import {MultiSelect} from '@/components/ui/multi-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
-import {fetchGroups} from '@/lib/api'
+import {type GroupWithMembers, fetchGroup, fetchGroups} from '@/lib/api'
 import {fetchServiceConfig, updateServiceConfig} from '@/lib/nursery-api'
 import type {ServiceType as NurseryServiceType} from '@/lib/nursery-api'
 import {nurseryKeys} from '@/lib/nursery-query-keys'
 import {
   type FooterBlock,
+  type Household,
   type SchedulesSettings,
+  createHousehold,
+  deleteHousehold,
+  fetchHouseholds,
   fetchSchedulesSettings,
   schedulesKeys,
+  updateHousehold,
   updateSchedulesSettings,
   uploadSchedulesLogo,
 } from '@/lib/schedules-api'
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ImagePlus, Plus, Settings, Trash2} from 'lucide-react'
+import {useMutation, useQueries, useQuery, useQueryClient} from '@tanstack/react-query'
+import {ArrowDown, ArrowUp, ImagePlus, Plus, Settings, Trash2, Users} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 import {toast} from 'sonner'
 
@@ -176,6 +181,7 @@ export function SchedulesSettingsPage() {
                 </div>
               }
             />
+            <HouseholdsSection singerGroupIds={settings.specialMusic.singerGroupIds} />
           </CardContent>
         </Card>
       </div>
@@ -326,6 +332,185 @@ function TypeDefaultsCard({titleLabel, titlePrefix, footerBlocks, middleSlot, on
           Save
         </Button>
       </div>
+    </div>
+  )
+}
+
+// ── Households editor ──────────────────────────────────────────────────
+
+function HouseholdsSection({singerGroupIds}: {singerGroupIds: number[]}) {
+  const queryClient = useQueryClient()
+  const {data: households} = useQuery({queryKey: schedulesKeys.households, queryFn: fetchHouseholds})
+  const groupQueries = useQueries({
+    queries: singerGroupIds.map((gid) => ({queryKey: ['group', gid], queryFn: () => fetchGroup(gid)})),
+  })
+  const singerPool: {id: number; firstName: string | null; lastName: string | null}[] = [
+    ...new Map(
+      groupQueries
+        .flatMap((q) => (q.data as GroupWithMembers | undefined)?.members ?? [])
+        .map((m) => [m.id, {id: m.id, firstName: m.firstName, lastName: m.lastName}]),
+    ).values(),
+  ].sort((a, b) => (a.firstName ?? '').localeCompare(b.firstName ?? ''))
+
+  const takenPersonIds = new Set((households ?? []).flatMap((h) => h.members.map((m) => m.personId)))
+
+  const [adding, setAdding] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [newName, setNewName] = useState('')
+
+  const createMut = useMutation({
+    mutationFn: ({ids, name}: {ids: number[]; name: string}) => createHousehold(ids, name || undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: schedulesKeys.households})
+      setAdding(false)
+      setSelectedIds([])
+      setNewName('')
+      toast.success('Household created')
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  })
+
+  const renameMut = useMutation({
+    mutationFn: ({id, name}: {id: number; name: string}) => updateHousehold(id, {name}),
+    onSuccess: () => queryClient.invalidateQueries({queryKey: schedulesKeys.households}),
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => deleteHousehold(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: schedulesKeys.households})
+      toast.success('Household removed')
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  })
+
+  const available = singerPool.filter((p) => !takenPersonIds.has(p.id))
+
+  return (
+    <div className="space-y-3 border-t pt-4">
+      <div>
+        <Label className="text-sm font-medium">Households</Label>
+        <p className="text-muted-foreground text-xs">
+          People in the same household share one highlighted page when exporting PDFs.
+        </p>
+      </div>
+
+      {(households ?? []).length > 0 && (
+        <div className="space-y-1.5">
+          {(households ?? []).map((h) => (
+            <HouseholdRow
+              key={h.id}
+              household={h}
+              onRename={renameMut.mutate}
+              onDelete={deleteMut.mutate}
+              busy={deleteMut.isPending}
+            />
+          ))}
+        </div>
+      )}
+
+      {adding ? (
+        <div className="space-y-2 rounded border p-3">
+          <MultiSelect
+            value={selectedIds.map(String)}
+            onValueChange={(v) => setSelectedIds(v.map(Number).filter((n) => !Number.isNaN(n)))}
+            options={available.map((p) => ({
+              value: String(p.id),
+              label: [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`,
+            }))}
+            placeholder="Pick members"
+            className="w-full"
+          />
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Household name (e.g. Tyler & Carissa)"
+            className="text-sm"
+          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              disabled={selectedIds.length < 2 || createMut.isPending}
+              onClick={() => createMut.mutate({ids: selectedIds, name: newName})}
+            >
+              {createMut.isPending ? 'Creating...' : 'Create'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setAdding(false)
+                setSelectedIds([])
+                setNewName('')
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button variant="outline" size="sm" onClick={() => setAdding(true)} disabled={available.length < 2}>
+          <Plus className="mr-1 h-3 w-3" /> Add Household
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function HouseholdRow({
+  household,
+  onRename,
+  onDelete,
+  busy,
+}: {
+  household: Household
+  onRename: (v: {id: number; name: string}) => void
+  onDelete: (id: number) => void
+  busy: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(household.name)
+
+  return (
+    <div className="bg-muted/30 flex items-center gap-2 rounded border px-3 py-2">
+      <Users className="text-muted-foreground h-4 w-4 shrink-0" />
+      {editing ? (
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => {
+            if (name.trim() && name.trim() !== household.name) onRename({id: household.id, name: name.trim()})
+            setEditing(false)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key === 'Escape') {
+              setName(household.name)
+              setEditing(false)
+            }
+          }}
+          className="h-7 flex-1 text-sm"
+          autoFocus
+        />
+      ) : (
+        <button
+          type="button"
+          className="flex-1 truncate text-left text-sm hover:underline"
+          onClick={() => setEditing(true)}
+        >
+          {household.name || household.members.map((m) => m.firstName || 'Unknown').join(' & ')}
+        </button>
+      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 shrink-0"
+        onClick={() => onDelete(household.id)}
+        disabled={busy}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
     </div>
   )
 }

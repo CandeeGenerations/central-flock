@@ -70,7 +70,7 @@ rm -f central-flock.db-wal central-flock.db-shm
 
 ### 4. Roll the code back to match the schema
 
-The restored DB matches the schema as it was *before* the bad deploy. If the running code still expects the new schema, it'll keep throwing — check out the SHA from before the bad deploy:
+The restored DB matches the schema as it was _before_ the bad deploy. If the running code still expects the new schema, it'll keep throwing — check out the SHA from before the bad deploy:
 
 ```bash
 git checkout <pre-deploy-sha>

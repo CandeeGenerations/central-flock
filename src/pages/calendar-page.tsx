@@ -432,7 +432,7 @@ function CalendarHeader({
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <CalendarIcon className="h-6 w-6" />
-          Calendar
+          Upcoming
         </h1>
         {lastSyncedAt !== undefined && (
           <p className="text-xs text-muted-foreground mt-1">Last synced {formatRelative(lastSyncedAt)}</p>

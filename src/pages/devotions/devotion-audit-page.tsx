@@ -88,7 +88,7 @@ export function DevotionAuditPage() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Data Audit</h2>
+        <h2 className="text-2xl font-bold">Auditing</h2>
       </div>
 
       {/* Summary Card */}

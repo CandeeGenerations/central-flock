@@ -101,7 +101,7 @@ export function NurserySchedulesPage() {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Nursery Schedules</h2>
+        <h2 className="text-2xl font-bold">Nursery</h2>
         <Button onClick={() => setGenerateOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Generate New

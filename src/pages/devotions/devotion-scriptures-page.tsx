@@ -82,7 +82,7 @@ export function DevotionScripturesPage() {
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Scripture Lookup</h2>
+        <h2 className="text-2xl font-bold">Scriptures</h2>
       </div>
 
       <Card size="sm">

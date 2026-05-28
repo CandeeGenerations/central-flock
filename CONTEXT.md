@@ -355,6 +355,18 @@ Discriminator on `drafts.recipient_mode` selecting how the compose UI assembles 
 
 Mode is sticky: removing the last group chip does not auto-switch the user to Individual mode — they explicitly picked Group mode and the mode choice survives an empty chip list.
 
+### Mobile primary tabs
+
+The four group tabs always visible in the mobile bottom nav, between Home (left) and More (right). Bound to `navGroups[0..4]` in `src/lib/nav-config.ts` — the **first four groups in declaration order**. There is no separate pinned-tabs config; reordering `navGroups` reflows the mobile primary strip. Currently People, Messaging, Devotionals, Schedules.
+
+### Mobile in-group bar
+
+When the user is inside a [[nav group]] (e.g., `/devotions/scriptures`), the bottom bar swaps from primary tabs to that group's children — `Home · first 4 children · More`. Same "first N from declaration order" rule as the primary tabs. Children beyond the 4th are reached via [[More sheet]]. Only Devotionals exceeds 4 children today.
+
+### More sheet
+
+A bottom sheet opened by tapping the "More" tile on the mobile bottom nav. Renders the **full nav tree** — every group, each expandable to its children — using the same `CollapsibleNavGroup` component as the desktop sidebar. Includes the [[Mobile primary tabs]] groups too: the sheet is reliably "everything," not "the leftovers." Every leaf in the app is two taps from anywhere (More → leaf).
+
 ### Message recipient label
 
 The "Recipients" cell on the message history table renders the audience compactly:

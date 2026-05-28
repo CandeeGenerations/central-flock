@@ -1,5 +1,6 @@
 import {CollapsibleNavGroup, NavPopoverProvider} from '@/components/collapsible-nav-group'
 import {CommandPaletteProvider} from '@/components/command-palette-provider'
+import {Sheet, SheetContent, SheetTitle, SheetTrigger} from '@/components/ui/sheet'
 import {Toaster} from '@/components/ui/sonner'
 import {Spinner} from '@/components/ui/spinner'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
@@ -67,7 +68,19 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import {Home, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun} from 'lucide-react'
+import {
+  Home,
+  LogOut,
+  Moon,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Search,
+  Settings,
+  Sun,
+} from 'lucide-react'
+import {useState} from 'react'
 import {BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate} from 'react-router-dom'
 
 import {Sentry} from './lib/sentry'
@@ -279,50 +292,66 @@ function MobileFab() {
   )
 }
 
+// See docs/adr/0008-mobile-nav-tabs-and-more-sheet.md.
+const MOBILE_PRIMARY_TAB_LIMIT = 4
+
 function BottomTabBar() {
   const location = useLocation()
   const activeGroup = findActiveGroup(location.pathname)
   const isHome = location.pathname === '/'
+  const [moreOpen, setMoreOpen] = useState(false)
 
-  // On any section page show [Home] + that section's children.
-  // On the home dashboard itself show [Home] + each section's top-level entry.
-  const items: {to: string; label: string; icon: typeof Home; isHome?: boolean}[] = [
-    {to: '/', label: 'Home', icon: Home, isHome: true},
-  ]
+  const tabs: {to: string; label: string; icon: typeof Home}[] = activeGroup
+    ? activeGroup.children.slice(0, MOBILE_PRIMARY_TAB_LIMIT).map((c) => ({to: c.to, label: c.label, icon: c.icon}))
+    : navGroups.slice(0, MOBILE_PRIMARY_TAB_LIMIT).map((g) => ({to: g.children[0].to, label: g.label, icon: g.icon}))
 
-  if (activeGroup) {
-    activeGroup.children.forEach((c) => items.push({to: c.to, label: c.label, icon: c.icon}))
-  } else {
-    navGroups.forEach((g) => items.push({to: g.children[0].to, label: g.label, icon: g.icon}))
-  }
+  const siblings = tabs.map((t) => ({to: t.to}))
+  const anyTabActive = tabs.some((t) => isChildActive(t.to, location.pathname, siblings))
+  const moreActive = !isHome && !anyTabActive
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-sidebar text-sidebar-foreground border-t">
       <div className="flex items-center justify-around px-3 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        {items.map(({to, label, icon: Icon, isHome: itemIsHome}) => {
-          const active = itemIsHome
-            ? isHome
-            : isChildActive(
-                to,
-                location.pathname,
-                items.filter((i) => !i.isHome),
-              )
+        <NavLink to="/" end className={({isActive}) => tabClass(isActive)}>
+          <Home className="h-5 w-5" />
+          <span>Home</span>
+        </NavLink>
+        {tabs.map(({to, label, icon: Icon}) => {
+          const active = isChildActive(to, location.pathname, siblings)
           return (
-            <NavLink
-              key={to}
-              to={to}
-              className={cn(
-                'flex flex-col items-center gap-1 px-2 py-2 rounded-lg text-[11px] font-medium transition-colors min-w-[3.5rem]',
-                active ? 'text-sidebar-accent-foreground bg-sidebar-accent' : 'text-sidebar-foreground/60',
-              )}
-            >
+            <NavLink key={to} to={to} className={() => tabClass(active)}>
               <Icon className="h-5 w-5" />
               <span>{label}</span>
             </NavLink>
           )
         })}
+        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+          <SheetTrigger className={tabClass(moreActive)}>
+            <MoreHorizontal className="h-5 w-5" />
+            <span>More</span>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="max-h-[85vh] p-4 pb-[calc(env(safe-area-inset-bottom)+2rem)]">
+            <SheetTitle className="px-1 pb-2">Navigation</SheetTitle>
+            <div className="overflow-y-auto">
+              <NavPopoverProvider>
+                <div className="space-y-1">
+                  {navGroups.map((group) => (
+                    <CollapsibleNavGroup key={group.id} group={group} onNavClick={() => setMoreOpen(false)} />
+                  ))}
+                </div>
+              </NavPopoverProvider>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </nav>
+  )
+}
+
+function tabClass(active: boolean) {
+  return cn(
+    'flex flex-col items-center gap-1 px-2 py-2 rounded-lg text-[11px] font-medium transition-colors min-w-[3.5rem]',
+    active ? 'text-sidebar-accent-foreground bg-sidebar-accent' : 'text-sidebar-foreground/60',
   )
 }
 

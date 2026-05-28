@@ -1,13 +1,19 @@
 import {
   AlertTriangle,
   Baby,
+  Book,
   BookOpen,
   Calendar,
+  CalendarDays,
   CheckSquare,
+  Clock,
+  Contact,
   FileText,
   FolderOpen,
   LayoutDashboard,
   List,
+  ListMusic,
+  MessageCircle,
   MessageSquare,
   Music,
   Printer,
@@ -53,39 +59,56 @@ export function findActiveGroup(pathname: string): NavGroup | null {
 
 export const navGroups: NavGroup[] = [
   {
+    id: 'people',
+    label: 'People',
+    icon: Users,
+    children: [
+      {to: '/people', label: 'Contacts', icon: Contact},
+      {to: '/groups', label: 'Groups', icon: FolderOpen},
+    ],
+  },
+  {
     id: 'messaging',
     label: 'Messaging',
     icon: MessageSquare,
     children: [
       {to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard},
-      {to: '/people', label: 'People', icon: Users},
-      {to: '/groups', label: 'Groups', icon: FolderOpen},
-      {to: '/messages', label: 'Messages', icon: MessageSquare},
+      {to: '/messages', label: 'Messages', icon: MessageCircle},
+      {to: '/rsvp', label: 'RSVPs', icon: CheckSquare},
       {to: '/templates', label: 'Templates', icon: FileText},
     ],
   },
   {
     id: 'devotions',
-    label: 'Devotions',
+    label: 'Devotionals',
     icon: BookOpen,
     children: [
       {to: '/devotions/stats', label: 'Dashboard', icon: LayoutDashboard},
       {to: '/devotions', label: 'Devotions', icon: List, end: true},
-      {to: '/devotions/scriptures', label: 'Scripture', icon: BookOpen},
+      {to: '/devotions/scriptures', label: 'Scriptures', icon: Book},
       {to: '/devotions/passages', label: 'Passages', icon: Sparkles},
-      {to: '/devotions/audit', label: 'Audit', icon: AlertTriangle},
-      {to: '/devotions/gwendolyn', label: 'Gwendolyn', icon: Smartphone},
+      {to: '/devotions/audit', label: 'Auditing', icon: AlertTriangle},
+      {to: '/devotions/gwendolyn', label: 'Gwendolyn’s', icon: Smartphone},
     ],
   },
   {
     id: 'schedules',
     label: 'Schedules',
-    icon: Calendar,
+    icon: Clock,
     children: [
+      {to: '/special-music', label: 'Special Music', icon: Music, end: true},
       {to: '/nursery', label: 'Nursery', icon: Baby, end: true},
       {to: '/nursery/workers', label: 'Nursery Workers', icon: Users},
-      {to: '/special-music', label: 'Special Music', icon: Music, end: true},
       {to: '/schedules/settings', label: 'Settings', icon: Settings, matchPaths: ['/nursery/settings']},
+    ],
+  },
+  {
+    id: 'calendar',
+    label: 'Calendar',
+    icon: Calendar,
+    children: [
+      {to: '/calendar', label: 'Upcoming', icon: CalendarDays, end: true},
+      {to: '/calendar/print', label: 'Print', icon: Printer},
     ],
   },
   {
@@ -93,8 +116,8 @@ export const navGroups: NavGroup[] = [
     label: 'Sermon Prep',
     icon: ScrollText,
     children: [
-      {to: '/sermons/quotes', label: 'All Quotes', icon: Quote, end: true},
-      {to: '/sermons/searches', label: 'Quote Research', icon: Sparkles, matchPaths: ['/sermons/research']},
+      {to: '/sermons/quotes', label: 'Quotes', icon: Quote, end: true},
+      {to: '/sermons/searches', label: 'Quote Searches', icon: Sparkles, matchPaths: ['/sermons/research']},
       {to: '/sermons/verse-strips', label: 'Verse Strips', icon: Scissors},
     ],
   },
@@ -107,19 +130,9 @@ export const navGroups: NavGroup[] = [
       {
         to: '/music/hymns/searches',
         label: 'Song Services',
-        icon: Music,
+        icon: ListMusic,
         matchPaths: ['/music/hymns'],
       },
-    ],
-  },
-  {
-    id: 'calendar',
-    label: 'Calendar',
-    icon: Calendar,
-    children: [
-      {to: '/calendar', label: 'Upcoming', icon: Calendar, end: true},
-      {to: '/rsvp', label: 'RSVPs', icon: CheckSquare},
-      {to: '/calendar/print', label: 'Print', icon: Printer},
     ],
   },
 ]

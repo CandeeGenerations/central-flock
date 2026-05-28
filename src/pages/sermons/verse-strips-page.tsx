@@ -77,7 +77,7 @@ export function VerseStripsPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
-      <h2 className="text-2xl font-bold">Verse Memorization Strips</h2>
+      <h2 className="text-2xl font-bold">Verse Strips</h2>
 
       <Card>
         <CardHeader className="pb-3">

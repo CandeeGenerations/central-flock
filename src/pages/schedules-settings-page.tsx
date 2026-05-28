@@ -75,7 +75,7 @@ export function SchedulesSettingsPage() {
     <div className="space-y-4 p-4 md:p-6">
       <div className="mb-6 flex items-center gap-3">
         <Settings className="h-6 w-6" />
-        <h2 className="text-2xl font-bold">Schedules Settings</h2>
+        <h2 className="text-2xl font-bold">Settings</h2>
       </div>
 
       <div className="max-w-2xl space-y-4">

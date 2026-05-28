@@ -224,7 +224,7 @@ export function PeoplePage() {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold">People</h2>
+        <h2 className="text-2xl font-bold">Contacts</h2>
         <div className="flex gap-2 items-center">
           <Popover>
             <PopoverTrigger asChild>

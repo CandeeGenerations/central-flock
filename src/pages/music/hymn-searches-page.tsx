@@ -55,7 +55,7 @@ export function HymnSearchesPage() {
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-2xl font-bold">
-          Suggested Song Services
+          Song Services
           {data ? <span className="ml-2 text-base font-normal text-muted-foreground">({data.total})</span> : null}
         </h2>
         <Button onClick={() => navigate('/music/hymns')}>

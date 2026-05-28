@@ -11,8 +11,8 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {Textarea} from '@/components/ui/textarea'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useProgressOperation} from '@/hooks/use-sse'
-import {pullPassagesForScan} from '@/lib/devotion-api'
-import {useQuery} from '@tanstack/react-query'
+import {type PoolPassage, fetchAvailablePassages, pullPassagesForScan} from '@/lib/devotion-api'
+import {useQuery, useQueryClient} from '@tanstack/react-query'
 import {
   AlertTriangle,
   Camera,
@@ -45,6 +45,7 @@ interface ParsedDevotion {
   generatedBibleReference?: string
   generatedTalkingPoints?: string
   generatedPassageId?: number
+  generatedRecorded?: boolean
   flagged?: boolean
   notes?: string | null
 }
@@ -129,6 +130,95 @@ function NotesModal({
               Save
             </Button>
           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PassagePickerModal({
+  open,
+  currentPassageId,
+  onClose,
+  onSelect,
+}: {
+  open: boolean
+  currentPassageId: number | undefined
+  onClose: () => void
+  onSelect: (passage: PoolPassage) => void
+}) {
+  const [search, setSearch] = useState('')
+  const {data: passages = [], isLoading} = useQuery({
+    queryKey: ['available-passages-picker'],
+    queryFn: fetchAvailablePassages,
+    enabled: open,
+  })
+
+  const filtered = passages.filter((p) => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      p.title.toLowerCase().includes(q) ||
+      p.bibleReference.toLowerCase().includes(q) ||
+      p.subcode?.toLowerCase().includes(q)
+    )
+  })
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.recorded !== b.recorded) return a.recorded ? -1 : 1
+    return 0
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Select Passage</DialogTitle>
+        </DialogHeader>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by title, reference, or notes…"
+          className="mb-2"
+          autoFocus
+        />
+        <div className="overflow-y-auto flex-1 -mx-6 px-6">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : sorted.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No available passages found.</p>
+          ) : (
+            <div className="space-y-1">
+              {sorted.map((p) => (
+                <button
+                  key={p.id}
+                  className={`w-full text-left rounded-lg border p-3 hover:bg-muted/50 transition-colors cursor-pointer ${
+                    p.id === currentPassageId ? 'border-primary bg-primary/5' : 'border-border'
+                  }`}
+                  onClick={() => onSelect(p)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm truncate">{p.title}</span>
+                    {p.recorded && (
+                      <Badge variant="outline" className="text-green-700 border-green-300 shrink-0">
+                        Recorded
+                      </Badge>
+                    )}
+                    {p.id === currentPassageId && (
+                      <Badge variant="secondary" className="shrink-0">
+                        Current
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">{p.bibleReference}</div>
+                  {p.subcode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{p.subcode}</div>}
+                  <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.talkingPoints}</div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -226,6 +316,8 @@ export function DevotionScanPage() {
     facebookInstagram: boolean
     podcast: boolean
   } | null>(null)
+  const [passagePickerRow, setPassagePickerRow] = useState<number | null>(null)
+  const queryClient = useQueryClient()
 
   // Load saved drafts
   const {data: drafts, refetch: refetchDrafts} = useQuery({
@@ -310,20 +402,29 @@ export function DevotionScanPage() {
 
     const enrichMap = new Map(enrichments.map((e) => [e.number, e]))
 
-    // Pull or generate passages for Tyler devotions
-    const tylerIndices: number[] = []
+    // Pull or generate passages only for Tyler devotions that don't already have one
+    const tylerIndicesNeedingPassage: number[] = []
     devotions.forEach((d, i) => {
-      if (d.devotionType === 'guest' && d.guestSpeaker === 'Tyler') tylerIndices.push(i)
+      if (d.devotionType === 'guest' && d.guestSpeaker === 'Tyler' && !d.generatedPassageId) {
+        tylerIndicesNeedingPassage.push(i)
+      }
     })
 
     const passageMap = new Map<
       number,
-      {id: number; title: string; bibleReference: string; talkingPoints: string; subcode: string | null}
+      {
+        id: number
+        title: string
+        bibleReference: string
+        talkingPoints: string
+        subcode: string | null
+        recorded: boolean
+      }
     >()
-    if (tylerIndices.length > 0) {
+    if (tylerIndicesNeedingPassage.length > 0) {
       try {
-        const pullResult = await pullPassagesForScan(tylerIndices.length)
-        tylerIndices.forEach((idx, j) => {
+        const pullResult = await pullPassagesForScan(tylerIndicesNeedingPassage.length)
+        tylerIndicesNeedingPassage.forEach((idx, j) => {
           if (j < pullResult.passages.length) {
             passageMap.set(idx, pullResult.passages[j])
           }
@@ -331,7 +432,7 @@ export function DevotionScanPage() {
         const fromPoolMsg = pullResult.fromPool > 0 ? `${pullResult.fromPool} from pool` : ''
         const generatedMsg = pullResult.generated > 0 ? `${pullResult.generated} freshly generated` : ''
         const parts = [fromPoolMsg, generatedMsg].filter(Boolean).join(', ')
-        toast.success(`Assigned ${tylerIndices.length} passages to Tyler devotions (${parts})`)
+        toast.success(`Assigned ${tylerIndicesNeedingPassage.length} passages to Tyler devotions (${parts})`)
       } catch (err) {
         console.error('Passage pull failed:', err)
         toast.error('Failed to generate passages for Tyler devotions')
@@ -346,13 +447,14 @@ export function DevotionScanPage() {
         if (enrichment?.fullChain.length) {
           updatedDevotion.referencedDevotions = enrichment.fullChain
         }
-        // Attach generated passage data to Tyler devotions
+        // Attach generated passage data to Tyler devotions (only for newly pulled)
         const passage = passageMap.get(i)
         if (passage) {
           updatedDevotion.generatedTitle = passage.title
           updatedDevotion.generatedBibleReference = passage.bibleReference
           updatedDevotion.generatedTalkingPoints = passage.talkingPoints
           updatedDevotion.generatedPassageId = passage.id
+          updatedDevotion.generatedRecorded = passage.recorded
           if (passage.subcode) {
             updatedDevotion.subcode = passage.subcode
           }
@@ -506,6 +608,32 @@ export function DevotionScanPage() {
       prev.map((r, i) => (i === notesRow ? {...r, devotion: {...r.devotion, notes: trimmed || null}} : r)),
     )
     setNotesRow(null)
+  }
+
+  const handlePassageSelect = (passage: PoolPassage) => {
+    if (passagePickerRow === null) return
+    setRows((prev) =>
+      prev.map((r, i) =>
+        i === passagePickerRow
+          ? {
+              ...r,
+              devotion: {
+                ...r.devotion,
+                generatedTitle: passage.title,
+                generatedBibleReference: passage.bibleReference,
+                generatedTalkingPoints: passage.talkingPoints,
+                generatedPassageId: passage.id,
+                generatedRecorded: passage.recorded,
+                bibleReference: passage.bibleReference,
+                subcode: passage.subcode ?? r.devotion.subcode,
+              },
+            }
+          : r,
+      ),
+    )
+    queryClient.invalidateQueries({queryKey: ['available-passages-picker']})
+    setPassagePickerRow(null)
+    toast.success(`Assigned "${passage.title}"`)
   }
 
   const handleEditChainSave = async () => {
@@ -810,22 +938,32 @@ export function DevotionScanPage() {
                           <SelectItem value="guest-Ed">Guest - Ed</SelectItem>
                         </SelectContent>
                       </Select>
-                      {row.devotion.generatedTitle && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center gap-1 mt-1 text-xs text-emerald-600">
-                                <Sparkles className="h-3 w-3" />
-                                <span className="truncate max-w-28">{row.devotion.generatedTitle}</span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
-                              <p className="font-medium">{row.devotion.generatedTitle}</p>
-                              <p className="text-xs mt-1">{row.devotion.generatedBibleReference}</p>
-                              <p className="text-xs mt-1">{row.devotion.generatedTalkingPoints}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                      {row.devotion.devotionType === 'guest' && row.devotion.guestSpeaker === 'Tyler' && (
+                        <div className="mt-1 space-y-0.5">
+                          {row.devotion.generatedTitle ? (
+                            <button
+                              className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 cursor-pointer"
+                              onClick={() => setPassagePickerRow(i)}
+                            >
+                              <Sparkles className="h-3 w-3 shrink-0" />
+                              <span className="truncate max-w-28">{row.devotion.generatedTitle}</span>
+                              {row.devotion.generatedRecorded && <Check className="h-3 w-3 text-green-600 shrink-0" />}
+                            </button>
+                          ) : (
+                            <button
+                              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                              onClick={() => setPassagePickerRow(i)}
+                            >
+                              <Sparkles className="h-3 w-3" />
+                              Pick passage…
+                            </button>
+                          )}
+                          {row.devotion.subcode && (
+                            <p className="text-[10px] text-muted-foreground font-mono truncate max-w-32">
+                              {row.devotion.subcode}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell className="!align-top">
@@ -1061,6 +1199,14 @@ export function DevotionScanPage() {
         initialValue={notesRow !== null ? (rows[notesRow]?.devotion.notes ?? '') : ''}
         onClose={() => setNotesRow(null)}
         onSave={saveNotes}
+      />
+
+      {/* Passage Picker Modal */}
+      <PassagePickerModal
+        open={passagePickerRow !== null}
+        currentPassageId={passagePickerRow !== null ? rows[passagePickerRow]?.devotion.generatedPassageId : undefined}
+        onClose={() => setPassagePickerRow(null)}
+        onSelect={handlePassageSelect}
       />
 
       {/* Devotion Detail Modal */}

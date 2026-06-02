@@ -248,7 +248,7 @@ function HalfGrid({
             const label = `${formatTimeShort(h * 60)} - ${formatTimeShort((h + 1) * 60)} PM`
             return (
               <tr key={h}>
-                <td className="border-r-2 border-b border-r-black border-b-gray-300 bg-white p-1 text-xs text-right whitespace-nowrap text-gray-900">
+                <td className="border-r-2 border-b border-b-dashed border-r-black border-b-gray-600 bg-white p-1 text-xs text-right whitespace-nowrap text-gray-900">
                   {label}
                 </td>
                 {days.map((d) => {

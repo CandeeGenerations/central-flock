@@ -269,7 +269,7 @@ export function FairBoothSchedulePage() {
             rosterAttrs={rosterAttrs}
             blank={blank}
           />
-          <PrintLegend />
+          {!blank && <PrintLegend />}
           <FooterBlocks blocks={settings.fairBooth.gridPageFooterBlocks} />
         </div>
         <div

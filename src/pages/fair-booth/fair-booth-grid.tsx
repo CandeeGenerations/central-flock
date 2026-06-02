@@ -241,7 +241,7 @@ function HalfGrid({
               )
             })}
             {Array.from({length: emptyTrailing}).map((_, i) => (
-              <th key={`empty-${i}`} className="border-r-2 border-b-2 border-black bg-gray-700"></th>
+              <th key={`empty-${i}`} className="border-b-2 border-black bg-gray-700"></th>
             ))}
           </tr>
         </thead>
@@ -290,7 +290,7 @@ function HalfGrid({
                   )
                 })}
                 {Array.from({length: emptyTrailing}).map((_, i) => (
-                  <td key={`empty-${i}`} className="border-r-2 border-black bg-gray-700"></td>
+                  <td key={`empty-${i}`} className="bg-gray-700"></td>
                 ))}
               </tr>
             )

@@ -1,4 +1,5 @@
 import {Button} from '@/components/ui/button'
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Label} from '@/components/ui/label'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
@@ -17,7 +18,7 @@ import {
   updateFairBoothSignup,
 } from '@/lib/schedules-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowLeft, ArrowUp, ChevronLeft, ChevronRight, Trash2} from 'lucide-react'
+import {ArrowDown, ArrowLeft, ArrowUp, ChevronLeft, ChevronRight, Plus, Trash2} from 'lucide-react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -29,7 +30,11 @@ const SHIFT_LABEL: Record<FairBoothShiftRole, string> = {
   worker: '——— Worker',
 }
 
-const SHIFT_RANK: Record<FairBoothShiftRole, number> = {unit_leader: 0, asst_unit: 1, worker: 2}
+const TIERS: {role: FairBoothShiftRole; label: string; emptyMsg: string | null}[] = [
+  {role: 'unit_leader', label: 'Unit Leader', emptyMsg: 'No Unit Leader assigned'},
+  {role: 'asst_unit', label: 'Asst Unit Leader', emptyMsg: 'No Asst Unit Leader assigned'},
+  {role: 'worker', label: 'Workers', emptyMsg: null},
+]
 
 export function FairBoothDayPage() {
   const {id, date} = useParams<{id: string; date: string}>()
@@ -85,7 +90,7 @@ export function FairBoothDayPage() {
   try {
     days = deriveFairDays(detail.schedule.scopeStart)
   } catch {
-    return <div className="p-4 text-destructive">Invalid schedule start (not a Friday).</div>
+    return <div className="text-destructive p-4">Invalid schedule start (not a Friday).</div>
   }
   const dayIdx = days.findIndex((d) => d.date === date)
   if (dayIdx === -1) return <div className="p-4">Date not in this fair</div>
@@ -97,15 +102,9 @@ export function FairBoothDayPage() {
   const rosterIds = new Set(detail.rosterPersonIds)
   const attrsByPerson = new Map(detail.rosterAttrs.map((a) => [a.personId, a]))
 
-  function firstAvailableInSlot(slotIdx: number): number | undefined {
-    const inSlot = new Set(
-      daySignups.filter((sg) => slotIndexForSignup(sg, day) === slotIdx).map((sg) => sg.personId),
-    )
-    return detail!.rosterPersonIds.find((pid) => !inSlot.has(pid))
-  }
-
   function addToSlot(slotIdx: number) {
-    const pid = firstAvailableInSlot(slotIdx)
+    const inSlot = new Set(daySignups.filter((sg) => slotIndexForSignup(sg, day) === slotIdx).map((sg) => sg.personId))
+    const pid = detail!.rosterPersonIds.find((p) => !inSlot.has(p))
     if (!pid) {
       toast.error('Every roster member is already in this slot.')
       return
@@ -119,29 +118,6 @@ export function FairBoothDayPage() {
       shiftRole: 'worker',
     })
   }
-  async function addSpanningBoth() {
-    const alreadyAnywhere = new Set(daySignups.map((sg) => sg.personId))
-    const pid = detail!.rosterPersonIds.find((p) => !alreadyAnywhere.has(p))
-    if (!pid) {
-      toast.error('Everyone on the roster already has a signup on this day.')
-      return
-    }
-    // One signup per slot so each gets its own row-override.
-    for (const s of day.slots) {
-      await addMutation.mutateAsync({
-        personId: pid,
-        dayDate: date!,
-        startMinute: s.startMinute,
-        endMinute: s.endMinute,
-        shiftRole: 'worker',
-      })
-    }
-  }
-
-  const sortedSignups = [...daySignups].sort(
-    (a, b) =>
-      (SHIFT_RANK[a.shiftRole] ?? 9) - (SHIFT_RANK[b.shiftRole] ?? 9) || a.sortOrder - b.sortOrder || a.id - b.id,
-  )
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-5xl">
@@ -172,10 +148,10 @@ export function FairBoothDayPage() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4 items-start">
+      <div className="grid items-start gap-4 md:grid-cols-2">
         <div className="md:sticky md:top-4 md:self-start">
-          <h3 className="font-medium mb-2">Preview</h3>
-          <div className="border rounded overflow-x-auto p-2 max-h-[calc(100vh-8rem)] overflow-y-auto">
+          <h3 className="mb-2 font-medium">Preview</h3>
+          <div className="max-h-[calc(100vh-8rem)] overflow-x-auto overflow-y-auto rounded border p-2">
             <FairBoothGrid
               scopeStart={detail.schedule.scopeStart}
               signups={daySignups}
@@ -186,193 +162,191 @@ export function FairBoothDayPage() {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <h3 className="font-medium">Signups</h3>
-          <AddSignupButtons day={day} addToSlot={addToSlot} addSpanningBoth={addSpanningBoth} />
-
-          {sortedSignups.length === 0 && (
-            <p className="text-muted-foreground text-sm">No signups yet — use the buttons above to add one.</p>
-          )}
-
-          {sortedSignups.map((s) => {
-            const person = detail.people.find((p) => p.id === s.personId)
-            const fairRole: FairBoothFairRole = attrsByPerson.get(s.personId)?.fairRole ?? 'worker'
-            const maxRole = maxShiftRoleFor(fairRole)
-            const allowedShifts: FairBoothShiftRole[] =
-              maxRole === 'worker'
-                ? ['worker']
-                : maxRole === 'asst_unit'
-                  ? ['worker', 'asst_unit']
-                  : ['worker', 'asst_unit', 'unit_leader']
-            const onRoster = rosterIds.has(s.personId)
+        <div className="space-y-4">
+          {day.slots.map((slot, slotIdx) => {
+            const slotSignups = daySignups
+              .filter((s) => slotIndexForSignup(s, day) === slotIdx)
+              .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+            const slotLabel = `${formatTimeShort(slot.startMinute)}–${formatTimeShort(slot.endMinute)} PM`
             return (
-              <div
-                key={s.id}
-                className={`rounded p-2 space-y-2 ${
-                  SHIFT_RANK[s.shiftRole] === 0
-                    ? 'border-2 border-purple-400'
-                    : SHIFT_RANK[s.shiftRole] === 1
-                      ? 'border-2 border-blue-400'
-                      : 'border'
-                }`}
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Label className="text-xs w-14 shrink-0">Person</Label>
-                  <SearchableSelect
-                    value={String(s.personId)}
-                    onValueChange={(v) =>
-                      updateMutation.mutate({signupId: s.id, body: {personId: Number(v)} as Partial<FairBoothSignup>})
-                    }
-                    options={detail.people
-                      .filter((p) => {
-                        if (p.id === s.personId) return true
-                        const mySlot = slotIndexForSignup(s, day)
-                        return !daySignups.some(
-                          (other) =>
-                            other.id !== s.id &&
-                            other.personId === p.id &&
-                            slotIndexForSignup(other, day) === mySlot,
-                        )
-                      })
-                      .map((p) => ({
-                        value: String(p.id),
-                        label: [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`,
-                      }))}
-                    className="w-56"
-                  />
-                  {!onRoster && <span className="text-xs text-yellow-700">⚠ no longer on roster</span>}
-                  {person?.isHispanic && <span className="text-xs text-emerald-700">Hispanic</span>}
-                  <div className="ml-auto flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => moveMutation.mutate({signupId: s.id, direction: 'up'})}
-                    >
-                      <ArrowUp className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => moveMutation.mutate({signupId: s.id, direction: 'down'})}
-                    >
-                      <ArrowDown className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteMutation.mutate(s.id)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap text-xs">
-                  <Label className="text-xs w-14 shrink-0">Time</Label>
-                  <TimePicker
-                    value={s.startMinute}
-                    onChange={(v) => updateMutation.mutate({signupId: s.id, body: {startMinute: v}})}
-                  />
-                  <span>→</span>
-                  <TimePicker
-                    value={s.endMinute}
-                    onChange={(v) => updateMutation.mutate({signupId: s.id, body: {endMinute: v}})}
-                  />
-                  <Label className="text-xs ml-4 shrink-0">Row</Label>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => rowMutation.mutate({signupId: s.id, direction: 'up'})}
-                  >
-                    <ArrowUp className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => rowMutation.mutate({signupId: s.id, direction: 'down'})}
-                  >
-                    <ArrowDown className="h-3 w-3" />
-                  </Button>
-                  {s.displayRowOverride !== null && (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="text-xs h-6 px-1"
-                      onClick={() => rowMutation.mutate({signupId: s.id, direction: 'reset'})}
-                    >
-                      reset
-                    </Button>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-wrap text-xs">
-                  <Label className="text-xs w-14 shrink-0">Role</Label>
-                  {allowedShifts.length === 1 ? (
-                    <span className="text-muted-foreground text-xs px-2 py-1 rounded border bg-muted/30">
-                      {SHIFT_LABEL[s.shiftRole]}
+              <Card key={slotIdx}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center justify-between text-base">
+                    <span>
+                      {day.slots.length > 1 ? `Slot ${slotIdx + 1} ` : ''}
+                      <span className="text-muted-foreground text-sm font-normal">({slotLabel})</span>
                     </span>
-                  ) : (
-                    <Select
-                      value={s.shiftRole}
-                      onValueChange={(v) =>
-                        updateMutation.mutate({signupId: s.id, body: {shiftRole: v as FairBoothShiftRole}})
-                      }
-                    >
-                      <SelectTrigger className="w-44">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allowedShifts.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {SHIFT_LABEL[r]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              </div>
+                    <Button variant="outline" size="sm" onClick={() => addToSlot(slotIdx)}>
+                      <Plus className="mr-1 h-3 w-3" /> Add signup
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {TIERS.map((tier) => {
+                    const tierSignups = slotSignups.filter((s) => s.shiftRole === tier.role)
+                    return (
+                      <div key={tier.role} className="space-y-2">
+                        <div className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                          {tier.label}
+                        </div>
+                        {tierSignups.length === 0
+                          ? tier.emptyMsg && <p className="text-destructive/70 text-xs italic">{tier.emptyMsg}</p>
+                          : tierSignups.map((s) => (
+                              <SignupCard
+                                key={s.id}
+                                signup={s}
+                                day={day}
+                                detail={detail}
+                                daySignups={daySignups}
+                                rosterIds={rosterIds}
+                                attrsByPerson={attrsByPerson}
+                                onUpdate={(body) => updateMutation.mutate({signupId: s.id, body})}
+                                onDelete={() => deleteMutation.mutate(s.id)}
+                                onMove={(direction) => moveMutation.mutate({signupId: s.id, direction})}
+                                onRow={(direction) => rowMutation.mutate({signupId: s.id, direction})}
+                              />
+                            ))}
+                      </div>
+                    )
+                  })}
+                </CardContent>
+              </Card>
             )
           })}
-          {sortedSignups.length > 3 && (
-            <AddSignupButtons day={day} addToSlot={addToSlot} addSpanningBoth={addSpanningBoth} />
-          )}
         </div>
       </div>
     </div>
   )
 }
 
-function AddSignupButtons({
+interface SignupCardProps {
+  signup: FairBoothSignup
+  day: ReturnType<typeof deriveFairDays>[number]
+  detail: NonNullable<ReturnType<typeof useQuery<Awaited<ReturnType<typeof fetchFairBoothSchedule>>>>['data']>
+  daySignups: FairBoothSignup[]
+  rosterIds: Set<number>
+  attrsByPerson: Map<number, {fairRole: FairBoothFairRole}>
+  onUpdate: (body: Partial<FairBoothSignup>) => void
+  onDelete: () => void
+  onMove: (direction: 'up' | 'down') => void
+  onRow: (direction: 'up' | 'down' | 'reset') => void
+}
+
+function SignupCard({
+  signup: s,
   day,
-  addToSlot,
-  addSpanningBoth,
-}: {
-  day: {slots: {startMinute: number; endMinute: number}[]}
-  addToSlot: (i: number) => void
-  addSpanningBoth: () => void
-}) {
+  detail,
+  daySignups,
+  rosterIds,
+  attrsByPerson,
+  onUpdate,
+  onDelete,
+  onMove,
+  onRow,
+}: SignupCardProps) {
+  const person = detail.people.find((p) => p.id === s.personId)
+  const fairRole: FairBoothFairRole = attrsByPerson.get(s.personId)?.fairRole ?? 'worker'
+  const maxRole = maxShiftRoleFor(fairRole)
+  const allowedShifts: FairBoothShiftRole[] =
+    maxRole === 'worker'
+      ? ['worker']
+      : maxRole === 'asst_unit'
+        ? ['worker', 'asst_unit']
+        : ['worker', 'asst_unit', 'unit_leader']
+  const onRoster = rosterIds.has(s.personId)
   return (
-    <div className="flex flex-wrap gap-2">
-      {day.slots.map((s, i) => (
-        <Button key={i} variant="outline" size="sm" onClick={() => addToSlot(i)}>
-          + Add to Slot {i + 1} ({formatTimeShort(s.startMinute)}-{formatTimeShort(s.endMinute)})
+    <div
+      className={`space-y-2 rounded p-2 ${
+        s.shiftRole === 'unit_leader'
+          ? 'border-2 border-purple-400'
+          : s.shiftRole === 'asst_unit'
+            ? 'border-2 border-blue-400'
+            : 'border'
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <Label className="w-14 shrink-0 text-xs">Person</Label>
+        <SearchableSelect
+          value={String(s.personId)}
+          onValueChange={(v) => onUpdate({personId: Number(v)} as Partial<FairBoothSignup>)}
+          options={detail.people
+            .filter((p) => {
+              if (p.id === s.personId) return true
+              const mySlot = slotIndexForSignup(s, day)
+              return !daySignups.some(
+                (other) => other.id !== s.id && other.personId === p.id && slotIndexForSignup(other, day) === mySlot,
+              )
+            })
+            .map((p) => ({
+              value: String(p.id),
+              label: [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`,
+            }))}
+          className="w-56"
+        />
+        {!onRoster && <span className="text-xs text-yellow-700">⚠ no longer on roster</span>}
+        {person?.isHispanic && <span className="text-xs text-emerald-700">Hispanic</span>}
+        <div className="ml-auto flex gap-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMove('up')}>
+            <ArrowUp className="h-3 w-3" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMove('down')}>
+            <ArrowDown className="h-3 w-3" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onDelete}>
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <Label className="w-14 shrink-0 text-xs">Time</Label>
+        <TimePicker value={s.startMinute} onChange={(v) => onUpdate({startMinute: v})} />
+        <span>→</span>
+        <TimePicker value={s.endMinute} onChange={(v) => onUpdate({endMinute: v})} />
+        <Label className="ml-4 shrink-0 text-xs">Row</Label>
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRow('up')}>
+          <ArrowUp className="h-3 w-3" />
         </Button>
-      ))}
-      {day.slots.length > 1 && (
-        <Button variant="outline" size="sm" onClick={addSpanningBoth}>
-          + Add spanning both
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRow('down')}>
+          <ArrowDown className="h-3 w-3" />
         </Button>
-      )}
+        {s.displayRowOverride !== null && (
+          <Button variant="link" size="sm" className="h-6 px-1 text-xs" onClick={() => onRow('reset')}>
+            reset
+          </Button>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <Label className="w-14 shrink-0 text-xs">Role</Label>
+        {allowedShifts.length === 1 ? (
+          <span className="text-muted-foreground bg-muted/30 rounded border px-2 py-1 text-xs">
+            {SHIFT_LABEL[s.shiftRole]}
+          </span>
+        ) : (
+          <Select value={s.shiftRole} onValueChange={(v) => onUpdate({shiftRole: v as FairBoothShiftRole})}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {allowedShifts.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {SHIFT_LABEL[r]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
     </div>
   )
 }
 
 function TimePicker({value, onChange}: {value: number; onChange: (v: number) => void}) {
-  // 30-minute options from 2:00 PM to 10:00 PM.
+  // 30-minute options from 2:00 PM to 10:00 PM (unbounded — soft slot reflow).
   const opts: number[] = []
   for (let m = 14 * 60; m <= 22 * 60; m += 30) opts.push(m)
   return (
     <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
-      <SelectTrigger className="w-24 h-7 text-xs">
+      <SelectTrigger className="h-7 w-24 text-xs">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

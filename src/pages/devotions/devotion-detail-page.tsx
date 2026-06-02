@@ -1241,11 +1241,31 @@ export function DevotionDetailPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {[
-                  {label: 'Title', value: podTitle, key: 'podcastTitle'},
-                  {label: 'YouTube Description', value: ytDescription, key: 'youtubeDescription'},
-                  {label: 'Facebook / Instagram Description', value: fbDescription, key: 'facebookDescription'},
-                  {label: 'Podcast Description', value: podDescription, key: 'podcastDescription'},
-                ].map(({label, value, key}) => (
+                  {
+                    label: 'Title',
+                    value: podTitle,
+                    key: 'podcastTitle',
+                    bg: 'bg-gradient-to-r from-[#FF0000] to-[#7B2CBF] text-white',
+                  },
+                  {
+                    label: 'YouTube Description',
+                    value: ytDescription,
+                    key: 'youtubeDescription',
+                    bg: 'bg-[#FF0000] text-white',
+                  },
+                  {
+                    label: 'Facebook / Instagram Description',
+                    value: fbDescription,
+                    key: 'facebookDescription',
+                    bg: 'bg-[#1877F2] text-white',
+                  },
+                  {
+                    label: 'Podcast Description',
+                    value: podDescription,
+                    key: 'podcastDescription',
+                    bg: 'bg-[#7B2CBF] text-white',
+                  },
+                ].map(({label, value, key, bg}) => (
                   <div key={key}>
                     <div className="flex items-center justify-between mb-1">
                       <Label>{label}</Label>
@@ -1258,7 +1278,13 @@ export function DevotionDetailPage() {
                         {copiedField === key ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
-                    <p className="text-sm bg-muted rounded-3xl p-4 font-mono whitespace-pre-wrap">{value}</p>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(value, key)}
+                      className={`w-full text-left text-sm ${bg} rounded-3xl p-4 font-mono whitespace-pre-wrap cursor-pointer transition-opacity hover:opacity-90`}
+                    >
+                      {value}
+                    </button>
                   </div>
                 ))}
               </CardContent>

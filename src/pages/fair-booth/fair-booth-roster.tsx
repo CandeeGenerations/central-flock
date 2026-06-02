@@ -140,49 +140,49 @@ interface RosterColumnProps {
 
 function RosterColumn({rows, initials, minBold, onClick, blankRows, clickable = true}: RosterColumnProps) {
   return (
-    <div className="rounded-md overflow-hidden">
-    <table className="w-full border-collapse text-sm">
-      <thead>
-        <tr>
-          <th className="border bg-muted p-1 text-left text-foreground">Name ({rows.length})</th>
-          <th className="border bg-muted p-1 text-left w-24 text-foreground">Initials</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => {
-          const fullName = [r.firstName, r.lastName].filter(Boolean).join(' ') || `Person ${r.personId}`
-          const italic = r.signupCount === 0
-          const bold = r.signupCount > 0 && r.signupCount < minBold
-          const init = initials.get(r.personId) ?? '??'
-          return (
-            <tr
-              key={r.personId}
-              className={clickable ? 'cursor-pointer hover:bg-muted/30' : ''}
-              onClick={clickable ? () => onClick(r.personId) : undefined}
-            >
-              <td className={`border p-1 ${italic ? 'italic' : ''} ${bold ? 'font-bold' : ''}`}>
-                {fullName} ({r.signupCount})
-                {r.isHispanic && (
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    H
-                  </Badge>
-                )}
-              </td>
-              <td className="border p-1 font-mono">
-                {init}
-                {fairRoleStars(r.fairRole as FairBoothFairRole)}
-              </td>
-            </tr>
-          )
-        })}
-        {Array.from({length: blankRows}).map((_, i) => (
-          <tr key={`blank-${i}`}>
-            <td className="border p-1">&nbsp;</td>
-            <td className="border p-1">&nbsp;</td>
+    <div className="rounded-md overflow-hidden border">
+      <table className="w-full text-sm" style={{borderCollapse: 'separate', borderSpacing: 0}}>
+        <thead>
+          <tr>
+            <th className="border-r border-b p-1 text-left text-foreground bg-muted">Name ({rows.length})</th>
+            <th className="border-b p-1 text-left w-24 text-foreground bg-muted">Initials</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const fullName = [r.firstName, r.lastName].filter(Boolean).join(' ') || `Person ${r.personId}`
+            const italic = r.signupCount === 0
+            const bold = r.signupCount > 0 && r.signupCount < minBold
+            const init = initials.get(r.personId) ?? '??'
+            return (
+              <tr
+                key={r.personId}
+                className={clickable ? 'cursor-pointer hover:bg-muted/30' : ''}
+                onClick={clickable ? () => onClick(r.personId) : undefined}
+              >
+                <td className={`border-r border-b p-1 ${italic ? 'italic' : ''} ${bold ? 'font-bold' : ''}`}>
+                  {fullName} ({r.signupCount})
+                  {r.isHispanic && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      H
+                    </Badge>
+                  )}
+                </td>
+                <td className="border-b p-1 font-mono">
+                  {init}
+                  {fairRoleStars(r.fairRole as FairBoothFairRole)}
+                </td>
+              </tr>
+            )
+          })}
+          {Array.from({length: blankRows}).map((_, i) => (
+            <tr key={`blank-${i}`}>
+              <td className="border-r border-b p-1">&nbsp;</td>
+              <td className="border-b p-1">&nbsp;</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

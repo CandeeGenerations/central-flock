@@ -208,84 +208,89 @@ function HalfGrid({
   clickable = true,
 }: HalfGridProps) {
   return (
-    <div className="rounded-md overflow-hidden">
-    <table className="w-full border-collapse text-xs table-fixed">
-      <thead>
-        <tr>
-          <th className="border-2 border-black bg-white p-1 text-left text-xs font-normal w-16"></th>
-          {days.map((d) => {
-            const coverage = blank ? 'none' : hispanicCoverageForDay(signups, hispanicIds, d)
-            const headerBg = blank ? 'bg-white' : HEADER_BG_BY_COVERAGE[coverage]
-            const counts = blank ? '' : headerCountsForDay(signups, d)
-            const dayDate = new Date(d.date + 'T12:00:00')
-            const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayDate.getDay()]
+    <div className="rounded-md overflow-hidden border-2 border-black" style={{transform: 'translateZ(0)'}}>
+      <table className="w-full text-xs table-fixed" style={{borderCollapse: 'separate', borderSpacing: 0}}>
+        <thead>
+          <tr>
+            <th className="border-r-2 border-b-2 border-black bg-white p-1 text-left text-xs font-normal w-16"></th>
+            {days.map((d) => {
+              const coverage = blank ? 'none' : hispanicCoverageForDay(signups, hispanicIds, d)
+              const headerBg = blank ? 'bg-white' : HEADER_BG_BY_COVERAGE[coverage]
+              const counts = blank ? '' : headerCountsForDay(signups, d)
+              const dayDate = new Date(d.date + 'T12:00:00')
+              const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayDate.getDay()]
+              return (
+                <th
+                  key={d.date}
+                  className={`border-r-2 border-b-2 border-black p-1 text-center text-sm text-gray-900 font-bold ${headerBg}`}
+                >
+                  {clickable ? (
+                    <a href={dayHref(scheduleId, d.date)} className="block cursor-pointer text-gray-900">
+                      {dayName}, {dayDate.getDate()}
+                      {counts ? ` (${counts})` : ''}
+                    </a>
+                  ) : (
+                    <span className="block text-gray-900">
+                      {dayName}, {dayDate.getDate()}
+                      {counts ? ` (${counts})` : ''}
+                    </span>
+                  )}
+                </th>
+              )
+            })}
+            {Array.from({length: emptyTrailing}).map((_, i) => (
+              <th key={`empty-${i}`} className="border-r-2 border-b-2 border-black bg-gray-700"></th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {HOUR_ROWS.map((h) => {
+            const label = `${formatTimeShort(h * 60)} - ${formatTimeShort((h + 1) * 60)} PM`
             return (
-              <th key={d.date} className={`border-2 border-black p-1 text-center text-sm text-gray-900 font-bold ${headerBg}`}>
-                {clickable ? (
-                  <a href={dayHref(scheduleId, d.date)} className="block cursor-pointer text-gray-900">
-                    {dayName}, {dayDate.getDate()}
-                    {counts ? ` (${counts})` : ''}
-                  </a>
-                ) : (
-                  <span className="block text-gray-900">
-                    {dayName}, {dayDate.getDate()}
-                    {counts ? ` (${counts})` : ''}
-                  </span>
-                )}
-              </th>
+              <tr key={h}>
+                <td className="border-r-2 border-b-2 border-black bg-white p-1 text-xs text-right whitespace-nowrap text-gray-900">
+                  {label}
+                </td>
+                {days.map((d) => {
+                  const cells = renderFn(d)
+                  const cell = cells.get(h * 60)!
+                  const inAnySlot = d.slots.some((s) => h * 60 >= s.startMinute && h * 60 < s.endMinute)
+                  const slotBoundary = d.slots.length > 1 && h * 60 === d.slots[1].startMinute
+                  const bg = inAnySlot ? cell.bgClass || 'bg-white' : 'bg-gray-700'
+                  const borderTop = cell.dotted
+                    ? 'border-t border-t-dashed border-t-gray-600'
+                    : slotBoundary
+                      ? 'border-t-2 border-t-black'
+                      : ''
+                  return (
+                    <td
+                      key={d.date}
+                      className={`border-r-2 border-black align-top p-1 text-gray-900 ${bg} ${borderTop} ${clickable ? 'cursor-pointer' : ''}`}
+                      onClick={
+                        clickable
+                          ? () => {
+                              window.location.assign(dayHref(scheduleId, d.date))
+                            }
+                          : undefined
+                      }
+                    >
+                      {inAnySlot &&
+                        cell.entries.map((e) => (
+                          <div key={e.signupId} className="font-mono leading-tight">
+                            {e.line}
+                          </div>
+                        ))}
+                    </td>
+                  )
+                })}
+                {Array.from({length: emptyTrailing}).map((_, i) => (
+                  <td key={`empty-${i}`} className="border-r-2 border-black bg-gray-700"></td>
+                ))}
+              </tr>
             )
           })}
-          {Array.from({length: emptyTrailing}).map((_, i) => (
-            <th key={`empty-${i}`} className="border-2 border-black bg-gray-700"></th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {HOUR_ROWS.map((h) => {
-          const label = `${formatTimeShort(h * 60)} - ${formatTimeShort((h + 1) * 60)} PM`
-          return (
-            <tr key={h}>
-              <td className="border-2 border-black bg-white p-1 text-xs text-right whitespace-nowrap text-gray-900">{label}</td>
-              {days.map((d) => {
-                const cells = renderFn(d)
-                const cell = cells.get(h * 60)!
-                const inAnySlot = d.slots.some((s) => h * 60 >= s.startMinute && h * 60 < s.endMinute)
-                const slotBoundary = d.slots.length > 1 && h * 60 === d.slots[1].startMinute
-                const bg = inAnySlot ? cell.bgClass || 'bg-white' : 'bg-gray-700'
-                const borderTop = cell.dotted
-                  ? 'border-t border-t-dashed border-t-gray-600'
-                  : slotBoundary
-                    ? 'border-t-2 border-t-black'
-                    : ''
-                return (
-                  <td
-                    key={d.date}
-                    className={`border-l-2 border-r-2 border-black align-top p-1 text-gray-900 ${bg} ${borderTop} ${clickable ? 'cursor-pointer' : ''}`}
-                    onClick={
-                      clickable
-                        ? () => {
-                            window.location.assign(dayHref(scheduleId, d.date))
-                          }
-                        : undefined
-                    }
-                  >
-                    {inAnySlot &&
-                      cell.entries.map((e) => (
-                        <div key={e.signupId} className="font-mono leading-tight">
-                          {e.line}
-                        </div>
-                      ))}
-                  </td>
-                )
-              })}
-              {Array.from({length: emptyTrailing}).map((_, i) => (
-                <td key={`empty-${i}`} className="border-l-2 border-r-2 border-black bg-gray-700"></td>
-              ))}
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
+        </tbody>
+      </table>
     </div>
   )
 }

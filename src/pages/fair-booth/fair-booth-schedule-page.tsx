@@ -1,12 +1,11 @@
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {PageSpinner} from '@/components/ui/spinner'
+import {deriveFairDays} from '@/lib/fair-booth-render'
 import {fetchFairBoothSchedule, fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
 import {useQuery} from '@tanstack/react-query'
 import {ArrowLeft, ChevronLeft, ChevronRight, FileDown, FileImage} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
-
-import {deriveFairDays} from '@/lib/fair-booth-render'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -120,7 +119,18 @@ export function FairBoothSchedulePage() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            {isMobile ? <MobileGridNav scheduleId={scheduleId} scopeStart={schedule.scopeStart} signups={signups} people={people} rosterAttrs={rosterAttrs} blank={blank} dayIdx={mobileDayIdx} setDayIdx={setMobileDayIdx} /> : (
+            {isMobile ? (
+              <MobileGridNav
+                scheduleId={scheduleId}
+                scopeStart={schedule.scopeStart}
+                signups={signups}
+                people={people}
+                rosterAttrs={rosterAttrs}
+                blank={blank}
+                dayIdx={mobileDayIdx}
+                setDayIdx={setMobileDayIdx}
+              />
+            ) : (
               <FairBoothGrid
                 scopeStart={schedule.scopeStart}
                 signups={signups}
@@ -224,7 +234,16 @@ interface MobileGridNavProps {
   setDayIdx: (n: number) => void
 }
 
-function MobileGridNav({scheduleId, scopeStart, signups, people, rosterAttrs, blank, dayIdx, setDayIdx}: MobileGridNavProps) {
+function MobileGridNav({
+  scheduleId,
+  scopeStart,
+  signups,
+  people,
+  rosterAttrs,
+  blank,
+  dayIdx,
+  setDayIdx,
+}: MobileGridNavProps) {
   let days: ReturnType<typeof deriveFairDays>
   try {
     days = deriveFairDays(scopeStart)
@@ -239,8 +258,15 @@ function MobileGridNav({scheduleId, scopeStart, signups, people, rosterAttrs, bl
         <Button variant="outline" size="icon" disabled={safeIdx === 0} onClick={() => setDayIdx(safeIdx - 1)}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="text-sm font-medium">Day {safeIdx + 1} of {days.length}</span>
-        <Button variant="outline" size="icon" disabled={safeIdx === days.length - 1} onClick={() => setDayIdx(safeIdx + 1)}>
+        <span className="text-sm font-medium">
+          Day {safeIdx + 1} of {days.length}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          disabled={safeIdx === days.length - 1}
+          onClick={() => setDayIdx(safeIdx + 1)}
+        >
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>

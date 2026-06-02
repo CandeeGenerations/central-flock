@@ -234,8 +234,7 @@ fairBoothRouter.put(
         updates.initialsOverride =
           b.initialsOverride === null || b.initialsOverride.trim() === '' ? null : b.initialsOverride.trim()
       if (b.nameOverride !== undefined)
-        updates.nameOverride =
-          b.nameOverride === null || b.nameOverride.trim() === '' ? null : b.nameOverride.trim()
+        updates.nameOverride = b.nameOverride === null || b.nameOverride.trim() === '' ? null : b.nameOverride.trim()
       const row = db
         .update(schema.fairBoothRosterAttrs)
         .set(updates)

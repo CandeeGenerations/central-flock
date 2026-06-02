@@ -444,7 +444,7 @@ function slotIdxFor(signupStart: number, signupEnd: number, slots: {startMinute:
     const a = Math.max(signupStart, slots[i].startMinute)
     const b = Math.min(signupEnd, slots[i].endMinute)
     const ov = Math.max(0, b - a)
-    if (ov >= bestOverlap) {
+    if (ov > bestOverlap) {
       bestOverlap = ov
       bestIdx = i
     }

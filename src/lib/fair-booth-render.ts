@@ -361,7 +361,7 @@ export function slotIndexForSignup(signup: FairSignup, day: FairDay): number {
     const a = Math.max(signup.startMinute, s.startMinute)
     const b = Math.min(signup.endMinute, s.endMinute)
     const overlap = Math.max(0, b - a)
-    if (overlap >= bestOverlap) {
+    if (overlap > bestOverlap) {
       bestOverlap = overlap
       best = i
     }

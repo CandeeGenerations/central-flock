@@ -255,7 +255,7 @@ function HalfGrid({
                   ? 'border-t border-t-dashed border-t-gray-600'
                   : slotBoundary
                     ? 'border-t-2 border-t-black'
-                    : 'border-t border-t-gray-400'
+                    : ''
                 return (
                   <td
                     key={d.date}

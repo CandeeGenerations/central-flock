@@ -63,7 +63,8 @@ export function FairBoothSchedulePage() {
   if (isLoading || !detail || !settings) return <PageSpinner />
   const {schedule, people, rosterPersonIds, rosterAttrs, signups} = detail
   if (!schedule.scopeStart) return <div className="p-4">Schedule missing scope start.</div>
-  const rosterSize = rosterPersonIds.length
+  const signedUpIds = new Set(signups.map((s) => s.personId))
+  const rosterSize = rosterPersonIds.filter((pid) => signedUpIds.has(pid)).length
   const filenameBase = `fair-booth-${schedule.scopeLabel.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`
 
   async function withExport(fn: () => Promise<void>) {

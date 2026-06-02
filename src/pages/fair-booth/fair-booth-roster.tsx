@@ -28,7 +28,8 @@ export function FairBoothRoster({
   forceLight = false,
 }: FairBoothRosterProps) {
   const rosterSet = new Set(rosterPersonIds)
-  const inRoster = people.filter((p) => rosterSet.has(p.id))
+  const signedUpIds = new Set(signups.map((s) => s.personId))
+  const inRoster = people.filter((p) => rosterSet.has(p.id) && signedUpIds.has(p.id))
   const attrsByPerson = new Map(rosterAttrs.map((a) => [a.personId, a]))
   const overrides = new Map<number, string>()
   for (const a of rosterAttrs) {

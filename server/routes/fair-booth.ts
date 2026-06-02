@@ -436,6 +436,22 @@ fairBoothRouter.delete(
   }),
 )
 
+function slotIdxFor(signupStart: number, signupEnd: number, slots: {startMinute: number; endMinute: number}[]): number {
+  if (slots.length === 1) return 0
+  let bestIdx = 0
+  let bestOverlap = -1
+  for (let i = 0; i < slots.length; i++) {
+    const a = Math.max(signupStart, slots[i].startMinute)
+    const b = Math.min(signupEnd, slots[i].endMinute)
+    const ov = Math.max(0, b - a)
+    if (ov >= bestOverlap) {
+      bestOverlap = ov
+      bestIdx = i
+    }
+  }
+  return bestIdx
+}
+
 fairBoothRouter.post(
   '/:id/signups/:signupId/move',
   asyncHandler(async (req, res) => {
@@ -446,6 +462,9 @@ fairBoothRouter.post(
       res.status(404).json({error: 'Signup not found'})
       return
     }
+    const slots = slotsForDate(me.dayDate)
+    const mySlotIdx = slotIdxFor(me.startMinute, me.endMinute, slots)
+    // Peers: same schedule, day, shift_role, AND same slot.
     const peers = db
       .select()
       .from(schema.fairBoothSignups)
@@ -457,7 +476,18 @@ fairBoothRouter.post(
         ),
       )
       .all()
+      .filter((p) => slotIdxFor(p.startMinute, p.endMinute, slots) === mySlotIdx)
       .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+    // Normalize: rewrite sequential sort_order 0..N-1 in case ties existed.
+    for (let i = 0; i < peers.length; i++) {
+      if (peers[i].sortOrder !== i) {
+        db.update(schema.fairBoothSignups)
+          .set({sortOrder: i, updatedAt: new Date().toISOString()})
+          .where(eq(schema.fairBoothSignups.id, peers[i].id))
+          .run()
+        peers[i].sortOrder = i
+      }
+    }
     const idx = peers.findIndex((p) => p.id === signupId)
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1
     if (swapIdx < 0 || swapIdx >= peers.length) {

@@ -140,6 +140,7 @@ interface RosterColumnProps {
 
 function RosterColumn({rows, initials, minBold, onClick, blankRows, clickable = true}: RosterColumnProps) {
   return (
+    <div className="rounded-md border overflow-hidden">
     <table className="w-full border-collapse text-sm">
       <thead>
         <tr>
@@ -182,5 +183,6 @@ function RosterColumn({rows, initials, minBold, onClick, blankRows, clickable = 
         ))}
       </tbody>
     </table>
+    </div>
   )
 }

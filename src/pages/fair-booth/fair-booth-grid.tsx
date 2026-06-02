@@ -208,7 +208,8 @@ function HalfGrid({
   clickable = true,
 }: HalfGridProps) {
   return (
-    <table className="w-full border-collapse text-xs table-fixed border-2 border-black rounded-md overflow-hidden">
+    <div className="rounded-md border-2 border-black overflow-hidden">
+    <table className="w-full border-collapse text-xs table-fixed">
       <thead>
         <tr>
           <th className="border-2 border-black bg-white p-1 text-left text-xs font-normal w-16"></th>
@@ -285,5 +286,6 @@ function HalfGrid({
         })}
       </tbody>
     </table>
+    </div>
   )
 }

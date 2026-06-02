@@ -208,7 +208,7 @@ function HalfGrid({
   clickable = true,
 }: HalfGridProps) {
   return (
-    <div className="rounded-md border-2 border-black overflow-hidden">
+    <div className="rounded-md overflow-hidden">
     <table className="w-full border-collapse text-xs table-fixed">
       <thead>
         <tr>

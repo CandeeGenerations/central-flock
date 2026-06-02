@@ -1,6 +1,6 @@
 import {Badge} from '@/components/ui/badge'
-import {computeInitialsForRoster, orderRoster, splitRosterColumns} from '@/lib/fair-booth-render'
-import type {FairBoothRosterAttr, FairBoothSignup} from '@/lib/schedules-api'
+import {computeInitialsForRoster, fairRoleStars, orderRoster, splitRosterColumns} from '@/lib/fair-booth-render'
+import type {FairBoothFairRole, FairBoothRosterAttr, FairBoothSignup} from '@/lib/schedules-api'
 
 interface FairBoothRosterProps {
   people: {id: number; firstName: string | null; lastName: string | null; isHispanic: boolean}[]
@@ -145,7 +145,10 @@ function RosterColumn({rows, initials, minBold, onClick, blankRows}: RosterColum
                   </Badge>
                 )}
               </td>
-              <td className="border p-1 font-mono">{init}</td>
+              <td className="border p-1 font-mono">
+                {init}
+                {fairRoleStars(r.fairRole as FairBoothFairRole)}
+              </td>
             </tr>
           )
         })}

@@ -12,6 +12,7 @@ interface FairBoothRosterProps {
   blankRowsPerColumn?: number
   singleColumn?: boolean
   clickable?: boolean
+  forceLight?: boolean
 }
 
 export function FairBoothRoster({
@@ -24,6 +25,7 @@ export function FairBoothRoster({
   blankRowsPerColumn = 4,
   singleColumn = false,
   clickable = true,
+  forceLight = false,
 }: FairBoothRosterProps) {
   const rosterSet = new Set(rosterPersonIds)
   const inRoster = people.filter((p) => rosterSet.has(p.id))
@@ -86,6 +88,7 @@ export function FairBoothRoster({
           onClick={clickable ? onClickPerson : () => {}}
           blankRows={blankRowsPerColumn}
           clickable={clickable}
+          forceLight={forceLight}
         />
       ) : (
         <div className="grid grid-cols-2 gap-3">
@@ -96,6 +99,7 @@ export function FairBoothRoster({
             onClick={clickable ? onClickPerson : () => {}}
             blankRows={blankRowsPerColumn}
             clickable={clickable}
+            forceLight={forceLight}
           />
           <RosterColumn
             rows={right}
@@ -104,6 +108,7 @@ export function FairBoothRoster({
             onClick={clickable ? onClickPerson : () => {}}
             blankRows={blankRowsPerColumn}
             clickable={clickable}
+            forceLight={forceLight}
           />
         </div>
       )}
@@ -136,16 +141,28 @@ interface RosterColumnProps {
   onClick: (personId: number) => void
   blankRows: number
   clickable?: boolean
+  forceLight?: boolean
 }
 
-function RosterColumn({rows, initials, minBold, onClick, blankRows, clickable = true}: RosterColumnProps) {
+function RosterColumn({
+  rows,
+  initials,
+  minBold,
+  onClick,
+  blankRows,
+  clickable = true,
+  forceLight = false,
+}: RosterColumnProps) {
+  const headerBg = forceLight ? 'bg-gray-100' : 'bg-muted'
+  const headerText = forceLight ? 'text-gray-900' : 'text-foreground'
+  const cellText = forceLight ? 'text-gray-900' : ''
   return (
     <div className="rounded-md overflow-hidden border">
       <table className="w-full text-sm" style={{borderCollapse: 'separate', borderSpacing: 0}}>
         <thead>
           <tr>
-            <th className="border-r border-b p-1 text-left text-foreground bg-muted">Name ({rows.length})</th>
-            <th className="border-b p-1 text-left w-24 text-foreground bg-muted">Initials</th>
+            <th className={`border-r border-b p-1 text-left ${headerText} ${headerBg}`}>Name ({rows.length})</th>
+            <th className={`border-b p-1 text-left w-24 ${headerText} ${headerBg}`}>Initials</th>
           </tr>
         </thead>
         <tbody>
@@ -160,7 +177,7 @@ function RosterColumn({rows, initials, minBold, onClick, blankRows, clickable = 
                 className={clickable ? 'cursor-pointer hover:bg-muted/30' : ''}
                 onClick={clickable ? () => onClick(r.personId) : undefined}
               >
-                <td className={`border-r border-b p-1 ${italic ? 'italic' : ''} ${bold ? 'font-bold' : ''}`}>
+                <td className={`border-r border-b p-1 ${cellText} ${italic ? 'italic' : ''} ${bold ? 'font-bold' : ''}`}>
                   {fullName} ({r.signupCount})
                   {r.isHispanic && (
                     <Badge variant="secondary" className="ml-1 text-xs">
@@ -168,7 +185,7 @@ function RosterColumn({rows, initials, minBold, onClick, blankRows, clickable = 
                     </Badge>
                   )}
                 </td>
-                <td className="border-b p-1 font-mono">
+                <td className={`border-b p-1 font-mono ${cellText}`}>
                   {init}
                   {fairRoleStars(r.fairRole as FairBoothFairRole)}
                 </td>

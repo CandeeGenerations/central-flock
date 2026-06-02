@@ -199,6 +199,7 @@ export function FairBoothSchedulePage() {
             rosterAttrs={rosterAttrs}
             blank={blank}
           />
+          <PrintLegend />
           <FooterBlocks blocks={settings.fairBooth.gridPageFooterBlocks} />
         </div>
         <div ref={printRosterRef} style={{background: '#fff', padding: 16}}>
@@ -215,6 +216,7 @@ export function FairBoothSchedulePage() {
             signups={signups}
             minSignupsForBold={settings.fairBooth.minSignupsForBold}
             onClickPerson={() => {}}
+            forceLight
           />
           <FooterBlocks blocks={settings.fairBooth.rosterPageFooterBlocks} />
         </div>
@@ -279,6 +281,60 @@ function MobileGridNav({
         scheduleId={scheduleId}
         onlyDate={day.date}
       />
+    </div>
+  )
+}
+
+function PrintLegend() {
+  const headcount = [
+    {bg: '#fecaca', label: '≤3'},
+    {bg: '#fed7aa', label: '4'},
+    {bg: '#fef08a', label: '5'},
+    {bg: '#a5f3fc', label: '6'},
+    {bg: '#bfdbfe', label: '7'},
+    {bg: '#bbf7d0', label: '8'},
+    {bg: '#e9d5ff', label: '>8'},
+  ]
+  const coverage = [
+    {bg: '#86efac', label: 'Hispanic full day'},
+    {bg: '#fdba74', label: 'Hispanic partial'},
+    {bg: '#fca5a5', label: 'No Hispanic'},
+  ]
+  const swatch = (bg: string) => ({
+    display: 'inline-block' as const,
+    width: 18,
+    height: 12,
+    background: bg,
+    border: '1px solid #ccc',
+    borderRadius: 3,
+    verticalAlign: 'middle' as const,
+    marginRight: 4,
+  })
+  return (
+    <div style={{marginTop: 12, fontSize: 10, color: '#111', display: 'flex', gap: 24, flexWrap: 'wrap'}}>
+      <div>
+        <strong style={{display: 'block', fontSize: 9, textTransform: 'uppercase'}}>Headcount</strong>
+        {headcount.map((h) => (
+          <span key={h.label} style={{marginRight: 8}}>
+            <span style={swatch(h.bg)} />
+            {h.label}
+          </span>
+        ))}
+      </div>
+      <div>
+        <strong style={{display: 'block', fontSize: 9, textTransform: 'uppercase'}}>Day header</strong>
+        {coverage.map((c) => (
+          <span key={c.label} style={{marginRight: 8}}>
+            <span style={swatch(c.bg)} />
+            {c.label}
+          </span>
+        ))}
+      </div>
+      <div>
+        <strong style={{display: 'block', fontSize: 9, textTransform: 'uppercase'}}>Markers</strong>
+        <span style={{marginRight: 8, fontFamily: 'monospace'}}>— UL · —— AsstUL · ——— Worker</span>
+        <span style={{fontFamily: 'monospace'}}>★ Worker · ★★ AsstUnit · ★★★ UL · ★★★★ AsstFairMgr · ★★★★★ FairMgr</span>
+      </div>
     </div>
   )
 }

@@ -252,7 +252,7 @@ function HalfGrid({
             return (
               <tr key={h}>
                 <td
-                  className={`border-r-2 border-r-black ${axisBorderTop} bg-white p-1 text-xs text-right whitespace-nowrap text-gray-900`}
+                  className={`border-r-2 border-r-black ${axisBorderTop} bg-white p-1 text-xs text-right whitespace-nowrap text-gray-900 align-top`}
                 >
                   {label}
                 </td>
@@ -281,7 +281,7 @@ function HalfGrid({
                     >
                       {inAnySlot &&
                         cell.entries.map((e) => (
-                          <div key={e.signupId} className="font-mono leading-tight">
+                          <div key={e.signupId} className="font-mono font-bold leading-tight">
                             {e.line}
                           </div>
                         ))}

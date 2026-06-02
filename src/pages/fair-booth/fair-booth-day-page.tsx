@@ -229,7 +229,7 @@ interface SignupCardProps {
   detail: NonNullable<ReturnType<typeof useQuery<Awaited<ReturnType<typeof fetchFairBoothSchedule>>>>['data']>
   daySignups: FairBoothSignup[]
   rosterIds: Set<number>
-  attrsByPerson: Map<number, {fairRole: FairBoothFairRole}>
+  attrsByPerson: Map<number, {fairRole: FairBoothFairRole; nameOverride?: string | null}>
   onUpdate: (body: Partial<FairBoothSignup>) => void
   onDelete: () => void
   onMove: (direction: 'up' | 'down') => void
@@ -281,10 +281,14 @@ function SignupCard({
                 (other) => other.id !== s.id && other.personId === p.id && slotIndexForSignup(other, day) === mySlot,
               )
             })
-            .map((p) => ({
-              value: String(p.id),
-              label: [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`,
-            }))}
+            .map((p) => {
+              const override = attrsByPerson.get(p.id)?.nameOverride
+              const label =
+                override && override.trim() !== ''
+                  ? override.trim()
+                  : [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`
+              return {value: String(p.id), label}
+            })}
           className="w-56"
         />
         {!onRoster && <span className="text-xs text-yellow-700">⚠ no longer on roster</span>}

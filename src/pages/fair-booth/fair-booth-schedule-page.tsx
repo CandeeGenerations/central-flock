@@ -356,50 +356,54 @@ function PrintLegend() {
   ]
   const swatch = (bg: string) => ({
     display: 'inline-block' as const,
-    width: 28,
-    height: 18,
+    width: 26,
+    height: 16,
     background: bg,
     border: '1px solid #555',
     borderRadius: 4,
     verticalAlign: 'middle' as const,
     marginRight: 10,
   })
+  const sectionHeader: React.CSSProperties = {
+    fontSize: 13,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    letterSpacing: 1,
+  }
+  const item: React.CSSProperties = {padding: '3px 0'}
   return (
-    <div style={{marginTop: 20, fontSize: 14, color: '#111'}}>
-      <div style={{marginBottom: 16}}>
-        <div style={{fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 1}}>
-          Headcount
+    <div style={{marginTop: 24, fontSize: 13, color: '#111'}}>
+      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24}}>
+        <div>
+          <div style={sectionHeader}>Headcount</div>
+          {headcount.map((h) => (
+            <div key={h.label} style={item}>
+              <span style={swatch(h.bg)} />
+              {h.label}
+            </div>
+          ))}
         </div>
-        {headcount.map((h) => (
-          <div key={h.label} style={{padding: '3px 0'}}>
-            <span style={swatch(h.bg)} />
-            {h.label}
-          </div>
-        ))}
-      </div>
-      <div style={{marginBottom: 16}}>
-        <div style={{fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 1}}>
-          Day header
+        <div>
+          <div style={sectionHeader}>Day header</div>
+          {coverage.map((c) => (
+            <div key={c.label} style={item}>
+              <span style={swatch(c.bg)} />
+              {c.label}
+            </div>
+          ))}
         </div>
-        {coverage.map((c) => (
-          <div key={c.label} style={{padding: '3px 0'}}>
-            <span style={swatch(c.bg)} />
-            {c.label}
-          </div>
-        ))}
-      </div>
-      <div>
-        <div style={{fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 1}}>
-          Markers
+        <div>
+          <div style={sectionHeader}>Markers</div>
+          <div style={{...item, fontFamily: 'monospace'}}>—&nbsp;&nbsp;Unit Leader</div>
+          <div style={{...item, fontFamily: 'monospace'}}>——&nbsp;&nbsp;Asst Unit Leader</div>
+          <div style={{...item, fontFamily: 'monospace'}}>———&nbsp;&nbsp;Worker</div>
+          <div style={{...item, fontFamily: 'monospace'}}>★&nbsp;&nbsp;Worker (whole-fair role)</div>
+          <div style={{...item, fontFamily: 'monospace'}}>★★&nbsp;&nbsp;Asst Unit Leader</div>
+          <div style={{...item, fontFamily: 'monospace'}}>★★★&nbsp;&nbsp;Unit Leader</div>
+          <div style={{...item, fontFamily: 'monospace'}}>★★★★&nbsp;&nbsp;Asst Fair Manager</div>
+          <div style={{...item, fontFamily: 'monospace'}}>★★★★★&nbsp;&nbsp;Fair Manager</div>
         </div>
-        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>—&nbsp;&nbsp;Unit Leader</div>
-        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>——&nbsp;&nbsp;Asst Unit Leader</div>
-        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>———&nbsp;&nbsp;Worker</div>
-        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>★&nbsp;&nbsp;Worker (whole-fair role)</div>
-        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>★★&nbsp;&nbsp;Asst Unit Leader</div>
-        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>★★★&nbsp;&nbsp;Unit Leader</div>
-        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>★★★★&nbsp;&nbsp;Asst Fair Manager</div>
-        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>★★★★★&nbsp;&nbsp;Fair Manager</div>
       </div>
     </div>
   )
@@ -408,19 +412,30 @@ function PrintLegend() {
 function FooterBlocks({blocks}: {blocks: {kind: 'quote' | 'note' | 'spacer'; text: string; bold?: boolean}[]}) {
   if (!blocks || blocks.length === 0) return null
   return (
-    <div style={{marginTop: 16, textAlign: 'center', fontSize: 13, color: '#111'}}>
+    <div style={{marginTop: 48, textAlign: 'center', color: '#000'}}>
       {blocks.map((b, i) => {
         if (b.kind === 'spacer') return <div key={i} style={{height: 8}} />
         if (b.kind === 'quote')
           return (
-            <p key={i} style={{fontStyle: 'italic', fontWeight: b.bold ? 700 : 400, margin: '2px 0'}}>
-              &ldquo;{b.text}&rdquo;
-            </p>
+            <div
+              key={i}
+              style={{
+                fontFamily: '"DM Serif Display", serif',
+                fontStyle: 'italic',
+                fontSize: 16,
+                lineHeight: 1.35,
+                marginBottom: 8,
+                fontWeight: b.bold ? 700 : 400,
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {b.text}
+            </div>
           )
         return (
-          <p key={i} style={{fontWeight: b.bold ? 700 : 400, margin: '2px 0'}}>
+          <div key={i} style={{fontSize: 14, lineHeight: 1.4, marginBottom: 8, fontWeight: b.bold ? 700 : 400}}>
             {b.text}
-          </p>
+          </div>
         )
       })}
     </div>

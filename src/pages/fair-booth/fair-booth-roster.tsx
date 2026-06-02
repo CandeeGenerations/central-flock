@@ -182,7 +182,7 @@ function RosterColumn({
               >
                 <td className={`border-r border-b ${borderColor} p-1 ${cellText} ${italic ? 'italic' : ''} ${bold ? 'font-bold' : ''}`}>
                   {fullName} ({r.signupCount})
-                  {r.isHispanic && (
+                  {r.isHispanic && !forceLight && (
                     <Badge variant="secondary" className="ml-1 text-xs">
                       H
                     </Badge>

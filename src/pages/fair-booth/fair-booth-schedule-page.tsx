@@ -1,5 +1,6 @@
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 import {Input} from '@/components/ui/input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {deriveFairDays} from '@/lib/fair-booth-render'
@@ -10,7 +11,7 @@ import {
   updateFairBoothSchedule,
 } from '@/lib/schedules-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, ChevronLeft, ChevronRight, FileDown, FileImage, Pencil} from 'lucide-react'
+import {ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, Pencil} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -98,7 +99,11 @@ export function FairBoothSchedulePage() {
               }}
               className="h-9 w-72"
             />
-            <Button size="sm" onClick={() => labelDraft.trim() && renameMutation.mutate(labelDraft.trim())} disabled={renameMutation.isPending}>
+            <Button
+              size="sm"
+              onClick={() => labelDraft.trim() && renameMutation.mutate(labelDraft.trim())}
+              disabled={renameMutation.isPending}
+            >
               Save
             </Button>
             <Button size="sm" variant="outline" onClick={() => setEditingLabel(false)}>
@@ -123,48 +128,61 @@ export function FairBoothSchedulePage() {
           </h2>
         )}
         <div className="ml-auto flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={exporting}
-            onClick={() =>
-              withExport(async () => {
-                if (!printGridRef.current || !printRosterRef.current) return
-                await exportFairBoothPdf(printGridRef.current, printRosterRef.current, filenameBase)
-              })
-            }
-          >
-            <FileDown className="h-4 w-4 mr-1" /> Export PDF
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={exporting}
-            onClick={() =>
-              withExport(async () => {
-                if (!printGridRef.current) return
-                await exportFairBoothJpg(printGridRef.current, filenameBase)
-              })
-            }
-          >
-            <FileImage className="h-4 w-4 mr-1" /> Export JPG
-          </Button>
-          <Button
-            variant={blank ? 'default' : 'outline'}
-            size="sm"
-            disabled={exporting}
-            onClick={async () => {
-              setBlank(true)
-              await new Promise((r) => setTimeout(r, 120))
-              await withExport(async () => {
-                if (!printGridRef.current || !printRosterRef.current) return
-                await exportFairBoothPdf(printGridRef.current, printRosterRef.current, `${filenameBase}-blank`)
-              })
-              setBlank(false)
-            }}
-          >
-            Export Blank PDF
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={exporting}>
+                <Download className="h-4 w-4 mr-1" /> Export <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() =>
+                  withExport(async () => {
+                    if (!printGridRef.current || !printRosterRef.current) return
+                    await exportFairBoothPdf(printGridRef.current, printRosterRef.current, filenameBase)
+                  })
+                }
+              >
+                PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  withExport(async () => {
+                    if (!printGridRef.current) return
+                    await exportFairBoothJpg(printGridRef.current, filenameBase)
+                  })
+                }
+              >
+                JPG
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async () => {
+                  setBlank(true)
+                  await new Promise((r) => setTimeout(r, 120))
+                  await withExport(async () => {
+                    if (!printGridRef.current || !printRosterRef.current) return
+                    await exportFairBoothPdf(printGridRef.current, printRosterRef.current, `${filenameBase}-blank`)
+                  })
+                  setBlank(false)
+                }}
+              >
+                Blank PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async () => {
+                  setBlank(true)
+                  await new Promise((r) => setTimeout(r, 120))
+                  await withExport(async () => {
+                    if (!printGridRef.current) return
+                    await exportFairBoothJpg(printGridRef.current, `${filenameBase}-blank`)
+                  })
+                  setBlank(false)
+                }}
+              >
+                Blank JPG
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -259,7 +277,8 @@ export function FairBoothSchedulePage() {
               />
             )}
             <h2 style={{fontSize: 20, fontWeight: 700, color: '#000', margin: 0}}>
-              {settings.fairBooth.titlePrefix} {schedule.scopeLabel} ({rosterSize})
+              {settings.fairBooth.titlePrefix} {schedule.scopeLabel}
+              {blank ? '' : ` (${rosterSize})`}
             </h2>
           </div>
           <FairBoothGrid
@@ -291,7 +310,8 @@ export function FairBoothSchedulePage() {
               />
             )}
             <h2 style={{fontSize: 20, fontWeight: 700, color: '#000', margin: 0}}>
-              {settings.fairBooth.titlePrefix} {schedule.scopeLabel} — Roster ({rosterSize})
+              {settings.fairBooth.titlePrefix} {schedule.scopeLabel} — Roster
+              {blank ? '' : ` (${rosterSize})`}
             </h2>
           </div>
           <FairBoothRoster
@@ -303,6 +323,7 @@ export function FairBoothSchedulePage() {
             onClickPerson={() => {}}
             forceLight
             blankRowsPerColumn={blank ? 5 : 4}
+            hideCounts={blank}
           />
           <FooterBlocks blocks={settings.fairBooth.rosterPageFooterBlocks} />
         </div>

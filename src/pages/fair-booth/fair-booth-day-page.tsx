@@ -393,7 +393,9 @@ function Legend() {
           <span className="font-mono">— Unit Leader</span>
           <span className="font-mono">—— Asst Unit Leader</span>
           <span className="font-mono">——— Worker</span>
-          <span className="font-mono">★ Worker · ★★ Asst Unit · ★★★ Unit Leader · ★★★★ Asst Fair Mgr · ★★★★★ Fair Mgr</span>
+          <span className="font-mono">
+            ★ Worker · ★★ Asst Unit · ★★★ Unit Leader · ★★★★ Asst Fair Mgr · ★★★★★ Fair Mgr
+          </span>
         </div>
       </div>
     </div>

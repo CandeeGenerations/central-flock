@@ -13,6 +13,7 @@ interface FairBoothRosterProps {
   singleColumn?: boolean
   clickable?: boolean
   forceLight?: boolean
+  hideCounts?: boolean
 }
 
 export function FairBoothRoster({
@@ -26,6 +27,7 @@ export function FairBoothRoster({
   singleColumn = false,
   clickable = true,
   forceLight = false,
+  hideCounts = false,
 }: FairBoothRosterProps) {
   const rosterSet = new Set(rosterPersonIds)
   const signedUpIds = new Set(signups.map((s) => s.personId))
@@ -101,6 +103,7 @@ export function FairBoothRoster({
             blankRows={blankRowsPerColumn}
             clickable={clickable}
             forceLight={forceLight}
+            hideCounts={hideCounts}
           />
           <RosterColumn
             rows={right}
@@ -110,6 +113,7 @@ export function FairBoothRoster({
             blankRows={blankRowsPerColumn}
             clickable={clickable}
             forceLight={forceLight}
+            hideCounts={hideCounts}
           />
         </div>
       )}
@@ -143,6 +147,7 @@ interface RosterColumnProps {
   blankRows: number
   clickable?: boolean
   forceLight?: boolean
+  hideCounts?: boolean
 }
 
 function RosterColumn({
@@ -153,6 +158,7 @@ function RosterColumn({
   blankRows,
   clickable = true,
   forceLight = false,
+  hideCounts = false,
 }: RosterColumnProps) {
   const headerBg = forceLight ? 'bg-gray-100' : 'bg-muted'
   const headerText = forceLight ? 'text-gray-900' : 'text-foreground'
@@ -164,7 +170,7 @@ function RosterColumn({
         <thead>
           <tr>
             <th className={`border-r border-b ${borderColor} p-1 text-left ${headerText} ${headerBg}`}>
-              Name ({rows.length})
+              Name{hideCounts ? '' : ` (${rows.length})`}
             </th>
             <th className={`border-b ${borderColor} p-1 text-left w-24 ${headerText} ${headerBg}`}>Initials</th>
           </tr>
@@ -181,8 +187,11 @@ function RosterColumn({
                 className={clickable ? 'cursor-pointer hover:bg-muted/30' : ''}
                 onClick={clickable ? () => onClick(r.personId) : undefined}
               >
-                <td className={`border-r border-b ${borderColor} p-1 ${cellText} ${italic ? 'italic' : ''} ${bold ? 'font-bold' : ''}`}>
-                  {fullName} ({r.signupCount})
+                <td
+                  className={`border-r border-b ${borderColor} p-1 ${cellText} ${italic ? 'italic' : ''} ${bold ? 'font-bold' : ''}`}
+                >
+                  {fullName}
+                  {!hideCounts && ` (${r.signupCount})`}
                   {r.isHispanic && !forceLight && (
                     <Badge variant="secondary" className="ml-1 text-xs">
                       H

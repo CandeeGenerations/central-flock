@@ -120,7 +120,7 @@ export function FairBoothDayPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-5xl">
+    <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={() => navigate(`/schedules/fair-booth/${scheduleId}`)}>
           <ArrowLeft className="h-4 w-4" />

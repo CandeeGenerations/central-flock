@@ -1,5 +1,6 @@
 import {Button} from '@/components/ui/button'
 import {Label} from '@/components/ui/label'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {deriveFairDays, formatTimeShort, maxShiftRoleFor} from '@/lib/fair-booth-render'
@@ -211,23 +212,17 @@ export function FairBoothDayPage() {
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <Label className="text-xs">Person</Label>
-                  <Select
+                  <SearchableSelect
                     value={String(s.personId)}
                     onValueChange={(v) =>
                       updateMutation.mutate({signupId: s.id, body: {personId: Number(v)} as Partial<FairBoothSignup>})
                     }
-                  >
-                    <SelectTrigger className="w-56">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {detail.people.map((p) => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          {[p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={detail.people.map((p) => ({
+                      value: String(p.id),
+                      label: [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`,
+                    }))}
+                    className="w-56"
+                  />
                   {!onRoster && <span className="text-xs text-yellow-700">⚠ no longer on roster</span>}
                   <div className="ml-auto flex gap-1">
                     <Button
@@ -263,6 +258,11 @@ export function FairBoothDayPage() {
                     onChange={(v) => updateMutation.mutate({signupId: s.id, body: {endMinute: v}})}
                   />
                   <Label className="text-xs ml-2">Role</Label>
+                  {allowedShifts.length === 1 ? (
+                    <span className="text-muted-foreground text-xs px-2 py-1 rounded border bg-muted/30">
+                      {SHIFT_LABEL[s.shiftRole]}
+                    </span>
+                  ) : (
                   <Select
                     value={s.shiftRole}
                     onValueChange={(v) =>
@@ -280,6 +280,7 @@ export function FairBoothDayPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  )}
                   <Label className="text-xs ml-2">Row</Label>
                   <Button
                     variant="ghost"
@@ -330,7 +331,7 @@ function TimePicker({value, onChange}: {value: number; onChange: (v: number) => 
       <SelectContent>
         {opts.map((m) => (
           <SelectItem key={m} value={String(m)}>
-            {formatTimeShort(m)}
+            {formatTimeShort(m)} PM
           </SelectItem>
         ))}
       </SelectContent>

@@ -271,7 +271,7 @@ function HalfGrid({
                     <td
                       key={d.date}
                       className={`border-r-2 border-black align-top p-1 text-gray-900 ${bg} ${borderTop} ${clickable ? 'cursor-pointer' : ''}`}
-                      style={blank ? {height: 90} : undefined}
+                      style={blank ? {height: 60} : undefined}
                       onClick={
                         clickable
                           ? () => {

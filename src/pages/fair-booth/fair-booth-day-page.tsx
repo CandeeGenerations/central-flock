@@ -97,15 +97,17 @@ export function FairBoothDayPage() {
   const rosterIds = new Set(detail.rosterPersonIds)
   const attrsByPerson = new Map(detail.rosterAttrs.map((a) => [a.personId, a]))
 
+  const alreadyOnDay = new Set(daySignups.map((s) => s.personId))
+  const firstAvailable = detail!.rosterPersonIds.find((pid) => !alreadyOnDay.has(pid))
+
   function addToSlot(slotIdx: number) {
-    const personId = detail!.rosterPersonIds[0]
-    if (!personId) {
-      toast.error('No people on roster — configure roster Groups in Schedules Settings.')
+    if (!firstAvailable) {
+      toast.error('Everyone on the roster is already on this day.')
       return
     }
     const slot = day.slots[slotIdx]
     addMutation.mutate({
-      personId,
+      personId: firstAvailable,
       dayDate: date!,
       startMinute: slot.startMinute,
       endMinute: slot.endMinute,
@@ -113,13 +115,12 @@ export function FairBoothDayPage() {
     })
   }
   function addSpanningBoth() {
-    const personId = detail!.rosterPersonIds[0]
-    if (!personId) {
-      toast.error('No people on roster — configure roster Groups in Schedules Settings.')
+    if (!firstAvailable) {
+      toast.error('Everyone on the roster is already on this day.')
       return
     }
     addMutation.mutate({
-      personId,
+      personId: firstAvailable,
       dayDate: date!,
       startMinute: day.slots[0].startMinute,
       endMinute: day.slots[day.slots.length - 1].endMinute,
@@ -217,10 +218,16 @@ export function FairBoothDayPage() {
                     onValueChange={(v) =>
                       updateMutation.mutate({signupId: s.id, body: {personId: Number(v)} as Partial<FairBoothSignup>})
                     }
-                    options={detail.people.map((p) => ({
-                      value: String(p.id),
-                      label: [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`,
-                    }))}
+                    options={detail.people
+                      .filter(
+                        (p) =>
+                          p.id === s.personId ||
+                          !daySignups.some((other) => other.id !== s.id && other.personId === p.id),
+                      )
+                      .map((p) => ({
+                        value: String(p.id),
+                        label: [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`,
+                      }))}
                     className="w-56"
                   />
                   {!onRoster && <span className="text-xs text-yellow-700">⚠ no longer on roster</span>}

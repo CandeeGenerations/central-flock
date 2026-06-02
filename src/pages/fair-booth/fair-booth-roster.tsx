@@ -10,6 +10,8 @@ interface FairBoothRosterProps {
   minSignupsForBold: number
   onClickPerson: (personId: number) => void
   blankRowsPerColumn?: number
+  singleColumn?: boolean
+  clickable?: boolean
 }
 
 export function FairBoothRoster({
@@ -20,6 +22,8 @@ export function FairBoothRoster({
   minSignupsForBold,
   onClickPerson,
   blankRowsPerColumn = 4,
+  singleColumn = false,
+  clickable = true,
 }: FairBoothRosterProps) {
   const rosterSet = new Set(rosterPersonIds)
   const inRoster = people.filter((p) => rosterSet.has(p.id))
@@ -74,22 +78,35 @@ export function FairBoothRoster({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      {singleColumn ? (
         <RosterColumn
-          rows={left}
+          rows={ordered}
           initials={initials}
           minBold={minSignupsForBold}
-          onClick={onClickPerson}
+          onClick={clickable ? onClickPerson : () => {}}
           blankRows={blankRowsPerColumn}
+          clickable={clickable}
         />
-        <RosterColumn
-          rows={right}
-          initials={initials}
-          minBold={minSignupsForBold}
-          onClick={onClickPerson}
-          blankRows={blankRowsPerColumn}
-        />
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <RosterColumn
+            rows={left}
+            initials={initials}
+            minBold={minSignupsForBold}
+            onClick={clickable ? onClickPerson : () => {}}
+            blankRows={blankRowsPerColumn}
+            clickable={clickable}
+          />
+          <RosterColumn
+            rows={right}
+            initials={initials}
+            minBold={minSignupsForBold}
+            onClick={clickable ? onClickPerson : () => {}}
+            blankRows={blankRowsPerColumn}
+            clickable={clickable}
+          />
+        </div>
+      )}
       {orphans.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-300 rounded p-2 text-xs space-y-1">
           <div className="font-semibold text-yellow-900">No longer on roster Group:</div>
@@ -118,15 +135,16 @@ interface RosterColumnProps {
   minBold: number
   onClick: (personId: number) => void
   blankRows: number
+  clickable?: boolean
 }
 
-function RosterColumn({rows, initials, minBold, onClick, blankRows}: RosterColumnProps) {
+function RosterColumn({rows, initials, minBold, onClick, blankRows, clickable = true}: RosterColumnProps) {
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
         <tr>
-          <th className="border bg-gray-100 p-1 text-left text-gray-900">Name ({rows.length})</th>
-          <th className="border bg-gray-100 p-1 text-left w-24 text-gray-900">Initials</th>
+          <th className="border bg-muted p-1 text-left text-foreground">Name ({rows.length})</th>
+          <th className="border bg-muted p-1 text-left w-24 text-foreground">Initials</th>
         </tr>
       </thead>
       <tbody>
@@ -136,7 +154,11 @@ function RosterColumn({rows, initials, minBold, onClick, blankRows}: RosterColum
           const bold = r.signupCount > 0 && r.signupCount < minBold
           const init = initials.get(r.personId) ?? '??'
           return (
-            <tr key={r.personId} className="cursor-pointer hover:bg-muted/30" onClick={() => onClick(r.personId)}>
+            <tr
+              key={r.personId}
+              className={clickable ? 'cursor-pointer hover:bg-muted/30' : ''}
+              onClick={clickable ? () => onClick(r.personId) : undefined}
+            >
               <td className={`border p-1 ${italic ? 'italic' : ''} ${bold ? 'font-bold' : ''}`}>
                 {fullName} ({r.signupCount})
                 {r.isHispanic && (

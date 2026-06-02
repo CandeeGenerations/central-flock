@@ -3,8 +3,10 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {PageSpinner} from '@/components/ui/spinner'
 import {fetchFairBoothSchedule, fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
 import {useQuery} from '@tanstack/react-query'
-import {ArrowLeft, FileDown, FileImage} from 'lucide-react'
-import {useRef, useState} from 'react'
+import {ArrowLeft, ChevronLeft, ChevronRight, FileDown, FileImage} from 'lucide-react'
+import {useEffect, useRef, useState} from 'react'
+
+import {deriveFairDays} from '@/lib/fair-booth-render'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -20,8 +22,18 @@ export function FairBoothSchedulePage() {
   const [rosterPersonId, setRosterPersonId] = useState<number | null>(null)
   const [blank, setBlank] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileDayIdx, setMobileDayIdx] = useState(0)
   const printGridRef = useRef<HTMLDivElement | null>(null)
   const printRosterRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const apply = () => setIsMobile(mq.matches)
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
 
   const {data: detail, isLoading} = useQuery({
     queryKey: schedulesKeys.fairBooth(scheduleId),
@@ -108,14 +120,16 @@ export function FairBoothSchedulePage() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <FairBoothGrid
-              scopeStart={schedule.scopeStart}
-              signups={signups}
-              people={people}
-              rosterAttrs={rosterAttrs}
-              blank={blank}
-              scheduleId={scheduleId}
-            />
+            {isMobile ? <MobileGridNav scheduleId={scheduleId} scopeStart={schedule.scopeStart} signups={signups} people={people} rosterAttrs={rosterAttrs} blank={blank} dayIdx={mobileDayIdx} setDayIdx={setMobileDayIdx} /> : (
+              <FairBoothGrid
+                scopeStart={schedule.scopeStart}
+                signups={signups}
+                people={people}
+                rosterAttrs={rosterAttrs}
+                blank={blank}
+                scheduleId={scheduleId}
+              />
+            )}
           </div>
         </CardContent>
       </Card>
@@ -133,6 +147,8 @@ export function FairBoothSchedulePage() {
             minSignupsForBold={settings.fairBooth.minSignupsForBold}
             onClickPerson={(pid) => setRosterPersonId(pid)}
             blankRowsPerColumn={0}
+            singleColumn={isMobile}
+            clickable={!isMobile}
           />
         </CardContent>
       </Card>
@@ -193,6 +209,50 @@ export function FairBoothSchedulePage() {
           <FooterBlocks blocks={settings.fairBooth.rosterPageFooterBlocks} />
         </div>
       </div>
+    </div>
+  )
+}
+
+interface MobileGridNavProps {
+  scheduleId: number
+  scopeStart: string
+  signups: Parameters<typeof FairBoothGrid>[0]['signups']
+  people: Parameters<typeof FairBoothGrid>[0]['people']
+  rosterAttrs: Parameters<typeof FairBoothGrid>[0]['rosterAttrs']
+  blank: boolean
+  dayIdx: number
+  setDayIdx: (n: number) => void
+}
+
+function MobileGridNav({scheduleId, scopeStart, signups, people, rosterAttrs, blank, dayIdx, setDayIdx}: MobileGridNavProps) {
+  let days: ReturnType<typeof deriveFairDays>
+  try {
+    days = deriveFairDays(scopeStart)
+  } catch {
+    return <div className="text-destructive p-2 text-sm">Invalid scope start.</div>
+  }
+  const safeIdx = Math.min(Math.max(0, dayIdx), days.length - 1)
+  const day = days[safeIdx]
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Button variant="outline" size="icon" disabled={safeIdx === 0} onClick={() => setDayIdx(safeIdx - 1)}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-sm font-medium">Day {safeIdx + 1} of {days.length}</span>
+        <Button variant="outline" size="icon" disabled={safeIdx === days.length - 1} onClick={() => setDayIdx(safeIdx + 1)}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+      <FairBoothGrid
+        scopeStart={scopeStart}
+        signups={signups}
+        people={people}
+        rosterAttrs={rosterAttrs}
+        blank={blank}
+        scheduleId={scheduleId}
+        onlyDate={day.date}
+      />
     </div>
   )
 }

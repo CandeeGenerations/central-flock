@@ -9,6 +9,7 @@ interface FairBoothRosterProps {
   signups: FairBoothSignup[]
   minSignupsForBold: number
   onClickPerson: (personId: number) => void
+  blankRowsPerColumn?: number
 }
 
 export function FairBoothRoster({
@@ -18,6 +19,7 @@ export function FairBoothRoster({
   signups,
   minSignupsForBold,
   onClickPerson,
+  blankRowsPerColumn = 4,
 }: FairBoothRosterProps) {
   const rosterSet = new Set(rosterPersonIds)
   const inRoster = people.filter((p) => rosterSet.has(p.id))
@@ -61,8 +63,20 @@ export function FairBoothRoster({
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <RosterColumn rows={left} initials={initials} minBold={minSignupsForBold} onClick={onClickPerson} />
-        <RosterColumn rows={right} initials={initials} minBold={minSignupsForBold} onClick={onClickPerson} />
+        <RosterColumn
+          rows={left}
+          initials={initials}
+          minBold={minSignupsForBold}
+          onClick={onClickPerson}
+          blankRows={blankRowsPerColumn}
+        />
+        <RosterColumn
+          rows={right}
+          initials={initials}
+          minBold={minSignupsForBold}
+          onClick={onClickPerson}
+          blankRows={blankRowsPerColumn}
+        />
       </div>
       {orphans.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-300 rounded p-2 text-xs space-y-1">
@@ -91,9 +105,10 @@ interface RosterColumnProps {
   initials: Map<number, string>
   minBold: number
   onClick: (personId: number) => void
+  blankRows: number
 }
 
-function RosterColumn({rows, initials, minBold, onClick}: RosterColumnProps) {
+function RosterColumn({rows, initials, minBold, onClick, blankRows}: RosterColumnProps) {
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
@@ -122,6 +137,12 @@ function RosterColumn({rows, initials, minBold, onClick}: RosterColumnProps) {
             </tr>
           )
         })}
+        {Array.from({length: blankRows}).map((_, i) => (
+          <tr key={`blank-${i}`}>
+            <td className="border p-1">&nbsp;</td>
+            <td className="border p-1">&nbsp;</td>
+          </tr>
+        ))}
       </tbody>
     </table>
   )

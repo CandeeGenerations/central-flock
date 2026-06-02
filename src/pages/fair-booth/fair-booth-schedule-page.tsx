@@ -341,53 +341,65 @@ function MobileGridNav({
 
 function PrintLegend() {
   const headcount = [
-    {bg: '#fecaca', label: '≤3'},
-    {bg: '#fed7aa', label: '4'},
-    {bg: '#fef08a', label: '5'},
-    {bg: '#a5f3fc', label: '6'},
-    {bg: '#bfdbfe', label: '7'},
-    {bg: '#bbf7d0', label: '8'},
-    {bg: '#e9d5ff', label: '>8'},
+    {bg: '#fecaca', label: '≤ 3 people'},
+    {bg: '#fed7aa', label: '4 people'},
+    {bg: '#fef08a', label: '5 people'},
+    {bg: '#a5f3fc', label: '6 people'},
+    {bg: '#bfdbfe', label: '7 people'},
+    {bg: '#bbf7d0', label: '8 people'},
+    {bg: '#e9d5ff', label: 'More than 8 people'},
   ]
   const coverage = [
-    {bg: '#86efac', label: 'Hispanic full day'},
-    {bg: '#fdba74', label: 'Hispanic partial'},
-    {bg: '#fca5a5', label: 'No Hispanic'},
+    {bg: '#86efac', label: 'Hispanic — full day coverage'},
+    {bg: '#fdba74', label: 'Hispanic — partial coverage'},
+    {bg: '#fca5a5', label: 'No Hispanic coverage'},
   ]
   const swatch = (bg: string) => ({
     display: 'inline-block' as const,
-    width: 18,
-    height: 12,
+    width: 28,
+    height: 18,
     background: bg,
-    border: '1px solid #ccc',
-    borderRadius: 3,
+    border: '1px solid #555',
+    borderRadius: 4,
     verticalAlign: 'middle' as const,
-    marginRight: 4,
+    marginRight: 10,
   })
   return (
-    <div style={{marginTop: 12, fontSize: 10, color: '#111', display: 'flex', gap: 24, flexWrap: 'wrap'}}>
-      <div>
-        <strong style={{display: 'block', fontSize: 9, textTransform: 'uppercase'}}>Headcount</strong>
+    <div style={{marginTop: 20, fontSize: 14, color: '#111'}}>
+      <div style={{marginBottom: 16}}>
+        <div style={{fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 1}}>
+          Headcount
+        </div>
         {headcount.map((h) => (
-          <span key={h.label} style={{marginRight: 8}}>
+          <div key={h.label} style={{padding: '3px 0'}}>
             <span style={swatch(h.bg)} />
             {h.label}
-          </span>
+          </div>
         ))}
       </div>
-      <div>
-        <strong style={{display: 'block', fontSize: 9, textTransform: 'uppercase'}}>Day header</strong>
+      <div style={{marginBottom: 16}}>
+        <div style={{fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 1}}>
+          Day header
+        </div>
         {coverage.map((c) => (
-          <span key={c.label} style={{marginRight: 8}}>
+          <div key={c.label} style={{padding: '3px 0'}}>
             <span style={swatch(c.bg)} />
             {c.label}
-          </span>
+          </div>
         ))}
       </div>
       <div>
-        <strong style={{display: 'block', fontSize: 9, textTransform: 'uppercase'}}>Markers</strong>
-        <span style={{marginRight: 8, fontFamily: 'monospace'}}>— UL · —— AsstUL · ——— Worker</span>
-        <span style={{fontFamily: 'monospace'}}>★ Worker · ★★ AsstUnit · ★★★ UL · ★★★★ AsstFairMgr · ★★★★★ FairMgr</span>
+        <div style={{fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 1}}>
+          Markers
+        </div>
+        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>—&nbsp;&nbsp;Unit Leader</div>
+        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>——&nbsp;&nbsp;Asst Unit Leader</div>
+        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>———&nbsp;&nbsp;Worker</div>
+        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>★&nbsp;&nbsp;Worker (whole-fair role)</div>
+        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>★★&nbsp;&nbsp;Asst Unit Leader</div>
+        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>★★★&nbsp;&nbsp;Unit Leader</div>
+        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>★★★★&nbsp;&nbsp;Asst Fair Manager</div>
+        <div style={{padding: '3px 0', fontFamily: 'monospace'}}>★★★★★&nbsp;&nbsp;Fair Manager</div>
       </div>
     </div>
   )

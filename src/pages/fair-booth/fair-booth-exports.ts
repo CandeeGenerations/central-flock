@@ -70,7 +70,7 @@ export async function exportFairBoothPdf(
       renderWidth = maxHeight * imgRatio
     }
     const x = (pageWidth - renderWidth) / 2
-    const y = (pageHeight - renderHeight) / 2
+    const y = margin
     if (i > 0) pdf.addPage()
     pdf.addImage(dataUrl, 'JPEG', x, y, renderWidth, renderHeight)
   }

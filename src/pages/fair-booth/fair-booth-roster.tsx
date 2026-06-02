@@ -156,13 +156,16 @@ function RosterColumn({
   const headerBg = forceLight ? 'bg-gray-100' : 'bg-muted'
   const headerText = forceLight ? 'text-gray-900' : 'text-foreground'
   const cellText = forceLight ? 'text-gray-900' : ''
+  const borderColor = forceLight ? 'border-gray-400' : ''
   return (
-    <div className="rounded-md overflow-hidden border">
+    <div className={`rounded-md overflow-hidden border ${borderColor}`}>
       <table className="w-full text-sm" style={{borderCollapse: 'separate', borderSpacing: 0}}>
         <thead>
           <tr>
-            <th className={`border-r border-b p-1 text-left ${headerText} ${headerBg}`}>Name ({rows.length})</th>
-            <th className={`border-b p-1 text-left w-24 ${headerText} ${headerBg}`}>Initials</th>
+            <th className={`border-r border-b ${borderColor} p-1 text-left ${headerText} ${headerBg}`}>
+              Name ({rows.length})
+            </th>
+            <th className={`border-b ${borderColor} p-1 text-left w-24 ${headerText} ${headerBg}`}>Initials</th>
           </tr>
         </thead>
         <tbody>
@@ -177,7 +180,7 @@ function RosterColumn({
                 className={clickable ? 'cursor-pointer hover:bg-muted/30' : ''}
                 onClick={clickable ? () => onClick(r.personId) : undefined}
               >
-                <td className={`border-r border-b p-1 ${cellText} ${italic ? 'italic' : ''} ${bold ? 'font-bold' : ''}`}>
+                <td className={`border-r border-b ${borderColor} p-1 ${cellText} ${italic ? 'italic' : ''} ${bold ? 'font-bold' : ''}`}>
                   {fullName} ({r.signupCount})
                   {r.isHispanic && (
                     <Badge variant="secondary" className="ml-1 text-xs">
@@ -185,7 +188,7 @@ function RosterColumn({
                     </Badge>
                   )}
                 </td>
-                <td className={`border-b p-1 font-mono ${cellText}`}>
+                <td className={`border-b ${borderColor} p-1 font-mono ${cellText}`}>
                   {init}
                   {fairRoleStars(r.fairRole as FairBoothFairRole)}
                 </td>
@@ -194,8 +197,8 @@ function RosterColumn({
           })}
           {Array.from({length: blankRows}).map((_, i) => (
             <tr key={`blank-${i}`}>
-              <td className="border-r border-b p-1">&nbsp;</td>
-              <td className="border-b p-1">&nbsp;</td>
+              <td className={`border-r border-b ${borderColor} p-1`}>&nbsp;</td>
+              <td className={`border-b ${borderColor} p-1`}>&nbsp;</td>
             </tr>
           ))}
         </tbody>

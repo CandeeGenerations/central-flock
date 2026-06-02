@@ -107,9 +107,16 @@ export function FairBoothGrid({
       }
       // List every signup for this slot once. Default anchor = slot start row;
       // displayRowOverride shifts the entry N hours later (within slot bounds).
-      const inSlot = (signups as FairSignup[]).filter(
-        (s) => s.dayDate === day.date && slotIndexForSignup(s, day) === slot.index,
-      )
+      // Signups that fully cover a slot appear in every slot they cover (duplicated
+      // across both slots on a "spans both" entry); otherwise they fall in the
+      // majority-overlap slot only.
+      const inSlot = (signups as FairSignup[]).filter((s) => {
+        if (s.dayDate !== day.date) return false
+        const coversFully = (st: number, en: number) => s.startMinute <= st && s.endMinute >= en
+        const coversAnySlot = day.slots.some((sl) => coversFully(sl.startMinute, sl.endMinute))
+        if (coversAnySlot) return coversFully(slot.startMinute, slot.endMinute)
+        return slotIndexForSignup(s, day) === slot.index
+      })
       const orderRank: Record<string, number> = {unit_leader: 0, asst_unit: 1, worker: 2}
       const sorted = [...inSlot].sort((a, b) => {
         const ra = orderRank[a.shiftRole] ?? 9

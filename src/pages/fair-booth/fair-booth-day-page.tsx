@@ -162,10 +162,10 @@ export function FairBoothDayPage() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <div>
+      <div className="grid md:grid-cols-2 gap-4 items-start">
+        <div className="md:sticky md:top-4 md:self-start">
           <h3 className="font-medium mb-2">Preview</h3>
-          <div className="border rounded overflow-x-auto p-2">
+          <div className="border rounded overflow-x-auto p-2 max-h-[calc(100vh-8rem)] overflow-y-auto">
             <FairBoothGrid
               scopeStart={detail.schedule.scopeStart}
               signups={daySignups}
@@ -178,18 +178,7 @@ export function FairBoothDayPage() {
 
         <div className="space-y-3">
           <h3 className="font-medium">Signups</h3>
-          <div className="flex flex-wrap gap-2">
-            {day.slots.map((s, i) => (
-              <Button key={i} variant="outline" size="sm" onClick={() => addToSlot(i)}>
-                + Add to Slot {i + 1} ({formatTimeShort(s.startMinute)}-{formatTimeShort(s.endMinute)})
-              </Button>
-            ))}
-            {day.slots.length > 1 && (
-              <Button variant="outline" size="sm" onClick={addSpanningBoth}>
-                + Add spanning both
-              </Button>
-            )}
-          </div>
+          <AddSignupButtons day={day} addToSlot={addToSlot} addSpanningBoth={addSpanningBoth} />
 
           {sortedSignups.length === 0 && (
             <p className="text-muted-foreground text-sm">No signups yet — use the buttons above to add one.</p>
@@ -320,8 +309,36 @@ export function FairBoothDayPage() {
               </div>
             )
           })}
+          {sortedSignups.length > 3 && (
+            <AddSignupButtons day={day} addToSlot={addToSlot} addSpanningBoth={addSpanningBoth} />
+          )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function AddSignupButtons({
+  day,
+  addToSlot,
+  addSpanningBoth,
+}: {
+  day: {slots: {startMinute: number; endMinute: number}[]}
+  addToSlot: (i: number) => void
+  addSpanningBoth: () => void
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {day.slots.map((s, i) => (
+        <Button key={i} variant="outline" size="sm" onClick={() => addToSlot(i)}>
+          + Add to Slot {i + 1} ({formatTimeShort(s.startMinute)}-{formatTimeShort(s.endMinute)})
+        </Button>
+      ))}
+      {day.slots.length > 1 && (
+        <Button variant="outline" size="sm" onClick={addSpanningBoth}>
+          + Add spanning both
+        </Button>
+      )}
     </div>
   )
 }

@@ -201,7 +201,7 @@ export function FairBoothDayPage() {
                 className={`border rounded p-2 space-y-2 ${SHIFT_RANK[s.shiftRole] === 0 ? 'border-purple-300' : SHIFT_RANK[s.shiftRole] === 1 ? 'border-blue-300' : ''}`}
               >
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Label className="text-xs">Person</Label>
+                  <Label className="text-xs w-14 shrink-0">Person</Label>
                   <SearchableSelect
                     value={String(s.personId)}
                     onValueChange={(v) =>
@@ -220,6 +220,7 @@ export function FairBoothDayPage() {
                     className="w-56"
                   />
                   {!onRoster && <span className="text-xs text-yellow-700">⚠ no longer on roster</span>}
+                  {person?.isHispanic && <span className="text-xs text-emerald-700">Hispanic</span>}
                   <div className="ml-auto flex gap-1">
                     <Button
                       variant="ghost"
@@ -243,7 +244,7 @@ export function FairBoothDayPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap text-xs">
-                  <Label className="text-xs">Time</Label>
+                  <Label className="text-xs w-14 shrink-0">Time</Label>
                   <TimePicker
                     value={s.startMinute}
                     onChange={(v) => updateMutation.mutate({signupId: s.id, body: {startMinute: v}})}
@@ -253,31 +254,7 @@ export function FairBoothDayPage() {
                     value={s.endMinute}
                     onChange={(v) => updateMutation.mutate({signupId: s.id, body: {endMinute: v}})}
                   />
-                  <Label className="text-xs ml-2">Role</Label>
-                  {allowedShifts.length === 1 ? (
-                    <span className="text-muted-foreground text-xs px-2 py-1 rounded border bg-muted/30">
-                      {SHIFT_LABEL[s.shiftRole]}
-                    </span>
-                  ) : (
-                  <Select
-                    value={s.shiftRole}
-                    onValueChange={(v) =>
-                      updateMutation.mutate({signupId: s.id, body: {shiftRole: v as FairBoothShiftRole}})
-                    }
-                  >
-                    <SelectTrigger className="w-44">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allowedShifts.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {SHIFT_LABEL[r]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  )}
-                  <Label className="text-xs ml-2">Row</Label>
+                  <Label className="text-xs ml-4 shrink-0">Row</Label>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -304,7 +281,32 @@ export function FairBoothDayPage() {
                       reset
                     </Button>
                   )}
-                  {person?.isHispanic && <span className="ml-2 text-xs text-emerald-700">Hispanic</span>}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  <Label className="text-xs w-14 shrink-0">Role</Label>
+                  {allowedShifts.length === 1 ? (
+                    <span className="text-muted-foreground text-xs px-2 py-1 rounded border bg-muted/30">
+                      {SHIFT_LABEL[s.shiftRole]}
+                    </span>
+                  ) : (
+                    <Select
+                      value={s.shiftRole}
+                      onValueChange={(v) =>
+                        updateMutation.mutate({signupId: s.id, body: {shiftRole: v as FairBoothShiftRole}})
+                      }
+                    >
+                      <SelectTrigger className="w-44">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allowedShifts.map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {SHIFT_LABEL[r]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
             )

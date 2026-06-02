@@ -301,6 +301,7 @@ export function FairBoothSchedulePage() {
             minSignupsForBold={settings.fairBooth.minSignupsForBold}
             onClickPerson={() => {}}
             forceLight
+            blankRowsPerColumn={blank ? 5 : 4}
           />
           <FooterBlocks blocks={settings.fairBooth.rosterPageFooterBlocks} />
         </div>

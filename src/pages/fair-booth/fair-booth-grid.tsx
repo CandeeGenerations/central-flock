@@ -105,30 +105,32 @@ export function FairBoothGrid({
           if (cell) cell.bgClass = BG_BY_COLOR[colorForHeadcount(region.headcount)]
         }
       }
-      // List every signup for this slot once, anchored to the slot's start row.
+      // List every signup for this slot once. Default anchor = slot start row;
+      // displayRowOverride shifts the entry N hours later (within slot bounds).
       const inSlot = (signups as FairSignup[]).filter(
         (s) => s.dayDate === day.date && slotIndexForSignup(s, day) === slot.index,
       )
-      const anchorRow = slot.startMinute
-      const cell = map.get(anchorRow)
-      if (cell) {
-        const orderRank: Record<string, number> = {unit_leader: 0, asst_unit: 1, worker: 2}
-        const sorted = [...inSlot].sort((a, b) => {
-          const ra = orderRank[a.shiftRole] ?? 9
-          const rb = orderRank[b.shiftRole] ?? 9
-          if (ra !== rb) return ra - rb
-          return a.sortOrder - b.sortOrder || a.id - b.id
-        })
-        for (const s of sorted) {
-          const dashes = shiftRoleDashes(s.shiftRole)
-          const init = initials.get(s.personId) ?? '??'
-          const attr = attrsByPerson.get(s.personId)
-          const fairRole: FairBoothFairRole = attr?.fairRole ?? 'worker'
-          const stars = fairRoleStars(fairRole)
-          const slotFull = s.startMinute <= slot.startMinute && s.endMinute >= slot.endMinute
-          const partial = slotFull ? '' : ` (${formatTimeShort(s.startMinute)}-${formatTimeShort(s.endMinute)})`
-          cell.entries.push({signupId: s.id, line: `${dashes}${init}${stars}${partial}`})
-        }
+      const orderRank: Record<string, number> = {unit_leader: 0, asst_unit: 1, worker: 2}
+      const sorted = [...inSlot].sort((a, b) => {
+        const ra = orderRank[a.shiftRole] ?? 9
+        const rb = orderRank[b.shiftRole] ?? 9
+        if (ra !== rb) return ra - rb
+        return a.sortOrder - b.sortOrder || a.id - b.id
+      })
+      const slotRowsCount = Math.floor((slot.endMinute - slot.startMinute) / 60)
+      for (const s of sorted) {
+        const offset = Math.max(0, Math.min(s.displayRowOverride ?? 0, slotRowsCount - 1))
+        const anchorRow = slot.startMinute + offset * 60
+        const cell = map.get(anchorRow)
+        if (!cell) continue
+        const dashes = shiftRoleDashes(s.shiftRole)
+        const init = initials.get(s.personId) ?? '??'
+        const attr = attrsByPerson.get(s.personId)
+        const fairRole: FairBoothFairRole = attr?.fairRole ?? 'worker'
+        const stars = fairRoleStars(fairRole)
+        const slotFull = s.startMinute <= slot.startMinute && s.endMinute >= slot.endMinute
+        const partial = slotFull ? '' : ` (${formatTimeShort(s.startMinute)}-${formatTimeShort(s.endMinute)})`
+        cell.entries.push({signupId: s.id, line: `${dashes}${init}${stars}${partial}`})
       }
     }
     return map

@@ -239,13 +239,28 @@ export function FairBoothSchedulePage() {
 
       {/* Hidden print-only renderings — capture targets for PDF/JPG/blank. */}
       <div style={{position: 'fixed', left: '-99999px', top: 0, width: '1100px', background: '#fff'}}>
-        <div ref={printGridRef} style={{background: '#fff', padding: 16}}>
-          {settings.logoPath && (
-            <img src={settings.logoPath} alt="" style={{height: 64, margin: '0 auto 8px', display: 'block'}} />
-          )}
-          <h3 style={{textAlign: 'center', fontSize: 18, fontWeight: 'bold', marginBottom: 8}}>
-            {settings.fairBooth.titlePrefix} {schedule.scopeLabel} ({rosterSize})
-          </h3>
+        <div
+          ref={printGridRef}
+          style={{
+            background: '#fff',
+            padding: 24,
+            fontFamily: 'Arial, sans-serif',
+            color: '#000',
+          }}
+        >
+          <div style={{textAlign: 'center', marginBottom: 24}}>
+            {settings.logoPath && (
+              <img
+                src={settings.logoPath}
+                alt=""
+                style={{maxHeight: 80, margin: '0 auto 8px', display: 'block', objectFit: 'contain'}}
+                crossOrigin="anonymous"
+              />
+            )}
+            <h2 style={{fontSize: 20, fontWeight: 700, color: '#000', margin: 0}}>
+              {settings.fairBooth.titlePrefix} {schedule.scopeLabel} ({rosterSize})
+            </h2>
+          </div>
           <FairBoothGrid
             scopeStart={schedule.scopeStart}
             signups={signups}
@@ -256,13 +271,28 @@ export function FairBoothSchedulePage() {
           <PrintLegend />
           <FooterBlocks blocks={settings.fairBooth.gridPageFooterBlocks} />
         </div>
-        <div ref={printRosterRef} style={{background: '#fff', padding: 16}}>
-          {settings.logoPath && (
-            <img src={settings.logoPath} alt="" style={{height: 64, margin: '0 auto 8px', display: 'block'}} />
-          )}
-          <h3 style={{textAlign: 'center', fontSize: 18, fontWeight: 'bold', marginBottom: 8}}>
-            {settings.fairBooth.titlePrefix} — Roster
-          </h3>
+        <div
+          ref={printRosterRef}
+          style={{
+            background: '#fff',
+            padding: 24,
+            fontFamily: 'Arial, sans-serif',
+            color: '#000',
+          }}
+        >
+          <div style={{textAlign: 'center', marginBottom: 24}}>
+            {settings.logoPath && (
+              <img
+                src={settings.logoPath}
+                alt=""
+                style={{maxHeight: 80, margin: '0 auto 8px', display: 'block', objectFit: 'contain'}}
+                crossOrigin="anonymous"
+              />
+            )}
+            <h2 style={{fontSize: 20, fontWeight: 700, color: '#000', margin: 0}}>
+              {settings.fairBooth.titlePrefix} {schedule.scopeLabel} — Roster ({rosterSize})
+            </h2>
+          </div>
           <FairBoothRoster
             people={people}
             rosterPersonIds={rosterPersonIds}

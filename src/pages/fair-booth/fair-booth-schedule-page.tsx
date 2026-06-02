@@ -132,6 +132,7 @@ export function FairBoothSchedulePage() {
             signups={signups}
             minSignupsForBold={settings.fairBooth.minSignupsForBold}
             onClickPerson={(pid) => setRosterPersonId(pid)}
+            blankRowsPerColumn={0}
           />
         </CardContent>
       </Card>

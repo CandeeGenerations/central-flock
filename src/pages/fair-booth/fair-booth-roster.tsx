@@ -98,8 +98,8 @@ function RosterColumn({rows, initials, minBold, onClick}: RosterColumnProps) {
     <table className="w-full border-collapse text-sm">
       <thead>
         <tr>
-          <th className="border bg-gray-100 p-1 text-left">Name ({rows.length})</th>
-          <th className="border bg-gray-100 p-1 text-left w-24">Initials</th>
+          <th className="border bg-gray-100 p-1 text-left text-gray-900">Name ({rows.length})</th>
+          <th className="border bg-gray-100 p-1 text-left w-24 text-gray-900">Initials</th>
         </tr>
       </thead>
       <tbody>

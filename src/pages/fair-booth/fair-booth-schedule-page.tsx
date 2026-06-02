@@ -104,7 +104,7 @@ export function FairBoothSchedulePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Grid</CardTitle>
+          <CardTitle>Schedule</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">

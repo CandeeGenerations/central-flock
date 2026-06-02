@@ -7,7 +7,6 @@ import {
   colorForHeadcount,
   computeInitialsForRoster,
   deriveFairDays,
-  distributeSignupsToRows,
   fairRoleStars,
   formatTimeShort,
   headerCountsForDay,
@@ -95,56 +94,40 @@ export function FairBoothGrid({
     if (blank) return map
     for (const slot of day.slots) {
       const regions = stableRegionsForSlot(signups as FairSignup[], day.date, slot)
-      // dotted transitions inside the slot
       for (let i = 1; i < regions.length; i++) {
         const r = regions[i]
         const cell = map.get(r.startHour)
         if (cell) cell.dotted = true
       }
       for (const region of regions) {
-        // color: every row in region gets the same headcount color
         for (const h of region.hourRows) {
           const cell = map.get(h)
           if (cell) cell.bgClass = BG_BY_COLOR[colorForHeadcount(region.headcount)]
         }
-        // distribute signups across rows
-        const inSlot = (signups as FairSignup[]).filter(
-          (s) =>
-            s.dayDate === day.date &&
-            s.startMinute < region.endHour &&
-            s.endMinute > region.startHour &&
-            slotIndexForSignup(s, day) === slot.index,
-        )
-        const placement = distributeSignupsToRows(region, inSlot)
-        // Sort each row's entries: UL, AsstUL, Worker, then sortOrder
+      }
+      // List every signup for this slot once, anchored to the slot's start row.
+      const inSlot = (signups as FairSignup[]).filter(
+        (s) => s.dayDate === day.date && slotIndexForSignup(s, day) === slot.index,
+      )
+      const anchorRow = slot.startMinute
+      const cell = map.get(anchorRow)
+      if (cell) {
         const orderRank: Record<string, number> = {unit_leader: 0, asst_unit: 1, worker: 2}
-        const grouped = new Map<number, FairSignup[]>()
-        for (const s of inSlot) {
-          const row = placement.get(s.id)
-          if (row === undefined) continue
-          const arr = grouped.get(row) ?? []
-          arr.push(s)
-          grouped.set(row, arr)
-        }
-        for (const [row, list] of grouped) {
-          list.sort((a, b) => {
-            const ra = orderRank[a.shiftRole] ?? 9
-            const rb = orderRank[b.shiftRole] ?? 9
-            if (ra !== rb) return ra - rb
-            return a.sortOrder - b.sortOrder || a.id - b.id
-          })
-          const cell = map.get(row)
-          if (!cell) continue
-          for (const s of list) {
-            const dashes = shiftRoleDashes(s.shiftRole)
-            const init = initials.get(s.personId) ?? '??'
-            const attr = attrsByPerson.get(s.personId)
-            const fairRole: FairBoothFairRole = attr?.fairRole ?? 'worker'
-            const stars = fairRoleStars(fairRole)
-            const slotFull = s.startMinute <= slot.startMinute && s.endMinute >= slot.endMinute
-            const partial = slotFull ? '' : ` (${formatTimeShort(s.startMinute)}-${formatTimeShort(s.endMinute)})`
-            cell.entries.push({signupId: s.id, line: `${dashes}${init}${stars}${partial}`})
-          }
+        const sorted = [...inSlot].sort((a, b) => {
+          const ra = orderRank[a.shiftRole] ?? 9
+          const rb = orderRank[b.shiftRole] ?? 9
+          if (ra !== rb) return ra - rb
+          return a.sortOrder - b.sortOrder || a.id - b.id
+        })
+        for (const s of sorted) {
+          const dashes = shiftRoleDashes(s.shiftRole)
+          const init = initials.get(s.personId) ?? '??'
+          const attr = attrsByPerson.get(s.personId)
+          const fairRole: FairBoothFairRole = attr?.fairRole ?? 'worker'
+          const stars = fairRoleStars(fairRole)
+          const slotFull = s.startMinute <= slot.startMinute && s.endMinute >= slot.endMinute
+          const partial = slotFull ? '' : ` (${formatTimeShort(s.startMinute)}-${formatTimeShort(s.endMinute)})`
+          cell.entries.push({signupId: s.id, line: `${dashes}${init}${stars}${partial}`})
         }
       }
     }
@@ -163,6 +146,7 @@ export function FairBoothGrid({
         signups={signups as FairSignup[]}
         hispanicIds={hispanicIds}
         scheduleId={scheduleId}
+        clickable={false}
       />
     )
   }
@@ -204,13 +188,23 @@ interface HalfGridProps {
   signups: FairSignup[]
   hispanicIds: Set<number>
   scheduleId?: number
+  clickable?: boolean
 }
 
 function dayHref(scheduleId: number | undefined, date: string): string {
   return scheduleId !== undefined ? `/schedules/fair-booth/${scheduleId}/day/${date}` : `day/${date}`
 }
 
-function HalfGrid({days, emptyTrailing, renderFn, blank, signups, hispanicIds, scheduleId}: HalfGridProps) {
+function HalfGrid({
+  days,
+  emptyTrailing,
+  renderFn,
+  blank,
+  signups,
+  hispanicIds,
+  scheduleId,
+  clickable = true,
+}: HalfGridProps) {
   return (
     <table className="w-full border-collapse text-xs table-fixed">
       <thead>
@@ -224,10 +218,17 @@ function HalfGrid({days, emptyTrailing, renderFn, blank, signups, hispanicIds, s
             const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayDate.getDay()]
             return (
               <th key={d.date} className={`border p-1 text-center text-sm text-gray-900 ${headerBg}`}>
-                <a href={dayHref(scheduleId, d.date)} className="block cursor-pointer text-gray-900">
-                  {dayName}, {dayDate.getDate()}
-                  {counts ? ` (${counts})` : ''}
-                </a>
+                {clickable ? (
+                  <a href={dayHref(scheduleId, d.date)} className="block cursor-pointer text-gray-900">
+                    {dayName}, {dayDate.getDate()}
+                    {counts ? ` (${counts})` : ''}
+                  </a>
+                ) : (
+                  <span className="block text-gray-900">
+                    {dayName}, {dayDate.getDate()}
+                    {counts ? ` (${counts})` : ''}
+                  </span>
+                )}
               </th>
             )
           })}
@@ -256,10 +257,14 @@ function HalfGrid({days, emptyTrailing, renderFn, blank, signups, hispanicIds, s
                 return (
                   <td
                     key={d.date}
-                    className={`border align-top p-1 text-gray-900 ${bg} ${borderTop} cursor-pointer`}
-                    onClick={() => {
-                      window.location.assign(dayHref(scheduleId, d.date))
-                    }}
+                    className={`border align-top p-1 text-gray-900 ${bg} ${borderTop} ${clickable ? 'cursor-pointer' : ''}`}
+                    onClick={
+                      clickable
+                        ? () => {
+                            window.location.assign(dayHref(scheduleId, d.date))
+                          }
+                        : undefined
+                    }
                   >
                     {inAnySlot &&
                       cell.entries.map((e) => (

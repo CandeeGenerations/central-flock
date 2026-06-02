@@ -149,9 +149,9 @@ export function FairBoothDayPage() {
       </div>
 
       <div className="grid items-start gap-4 md:grid-cols-2">
-        <div className="md:sticky md:top-4 md:self-start">
-          <h3 className="mb-2 font-medium">Preview</h3>
-          <div className="max-h-[calc(100vh-8rem)] overflow-x-auto overflow-y-auto rounded border p-2">
+        <div className="md:sticky md:top-4 md:self-start space-y-3">
+          <h3 className="font-medium">Preview</h3>
+          <div className="max-h-[calc(100vh-16rem)] overflow-x-auto overflow-y-auto rounded border p-2">
             <FairBoothGrid
               scopeStart={detail.schedule.scopeStart}
               signups={daySignups}
@@ -160,6 +160,7 @@ export function FairBoothDayPage() {
               onlyDate={date}
             />
           </div>
+          <Legend />
         </div>
 
         <div className="space-y-4">
@@ -338,6 +339,58 @@ function SignupCard({
             </SelectContent>
           </Select>
         )}
+      </div>
+    </div>
+  )
+}
+
+function Legend() {
+  const headcount: {color: string; label: string}[] = [
+    {color: 'bg-red-200', label: '≤ 3'},
+    {color: 'bg-orange-200', label: '4'},
+    {color: 'bg-yellow-200', label: '5'},
+    {color: 'bg-cyan-200', label: '6'},
+    {color: 'bg-blue-200', label: '7'},
+    {color: 'bg-green-200', label: '8'},
+    {color: 'bg-purple-200', label: '> 8'},
+  ]
+  const coverage: {color: string; label: string}[] = [
+    {color: 'bg-green-300', label: 'Hispanic full day'},
+    {color: 'bg-orange-300', label: 'Hispanic partial'},
+    {color: 'bg-red-300', label: 'No Hispanic'},
+  ]
+  return (
+    <div className="rounded border p-2 text-xs space-y-2">
+      <div>
+        <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">Headcount</div>
+        <div className="flex flex-wrap gap-2">
+          {headcount.map((h) => (
+            <div key={h.label} className="flex items-center gap-1">
+              <span className={`inline-block h-3 w-4 rounded border ${h.color}`} />
+              <span>{h.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">Day header</div>
+        <div className="flex flex-wrap gap-2">
+          {coverage.map((c) => (
+            <div key={c.label} className="flex items-center gap-1">
+              <span className={`inline-block h-3 w-4 rounded border ${c.color}`} />
+              <span>{c.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">Markers</div>
+        <div className="flex flex-wrap gap-3">
+          <span className="font-mono">— Unit Leader</span>
+          <span className="font-mono">—— Asst Unit Leader</span>
+          <span className="font-mono">——— Worker</span>
+          <span className="font-mono">★ Worker · ★★ Asst Unit · ★★★ Unit Leader · ★★★★ Asst Fair Mgr · ★★★★★ Fair Mgr</span>
+        </div>
       </div>
     </div>
   )

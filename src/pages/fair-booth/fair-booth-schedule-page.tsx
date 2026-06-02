@@ -1,10 +1,16 @@
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Input} from '@/components/ui/input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {deriveFairDays} from '@/lib/fair-booth-render'
-import {fetchFairBoothSchedule, fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
-import {useQuery} from '@tanstack/react-query'
-import {ArrowLeft, ChevronLeft, ChevronRight, FileDown, FileImage} from 'lucide-react'
+import {
+  fetchFairBoothSchedule,
+  fetchSchedulesSettings,
+  schedulesKeys,
+  updateFairBoothSchedule,
+} from '@/lib/schedules-api'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {ArrowLeft, ChevronLeft, ChevronRight, FileDown, FileImage, Pencil} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -18,11 +24,25 @@ export function FairBoothSchedulePage() {
   const {id} = useParams<{id: string}>()
   const navigate = useNavigate()
   const scheduleId = Number(id)
+  const queryClient = useQueryClient()
   const [rosterPersonId, setRosterPersonId] = useState<number | null>(null)
   const [blank, setBlank] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [mobileDayIdx, setMobileDayIdx] = useState(0)
+  const [editingLabel, setEditingLabel] = useState(false)
+  const [labelDraft, setLabelDraft] = useState('')
+
+  const renameMutation = useMutation({
+    mutationFn: (scopeLabel: string) => updateFairBoothSchedule(scheduleId, {scopeLabel}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: schedulesKeys.fairBooth(scheduleId)})
+      queryClient.invalidateQueries({queryKey: schedulesKeys.fairBoothList})
+      setEditingLabel(false)
+      toast.success('Renamed')
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  })
   const printGridRef = useRef<HTMLDivElement | null>(null)
   const printRosterRef = useRef<HTMLDivElement | null>(null)
 
@@ -64,9 +84,43 @@ export function FairBoothSchedulePage() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/schedules/fair-booth')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-2xl font-bold">
-          {settings.fairBooth.titlePrefix} {schedule.scopeLabel} ({rosterSize})
-        </h2>
+        {editingLabel ? (
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold">{settings.fairBooth.titlePrefix}</span>
+            <Input
+              autoFocus
+              value={labelDraft}
+              onChange={(e) => setLabelDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && labelDraft.trim()) renameMutation.mutate(labelDraft.trim())
+                if (e.key === 'Escape') setEditingLabel(false)
+              }}
+              className="h-9 w-72"
+            />
+            <Button size="sm" onClick={() => labelDraft.trim() && renameMutation.mutate(labelDraft.trim())} disabled={renameMutation.isPending}>
+              Save
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEditingLabel(false)}>
+              Cancel
+            </Button>
+            <span className="text-2xl font-bold">({rosterSize})</span>
+          </div>
+        ) : (
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            {settings.fairBooth.titlePrefix} {schedule.scopeLabel} ({rosterSize})
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => {
+                setLabelDraft(schedule.scopeLabel)
+                setEditingLabel(true)
+              }}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </h2>
+        )}
         <div className="ml-auto flex gap-2 flex-wrap">
           <Button
             variant="outline"
@@ -342,17 +396,17 @@ function PrintLegend() {
 function FooterBlocks({blocks}: {blocks: {kind: 'quote' | 'note' | 'spacer'; text: string; bold?: boolean}[]}) {
   if (!blocks || blocks.length === 0) return null
   return (
-    <div className="mt-4 text-center text-sm space-y-1">
+    <div style={{marginTop: 16, textAlign: 'center', fontSize: 13, color: '#111'}}>
       {blocks.map((b, i) => {
-        if (b.kind === 'spacer') return <div key={i} className="h-2" />
+        if (b.kind === 'spacer') return <div key={i} style={{height: 8}} />
         if (b.kind === 'quote')
           return (
-            <p key={i} className={`italic ${b.bold ? 'font-bold' : ''}`}>
+            <p key={i} style={{fontStyle: 'italic', fontWeight: b.bold ? 700 : 400, margin: '2px 0'}}>
               &ldquo;{b.text}&rdquo;
             </p>
           )
         return (
-          <p key={i} className={b.bold ? 'font-bold' : ''}>
+          <p key={i} style={{fontWeight: b.bold ? 700 : 400, margin: '2px 0'}}>
             {b.text}
           </p>
         )

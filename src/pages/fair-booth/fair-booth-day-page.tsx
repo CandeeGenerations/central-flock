@@ -209,11 +209,9 @@ export function FairBoothDayPage() {
                       </div>
                     )
                   })}
-                  {slotSignups.length >= 3 && (
-                    <Button variant="outline" size="sm" onClick={() => addToSlot(slotIdx)}>
-                      <Plus className="mr-1 h-3 w-3" /> Add signup
-                    </Button>
-                  )}
+                  <Button variant="outline" size="sm" onClick={() => addToSlot(slotIdx)}>
+                    <Plus className="mr-1 h-3 w-3" /> Add signup
+                  </Button>
                 </CardContent>
               </Card>
             )

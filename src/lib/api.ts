@@ -96,6 +96,7 @@ export interface Person {
   // ("Madeline" instead of "Madeline Turner"). Per-cell override on the
   // Special Music schedule can flip this on or off for a specific cell.
   displayFirstNameOnly: boolean
+  isHispanic: boolean
   createdAt: string
   updatedAt: string
   groups?: {id: number; name: string}[]

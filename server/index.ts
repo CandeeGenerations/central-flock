@@ -21,6 +21,7 @@ import {calendarRouter} from './routes/calendar.js'
 import {contactsRouter} from './routes/contacts.js'
 import {cleanupOrphanedScanImages, devotionsRouter} from './routes/devotions.js'
 import {draftsRouter} from './routes/drafts.js'
+import {fairBoothRouter} from './routes/fair-booth.js'
 import {globalVariablesRouter} from './routes/global-variables.js'
 import {groupsRouter} from './routes/groups.js'
 import {gwendolynDevotionsRouter} from './routes/gwendolyn-devotions.js'
@@ -76,6 +77,7 @@ app.use('/api/stats', statsRouter)
 app.use('/api/home', homeRouter)
 app.use('/api/devotions', devotionsRouter)
 app.use('/api/gwendolyn-devotions', gwendolynDevotionsRouter)
+app.use('/api/schedules/fair-booth', fairBoothRouter)
 app.use('/api/schedules', schedulesRouter)
 app.use('/api/nursery/schedules', nurserySchedulesRouter)
 app.use('/api/nursery', nurseryRouter)

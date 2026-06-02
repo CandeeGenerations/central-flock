@@ -184,6 +184,176 @@ export function SchedulesSettingsPage() {
             <HouseholdsSection singerGroupIds={settings.specialMusic.singerGroupIds} />
           </CardContent>
         </Card>
+
+        {/* Fair Booth */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Fair Booth</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Title prefix</Label>
+              <Input
+                defaultValue={settings.fairBooth.titlePrefix}
+                onBlur={(e) => {
+                  const v = e.target.value
+                  if (v !== settings.fairBooth.titlePrefix) saveType(queryClient, {fairBooth: {titlePrefix: v}})
+                }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Roster groups</Label>
+              <p className="text-muted-foreground text-xs">
+                Union of these groups becomes the live fair roster (page 2 of the schedule).
+              </p>
+              <MultiSelect
+                value={settings.fairBooth.rosterGroupIds.map(String)}
+                onValueChange={(v) =>
+                  saveType(queryClient, {
+                    fairBooth: {rosterGroupIds: v.map(Number).filter((n) => !Number.isNaN(n))},
+                  })
+                }
+                options={(groups ?? []).map((g) => ({value: String(g.id), label: g.name}))}
+                placeholder="Pick groups"
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Bold threshold (signups)</Label>
+              <p className="text-muted-foreground text-xs">
+                Roster names with fewer than this many signups render bold. Default 3.
+              </p>
+              <Input
+                type="number"
+                min={0}
+                defaultValue={settings.fairBooth.minSignupsForBold}
+                onBlur={(e) => {
+                  const n = Number(e.target.value)
+                  if (!Number.isNaN(n) && n !== settings.fairBooth.minSignupsForBold)
+                    saveType(queryClient, {fairBooth: {minSignupsForBold: n}})
+                }}
+                className="w-24"
+              />
+            </div>
+            <FairBoothFooterEditor
+              label="Grid page footer"
+              blocks={settings.fairBooth.gridPageFooterBlocks}
+              onSave={(blocks) => saveType(queryClient, {fairBooth: {gridPageFooterBlocks: blocks}})}
+            />
+            <FairBoothFooterEditor
+              label="Roster page footer"
+              blocks={settings.fairBooth.rosterPageFooterBlocks}
+              onSave={(blocks) => saveType(queryClient, {fairBooth: {rosterPageFooterBlocks: blocks}})}
+            />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+function FairBoothFooterEditor({
+  label,
+  blocks,
+  onSave,
+}: {
+  label: string
+  blocks: FooterBlock[]
+  onSave: (blocks: FooterBlock[]) => void
+}) {
+  const [local, setLocal] = useState<FooterBlock[]>(blocks)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setLocal(blocks), [blocks])
+  const dirty = JSON.stringify(local) !== JSON.stringify(blocks)
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-medium">{label}</Label>
+      <div className="space-y-2">
+        {local.map((b, i) => (
+          <div key={i} className="bg-muted/30 flex items-start gap-2 rounded border p-2">
+            <Select
+              value={b.kind}
+              onValueChange={(v) =>
+                setLocal((prev) => prev.map((x, idx) => (idx === i ? {...x, kind: v as FooterBlock['kind']} : x)))
+              }
+            >
+              <SelectTrigger className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="quote">Quote</SelectItem>
+                <SelectItem value="note">Note</SelectItem>
+                <SelectItem value="spacer">Spacer</SelectItem>
+              </SelectContent>
+            </Select>
+            {b.kind === 'spacer' ? (
+              <div className="text-muted-foreground flex-1 self-center text-xs">— blank line —</div>
+            ) : (
+              <Textarea
+                value={b.text}
+                onChange={(e) =>
+                  setLocal((prev) => prev.map((x, idx) => (idx === i ? {...x, text: e.target.value} : x)))
+                }
+                rows={2}
+                className="flex-1"
+              />
+            )}
+            <div className="flex flex-col gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={i === 0}
+                onClick={() =>
+                  setLocal((prev) => {
+                    const next = [...prev]
+                    ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
+                    return next
+                  })
+                }
+              >
+                <ArrowUp className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={i === local.length - 1}
+                onClick={() =>
+                  setLocal((prev) => {
+                    const next = [...prev]
+                    ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
+                    return next
+                  })
+                }
+              >
+                <ArrowDown className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setLocal((prev) => prev.filter((_, idx) => idx !== i))}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={() => setLocal((p) => [...p, {kind: 'note', text: ''}])}>
+          <Plus className="mr-1 h-3 w-3" /> Note
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setLocal((p) => [...p, {kind: 'quote', text: ''}])}>
+          <Plus className="mr-1 h-3 w-3" /> Quote
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setLocal((p) => [...p, {kind: 'spacer', text: ''}])}>
+          <Plus className="mr-1 h-3 w-3" /> Spacer
+        </Button>
+        <Button disabled={!dirty} size="sm" onClick={() => onSave(local)}>
+          Save
+        </Button>
       </div>
     </div>
   )

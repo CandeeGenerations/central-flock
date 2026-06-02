@@ -153,6 +153,7 @@ export function PersonDetailPage() {
         anniversaryDay: person.anniversaryDay,
         anniversaryYear: person.anniversaryYear,
         displayFirstNameOnly: person.displayFirstNameOnly,
+        isHispanic: person.isHispanic,
       })
       setEditing(true)
     }
@@ -375,6 +376,16 @@ export function PersonDetailPage() {
                 />
                 <Label htmlFor="display-first-name-only" className="cursor-pointer text-sm font-normal">
                   Show only first name on schedules
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="is-hispanic"
+                  checked={!!form.isHispanic}
+                  onCheckedChange={(v) => setForm((f) => ({...f, isHispanic: v === true}))}
+                />
+                <Label htmlFor="is-hispanic" className="cursor-pointer text-sm font-normal">
+                  Hispanic (drives Fair Booth coverage)
                 </Label>
               </div>
               <div className="flex gap-2">

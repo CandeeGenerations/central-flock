@@ -27,6 +27,9 @@ import {DevotionStatsPage} from '@/pages/devotions/devotion-stats-page'
 import {GwendolynDetailPage} from '@/pages/devotions/gwendolyn-detail-page'
 import {GwendolynListPage} from '@/pages/devotions/gwendolyn-list-page'
 import {GwendolynNewPage} from '@/pages/devotions/gwendolyn-new-page'
+import {FairBoothDayPage} from '@/pages/fair-booth/fair-booth-day-page'
+import {FairBoothSchedulePage} from '@/pages/fair-booth/fair-booth-schedule-page'
+import {FairBoothSchedulesPage} from '@/pages/fair-booth/fair-booth-schedules-page'
 import {GroupDetailPage} from '@/pages/group-detail-page'
 import {GroupsPage} from '@/pages/groups-page'
 import {HomePage} from '@/pages/home-page'
@@ -461,6 +464,9 @@ function AppLayoutInner({
               <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
               <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
               <Route path="/schedules/settings" element={<SchedulesSettingsPage />} />
+              <Route path="/schedules/fair-booth" element={<FairBoothSchedulesPage />} />
+              <Route path="/schedules/fair-booth/:id" element={<FairBoothSchedulePage />} />
+              <Route path="/schedules/fair-booth/:id/day/:date" element={<FairBoothDayPage />} />
               <Route path="/sermons/quotes" element={<QuotesPage />} />
               <Route path="/sermons/quotes/:id" element={<QuoteDetailPage />} />
               <Route path="/sermons/research" element={<QuotesResearchPage />} />

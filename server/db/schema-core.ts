@@ -21,6 +21,9 @@ export const people = sqliteTable('people', {
   // ("Madeline" instead of "Madeline Turner"). Can be overridden per cell
   // via special_music_performers.display_first_name_only.
   displayFirstNameOnly: integer('display_first_name_only', {mode: 'boolean'}).notNull().default(false),
+  // Drives the Fair Booth day-header coverage color. Intentionally person-level
+  // (stable across years); see docs/adr/0009-fair-booth-schedule.md.
+  isHispanic: integer('is_hispanic', {mode: 'boolean'}).notNull().default(false),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

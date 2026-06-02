@@ -99,6 +99,7 @@ export const navGroups: NavGroup[] = [
       {to: '/special-music', label: 'Special Music', icon: Music, end: true},
       {to: '/nursery', label: 'Nursery', icon: Baby, end: true},
       {to: '/nursery/workers', label: 'Nursery Workers', icon: Users},
+      {to: '/schedules/fair-booth', label: 'Fair Booth', icon: Sparkles},
       {to: '/schedules/settings', label: 'Settings', icon: Settings, matchPaths: ['/nursery/settings']},
     ],
   },

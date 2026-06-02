@@ -42,6 +42,7 @@ interface FairBoothGridProps {
   people: FairPerson[]
   rosterAttrs: FairBoothRosterAttr[]
   blank?: boolean
+  scheduleId?: number
 }
 
 interface CellRender {
@@ -50,7 +51,14 @@ interface CellRender {
   entries: {signupId: number; line: string}[]
 }
 
-export function FairBoothGrid({scopeStart, signups, people, rosterAttrs, blank = false}: FairBoothGridProps) {
+export function FairBoothGrid({
+  scopeStart,
+  signups,
+  people,
+  rosterAttrs,
+  blank = false,
+  scheduleId,
+}: FairBoothGridProps) {
   let days: FairDay[]
   try {
     days = deriveFairDays(scopeStart)
@@ -144,6 +152,7 @@ export function FairBoothGrid({scopeStart, signups, people, rosterAttrs, blank =
         blank={blank}
         signups={signups as FairSignup[]}
         hispanicIds={hispanicIds}
+        scheduleId={scheduleId}
       />
       <HalfGrid
         days={half2}
@@ -152,6 +161,7 @@ export function FairBoothGrid({scopeStart, signups, people, rosterAttrs, blank =
         blank={blank}
         signups={signups as FairSignup[]}
         hispanicIds={hispanicIds}
+        scheduleId={scheduleId}
       />
     </div>
   )
@@ -164,9 +174,14 @@ interface HalfGridProps {
   blank: boolean
   signups: FairSignup[]
   hispanicIds: Set<number>
+  scheduleId?: number
 }
 
-function HalfGrid({days, emptyTrailing, renderFn, blank, signups, hispanicIds}: HalfGridProps) {
+function dayHref(scheduleId: number | undefined, date: string): string {
+  return scheduleId !== undefined ? `/schedules/fair-booth/${scheduleId}/day/${date}` : `day/${date}`
+}
+
+function HalfGrid({days, emptyTrailing, renderFn, blank, signups, hispanicIds, scheduleId}: HalfGridProps) {
   return (
     <table className="w-full border-collapse text-xs table-fixed">
       <thead>
@@ -180,7 +195,7 @@ function HalfGrid({days, emptyTrailing, renderFn, blank, signups, hispanicIds}: 
             const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayDate.getDay()]
             return (
               <th key={d.date} className={`border p-1 text-center text-sm text-gray-900 ${headerBg}`}>
-                <a href={`day/${d.date}`} className="block cursor-pointer text-gray-900">
+                <a href={dayHref(scheduleId, d.date)} className="block cursor-pointer text-gray-900">
                   {dayName}, {dayDate.getDate()}
                   {counts ? ` (${counts})` : ''}
                 </a>
@@ -214,7 +229,7 @@ function HalfGrid({days, emptyTrailing, renderFn, blank, signups, hispanicIds}: 
                     key={d.date}
                     className={`border align-top p-1 text-gray-900 ${bg} ${borderTop} cursor-pointer`}
                     onClick={() => {
-                      window.location.assign(`day/${d.date}`)
+                      window.location.assign(dayHref(scheduleId, d.date))
                     }}
                   >
                     {inAnySlot &&

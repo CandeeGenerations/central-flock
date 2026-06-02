@@ -114,6 +114,7 @@ export function FairBoothSchedulePage() {
               people={people}
               rosterAttrs={rosterAttrs}
               blank={blank}
+              scheduleId={scheduleId}
             />
           </div>
         </CardContent>

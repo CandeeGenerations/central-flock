@@ -495,12 +495,14 @@ fairBoothRouter.post(
       return
     }
     const other = peers[swapIdx]
+    const meNewOrder = other.sortOrder
+    const otherNewOrder = peers[idx].sortOrder
     db.update(schema.fairBoothSignups)
-      .set({sortOrder: other.sortOrder, updatedAt: new Date().toISOString()})
+      .set({sortOrder: meNewOrder, updatedAt: new Date().toISOString()})
       .where(eq(schema.fairBoothSignups.id, me.id))
       .run()
     db.update(schema.fairBoothSignups)
-      .set({sortOrder: me.sortOrder, updatedAt: new Date().toISOString()})
+      .set({sortOrder: otherNewOrder, updatedAt: new Date().toISOString()})
       .where(eq(schema.fairBoothSignups.id, other.id))
       .run()
     res.json({success: true})

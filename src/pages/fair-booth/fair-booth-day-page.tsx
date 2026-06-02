@@ -198,7 +198,13 @@ export function FairBoothDayPage() {
             return (
               <div
                 key={s.id}
-                className={`border rounded p-2 space-y-2 ${SHIFT_RANK[s.shiftRole] === 0 ? 'border-purple-300' : SHIFT_RANK[s.shiftRole] === 1 ? 'border-blue-300' : ''}`}
+                className={`rounded p-2 space-y-2 ${
+                  SHIFT_RANK[s.shiftRole] === 0
+                    ? 'border-2 border-purple-400'
+                    : SHIFT_RANK[s.shiftRole] === 1
+                      ? 'border-2 border-blue-400'
+                      : 'border'
+                }`}
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <Label className="text-xs w-14 shrink-0">Person</Label>

@@ -1,4 +1,5 @@
 import {Button} from '@/components/ui/button'
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {PageSpinner} from '@/components/ui/spinner'
 import {fetchFairBoothSchedule, fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
 import {useQuery} from '@tanstack/react-query'
@@ -19,8 +20,8 @@ export function FairBoothSchedulePage() {
   const [rosterPersonId, setRosterPersonId] = useState<number | null>(null)
   const [blank, setBlank] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const gridRef = useRef<HTMLDivElement | null>(null)
-  const rosterRef = useRef<HTMLDivElement | null>(null)
+  const printGridRef = useRef<HTMLDivElement | null>(null)
+  const printRosterRef = useRef<HTMLDivElement | null>(null)
 
   const {data: detail, isLoading} = useQuery({
     queryKey: schedulesKeys.fairBooth(scheduleId),
@@ -62,8 +63,8 @@ export function FairBoothSchedulePage() {
             disabled={exporting}
             onClick={() =>
               withExport(async () => {
-                if (!gridRef.current || !rosterRef.current) return
-                await exportFairBoothPdf(gridRef.current, rosterRef.current, filenameBase)
+                if (!printGridRef.current || !printRosterRef.current) return
+                await exportFairBoothPdf(printGridRef.current, printRosterRef.current, filenameBase)
               })
             }
           >
@@ -75,8 +76,8 @@ export function FairBoothSchedulePage() {
             disabled={exporting}
             onClick={() =>
               withExport(async () => {
-                if (!gridRef.current) return
-                await exportFairBoothJpg(gridRef.current, filenameBase)
+                if (!printGridRef.current) return
+                await exportFairBoothJpg(printGridRef.current, filenameBase)
               })
             }
           >
@@ -90,8 +91,8 @@ export function FairBoothSchedulePage() {
               setBlank(true)
               await new Promise((r) => setTimeout(r, 120))
               await withExport(async () => {
-                if (!gridRef.current || !rosterRef.current) return
-                await exportFairBoothPdf(gridRef.current, rosterRef.current, `${filenameBase}-blank`)
+                if (!printGridRef.current || !printRosterRef.current) return
+                await exportFairBoothPdf(printGridRef.current, printRosterRef.current, `${filenameBase}-blank`)
               })
               setBlank(false)
             }}
@@ -101,12 +102,11 @@ export function FairBoothSchedulePage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="md:flex-[2] min-w-0" ref={gridRef}>
-          {settings.logoPath && <img src={settings.logoPath} alt="" className="mb-2 h-16 mx-auto object-contain" />}
-          <h3 className="text-center text-lg font-bold mb-2">
-            {settings.fairBooth.titlePrefix} {schedule.scopeLabel} ({rosterSize})
-          </h3>
+      <Card>
+        <CardHeader>
+          <CardTitle>Grid</CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="overflow-x-auto">
             <FairBoothGrid
               scopeStart={schedule.scopeStart}
@@ -116,11 +116,14 @@ export function FairBoothSchedulePage() {
               blank={blank}
             />
           </div>
-          <FooterBlocks blocks={settings.fairBooth.gridPageFooterBlocks} />
-        </div>
-        <div className="md:flex-1 min-w-0" ref={rosterRef}>
-          {settings.logoPath && <img src={settings.logoPath} alt="" className="mb-2 h-16 mx-auto object-contain" />}
-          <h3 className="text-center text-lg font-bold mb-2">{settings.fairBooth.titlePrefix} — Roster</h3>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Roster</CardTitle>
+        </CardHeader>
+        <CardContent>
           <FairBoothRoster
             people={people}
             rosterPersonIds={rosterPersonIds}
@@ -129,9 +132,8 @@ export function FairBoothSchedulePage() {
             minSignupsForBold={settings.fairBooth.minSignupsForBold}
             onClickPerson={(pid) => setRosterPersonId(pid)}
           />
-          <FooterBlocks blocks={settings.fairBooth.rosterPageFooterBlocks} />
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <p className="text-muted-foreground text-xs">
         Tip: click any day column in the grid to edit that day. Click a name on the roster to edit fair role and
@@ -152,6 +154,43 @@ export function FairBoothSchedulePage() {
           onClose={() => setRosterPersonId(null)}
         />
       )}
+
+      {/* Hidden print-only renderings — capture targets for PDF/JPG/blank. */}
+      <div style={{position: 'fixed', left: '-99999px', top: 0, width: '1100px', background: '#fff'}}>
+        <div ref={printGridRef} style={{background: '#fff', padding: 16}}>
+          {settings.logoPath && (
+            <img src={settings.logoPath} alt="" style={{height: 64, margin: '0 auto 8px', display: 'block'}} />
+          )}
+          <h3 style={{textAlign: 'center', fontSize: 18, fontWeight: 'bold', marginBottom: 8}}>
+            {settings.fairBooth.titlePrefix} {schedule.scopeLabel} ({rosterSize})
+          </h3>
+          <FairBoothGrid
+            scopeStart={schedule.scopeStart}
+            signups={signups}
+            people={people}
+            rosterAttrs={rosterAttrs}
+            blank={blank}
+          />
+          <FooterBlocks blocks={settings.fairBooth.gridPageFooterBlocks} />
+        </div>
+        <div ref={printRosterRef} style={{background: '#fff', padding: 16}}>
+          {settings.logoPath && (
+            <img src={settings.logoPath} alt="" style={{height: 64, margin: '0 auto 8px', display: 'block'}} />
+          )}
+          <h3 style={{textAlign: 'center', fontSize: 18, fontWeight: 'bold', marginBottom: 8}}>
+            {settings.fairBooth.titlePrefix} — Roster
+          </h3>
+          <FairBoothRoster
+            people={people}
+            rosterPersonIds={rosterPersonIds}
+            rosterAttrs={rosterAttrs}
+            signups={signups}
+            minSignupsForBold={settings.fairBooth.minSignupsForBold}
+            onClickPerson={() => {}}
+          />
+          <FooterBlocks blocks={settings.fairBooth.rosterPageFooterBlocks} />
+        </div>
+      </div>
     </div>
   )
 }

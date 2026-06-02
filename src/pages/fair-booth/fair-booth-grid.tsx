@@ -130,26 +130,66 @@ export function FairBoothGrid({scopeStart, signups, people, rosterAttrs, blank =
     return map
   }
 
+  // Split days into two stacked halves: first 5, then remaining 4 + one empty
+  // slot so both halves render the same column count and align visually.
+  const half1 = days.slice(0, 5)
+  const half2 = days.slice(5, 9)
+
   return (
-    <table className="w-full border-collapse text-xs">
+    <div className="space-y-4">
+      <HalfGrid
+        days={half1}
+        emptyTrailing={0}
+        renderFn={renderFn}
+        blank={blank}
+        signups={signups as FairSignup[]}
+        hispanicIds={hispanicIds}
+      />
+      <HalfGrid
+        days={half2}
+        emptyTrailing={5 - half2.length}
+        renderFn={renderFn}
+        blank={blank}
+        signups={signups as FairSignup[]}
+        hispanicIds={hispanicIds}
+      />
+    </div>
+  )
+}
+
+interface HalfGridProps {
+  days: FairDay[]
+  emptyTrailing: number
+  renderFn: (day: FairDay) => Map<number, CellRender>
+  blank: boolean
+  signups: FairSignup[]
+  hispanicIds: Set<number>
+}
+
+function HalfGrid({days, emptyTrailing, renderFn, blank, signups, hispanicIds}: HalfGridProps) {
+  return (
+    <table className="w-full border-collapse text-xs table-fixed">
       <thead>
         <tr>
           <th className="border bg-white p-1 text-left text-xs font-normal w-16"></th>
           {days.map((d) => {
-            const coverage = blank ? 'none' : hispanicCoverageForDay(signups as FairSignup[], hispanicIds, d)
+            const coverage = blank ? 'none' : hispanicCoverageForDay(signups, hispanicIds, d)
             const headerBg = blank ? 'bg-white' : HEADER_BG_BY_COVERAGE[coverage]
-            const counts = blank ? '' : headerCountsForDay(signups as FairSignup[], d)
+            const counts = blank ? '' : headerCountsForDay(signups, d)
             const dayDate = new Date(d.date + 'T12:00:00')
             const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayDate.getDay()]
             return (
-              <th key={d.date} className={`border p-1 text-center text-sm ${headerBg}`}>
-                <a href={`day/${d.date}`} className="block cursor-pointer">
+              <th key={d.date} className={`border p-1 text-center text-sm text-gray-900 ${headerBg}`}>
+                <a href={`day/${d.date}`} className="block cursor-pointer text-gray-900">
                   {dayName}, {dayDate.getDate()}
                   {counts ? ` (${counts})` : ''}
                 </a>
               </th>
             )
           })}
+          {Array.from({length: emptyTrailing}).map((_, i) => (
+            <th key={`empty-${i}`} className="border bg-gray-700"></th>
+          ))}
         </tr>
       </thead>
       <tbody>
@@ -157,7 +197,7 @@ export function FairBoothGrid({scopeStart, signups, people, rosterAttrs, blank =
           const label = `${formatTimeShort(h * 60)} - ${formatTimeShort((h + 1) * 60)} PM`
           return (
             <tr key={h}>
-              <td className="border bg-white p-1 text-xs text-right whitespace-nowrap">{label}</td>
+              <td className="border bg-white p-1 text-xs text-right whitespace-nowrap text-gray-900">{label}</td>
               {days.map((d) => {
                 const cells = renderFn(d)
                 const cell = cells.get(h * 60)!
@@ -172,7 +212,7 @@ export function FairBoothGrid({scopeStart, signups, people, rosterAttrs, blank =
                 return (
                   <td
                     key={d.date}
-                    className={`border align-top p-1 ${bg} ${borderTop} cursor-pointer`}
+                    className={`border align-top p-1 text-gray-900 ${bg} ${borderTop} cursor-pointer`}
                     onClick={() => {
                       window.location.assign(`day/${d.date}`)
                     }}
@@ -186,6 +226,9 @@ export function FairBoothGrid({scopeStart, signups, people, rosterAttrs, blank =
                   </td>
                 )
               })}
+              {Array.from({length: emptyTrailing}).map((_, i) => (
+                <td key={`empty-${i}`} className="border bg-gray-700"></td>
+              ))}
             </tr>
           )
         })}

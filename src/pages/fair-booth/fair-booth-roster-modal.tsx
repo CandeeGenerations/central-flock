@@ -36,6 +36,7 @@ const FAIR_ROLES: {value: FairBoothFairRole; label: string}[] = [
 export function FairBoothRosterModal({scheduleId, personId, person, attrs, signupCount, onClose}: Props) {
   const queryClient = useQueryClient()
   const [override, setOverride] = useState(attrs?.initialsOverride ?? '')
+  const [nameOverride, setNameOverride] = useState(attrs?.nameOverride ?? '')
   const [fairRole, setFairRole] = useState<FairBoothFairRole>(attrs?.fairRole ?? 'worker')
   const [isHispanic, setIsHispanic] = useState(person.isHispanic)
 
@@ -44,6 +45,7 @@ export function FairBoothRosterModal({scheduleId, personId, person, attrs, signu
       upsertFairBoothRosterAttrs(scheduleId, personId, {
         fairRole,
         initialsOverride: override.trim() === '' ? null : override.trim(),
+        nameOverride: nameOverride.trim() === '' ? null : nameOverride.trim(),
       }),
     onSuccess: () => queryClient.invalidateQueries({queryKey: schedulesKeys.fairBooth(scheduleId)}),
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
@@ -74,6 +76,17 @@ export function FairBoothRosterModal({scheduleId, personId, person, attrs, signu
           <DialogTitle>{fullName}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <div>
+            <Label>Name override</Label>
+            <Input
+              value={nameOverride}
+              onChange={(e) => setNameOverride(e.target.value)}
+              placeholder="e.g. Mark Candee"
+            />
+            <p className="text-muted-foreground mt-1 text-xs">
+              Per-schedule display name. Initials are computed from this when set.
+            </p>
+          </div>
           <div>
             <Label>Initials override</Label>
             <Input

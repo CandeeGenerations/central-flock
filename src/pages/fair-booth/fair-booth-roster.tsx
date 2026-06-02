@@ -28,26 +28,38 @@ export function FairBoothRoster({
   for (const a of rosterAttrs) {
     if (a.initialsOverride && a.initialsOverride.trim() !== '') overrides.set(a.personId, a.initialsOverride)
   }
+  function effectiveName(p: {id: number; firstName: string | null; lastName: string | null}): {
+    first: string
+    last: string
+  } {
+    const ov = attrsByPerson.get(p.id)?.nameOverride
+    if (ov && ov.trim() !== '') {
+      const parts = ov.trim().split(/\s+/)
+      return {first: parts[0] ?? '', last: parts.slice(1).join(' ')}
+    }
+    return {first: p.firstName ?? '', last: p.lastName ?? ''}
+  }
   const initials = computeInitialsForRoster(
-    inRoster.map((p) => ({
-      id: p.id,
-      firstName: p.firstName ?? '',
-      lastName: p.lastName ?? '',
-      isHispanic: p.isHispanic,
-    })),
+    inRoster.map((p) => {
+      const n = effectiveName(p)
+      return {id: p.id, firstName: n.first, lastName: n.last, isHispanic: p.isHispanic}
+    }),
     overrides,
   )
   const signupCounts = new Map<number, number>()
   for (const s of signups) signupCounts.set(s.personId, (signupCounts.get(s.personId) ?? 0) + 1)
-  const rosterRows = inRoster.map((p) => ({
-    personId: p.id,
-    firstName: p.firstName ?? '',
-    lastName: p.lastName ?? '',
-    fairRole: attrsByPerson.get(p.id)?.fairRole ?? ('worker' as const),
-    initialsOverride: attrsByPerson.get(p.id)?.initialsOverride ?? null,
-    signupCount: signupCounts.get(p.id) ?? 0,
-    isHispanic: p.isHispanic,
-  }))
+  const rosterRows = inRoster.map((p) => {
+    const n = effectiveName(p)
+    return {
+      personId: p.id,
+      firstName: n.first,
+      lastName: n.last,
+      fairRole: attrsByPerson.get(p.id)?.fairRole ?? ('worker' as const),
+      initialsOverride: attrsByPerson.get(p.id)?.initialsOverride ?? null,
+      signupCount: signupCounts.get(p.id) ?? 0,
+      isHispanic: p.isHispanic,
+    }
+  })
   const ordered = orderRoster(rosterRows)
   const {left, right} = splitRosterColumns(ordered)
   // Orphans: people with signups but no longer on roster.

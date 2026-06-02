@@ -24,6 +24,7 @@ export const fairBoothRosterAttrs = sqliteTable(
       .references(() => people.id, {onDelete: 'cascade'}),
     fairRole: text('fair_role', {enum: fairBoothFairRoles}).notNull().default('worker'),
     initialsOverride: text('initials_override'),
+    nameOverride: text('name_override'),
     createdAt: text('created_at')
       .default(sql`(datetime('now'))`)
       .notNull(),

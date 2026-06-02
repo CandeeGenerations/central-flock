@@ -183,6 +183,13 @@
       "when": 1780366649420,
       "tag": "0025_legal_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1780500000000,
+      "tag": "0026_fair_booth_name_override",
+      "breakpoints": true
     }
   ]
 }

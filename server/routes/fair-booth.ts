@@ -218,7 +218,7 @@ fairBoothRouter.put(
   asyncHandler(async (req, res) => {
     const scheduleId = Number(req.params.id)
     const personId = Number(req.params.personId)
-    const b = req.body as {fairRole?: FairBoothFairRole; initialsOverride?: string | null}
+    const b = req.body as {fairRole?: FairBoothFairRole; initialsOverride?: string | null; nameOverride?: string | null}
     const existing = db
       .select()
       .from(schema.fairBoothRosterAttrs)
@@ -233,6 +233,9 @@ fairBoothRouter.put(
       if (b.initialsOverride !== undefined)
         updates.initialsOverride =
           b.initialsOverride === null || b.initialsOverride.trim() === '' ? null : b.initialsOverride.trim()
+      if (b.nameOverride !== undefined)
+        updates.nameOverride =
+          b.nameOverride === null || b.nameOverride.trim() === '' ? null : b.nameOverride.trim()
       const row = db
         .update(schema.fairBoothRosterAttrs)
         .set(updates)
@@ -248,6 +251,7 @@ fairBoothRouter.put(
           personId,
           fairRole: b.fairRole ?? 'worker',
           initialsOverride: b.initialsOverride && b.initialsOverride.trim() !== '' ? b.initialsOverride.trim() : null,
+          nameOverride: b.nameOverride && b.nameOverride.trim() !== '' ? b.nameOverride.trim() : null,
         })
         .returning()
         .get()

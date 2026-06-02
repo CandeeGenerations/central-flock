@@ -186,6 +186,7 @@ export interface FairBoothRosterAttr {
   personId: number
   fairRole: FairBoothFairRole
   initialsOverride: string | null
+  nameOverride: string | null
 }
 
 export interface FairBoothSignup {
@@ -224,7 +225,7 @@ export const deleteFairBoothSchedule = (id: number) =>
 export const upsertFairBoothRosterAttrs = (
   scheduleId: number,
   personId: number,
-  body: {fairRole?: FairBoothFairRole; initialsOverride?: string | null},
+  body: {fairRole?: FairBoothFairRole; initialsOverride?: string | null; nameOverride?: string | null},
 ) =>
   request<FairBoothRosterAttr>(`/schedules/fair-booth/${scheduleId}/roster-attrs/${personId}`, {
     method: 'PUT',

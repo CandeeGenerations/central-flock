@@ -72,7 +72,17 @@ export function FairBoothGrid({
     if (a.initialsOverride && a.initialsOverride.trim() !== '') overrides.set(a.personId, a.initialsOverride)
   }
   const initials = computeInitialsForRoster(
-    people.map((p) => ({id: p.id, firstName: p.firstName ?? '', lastName: p.lastName ?? '', isHispanic: p.isHispanic})),
+    people.map((p) => {
+      const ov = attrsByPerson.get(p.id)?.nameOverride
+      let first = p.firstName ?? ''
+      let last = p.lastName ?? ''
+      if (ov && ov.trim() !== '') {
+        const parts = ov.trim().split(/\s+/)
+        first = parts[0] ?? ''
+        last = parts.slice(1).join(' ')
+      }
+      return {id: p.id, firstName: first, lastName: last, isHispanic: p.isHispanic}
+    }),
     overrides,
   )
 

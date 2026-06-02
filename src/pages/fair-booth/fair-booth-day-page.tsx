@@ -287,7 +287,6 @@ function SignupCard({
           className="w-56"
         />
         {!onRoster && <span className="text-xs text-yellow-700">⚠ no longer on roster</span>}
-        {person?.isHispanic && <span className="text-xs text-emerald-700">Hispanic</span>}
         <Label className="ml-4 shrink-0 text-xs">Row</Label>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onRow('up')}>
           <ArrowUp className="h-3 w-3" />
@@ -317,6 +316,7 @@ function SignupCard({
         <TimePicker value={s.startMinute} onChange={(v) => onUpdate({startMinute: v})} />
         <span>→</span>
         <TimePicker value={s.endMinute} onChange={(v) => onUpdate({endMinute: v})} />
+        {person?.isHispanic && <span className="ml-2 text-xs text-emerald-700">Hispanic</span>}
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <Label className="w-14 shrink-0 text-xs">Role</Label>

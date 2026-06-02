@@ -43,6 +43,8 @@ interface FairBoothGridProps {
   rosterAttrs: FairBoothRosterAttr[]
   blank?: boolean
   scheduleId?: number
+  // When set, render only the column for this date (no two-half split).
+  onlyDate?: string
 }
 
 interface CellRender {
@@ -58,6 +60,7 @@ export function FairBoothGrid({
   rosterAttrs,
   blank = false,
   scheduleId,
+  onlyDate,
 }: FairBoothGridProps) {
   let days: FairDay[]
   try {
@@ -146,6 +149,22 @@ export function FairBoothGrid({
       }
     }
     return map
+  }
+
+  if (onlyDate) {
+    const day = days.find((d) => d.date === onlyDate)
+    if (!day) return <div className="text-muted-foreground p-2 text-sm">Date not in this fair.</div>
+    return (
+      <HalfGrid
+        days={[day]}
+        emptyTrailing={0}
+        renderFn={renderFn}
+        blank={blank}
+        signups={signups as FairSignup[]}
+        hispanicIds={hispanicIds}
+        scheduleId={scheduleId}
+      />
+    )
   }
 
   // Split days into two stacked halves: first 5, then remaining 4 + one empty

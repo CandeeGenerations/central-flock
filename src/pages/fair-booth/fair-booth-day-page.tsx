@@ -169,6 +169,7 @@ export function FairBoothDayPage() {
               signups={daySignups}
               people={detail.people}
               rosterAttrs={detail.rosterAttrs}
+              onlyDate={date}
             />
           </div>
         </div>

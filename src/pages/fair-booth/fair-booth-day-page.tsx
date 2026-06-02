@@ -3,7 +3,7 @@ import {Label} from '@/components/ui/label'
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
-import {deriveFairDays, formatTimeShort, maxShiftRoleFor} from '@/lib/fair-booth-render'
+import {deriveFairDays, formatTimeShort, maxShiftRoleFor, slotIndexForSignup} from '@/lib/fair-booth-render'
 import {
   type FairBoothFairRole,
   type FairBoothShiftRole,
@@ -97,35 +97,45 @@ export function FairBoothDayPage() {
   const rosterIds = new Set(detail.rosterPersonIds)
   const attrsByPerson = new Map(detail.rosterAttrs.map((a) => [a.personId, a]))
 
-  const alreadyOnDay = new Set(daySignups.map((s) => s.personId))
-  const firstAvailable = detail!.rosterPersonIds.find((pid) => !alreadyOnDay.has(pid))
+  function firstAvailableInSlot(slotIdx: number): number | undefined {
+    const inSlot = new Set(
+      daySignups.filter((sg) => slotIndexForSignup(sg, day) === slotIdx).map((sg) => sg.personId),
+    )
+    return detail!.rosterPersonIds.find((pid) => !inSlot.has(pid))
+  }
 
   function addToSlot(slotIdx: number) {
-    if (!firstAvailable) {
-      toast.error('Everyone on the roster is already on this day.')
+    const pid = firstAvailableInSlot(slotIdx)
+    if (!pid) {
+      toast.error('Every roster member is already in this slot.')
       return
     }
     const slot = day.slots[slotIdx]
     addMutation.mutate({
-      personId: firstAvailable,
+      personId: pid,
       dayDate: date!,
       startMinute: slot.startMinute,
       endMinute: slot.endMinute,
       shiftRole: 'worker',
     })
   }
-  function addSpanningBoth() {
-    if (!firstAvailable) {
-      toast.error('Everyone on the roster is already on this day.')
+  async function addSpanningBoth() {
+    const alreadyAnywhere = new Set(daySignups.map((sg) => sg.personId))
+    const pid = detail!.rosterPersonIds.find((p) => !alreadyAnywhere.has(p))
+    if (!pid) {
+      toast.error('Everyone on the roster already has a signup on this day.')
       return
     }
-    addMutation.mutate({
-      personId: firstAvailable,
-      dayDate: date!,
-      startMinute: day.slots[0].startMinute,
-      endMinute: day.slots[day.slots.length - 1].endMinute,
-      shiftRole: 'worker',
-    })
+    // One signup per slot so each gets its own row-override.
+    for (const s of day.slots) {
+      await addMutation.mutateAsync({
+        personId: pid,
+        dayDate: date!,
+        startMinute: s.startMinute,
+        endMinute: s.endMinute,
+        shiftRole: 'worker',
+      })
+    }
   }
 
   const sortedSignups = [...daySignups].sort(
@@ -214,11 +224,16 @@ export function FairBoothDayPage() {
                       updateMutation.mutate({signupId: s.id, body: {personId: Number(v)} as Partial<FairBoothSignup>})
                     }
                     options={detail.people
-                      .filter(
-                        (p) =>
-                          p.id === s.personId ||
-                          !daySignups.some((other) => other.id !== s.id && other.personId === p.id),
-                      )
+                      .filter((p) => {
+                        if (p.id === s.personId) return true
+                        const mySlot = slotIndexForSignup(s, day)
+                        return !daySignups.some(
+                          (other) =>
+                            other.id !== s.id &&
+                            other.personId === p.id &&
+                            slotIndexForSignup(other, day) === mySlot,
+                        )
+                      })
                       .map((p) => ({
                         value: String(p.id),
                         label: [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`,

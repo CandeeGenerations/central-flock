@@ -209,6 +209,11 @@ export function FairBoothDayPage() {
                       </div>
                     )
                   })}
+                  {slotSignups.length >= 3 && (
+                    <Button variant="outline" size="sm" onClick={() => addToSlot(slotIdx)}>
+                      <Plus className="mr-1 h-3 w-3" /> Add signup
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )
@@ -285,6 +290,18 @@ function SignupCard({
         />
         {!onRoster && <span className="text-xs text-yellow-700">⚠ no longer on roster</span>}
         {person?.isHispanic && <span className="text-xs text-emerald-700">Hispanic</span>}
+        <Label className="ml-4 shrink-0 text-xs">Row</Label>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onRow('up')}>
+          <ArrowUp className="h-3 w-3" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onRow('down')}>
+          <ArrowDown className="h-3 w-3" />
+        </Button>
+        {s.displayRowOverride !== null && (
+          <Button variant="link" size="sm" className="h-7 px-1 text-xs" onClick={() => onRow('reset')}>
+            reset
+          </Button>
+        )}
         <div className="ml-auto flex gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMove('up')}>
             <ArrowUp className="h-3 w-3" />
@@ -302,18 +319,6 @@ function SignupCard({
         <TimePicker value={s.startMinute} onChange={(v) => onUpdate({startMinute: v})} />
         <span>→</span>
         <TimePicker value={s.endMinute} onChange={(v) => onUpdate({endMinute: v})} />
-        <Label className="ml-4 shrink-0 text-xs">Row</Label>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRow('up')}>
-          <ArrowUp className="h-3 w-3" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRow('down')}>
-          <ArrowDown className="h-3 w-3" />
-        </Button>
-        {s.displayRowOverride !== null && (
-          <Button variant="link" size="sm" className="h-6 px-1 text-xs" onClick={() => onRow('reset')}>
-            reset
-          </Button>
-        )}
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <Label className="w-14 shrink-0 text-xs">Role</Label>

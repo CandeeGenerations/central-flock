@@ -21,12 +21,6 @@
     "preview": "vite preview",
     "release": "standard-version -a -- --release-as minor"
   },
-  "resolutions": {
-    "esbuild": "^0.25.0",
-    "fast-uri": "^3.1.2",
-    "hono": "^4.12.21",
-    "qs": "^6.15.2"
-  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.103.0",
     "@fontsource-variable/raleway": "^5.2.8",

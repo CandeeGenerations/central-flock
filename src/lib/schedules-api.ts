@@ -17,7 +17,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export type ScheduleType = 'nursery' | 'special_music'
+export type ScheduleType = 'nursery' | 'special_music' | 'fair_booth'
 
 export interface FooterBlock {
   kind: 'quote' | 'note' | 'spacer'
@@ -36,6 +36,13 @@ export interface SchedulesSettings {
     footerBlocks: FooterBlock[]
     singerGroupIds: number[]
   }
+  fairBooth: {
+    titlePrefix: string
+    rosterGroupIds: number[]
+    minSignupsForBold: number
+    gridPageFooterBlocks: FooterBlock[]
+    rosterPageFooterBlocks: FooterBlock[]
+  }
 }
 
 export const fetchSchedulesSettings = () => request<SchedulesSettings>('/schedules/settings')
@@ -44,6 +51,7 @@ export const updateSchedulesSettings = (
   body: Partial<{
     nursery: Partial<SchedulesSettings['nursery']>
     specialMusic: Partial<SchedulesSettings['specialMusic']>
+    fairBooth: Partial<SchedulesSettings['fairBooth']>
   }>,
 ) => request<SchedulesSettings>('/schedules/settings', {method: 'PUT', body: JSON.stringify(body)})
 
@@ -159,4 +167,120 @@ export const schedulesKeys = {
   list: (type?: ScheduleType) => ['schedules', 'list', type ?? 'all'] as const,
   schedule: (id: number) => ['schedules', 'detail', id] as const,
   cells: (id: number) => ['schedules', 'cells', id] as const,
+  fairBoothList: ['schedules', 'fair-booth', 'list'] as const,
+  fairBooth: (id: number) => ['schedules', 'fair-booth', id] as const,
 }
+
+// ── Fair Booth ─────────────────────────────────────────────────────────
+
+export type FairBoothFairRole = 'worker' | 'asst_unit' | 'unit_leader' | 'asst_fair_mgr' | 'fair_mgr'
+export type FairBoothShiftRole = 'worker' | 'asst_unit' | 'unit_leader'
+
+export interface FairBoothScheduleListRow extends Schedule {
+  signupCount: number
+}
+
+export interface FairBoothRosterAttr {
+  id: number
+  scheduleId: number
+  personId: number
+  fairRole: FairBoothFairRole
+  initialsOverride: string | null
+  nameOverride: string | null
+}
+
+export interface FairBoothSignup {
+  id: number
+  scheduleId: number
+  personId: number
+  dayDate: string
+  startMinute: number
+  endMinute: number
+  shiftRole: FairBoothShiftRole
+  sortOrder: number
+  displayRowOverride: number | null
+}
+
+export interface FairBoothScheduleDetail {
+  schedule: Schedule
+  people: {id: number; firstName: string | null; lastName: string | null; isHispanic: boolean}[]
+  rosterPersonIds: number[]
+  rosterAttrs: FairBoothRosterAttr[]
+  signups: FairBoothSignup[]
+}
+
+export const fetchFairBoothSchedules = () => request<FairBoothScheduleListRow[]>('/schedules/fair-booth/')
+
+export const fetchFairBoothSchedule = (id: number) => request<FairBoothScheduleDetail>(`/schedules/fair-booth/${id}`)
+
+export const createFairBoothSchedule = (input: {scopeStart: string; scopeLabel?: string}) =>
+  request<Schedule>('/schedules/fair-booth/', {method: 'POST', body: JSON.stringify(input)})
+
+export const updateFairBoothSchedule = (id: number, body: {scopeStart?: string; scopeLabel?: string}) =>
+  request<Schedule>(`/schedules/fair-booth/${id}`, {method: 'PATCH', body: JSON.stringify(body)})
+
+export const deleteFairBoothSchedule = (id: number) =>
+  request<{success: true}>(`/schedules/fair-booth/${id}`, {method: 'DELETE'})
+
+export const upsertFairBoothRosterAttrs = (
+  scheduleId: number,
+  personId: number,
+  body: {fairRole?: FairBoothFairRole; initialsOverride?: string | null; nameOverride?: string | null},
+) =>
+  request<FairBoothRosterAttr>(`/schedules/fair-booth/${scheduleId}/roster-attrs/${personId}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+
+export const deleteFairBoothRosterAttrs = (scheduleId: number, personId: number) =>
+  request<{success: true}>(`/schedules/fair-booth/${scheduleId}/roster-attrs/${personId}`, {method: 'DELETE'})
+
+export const createFairBoothSignup = (
+  scheduleId: number,
+  body: {
+    personId: number
+    dayDate: string
+    startMinute: number
+    endMinute: number
+    shiftRole: FairBoothShiftRole
+    sortOrder?: number
+    displayRowOverride?: number | null
+  },
+) =>
+  request<FairBoothSignup>(`/schedules/fair-booth/${scheduleId}/signups`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+
+export const updateFairBoothSignup = (
+  scheduleId: number,
+  signupId: number,
+  body: Partial<{
+    personId: number
+    dayDate: string
+    startMinute: number
+    endMinute: number
+    shiftRole: FairBoothShiftRole
+    sortOrder: number
+    displayRowOverride: number | null
+  }>,
+) =>
+  request<FairBoothSignup>(`/schedules/fair-booth/${scheduleId}/signups/${signupId}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+
+export const deleteFairBoothSignup = (scheduleId: number, signupId: number) =>
+  request<{success: true}>(`/schedules/fair-booth/${scheduleId}/signups/${signupId}`, {method: 'DELETE'})
+
+export const moveFairBoothSignup = (scheduleId: number, signupId: number, direction: 'up' | 'down') =>
+  request<{success: true}>(`/schedules/fair-booth/${scheduleId}/signups/${signupId}/move`, {
+    method: 'POST',
+    body: JSON.stringify({direction}),
+  })
+
+export const rowFairBoothSignup = (scheduleId: number, signupId: number, direction: 'up' | 'down' | 'reset') =>
+  request<{displayRowOverride: number | null}>(`/schedules/fair-booth/${scheduleId}/signups/${signupId}/row`, {
+    method: 'POST',
+    body: JSON.stringify({direction}),
+  })

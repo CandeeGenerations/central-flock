@@ -35,6 +35,13 @@ interface SchedulesSettings {
     footerBlocks: FooterBlock[]
     singerGroupIds: number[]
   }
+  fairBooth: {
+    titlePrefix: string
+    rosterGroupIds: number[]
+    minSignupsForBold: number
+    gridPageFooterBlocks: FooterBlock[]
+    rosterPageFooterBlocks: FooterBlock[]
+  }
 }
 
 function readSettings(): SchedulesSettings {
@@ -60,6 +67,30 @@ function readSettings(): SchedulesSettings {
       footerBlocks: parseJson<FooterBlock[]>('schedules.specialMusic.footerBlocks', []),
       singerGroupIds: parseJson<number[]>('schedules.specialMusic.singerGroupIds', []),
     },
+    fairBooth: {
+      titlePrefix: map.get('schedules.fairBooth.titlePrefix') ?? 'Fair Booth Schedule',
+      rosterGroupIds: parseJson<number[]>('schedules.fairBooth.rosterGroupIds', []),
+      minSignupsForBold: Number(map.get('schedules.fairBooth.minSignupsForBold') ?? '3'),
+      gridPageFooterBlocks: parseJson<FooterBlock[]>('schedules.fairBooth.gridPageFooterBlocks', [
+        {
+          kind: 'quote',
+          text: 'The fruit of the righteous is a tree of life; and he that winneth souls is wise.',
+          bold: true,
+        },
+        {kind: 'note', text: '— Proverbs 11:30'},
+        {kind: 'spacer', text: ''},
+        {
+          kind: 'note',
+          text: 'If you are going to work in the Fair Booth this year, please put your initials in a time slot above so we know that we can count on you to be there at that time.',
+        },
+      ]),
+      rosterPageFooterBlocks: parseJson<FooterBlock[]>('schedules.fairBooth.rosterPageFooterBlocks', [
+        {
+          kind: 'note',
+          text: 'Please put your name and your initials above so we know who you are and which slot you signed up to serve.',
+        },
+      ]),
+    },
   }
 }
 
@@ -83,6 +114,7 @@ schedulesRouter.put(
     const body = req.body as Partial<{
       nursery: Partial<SchedulesSettings['nursery']>
       specialMusic: Partial<SchedulesSettings['specialMusic']>
+      fairBooth: Partial<SchedulesSettings['fairBooth']>
     }>
     if (body.nursery?.titlePrefix !== undefined) upsert('schedules.nursery.titlePrefix', body.nursery.titlePrefix)
     if (body.nursery?.footerBlocks !== undefined)
@@ -93,6 +125,15 @@ schedulesRouter.put(
       upsert('schedules.specialMusic.footerBlocks', JSON.stringify(body.specialMusic.footerBlocks))
     if (body.specialMusic?.singerGroupIds !== undefined)
       upsert('schedules.specialMusic.singerGroupIds', JSON.stringify(body.specialMusic.singerGroupIds))
+    if (body.fairBooth?.titlePrefix !== undefined) upsert('schedules.fairBooth.titlePrefix', body.fairBooth.titlePrefix)
+    if (body.fairBooth?.rosterGroupIds !== undefined)
+      upsert('schedules.fairBooth.rosterGroupIds', JSON.stringify(body.fairBooth.rosterGroupIds))
+    if (body.fairBooth?.minSignupsForBold !== undefined)
+      upsert('schedules.fairBooth.minSignupsForBold', String(body.fairBooth.minSignupsForBold))
+    if (body.fairBooth?.gridPageFooterBlocks !== undefined)
+      upsert('schedules.fairBooth.gridPageFooterBlocks', JSON.stringify(body.fairBooth.gridPageFooterBlocks))
+    if (body.fairBooth?.rosterPageFooterBlocks !== undefined)
+      upsert('schedules.fairBooth.rosterPageFooterBlocks', JSON.stringify(body.fairBooth.rosterPageFooterBlocks))
     res.json(readSettings())
   }),
 )
@@ -249,7 +290,10 @@ schedulesRouter.get(
   '/',
   asyncHandler(async (req, res) => {
     const type = typeof req.query.type === 'string' ? req.query.type : undefined
-    const where = type === 'nursery' || type === 'special_music' ? eq(schema.schedules.scheduleType, type) : undefined
+    const where =
+      type === 'nursery' || type === 'special_music' || type === 'fair_booth'
+        ? eq(schema.schedules.scheduleType, type)
+        : undefined
     const rows = db
       .select()
       .from(schema.schedules)

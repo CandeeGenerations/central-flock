@@ -374,3 +374,90 @@ The "Recipients" cell on the message history table renders the audience compactl
 - **0 groups, ≤ 2 individuals:** comma-joined names.
 - **0 groups, ≥ 3 individuals:** first 2 names + "+ N more" with a tooltip listing all names.
 - **Group send:** comma-joined group names. When the rendered line would overflow or when extras exist, a single merged "+ N more" affordance ends the line; its tooltip is sectioned ("Groups: …", "Extras: …").
+
+### Fair Booth Schedule
+
+A `schedule_type='fair_booth'` envelope rendering a dense per-hour signup grid across the 9-day county fair (Friday through the following Saturday). The grid (page 1) shows initials with role markers (dashes for the shift role, stars for the whole-fair role) and partial-time annotations like `(5-7)`; the roster (page 2) is the legend mapping initials to names plus per-person signup counts. See [docs/adr/0009-fair-booth-schedule.md](docs/adr/0009-fair-booth-schedule.md).
+
+Unlike Nursery (auto-generated) and Special Music (cell editor), Fair Booth uses a per-day sub-page editor — the rendered grid is read-only WYSIWYG with click-to-route hotspots on day columns and roster rows.
+
+### Fair day
+
+A virtual day in a Fair Booth schedule. Days are not stored; they're derived from `schedule.scope_start` (always a Friday) and a hardcoded day-of-week → slot-pattern map. The pattern is fixed:
+
+- **Sat / Sun / Tue** — two slots: `2:00–6:00 PM` and `6:00–10:00 PM`.
+- **Fri / Mon / Wed / Thu** — one slot: `5:00–10:00 PM`.
+
+If the local fair ever changes shape (different start day, different hours, different run length), this hardcoded map becomes a code change.
+
+### Fair slot
+
+A named time band within a Fair day. Slots are render-only — sign-ups are stored as arbitrary `(start_minute, end_minute)` ranges on `fair_booth_signups`, not FK'd to a slot. Slots drive the day-header layout (`(7-6 // 8-7)` style counts) and the "Spans both" / "Slot 1" / "Slot 2" add buttons in the [[Fair day editor]].
+
+### Fair Booth signup
+
+A single row in `fair_booth_signups`: `(schedule_id, person_id, day_date, start_minute, end_minute, shift_role, sort_order, display_row_override?)`. Times are minutes-since-midnight at 30-minute granularity. A person who works both slots of a 2-slot day is one row spanning the full range, not two. Render placement (which slot column shows the entry) is determined by "majority of hours in slot wins; ties to the later slot."
+
+### Shift role
+
+Per-signup enum on `fair_booth_signups.shift_role`: `unit_leader` (1 dash), `asst_unit` (2 dashes), `worker` (3 dashes). Rendered as the dash prefix on the initials. At most one Unit Leader and one Asst Unit Leader are allowed per (schedule, day, slot); enforced in the editor and validated on save. Workers are unbounded and reorderable within the tier via `sort_order` ↑↓ in the [[Fair day editor]].
+
+### Fair role
+
+Per-schedule enum on `fair_booth_roster_attrs.fair_role`: `worker` (1★), `asst_unit` (2★), `unit_leader` (3★), `asst_fair_mgr` (4★), `fair_mgr` (5★). Rendered as the star suffix on the initials. Caps the [[Shift role]] a person can be assigned: 1★ → worker only; 2★ → up to asst_unit; 3★/4★/5★ → up to unit_leader. The cap is a soft enforcement in the editor (the dropdown hides higher tiers), not a DB constraint.
+
+### Fair roster
+
+The set of `people` eligible to appear on the Fair Booth schedule. Configured via `schedules.fairBooth.rosterGroupIds` — a multi-select of existing **Groups** (the SMS-recipient kind), members union'd and deduplicated. **Live, not snapshot** — mid-season Group adds/removes propagate immediately. People who were removed from the Group but still have signups on the grid render as a soft warning in the schedule UI; the operator resolves manually.
+
+### Fair Booth roster attrs
+
+Sparse per-schedule per-person overrides in `fair_booth_roster_attrs`. A row only exists when the user has set a non-default. Carries `fair_role` and `initials_override`. Reading the roster left-joins this table against the live roster pool; missing rows use defaults (`fair_role='worker'`, computed initials).
+
+### Initials and collision resolution
+
+Display initials = `firstName[0] + lastName[0]`, uppercased, computed at render time. When two people on the same schedule's roster would share the same 2-letter base, the **alphabetically-first person (by `lastName`, then `firstName`) keeps the base** and later names extend by walking first-name characters from position 2 and inserting a lowercased disambiguating slice between F and L (Becky Candee → `BeC` when Brandon Cobb keeps `BC`). Three-way collisions extend the second and third names until each is unique. Manual `initials_override` on `fair_booth_roster_attrs` always wins; overridden people are removed from the collision pool before the algorithm runs.
+
+### Hispanic flag
+
+`people.is_hispanic` boolean (default `false`). Used by the Fair Booth day-header coverage calculation. Edited from the Person detail page; surfaced read-write in the [[Fair Booth roster row modal]] for convenience (writes flow back to the same global column, with a one-line note that the change applies app-wide).
+
+### Hispanic coverage
+
+The Fair Booth day-header color is driven by Hispanic coverage across the **full day's hours** (union of `2:00 PM – 10:00 PM` on 2-slot days, `5:00 PM – 10:00 PM` on 1-slot days). Coverage = union of `is_hispanic = true` people's `[start, end)` signup intervals on that day. Full coverage of every minute → **green** header. Partial coverage (any gap, even one minute) → **yellow/orange**. Zero coverage → **red**. Multiple Hispanic people overlapping doesn't add to coverage; it's binary per minute.
+
+### Headcount coloring and dotted transitions
+
+Per-hour rows in the grid are colored by **headcount at that hour** (distinct people whose `[start, end)` overlaps the hour): ≤3 red, 4 orange, 5 yellow, 6 light blue/green, 7 blue, 8 green, >8 purple. A **dotted line** is drawn between hour rows within the same slot wherever the headcount changes from one row to the next. **Slot boundaries** (the 6 PM line on a 2-slot day) are always solid, not dotted.
+
+### Day-header count format
+
+`(openCount-closeCount)` per slot, separated by `//` for 2-slot days. `openCount` = headcount at the first minute of the slot; `closeCount` = headcount at the last minute. When `openCount == closeCount` the dash collapses to a single number. Examples from last year's run: Fri 8 → `(8)`, Mon 11 → `(10-6)`, Sat 9 → `(7-6 // 8-7)`, Sat 16 → `(4 // 6)`. The grand total above the title (`(32)` last year) is the count of distinct people on the live roster.
+
+### Fair day editor
+
+The sub-page at `/schedules/fair-booth/:scheduleId/day/:date` reached by clicking any cell in a day column on the schedule detail view. Header has back-to-schedule plus `← Prev day / Next day →` chevrons walking through the schedule's 9 days. Body: a live day-column preview (rendered identically to the print) above a signups table grouped by shift role with ↑↓ buttons for sort and a separate ↑↓ pair for `display_row_override`. Add affordance: three buttons on 2-slot days (`+ Add to Slot 1 (2–6)`, `+ Add to Slot 2 (6–10)`, `+ Add spanning both`), one button on 1-slot days. Auto-saves on every change.
+
+### Fair Booth roster row modal
+
+A modal opened by clicking a name row on page 2 of the schedule detail view. Fields: initials override (text; empty = use computed), fair role (1–5★ picker), Hispanic checkbox (writes to `people.is_hispanic` globally with a one-line note). Read-only signup count with "filter grid to this person" link. There is no "+ Add to roster" affordance on page 2 — roster membership flows from the configured Group(s) in settings.
+
+### Page 1 / Page 2 layout
+
+The Fair Booth schedule detail view shows two "pages" — the grid (page 1) and the roster legend (page 2). Layout is responsive: **side-by-side on desktop, stacked on mobile**. Both panes are clickable (grid cells → [[Fair day editor]], roster rows → [[Fair Booth roster row modal]]). PDF capture writes them as two pages; the on-screen layout doesn't affect capture.
+
+### Roster ordering and column split
+
+Page 2 sort order: fair role descending (`fair_mgr` → `worker`) → `lastName` ascending → `firstName` ascending. The single sorted list is split at its midpoint into two columns of equal length; each column's header carries a `(N)` count of names in that column, and the page-1 title carries a `(N)` of the total roster size.
+
+### Italic and bold roster markers
+
+On page 2: **italic** = on the roster but zero signups for this schedule. **Bold** = signup count is below `schedules.fairBooth.minSignupsForBold` (default `3`). Both markers are computed per render against the live data; neither is a stored flag.
+
+### No draft/final lifecycle for fair_booth
+
+Unlike Nursery and Special Music, Fair Booth schedules are always editable and always exportable. The shared `schedules.status` column stays at `'draft'` permanently for `schedule_type='fair_booth'` rows; the Fair Booth UI hides the status badge and the Finalize/Reopen buttons. Operationally, the sheet is reprinted weekly during the fair and gating exports behind "final" would mean flipping back to draft every time anyone signs up.
+
+### Blank PDF export
+
+A Fair Booth–specific export alongside the live PDF/JPG exports. Renders **page 1 with empty hour cells** (no signups, no counts in parens, uncolored headers, no dotted lines), and **page 2 with the live roster** (since people sign initials on the printed sheet and the roster is the legend). Available regardless of schedule state.

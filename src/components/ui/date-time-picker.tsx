@@ -141,7 +141,7 @@ export function DatePicker({value, onChange, placeholder = 'Pick a date...'}: Da
         </div>
       </div>
       <PopoverContent className="w-auto max-w-[calc(100vw-2rem)] p-0" align="end">
-        <Calendar mode="single" defaultMonth={date} selected={date} onSelect={handleDateSelect} initialFocus />
+        <Calendar mode="single" defaultMonth={date} selected={date} onSelect={handleDateSelect} autoFocus />
       </PopoverContent>
     </Popover>
   )
@@ -240,7 +240,7 @@ export function DateTimePicker({value, onChange, placeholder = 'Pick a date & ti
           selected={date}
           onSelect={handleDateSelect}
           disabled={{before: new Date()}}
-          initialFocus
+          autoFocus
         />
         <TimeSelectors date={date} hours={hours} minutes={minutes} onTimeChange={handleTimeChange} />
       </PopoverContent>

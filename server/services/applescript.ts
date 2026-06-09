@@ -31,6 +31,10 @@ function setClipboard(text: string): Promise<string> {
   return spawnStdin('pbcopy', [], text)
 }
 
+function getClipboard(): Promise<string> {
+  return spawnStdin('pbpaste', [], '')
+}
+
 function runAppleScript(script: string): Promise<string> {
   return spawnStdin('osascript', [], script)
 }
@@ -67,7 +71,7 @@ tell application "System Events"
     key code 51
     delay 0.2
     keystroke "v" using command down
-    delay 0.3
+    delay 0.8
     key code 36
   end tell
 end tell
@@ -76,6 +80,28 @@ delay 1.5`
     // Set clipboard via pbcopy stdin — avoids AppleScript string escaping issues
     await setClipboard(straightenQuotes(message))
     await runAppleScript(script)
+
+    // Verify the message actually sent. osascript exits 0 once the keystrokes are
+    // dispatched, even if Messages swallowed the Return and left the text in the
+    // compose box. Confirm by emptying the clipboard, then select-all + copy in the
+    // compose field: if it sent, the field is empty and copy is a no-op so the
+    // clipboard stays empty; if it didn't, copy pulls the leftover text back.
+    await setClipboard('')
+    await runAppleScript(`
+tell application "System Events"
+  tell process "Messages"
+    set frontmost to true
+    delay 0.2
+    keystroke "a" using command down
+    delay 0.1
+    keystroke "c" using command down
+    delay 0.2
+  end tell
+end tell`)
+    const leftover = (await getClipboard()).trim()
+    if (leftover.length > 0) {
+      throw new Error('message pasted but did not send (compose field still contained text after Return)')
+    }
   } catch (error) {
     throw new Error(
       `Failed to send message via UI to ${phoneNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,

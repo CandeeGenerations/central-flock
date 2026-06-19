@@ -1,4 +1,5 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
+import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
 import {Pagination} from '@/components/ui/pagination'
@@ -70,6 +71,7 @@ export function QuoteSearchesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Topic</TableHead>
+                <TableHead>Sources</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Results</TableHead>
                 <TableHead>Model</TableHead>
@@ -79,7 +81,7 @@ export function QuoteSearchesPage() {
             <TableBody>
               {data?.searches.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-12">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
                     No searches yet.
                   </TableCell>
                 </TableRow>
@@ -91,6 +93,20 @@ export function QuoteSearchesPage() {
                     onClick={() => navigate(`/sermons/searches/${s.id}`)}
                   >
                     <TableCell className="font-medium">{s.topic}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {s.hasQuotes && (
+                          <Badge variant="secondary" className="text-xs">
+                            Quotes
+                          </Badge>
+                        )}
+                        {s.hasMusic && (
+                          <Badge variant="secondary" className="text-xs">
+                            Lyrics
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{fmtDate(s.createdAt)}</TableCell>
                     <TableCell className="text-sm">{s.resultCount}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{s.model}</TableCell>

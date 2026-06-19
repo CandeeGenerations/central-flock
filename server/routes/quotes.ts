@@ -4,8 +4,14 @@ import {Router} from 'express'
 import {db, schema, sqlite} from '../db/index.js'
 import {AI_MODELS} from '../lib/ai-models.js'
 import {asyncHandler} from '../lib/route-helpers.js'
+import {runMusicSearch} from '../services/music-search.js'
 import {extractCitedAuthor} from '../services/quote-parser.js'
-import {rehydrateSearch, runQuoteResearch} from '../services/quote-research.js'
+import {
+  computeQuoteResearch,
+  rehydrateSearch,
+  runQuoteResearch,
+  serializeQuoteResults,
+} from '../services/quote-research.js'
 
 const anthropic = new Anthropic()
 
@@ -44,7 +50,10 @@ quotesRouter.get(
 
     const rows = sqlite
       .prepare(
-        `SELECT id, topic, created_at AS createdAt, model, json_array_length(results) AS resultCount
+        `SELECT id, topic, created_at AS createdAt, model,
+                CASE WHEN results IS NULL THEN 0 ELSE json_array_length(results) END AS resultCount,
+                (results IS NOT NULL) AS hasQuotes,
+                (music_results IS NOT NULL) AS hasMusic
          FROM quote_searches ${whereClause}
          ORDER BY created_at DESC LIMIT ? OFFSET ?`,
       )
@@ -52,12 +61,14 @@ quotesRouter.get(
       id: number
       topic: string
       createdAt: string
-      model: string
+      model: string | null
       resultCount: number
+      hasQuotes: number
+      hasMusic: number
     }[]
 
     res.json({
-      searches: rows,
+      searches: rows.map((r) => ({...r, hasQuotes: !!r.hasQuotes, hasMusic: !!r.hasMusic})),
       total: countRow.count,
       page,
       pageSize,
@@ -77,14 +88,18 @@ quotesRouter.get(
     }
 
     const row = sqlite
-      .prepare(`SELECT id, topic, synthesis, results, model, created_at AS createdAt FROM quote_searches WHERE id = ?`)
+      .prepare(
+        `SELECT id, topic, synthesis, results, model, music_results AS musicResults, created_at AS createdAt
+         FROM quote_searches WHERE id = ?`,
+      )
       .get(id) as
       | {
           id: number
           topic: string
-          synthesis: string
-          results: string
-          model: string
+          synthesis: string | null
+          results: string | null
+          model: string | null
+          musicResults: string | null
           createdAt: string
         }
       | undefined
@@ -116,18 +131,104 @@ quotesRouter.delete(
   }),
 )
 
-// POST /api/quotes/research — run AI topic research
+// POST /api/quotes/research — run AI topic research (quote portion inline).
+// Music portion runs separately via POST /searches/:id/music. At least one
+// toggle must be on. Music-only creates a row with just the topic.
 quotesRouter.post(
   '/research',
   asyncHandler(async (req, res) => {
-    const {topic} = req.body as {topic?: string}
+    const {
+      topic,
+      includeQuotes = true,
+      includeMusic = true,
+    } = req.body as {
+      topic?: string
+      includeQuotes?: boolean
+      includeMusic?: boolean
+    }
     if (!topic || typeof topic !== 'string' || !topic.trim()) {
       res.status(400).json({error: 'topic is required'})
       return
     }
+    if (!includeQuotes && !includeMusic) {
+      res.status(400).json({error: 'at least one of includeQuotes or includeMusic must be true'})
+      return
+    }
 
-    const result = await runQuoteResearch(topic.trim())
-    res.json(result)
+    if (includeQuotes) {
+      const result = await runQuoteResearch(topic.trim())
+      res.json(result)
+      return
+    }
+
+    // Music-only: create the row with just the topic; client fires the music phase next.
+    const inserted = db
+      .insert(schema.quoteSearches)
+      .values({topic: topic.trim()})
+      .returning({id: schema.quoteSearches.id})
+      .get()
+    res.json({searchId: inserted!.id, synthesis: null, results: [], candidateCount: 0, durationMs: 0})
+  }),
+)
+
+// POST /api/quotes/searches/:id/music — run the music portion for an existing
+// search. Used both by create-time auto-fire and the "Add music" button (#3).
+quotesRouter.post(
+  '/searches/:id/music',
+  asyncHandler(async (req, res) => {
+    const id = parseInt(String(req.params.id))
+    if (isNaN(id)) {
+      res.status(400).json({error: 'Invalid id'})
+      return
+    }
+    const row = sqlite.prepare(`SELECT topic FROM quote_searches WHERE id = ?`).get(id) as {topic: string} | undefined
+    if (!row) {
+      res.status(404).json({error: 'Search not found'})
+      return
+    }
+
+    const start = Date.now()
+    const {model, results: musicResults} = await runMusicSearch(row.topic)
+    const durationMs = Date.now() - start
+
+    sqlite
+      .prepare(
+        `UPDATE quote_searches
+         SET music_results = ?, music_model = ?, music_searched_at = datetime('now', 'localtime'), music_duration_ms = ?
+         WHERE id = ?`,
+      )
+      .run(JSON.stringify(musicResults), model, durationMs, id)
+
+    res.json({musicResults})
+  }),
+)
+
+// POST /api/quotes/searches/:id/quotes — run the quote portion for an existing
+// (music-only) search. Symmetric counterpart to /music.
+quotesRouter.post(
+  '/searches/:id/quotes',
+  asyncHandler(async (req, res) => {
+    const id = parseInt(String(req.params.id))
+    if (isNaN(id)) {
+      res.status(400).json({error: 'Invalid id'})
+      return
+    }
+    const row = sqlite.prepare(`SELECT topic FROM quote_searches WHERE id = ?`).get(id) as {topic: string} | undefined
+    if (!row) {
+      res.status(404).json({error: 'Search not found'})
+      return
+    }
+
+    const {synthesis, results, model, candidateCount, durationMs} = await computeQuoteResearch(row.topic)
+    sqlite
+      .prepare(
+        `UPDATE quote_searches
+         SET synthesis = ?, results = ?, model = ?, candidate_count = ?, duration_ms = ?
+         WHERE id = ?`,
+      )
+      .run(synthesis, serializeQuoteResults(results), model, candidateCount, durationMs, id)
+
+    res.json({synthesis, results, candidateCount, durationMs})
   }),
 )
 

@@ -1,9 +1,13 @@
+import {LyricResultView} from '@/components/sermons/lyric-result-view'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
-import {type ResearchResult, listSearches, runResearch} from '@/lib/quotes-api'
-import {useMutation, useQuery} from '@tanstack/react-query'
+import {Label} from '@/components/ui/label'
+import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
+import {type MusicResult, type ResearchResult, runMusicSearch, runResearch} from '@/lib/quotes-api'
+import {useMutation} from '@tanstack/react-query'
 import {ArrowRight} from 'lucide-react'
 import {useState} from 'react'
 import {Link} from 'react-router-dom'
@@ -67,34 +71,57 @@ function ResultCard({result}: {result: ResearchResult['results'][number]}) {
 
 export function QuotesResearchPage() {
   const [topic, setTopic] = useState('')
+  const [includeQuotes, setIncludeQuotes] = useState(true)
+  const [includeMusic, setIncludeMusic] = useState(true)
   const [result, setResult] = useState<ResearchResult | null>(null)
+  const [musicResults, setMusicResults] = useState<MusicResult[] | null>(null)
+  const [tab, setTab] = useState<'quotes' | 'lyrics'>('quotes')
 
-  const {data: recentSearches} = useQuery({
-    queryKey: ['quotes', 'searches', 'recent'],
-    queryFn: () => listSearches({pageSize: 8}),
+  const musicMutation = useMutation({
+    mutationFn: (searchId: number) => runMusicSearch(searchId),
+    onSuccess: (data) => {
+      setMusicResults(data.musicResults)
+      const n = data.musicResults.length
+      if (n === 0) toast('Music search found nothing')
+      else {
+        const unverified = data.musicResults.filter((r) => !r.verified).length
+        toast.success(
+          unverified > 0 ? `Lyrics ready — ${n} songs (${unverified} unverified)` : `Lyrics ready — ${n} songs`,
+        )
+      }
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Music search failed'),
   })
 
   const mutation = useMutation({
-    mutationFn: (t: string) => runResearch(t),
-    onSuccess: (data) => setResult(data),
+    mutationFn: (t: string) => runResearch(t, {includeQuotes, includeMusic}),
+    onSuccess: (data) => {
+      setResult(data)
+      setTab(includeQuotes ? 'quotes' : 'lyrics')
+      if (includeMusic) musicMutation.mutate(data.searchId)
+    },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Research failed'),
   })
 
   const submit = (t?: string) => {
     const q = (t ?? topic).trim()
-    if (!q) return
+    if (!q || (!includeQuotes && !includeMusic)) return
     setTopic(q)
     setResult(null)
+    setMusicResults(null)
     mutation.mutate(q)
   }
+
+  const searchId = result?.searchId
+  const musicPending = musicMutation.isPending
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
       <h2 className="text-2xl font-bold">New Quote Research</h2>
 
-      {/* Topic input */}
+      {/* Topic input + source toggles */}
       <Card>
-        <CardContent className="pt-4">
+        <CardContent className="pt-4 space-y-3">
           <div className="flex gap-2">
             <Input
               value={topic}
@@ -104,30 +131,42 @@ export function QuotesResearchPage() {
               disabled={mutation.isPending}
               className="flex-1"
             />
-            <Button onClick={() => submit()} disabled={mutation.isPending || !topic.trim()}>
+            <Button
+              onClick={() => submit()}
+              disabled={mutation.isPending || !topic.trim() || (!includeQuotes && !includeMusic)}
+            >
               {mutation.isPending ? 'Researching…' : 'Go'}
             </Button>
           </div>
 
-          {/* Recent searches pills */}
-          {recentSearches && recentSearches.searches.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2 items-center">
-              <span className="text-xs text-muted-foreground">Recent:</span>
-              {recentSearches.searches.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => submit(s.topic)}
-                  className="text-xs px-2 py-1 rounded-full border border-border hover:bg-muted transition-colors"
-                >
-                  {s.topic}
-                </button>
-              ))}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="toggle-quotes"
+                checked={includeQuotes}
+                onCheckedChange={(v) => setIncludeQuotes(v === true)}
+                disabled={mutation.isPending}
+              />
+              <Label htmlFor="toggle-quotes" className="text-sm">
+                Search quotes
+              </Label>
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="toggle-music"
+                checked={includeMusic}
+                onCheckedChange={(v) => setIncludeMusic(v === true)}
+                disabled={mutation.isPending}
+              />
+              <Label htmlFor="toggle-music" className="text-sm">
+                Search music (lyrics)
+              </Label>
+            </div>
+          </div>
 
           {/* Empty state example chips */}
-          {!result && !mutation.isPending && !recentSearches?.searches.length && (
-            <div className="mt-3 flex flex-wrap gap-2 items-center">
+          {!result && !mutation.isPending && (
+            <div className="flex flex-wrap gap-2 items-center">
               <span className="text-xs text-muted-foreground">Try:</span>
               {EXAMPLE_TOPICS.map((t) => (
                 <button
@@ -143,7 +182,7 @@ export function QuotesResearchPage() {
         </CardContent>
       </Card>
 
-      {/* Loading skeleton */}
+      {/* Loading skeleton (quote phase) */}
       {mutation.isPending && (
         <Card>
           <CardContent className="pt-4 space-y-3">
@@ -157,28 +196,61 @@ export function QuotesResearchPage() {
 
       {/* Results */}
       {result && !mutation.isPending && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">AI Synthesis</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm leading-relaxed">{result.synthesis}</p>
-              <p className="text-xs text-muted-foreground mt-2">
-                {result.results.length} quotes from {result.candidateCount} candidates ·{' '}
-                <Link to={`/sermons/searches/${result.searchId}`} className="underline">
-                  view saved search
-                </Link>
-              </p>
-            </CardContent>
-          </Card>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'quotes' | 'lyrics')}>
+          <TabsList>
+            <TabsTrigger value="quotes">Quotes ({result.results.length})</TabsTrigger>
+            <TabsTrigger value="lyrics">Lyrics{musicResults ? ` (${musicResults.length})` : ''}</TabsTrigger>
+          </TabsList>
 
-          <div className="space-y-3">
-            {result.results.map((r) => (
-              <ResultCard key={r.quoteId} result={r} />
-            ))}
-          </div>
-        </>
+          <TabsContent value="quotes" className="space-y-3">
+            {result.synthesis ? (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">AI Synthesis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed">{result.synthesis}</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {result.results.length} quotes from {result.candidateCount} candidates ·{' '}
+                      <Link to={`/sermons/searches/${result.searchId}`} className="underline">
+                        view saved search
+                      </Link>
+                    </p>
+                  </CardContent>
+                </Card>
+                {result.results.map((r) => (
+                  <ResultCard key={r.quoteId} result={r} />
+                ))}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground p-2">Quotes were not searched for this topic.</p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="lyrics" className="space-y-3">
+            {musicPending ? (
+              <Card>
+                <CardContent className="pt-4 space-y-3">
+                  <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
+                  <div className="h-4 bg-muted animate-pulse rounded w-2/3" />
+                  <p className="text-sm text-muted-foreground text-center pt-2">Searching music…</p>
+                </CardContent>
+              </Card>
+            ) : musicResults ? (
+              <LyricResultView results={musicResults} />
+            ) : (
+              <div className="p-2 space-y-2">
+                <p className="text-sm text-muted-foreground">No music searched for this topic.</p>
+                {searchId && (
+                  <Button variant="outline" size="sm" onClick={() => musicMutation.mutate(searchId)}>
+                    Search music for this topic
+                  </Button>
+                )}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   )

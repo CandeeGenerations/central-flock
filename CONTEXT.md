@@ -458,6 +458,37 @@ On page 2: **italic** = on the roster but zero signups for this schedule. **Bold
 
 Unlike Nursery and Special Music, Fair Booth schedules are always editable and always exportable. The shared `schedules.status` column stays at `'draft'` permanently for `schedule_type='fair_booth'` rows; the Fair Booth UI hides the status badge and the Finalize/Reopen buttons. Operationally, the sheet is reprinted weekly during the fair and gating exports behind "final" would mean flipping back to draft every time anyone signs up.
 
+### Quote search
+
+A topic-driven sermon-prep search under **Sermons** (route `/sermons/research`, history at `/sermons/searches`, backed by the `quote_searches` table). One free-text **topic** drives the search; results come from up to two sources, each gated by its own toggle (**both on by default**):
+
+- **Quote portion** — searches the [[Quote library]] (the `quotes` table) and returns ranked quotes plus a synthesis paragraph. This is the original behavior. Stored as `quote_searches.synthesis` + `results` (an id+metadata JSON array rehydrated against current `quotes` rows on read).
+- **Music portion** — searches the burgundy/silver songs and returns [[Song lyric quote]]s. Stored self-contained (see below).
+
+The research form is the topic input + **two source toggles** (Quotes, Music — both on by default every visit, not persisted) + Search button, shown where the old "Recent searches" pills were (those pills are removed — request #1 — as the history list page is redundant with them). The history list (`/sermons/searches`) shows per-row **chips** indicating which portions a search has (`Quotes` / `Lyrics`). The Lyrics tab has no synthesis paragraph (quotes-only feature) and **two distinct empty states**: "not searched yet" (shows the Add-music CTA) vs. "searched, found nothing."
+
+A search must have **at least one** portion (both toggles off is rejected / Search disabled). A search may therefore be quotes-only, music-only, or both — so `synthesis` and `results` are **nullable**. The table name `quote_searches` is kept despite music-only searches: a lyric is itself "a quote of a song," so both halves are quotes from different sources.
+
+**Results UI** is a two-tab layout (`Quotes (N)` / `Lyrics (N)`, both tabs always present with live counts). The quote synthesis paragraph lives inside the Quotes tab. Default active tab is whichever portion has results (Quotes wins when both do; Lyrics for music-only). A portion that wasn't searched renders an **empty state with a CTA** in its tab — "Search music for this topic" on a quotes-only search, and symmetrically "Search quotes for this topic" on a music-only search (request #3, made bidirectional). Both CTAs hit the respective phase endpoint and fill in the missing portion of the existing search. While the music half runs, the Lyrics tab shows a spinner.
+
+**Execution is two-phase.** `POST /api/quotes/research` creates the row and runs the (fast) quote portion inline, returning quotes immediately. The (slow, web-search) music portion runs via a separate `POST /api/quotes/searches/:id/music` call — fired automatically when the music toggle is on, and the **same** endpoint the "Add music" button (request #3) calls on an existing search. When the music call resolves, a plain sonner toast ("Lyrics ready — N songs") fires *while the user is still on the research page*; navigating away forgoes the toast (no app-level runner — kept simple).
+
+**Re-run** (detail page) reproduces the original search's portion set as a new saved search (original preserved): quotes-only re-runs quotes, music-only re-runs music, a both search runs quotes inline and auto-fires the music phase.
+
+### Song lyric quote
+
+A music result inside a [[Quote search]]: the verse(s)/chorus(es) of a burgundy/silver hymn that fit the topic, for pasting into a message. The AI picks relevant hymns from stored `hymns` metadata, then sources the actual lyric text via web search (verified against the stored `first_line`); swappable to a hymnal-PDF corpus later. Result shape and sourcing strategy: see [docs/adr/0010-music-lyric-source.md](docs/adr/0010-music-lyric-source.md). Stored self-contained as a JSON blob on the `quote_searches` row (mirrors `hymn_searches.sections`) because lyrics aren't in the DB and can't be rehydrated by id.
+
+**Copy:** each song result has a Copy button (songs only — quote results have no copy affordance; the user hand-copies the part of a quote they want). Copying yields the reference + excerpt — book, number, title, then the lyric excerpt — with a `toast.success('Copied')`.
+
+**What's returned:** 3–8 songs (fewer if fewer genuinely fit — no padding), each with the burgundy/silver `BookNumberBadge`, title, author, the **relevant stanza excerpt** (complete verse(s)/chorus(es) only — never partial lines or the whole hymn), a "why this fits" note, a `relevance` of high/medium/low (same vocabulary as quote results), a `verified` flag, and the source URL. **No book filter in v1** — always searches both burgundy and silver. Full-hymn lookup is out of scope (the user reads the rest from the physical book).
+
+Distinct from the [[Hymn suggestion]] feature, which takes title/scripture/theme/audience and returns a full worship-**service structure** (opening, congregational, special, invitation, flow) rather than quotable lyric excerpts.
+
+### Quote library
+
+The corpus of captured quotes in the `quotes` table (sourced from n8n, import, or manual entry), browsable at `/sermons/quotes`. The quote portion of a [[Quote search]] searches this corpus (FTS5 prefilter when large) and the AI returns quotes drawn only from it — never invented.
+
 ### Blank PDF export
 
 A Fair Booth–specific export alongside the live PDF/JPG exports. Renders **page 1 with empty hour cells** (no signups, no counts in parens, uncolored headers, no dotted lines), and **page 2 with the live roster** (since people sign initials on the printed sheet and the roster is the legend). Available regardless of schedule state.

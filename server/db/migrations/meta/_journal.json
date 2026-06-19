@@ -190,6 +190,13 @@
       "when": 1780500000000,
       "tag": "0026_fair_booth_name_override",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1781878491327,
+      "tag": "0027_polite_shaman",
+      "breakpoints": true
     }
   ]
 }

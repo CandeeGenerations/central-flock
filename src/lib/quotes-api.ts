@@ -113,10 +113,24 @@ export function aiTagQuote(quoteText: string): Promise<{summary: string; tags: s
   })
 }
 
+// Music (song lyric) results — self-contained (ADR 0010)
+export interface MusicResult {
+  book: 'burgundy' | 'silver'
+  number: number
+  title: string
+  author: string | null
+  relevantLyrics: string
+  note: string
+  relevance: 'high' | 'medium' | 'low'
+  source: 'web' | 'corpus'
+  verified: boolean
+  sourceUrl?: string
+}
+
 // Research
 export interface ResearchResult {
   searchId: number
-  synthesis: string
+  synthesis: string | null
   candidateCount: number
   durationMs: number
   results: Array<{
@@ -127,8 +141,24 @@ export interface ResearchResult {
   }>
 }
 
-export function runResearch(topic: string): Promise<ResearchResult> {
-  return request<ResearchResult>('/quotes/research', {method: 'POST', body: JSON.stringify({topic})})
+export function runResearch(
+  topic: string,
+  opts?: {includeQuotes?: boolean; includeMusic?: boolean},
+): Promise<ResearchResult> {
+  return request<ResearchResult>('/quotes/research', {
+    method: 'POST',
+    body: JSON.stringify({topic, ...opts}),
+  })
+}
+
+export function runMusicSearch(searchId: number): Promise<{musicResults: MusicResult[]}> {
+  return request<{musicResults: MusicResult[]}>(`/quotes/searches/${searchId}/music`, {method: 'POST'})
+}
+
+export function runQuotesForSearch(
+  searchId: number,
+): Promise<{synthesis: string; results: ResearchResult['results']; candidateCount: number; durationMs: number}> {
+  return request(`/quotes/searches/${searchId}/quotes`, {method: 'POST'})
 }
 
 // Search history
@@ -136,8 +166,10 @@ export interface QuoteSearch {
   id: number
   topic: string
   createdAt: string
-  model: string
+  model: string | null
   resultCount: number
+  hasQuotes: boolean
+  hasMusic: boolean
 }
 
 export interface QuoteSearchListResponse {
@@ -151,8 +183,8 @@ export interface QuoteSearchListResponse {
 export interface QuoteSearchDetail {
   id: number
   topic: string
-  synthesis: string
-  model: string
+  synthesis: string | null
+  model: string | null
   createdAt: string | null
   results: Array<{
     quoteId: number
@@ -160,6 +192,7 @@ export interface QuoteSearchDetail {
     relevance: string
     quote: Quote | null
   }>
+  musicResults: MusicResult[] | null
 }
 
 export function listSearches(params?: {

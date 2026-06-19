@@ -159,7 +159,17 @@ function parseTags(raw: string): string[] {
   }
 }
 
-export async function runQuoteResearch(topic: string): Promise<ResearchResult> {
+export interface QuoteComputeResult {
+  synthesis: string
+  results: ResearchResult['results']
+  model: string
+  candidateCount: number
+  durationMs: number
+}
+
+// Run the quote-research LLM call without persisting. Used by runQuoteResearch
+// (insert path) and the "add quotes to an existing search" route (update path).
+export async function computeQuoteResearch(topic: string): Promise<QuoteComputeResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set')
 
@@ -204,6 +214,12 @@ export async function runQuoteResearch(topic: string): Promise<ResearchResult> {
   const {synthesis, results} = parseAiResponse(textBlock.text, quotesById)
   const durationMs = Date.now() - start
 
+  return {synthesis, results, model, candidateCount: candidates.length, durationMs}
+}
+
+export async function runQuoteResearch(topic: string): Promise<ResearchResult> {
+  const {synthesis, results, model, candidateCount, durationMs} = await computeQuoteResearch(topic)
+
   const inserted = db
     .insert(schema.quoteSearches)
     .values({
@@ -211,7 +227,7 @@ export async function runQuoteResearch(topic: string): Promise<ResearchResult> {
       synthesis,
       results: JSON.stringify(results.map((r) => ({quoteId: r.quoteId, note: r.note, relevance: r.relevance}))),
       model,
-      candidateCount: candidates.length,
+      candidateCount,
       durationMs,
     })
     .returning({id: schema.quoteSearches.id})
@@ -221,23 +237,29 @@ export async function runQuoteResearch(topic: string): Promise<ResearchResult> {
     searchId: inserted!.id,
     synthesis,
     results,
-    candidateCount: candidates.length,
+    candidateCount,
     durationMs,
   }
+}
+
+// Serialize quote results to the stored id+metadata JSON shape.
+export function serializeQuoteResults(results: ResearchResult['results']): string {
+  return JSON.stringify(results.map((r) => ({quoteId: r.quoteId, note: r.note, relevance: r.relevance})))
 }
 
 export function rehydrateSearch(searchRow: {
   id: number
   topic: string
-  synthesis: string
-  results: string
-  model: string
+  synthesis: string | null
+  results: string | null
+  model: string | null
+  musicResults: string | null
   createdAt: string | null
 }): {
   id: number
   topic: string
-  synthesis: string
-  model: string
+  synthesis: string | null
+  model: string | null
   createdAt: string | null
   results: Array<{
     quoteId: number
@@ -245,8 +267,11 @@ export function rehydrateSearch(searchRow: {
     relevance: string
     quote: PublicQuote | null
   }>
+  musicResults: unknown[] | null
 } {
-  const stored = JSON.parse(searchRow.results) as Array<{quoteId: number; note: string; relevance: string}>
+  const stored = searchRow.results
+    ? (JSON.parse(searchRow.results) as Array<{quoteId: number; note: string; relevance: string}>)
+    : []
 
   const ids = stored.map((r) => r.quoteId)
   let quotesById = new Map<number, QuoteRow>()
@@ -276,5 +301,6 @@ export function rehydrateSearch(searchRow: {
         quote: row ? {...row, tags: parseTags(row.tags)} : null,
       }
     }),
+    musicResults: searchRow.musicResults ? (JSON.parse(searchRow.musicResults) as unknown[]) : null,
   }
 }

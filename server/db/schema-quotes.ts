@@ -20,10 +20,16 @@ export const quotes = sqliteTable('quotes', {
 export const quoteSearches = sqliteTable('quote_searches', {
   id: integer('id').primaryKey({autoIncrement: true}),
   topic: text('topic').notNull(),
-  synthesis: text('synthesis').notNull(),
-  results: text('results').notNull(), // JSON: [{quoteId, note, relevance}]
-  model: text('model').notNull(),
-  candidateCount: integer('candidate_count').notNull(),
-  durationMs: integer('duration_ms').notNull(),
+  // Quote portion — nullable so a search can be music-only
+  synthesis: text('synthesis'),
+  results: text('results'), // JSON: [{quoteId, note, relevance}]
+  model: text('model'),
+  candidateCount: integer('candidate_count'),
+  durationMs: integer('duration_ms'),
+  // Music portion — self-contained (lyrics aren't in the DB, can't rehydrate)
+  musicResults: text('music_results'), // JSON: MusicResult[] | null (null = music not searched)
+  musicModel: text('music_model'),
+  musicSearchedAt: text('music_searched_at'),
+  musicDurationMs: integer('music_duration_ms'),
   createdAt: text('created_at').default(sql`(datetime('now', 'localtime'))`),
 })

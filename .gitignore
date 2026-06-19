@@ -40,3 +40,6 @@ dist-ssr
 
 # Local deploy env — secrets, never commit
 .env.deploy
+
+# TypeScript incremental build info
+*.tsbuildinfo

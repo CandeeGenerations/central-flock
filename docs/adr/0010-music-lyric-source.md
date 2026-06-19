@@ -10,7 +10,7 @@ The quote search feature (`/sermons/research`) is being extended so a search can
 
 ## Decision
 
-The AI selects relevant hymns from the **stored hymn metadata** (grounding the *selection* in our real books), then sources the actual lyric text via **Claude's server-side web search tool**. This is the first tool-using AI call in the codebase — every other call today is a plain text/XML completion.
+The AI selects relevant hymns from the **stored hymn metadata** (grounding the _selection_ in our real books), then sources the actual lyric text via **Claude's server-side web search tool**. This is the first tool-using AI call in the codebase — every other call today is a plain text/XML completion.
 
 Lyric sourcing is hidden behind a single service function with a **source-agnostic result contract** so the source can be swapped without touching the API, stored JSON, or UI:
 

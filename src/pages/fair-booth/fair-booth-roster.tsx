@@ -118,8 +118,14 @@ export function FairBoothRoster({
         </div>
       )}
       {orphans.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-300 rounded p-2 text-xs space-y-1">
-          <div className="font-semibold text-yellow-900">No longer on roster Group:</div>
+        <div
+          className={`rounded border p-2 text-xs space-y-1 ${
+            forceLight
+              ? 'bg-yellow-50 border-yellow-300 text-yellow-900'
+              : 'bg-yellow-50 border-yellow-300 text-yellow-900 dark:bg-yellow-950/40 dark:border-yellow-800 dark:text-yellow-100'
+          }`}
+        >
+          <div className="font-semibold">No longer on roster Group:</div>
           {orphans.map((o) => (
             <div key={o.personId}>
               {o.firstName} {o.lastName} — {o.signupCount} shifts

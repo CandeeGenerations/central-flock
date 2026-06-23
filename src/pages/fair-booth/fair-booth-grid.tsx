@@ -16,6 +16,7 @@ import {
   stableRegionsForSlot,
 } from '@/lib/fair-booth-render'
 import type {FairBoothFairRole, FairBoothRosterAttr, FairBoothSignup} from '@/lib/schedules-api'
+import {Link, useNavigate} from 'react-router-dom'
 
 const HOUR_ROWS = [14, 15, 16, 17, 18, 19, 20, 21] // 2pm-9pm rows; each row spans 1 hour ending at the next.
 
@@ -209,6 +210,7 @@ function HalfGrid({
   scheduleId,
   clickable = true,
 }: HalfGridProps) {
+  const navigate = useNavigate()
   return (
     <div className="rounded-md overflow-hidden border-2 border-black" style={{transform: 'translateZ(0)'}}>
       <table className="w-full text-xs table-fixed" style={{borderCollapse: 'separate', borderSpacing: 0}}>
@@ -229,10 +231,10 @@ function HalfGrid({
                   className={`${rightBorder} border-b-2 border-black p-1 text-center text-sm text-gray-900 font-bold ${headerBg}`}
                 >
                   {clickable ? (
-                    <a href={dayHref(scheduleId, d.date)} className="block cursor-pointer text-gray-900">
+                    <Link to={dayHref(scheduleId, d.date)} className="block cursor-pointer text-gray-900">
                       {dayName}, {dayDate.getDate()}
                       {counts ? ` (${counts})` : ''}
-                    </a>
+                    </Link>
                   ) : (
                     <span className="block text-gray-900">
                       {dayName}, {dayDate.getDate()}
@@ -276,13 +278,7 @@ function HalfGrid({
                       key={d.date}
                       className={`${rightBorder} align-top p-1 text-gray-900 ${bg} ${borderTop} ${clickable ? 'cursor-pointer' : ''}`}
                       style={blank ? {height: 60} : undefined}
-                      onClick={
-                        clickable
-                          ? () => {
-                              window.location.assign(dayHref(scheduleId, d.date))
-                            }
-                          : undefined
-                      }
+                      onClick={clickable ? () => navigate(dayHref(scheduleId, d.date)) : undefined}
                     >
                       {inAnySlot &&
                         cell.entries.map((e) => (

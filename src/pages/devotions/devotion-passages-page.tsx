@@ -25,6 +25,7 @@ export function DevotionPassagesPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [count, setCount] = useState(10)
+  const [topic, setTopic] = useState('')
   const [filter, setFilter] = useState<FilterMode>('available')
   const [recordedFilter, setRecordedFilter] = useState<RecordedFilter>('not-recorded')
   const [page, setPage] = useState(1)
@@ -56,7 +57,7 @@ export function DevotionPassagesPage() {
 
   const handleGenerate = async () => {
     try {
-      const data = await startGenerate(() => generatePoolPassages(count))
+      const data = await startGenerate(() => generatePoolPassages(count, topic))
       queryClient.invalidateQueries({queryKey: ['passages-pool']})
       toast.success(`Generated ${data.generated} passages`)
       setGenerateOpen(false)
@@ -109,6 +110,16 @@ export function DevotionPassagesPage() {
                 value={count}
                 onChange={(e) => setCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))}
                 className="w-28"
+                disabled={genState.isRunning}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Topic (optional)</Label>
+              <Input
+                type="text"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g. freedom, independence (July 4th)"
                 disabled={genState.isRunning}
               />
             </div>
@@ -206,7 +217,10 @@ function PassageRow({passage, onClick}: {passage: PoolPassage; onClick: () => vo
 
   return (
     <TableRow className="cursor-pointer hover:bg-muted/50" onClick={onClick}>
-      <TableCell className="font-medium max-w-48">{passage.title}</TableCell>
+      <TableCell className="font-medium max-w-48">
+        {passage.title}
+        {passage.notes && <div className="text-xs text-muted-foreground font-normal">{passage.notes}</div>}
+      </TableCell>
       <TableCell>{passage.bibleReference}</TableCell>
       <TableCell className="font-mono text-xs text-muted-foreground">{passage.subcode || '—'}</TableCell>
       <TableCell className="text-center">

@@ -1361,7 +1361,8 @@ devotionsRouter.post(
   '/pool/generate',
   asyncHandler(async (req, res) => {
     const count = Math.min(Math.max(Number(req.body.count) || 1, 1), 20)
-    const passages = await generateDevotionPassage(count)
+    const topic = typeof req.body.topic === 'string' ? req.body.topic.trim() : undefined
+    const passages = await generateDevotionPassage(count, undefined, topic)
 
     for (const p of passages) {
       db.insert(schema.generatedPassages)
@@ -1369,6 +1370,7 @@ devotionsRouter.post(
           title: p.title,
           bibleReference: p.bibleReference,
           talkingPoints: p.talkingPoints,
+          notes: p.notes,
         })
         .run()
     }
@@ -1455,6 +1457,18 @@ devotionsRouter.post(
       )
       .run()
 
+    // Append passage notes (e.g. topic) into the devotion's notes
+    let mergedNotes: string | undefined
+    if (passage.notes && passage.notes.trim()) {
+      const existing = db
+        .select({notes: schema.devotions.notes})
+        .from(schema.devotions)
+        .where(eq(schema.devotions.id, devotionId))
+        .get()
+      const prior = existing?.notes?.trim()
+      mergedNotes = prior ? `${prior}\n${passage.notes.trim()}` : passage.notes.trim()
+    }
+
     // Update devotion with passage content
     db.update(schema.devotions)
       .set({
@@ -1462,6 +1476,7 @@ devotionsRouter.post(
         bibleReference: passage.bibleReference,
         talkingPoints: passage.talkingPoints,
         ...(passage.subcode ? {subcode: passage.subcode} : {}),
+        ...(mergedNotes !== undefined ? {notes: mergedNotes} : {}),
         updatedAt: sql`datetime('now')`,
       })
       .where(eq(schema.devotions.id, devotionId))

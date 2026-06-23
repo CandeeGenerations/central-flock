@@ -4,6 +4,16 @@ Glossary of domain terms used in Central Flock. Update inline as terms are resol
 
 ## Terms
 
+### Devotion Topic
+
+An optional theme that steers AI generation of a devotion passage toward a special
+day (e.g. "freedom, independence" for July 4th). Free text, entered in the Generate
+modal; applies to every passage in the batch. Stored in labeled form
+(`Topic: <text>`) in the passage's `notes`, and appended to the devotion's notes on
+assignment. It only _steers_ generation — the "avoid recently-used verses/titles"
+rules still apply, so a topic never forces a repeat.
+_Avoid_: Theme, category, tag (no structured taxonomy exists — it is free text).
+
 ### RSVP List
 
 A tracker for who is coming to a specific Event. Seeded from a Group, then freely editable (add/remove people). Records each person's response (Yes / No / Maybe / No response), an optional headcount, and an optional free-text note.

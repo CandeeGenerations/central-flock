@@ -69,6 +69,7 @@ export const generatedPassages = sqliteTable('generated_passages', {
   title: text('title').notNull(),
   bibleReference: text('bible_reference').notNull(),
   talkingPoints: text('talking_points').notNull(),
+  notes: text('notes'),
   subcode: text('subcode'),
   recorded: integer('recorded', {mode: 'boolean'}).default(false).notNull(),
   used: integer('used', {mode: 'boolean'}).default(false).notNull(),

@@ -335,6 +335,7 @@ export interface GeneratedPassage {
   title: string
   bibleReference: string
   talkingPoints: string
+  notes: string | null
 }
 
 export interface PoolPassage extends GeneratedPassage {
@@ -352,10 +353,10 @@ export function generatePassage() {
   return request<GeneratedPassage>('/devotions/generate-passage', {method: 'POST'})
 }
 
-export function generatePoolPassages(count: number) {
+export function generatePoolPassages(count: number, topic?: string) {
   return request<{generated: number; passages: GeneratedPassage[]}>('/devotions/pool/generate', {
     method: 'POST',
-    body: JSON.stringify({count}),
+    body: JSON.stringify({count, topic: topic?.trim() || undefined}),
   })
 }
 

@@ -9,6 +9,7 @@ export interface GeneratedPassage {
   title: string
   bibleReference: string
   talkingPoints: string
+  notes: string | null
 }
 
 const SYSTEM_PROMPT = `You are a Baptist devotional content creator. Generate a short devotion passage for Tyler Candee, a pastor at Central Baptist Church (Woodbridge, VA), who records a brief 4-6 minute morning devotional video called "From the Shepherd to the Sheep."
@@ -76,12 +77,16 @@ function getRepetitionContext(): {references: string[]; titles: string[]} {
   return {references, titles}
 }
 
-function buildUserMessage(extraRefs: string[], extraTitles: string[]): string {
+function buildUserMessage(extraRefs: string[], extraTitles: string[], topic?: string): string {
   const {references, titles} = getRepetitionContext()
   const allRefs = [...new Set([...references, ...extraRefs])]
   const allTitles = [...new Set([...titles, ...extraTitles])]
 
   let msg = 'Generate one fresh devotion passage.\n'
+
+  if (topic && topic.trim()) {
+    msg += `\nThis passage MUST be on the topic: ${topic.trim()}. Choose a fitting verse and title for that theme.\n`
+  }
 
   if (allRefs.length > 0) {
     msg += `\nPreviously used Bible references (avoid repeating these):\n${allRefs.join(', ')}\n`
@@ -110,6 +115,7 @@ function parseResponse(text: string): GeneratedPassage {
     title: titleMatch[1].trim(),
     bibleReference,
     talkingPoints: pointsMatch[1].trim(),
+    notes: null,
   }
 }
 
@@ -136,7 +142,11 @@ function normalizeReference(ref: string): string {
 
 export type ProgressCallback = (step: string, message: string, progress: number) => void
 
-export async function generateDevotionPassage(count = 1, onProgress?: ProgressCallback): Promise<GeneratedPassage[]> {
+export async function generateDevotionPassage(
+  count = 1,
+  onProgress?: ProgressCallback,
+  topic?: string,
+): Promise<GeneratedPassage[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY environment variable is not set')
@@ -155,7 +165,7 @@ export async function generateDevotionPassage(count = 1, onProgress?: ProgressCa
     const progress = 20 + Math.round((i / count) * 60)
     onProgress?.('calling_ai', label, progress)
 
-    const userMessage = buildUserMessage(freshRefs, freshTitles)
+    const userMessage = buildUserMessage(freshRefs, freshTitles, topic)
 
     const response = await client.messages.create({
       model,
@@ -176,6 +186,7 @@ export async function generateDevotionPassage(count = 1, onProgress?: ProgressCa
     )
 
     const passage = parseResponse(textBlock.text)
+    if (topic && topic.trim()) passage.notes = `Topic: ${topic.trim()}`
     results.push(passage)
     freshRefs.push(passage.bibleReference)
     freshTitles.push(passage.title)

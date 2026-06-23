@@ -542,9 +542,19 @@ export function DevotionScanPage() {
   }
 
   const handleImport = async () => {
-    const selected = rows.filter((r) => r.selected).map((r) => r.devotion)
+    const selectedRows = rows.filter((r) => r.selected)
+    const selected = selectedRows.map((r) => r.devotion)
     if (selected.length === 0) {
       toast.error('No rows selected')
+      return
+    }
+    const passageCounts = new Map<number, number>()
+    for (const r of selectedRows) {
+      const pid = r.devotion.generatedPassageId
+      if (pid != null) passageCounts.set(pid, (passageCounts.get(pid) ?? 0) + 1)
+    }
+    if ([...passageCounts.values()].some((c) => c > 1)) {
+      toast.error('Same passage assigned to multiple devotions. Resolve duplicates before importing.')
       return
     }
     setImporting(true)
@@ -625,7 +635,7 @@ export function DevotionScanPage() {
                 generatedPassageId: passage.id,
                 generatedRecorded: passage.recorded,
                 bibleReference: passage.bibleReference,
-                subcode: passage.subcode ?? r.devotion.subcode,
+                subcode: passage.subcode ?? null,
               },
             }
           : r,
@@ -700,6 +710,18 @@ export function DevotionScanPage() {
   const newCount = rows.filter((r) => !r.existing).length
   const verseMismatches = rows.filter((r) => isVerseMatch(r) === false).length
   const missingVerses = rows.filter((r) => !r.devotion.bibleReference && r.devotion.devotionType !== 'guest').length
+
+  // A passage may only be assigned to one selected devotion. Flag any passage
+  // assigned to two or more selected rows so duplicates can't be imported.
+  const passageIdCounts = new Map<number, number>()
+  for (const r of rows) {
+    const pid = r.devotion.generatedPassageId
+    if (r.selected && pid != null) passageIdCounts.set(pid, (passageIdCounts.get(pid) ?? 0) + 1)
+  }
+  const duplicatePassageIds = new Set([...passageIdCounts.entries()].filter(([, c]) => c > 1).map(([id]) => id))
+  const isDuplicatePassageRow = (row: RowState) =>
+    row.selected && row.devotion.generatedPassageId != null && duplicatePassageIds.has(row.devotion.generatedPassageId)
+  const duplicatePassageCount = rows.filter(isDuplicatePassageRow).length
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-5">
@@ -854,6 +876,12 @@ export function DevotionScanPage() {
                   {verseMismatches} verse mismatch{verseMismatches > 1 ? 'es' : ''}
                 </Badge>
               )}
+              {duplicatePassageCount > 0 && (
+                <Badge className="bg-red-100 text-red-800">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {duplicatePassageCount} duplicate passage{duplicatePassageCount > 1 ? 's' : ''}
+                </Badge>
+              )}
               {enriching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             </CardTitle>
           </CardHeader>
@@ -881,15 +909,17 @@ export function DevotionScanPage() {
                 {rows.map((row, i) => (
                   <TableRow
                     key={i}
-                    className={`
-                        row.existing && !row.selected
-                          ? 'opacity-50'
+                    className={`${
+                      row.existing && !row.selected
+                        ? 'opacity-50'
+                        : isDuplicatePassageRow(row)
+                          ? 'bg-red-50 dark:bg-red-950/20'
                           : isVerseMatch(row) === false
                             ? 'bg-red-50 dark:bg-red-950/20'
                             : row.existing
                               ? 'bg-amber-50 dark:bg-amber-950/20'
                               : ''
-                      }`}
+                    }`}
                   >
                     <TableCell className="px-2">
                       <RowStatusIcon row={row} />
@@ -961,6 +991,12 @@ export function DevotionScanPage() {
                           {row.devotion.subcode && (
                             <p className="text-[10px] text-muted-foreground font-mono truncate max-w-32">
                               {row.devotion.subcode}
+                            </p>
+                          )}
+                          {isDuplicatePassageRow(row) && (
+                            <p className="flex items-center gap-1 text-[10px] text-red-600">
+                              <AlertTriangle className="h-3 w-3 shrink-0" />
+                              Passage used by another devo
                             </p>
                           )}
                         </div>
@@ -1122,6 +1158,13 @@ export function DevotionScanPage() {
               </p>
             )}
 
+            {duplicatePassageCount > 0 && (
+              <p className="text-sm text-red-600">
+                {duplicatePassageCount} selected devotion{duplicatePassageCount > 1 ? 's share' : ' shares'} a passage
+                already assigned to another. Pick a different passage before importing.
+              </p>
+            )}
+
             {/* Actions */}
             <div className="flex items-center justify-end gap-2">
               <Button
@@ -1140,7 +1183,11 @@ export function DevotionScanPage() {
                 {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
                 Save Draft
               </Button>
-              <Button size="sm" onClick={handleImport} disabled={importing || selectedCount === 0}>
+              <Button
+                size="sm"
+                onClick={handleImport}
+                disabled={importing || selectedCount === 0 || duplicatePassageCount > 0}
+              >
                 {importing ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />

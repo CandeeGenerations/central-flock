@@ -429,6 +429,9 @@ function AppLayoutInner({
 
           {/* Main content */}
           <main className="flex-1 overflow-auto pb-48 md:pb-8">
+            {/* When adding/removing routes here, keep the Cmd+K command palette in sync:
+                sidebar routes derive from src/lib/nav-config.ts; non-sidebar routes need an
+                explicit entry in src/lib/search/actions.ts. See CLAUDE.md → Key Patterns. */}
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/dashboard" element={<DashboardPage />} />

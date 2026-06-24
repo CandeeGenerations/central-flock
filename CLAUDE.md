@@ -48,3 +48,4 @@ Schema is in `server/db/schema.ts` using Drizzle ORM. Tables: `people`, `groups`
 - Template variables: `{{firstName}}`, `{{lastName}}`, `{{fullName}}`
 - Phone numbers stored in E.164 format, validated as 10-digit US numbers
 - CSV import via `/api/import` (preview + execute); CSV export via `/api/people/export` and `/api/groups/:id/export`
+- Command palette (Cmd+K): when adding/removing/renaming a route in `src/App.tsx` or a nav entry in `src/lib/nav-config.ts`, keep the palette in sync. Sidebar nav actions are derived from `navGroups` in `src/lib/search/actions.ts` (so sidebar routes update automatically); non-sidebar routes need an explicit entry there. New searchable entities get a provider in `src/lib/search/providers/` (registered in `providers/index.ts`); a new group also needs `GROUP_ORDER` + `PREFIX_TO_GROUP` in `src/components/command-palette.tsx`.

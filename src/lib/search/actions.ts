@@ -1,27 +1,25 @@
 import {exportPeopleCSV} from '@/lib/api'
+import {navGroups} from '@/lib/nav-config'
 import type {ActionsBuildContext, SearchItem} from '@/lib/search/registry'
 import {
   ArrowRight,
-  Baby,
   BookOpen,
-  Calendar,
   CheckSquare,
   Download,
   FileText,
-  FolderOpen,
   FolderPlus,
   LayoutDashboard,
   Mail,
-  MessageSquare,
   Moon,
   Music,
   Plus,
   Quote,
+  ScanLine,
+  SearchX,
   Settings,
   Sparkles,
   Upload,
   UserPlus,
-  Users,
 } from 'lucide-react'
 
 const GO_PREFIX = 'Go to'
@@ -41,31 +39,24 @@ function nav(to: string, label: string, icon: SearchItem['icon'], keywords: stri
 }
 
 export function buildNavigationActions(): SearchItem[] {
-  return [
+  // Sidebar routes derive from navGroups (src/lib/nav-config.ts) so the palette
+  // can't drift from the sidebar — adding/removing a nav entry updates kbar
+  // automatically. Only routes NOT in the sidebar need an explicit entry below.
+  const fromSidebar = navGroups.flatMap((g) =>
+    g.children.map((c) => nav(c.to, `${g.label} ${c.label}`, c.icon, [c.label, g.label])),
+  )
+  const nonNavRoutes = [
     nav('/', 'Home', LayoutDashboard, ['dashboard', 'start']),
-    nav('/dashboard', 'Messaging Dashboard', LayoutDashboard),
-    nav('/people', 'People', Users, ['contacts']),
-    nav('/groups', 'Groups', FolderOpen),
-    nav('/messages', 'Messages', MessageSquare, ['history', 'sent']),
     nav('/messages/compose', 'Compose Message', Mail, ['new message', 'send']),
-    nav('/templates', 'Templates', FileText),
-    nav('/devotions', 'Devotions', BookOpen),
-    nav('/devotions/stats', 'Devotions Dashboard', LayoutDashboard),
-    nav('/devotions/gwendolyn', 'Gwendolyn Devotions', BookOpen),
-    nav('/devotions/passages', 'Devotion Passages', Sparkles),
-    nav('/sermons/quotes', 'Sermon Quotes', Quote),
-    nav('/sermons/research', 'Sermon Research', Sparkles),
-    nav('/music/specials', 'Specials', Sparkles, ['special music', 'performance', 'solo', 'duet']),
-    nav('/music/hymns', 'Hymn Prep', Music),
-    nav('/music/hymns/searches', 'Hymn Search History', Music),
-    nav('/nursery', 'Nursery Schedules', Baby),
-    nav('/nursery/workers', 'Nursery Workers', Users),
-    nav('/calendar', 'Calendar', Calendar),
-    nav('/rsvp', 'RSVPs', CheckSquare, ['rsvp', 'attendance', 'event', 'invite']),
+    nav('/devotions/scan', 'Devotion Scan', ScanLine, ['scan', 'ocr', 'sheet', 'import']),
+    nav('/devotions/missing', 'Devotion Missing', SearchX, ['missing', 'gaps', 'incomplete']),
+    nav('/music/hymns', 'Hymn Prep', Music, ['hymn', 'prep', 'song service']),
+    nav('/sermons/research', 'Sermon Research', Sparkles, ['research']),
     nav('/import', 'Import CSV', Upload, ['upload']),
     nav('/import/contacts', 'Import Mac Contacts', Upload),
     nav('/settings', 'Settings', Settings),
   ]
+  return [...nonNavRoutes, ...fromSidebar]
 }
 
 export function buildCreateActions(): SearchItem[] {

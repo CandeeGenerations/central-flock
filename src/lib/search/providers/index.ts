@@ -1,8 +1,10 @@
 import type {SearchProvider} from '@/lib/search/registry'
 
 import {calendarProvider} from './calendar'
+import {devotionPassagesProvider} from './devotion-passages'
 import {devotionsProvider} from './devotions'
 import {draftsProvider} from './drafts'
+import {fairBoothSchedulesProvider} from './fair-booth-schedules'
 import {groupsProvider} from './groups'
 import {gwendolynDevotionsProvider} from './gwendolyn-devotions'
 import {hymnsProvider} from './hymns'
@@ -19,6 +21,8 @@ export const providers: SearchProvider[] = [
   peopleProvider as SearchProvider,
   groupsProvider as SearchProvider,
   devotionsProvider as SearchProvider,
+  devotionPassagesProvider as SearchProvider,
+  fairBoothSchedulesProvider as SearchProvider,
   messagesProvider as SearchProvider,
   quotesProvider as SearchProvider,
   templatesProvider as SearchProvider,

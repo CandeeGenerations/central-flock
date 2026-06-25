@@ -15,14 +15,12 @@ const MAX_SEARCH_RESULTS = 25
 const EMPTY_STATE_GROUPS = new Set(['Navigation', 'Create', 'Commands', 'Recent'])
 
 const GROUP_ORDER = [
+  'Recent',
   'Navigation',
   'Create',
   'Commands',
-  'Recent',
   'People',
   'Groups',
-  'Notes',
-  'Folders',
   'Devotions',
   'Passages',
   'Gwendolyn Devotions',
@@ -50,11 +48,6 @@ const PREFIX_TO_GROUP: Record<string, string> = {
   g: 'Groups',
   group: 'Groups',
   groups: 'Groups',
-  n: 'Notes',
-  note: 'Notes',
-  notes: 'Notes',
-  folder: 'Folders',
-  folders: 'Folders',
   d: 'Devotions',
   devo: 'Devotions',
   devos: 'Devotions',
@@ -199,7 +192,7 @@ export function CommandPalette({open, onOpenChange}: {open: boolean; onOpenChang
       >
         <DialogTitle className="sr-only">Global Search</DialogTitle>
         <DialogDescription className="sr-only">
-          Search people, groups, notes, and jump to any page or action.
+          Search people, groups, devotions, and jump to any page or action.
         </DialogDescription>
         <Command shouldFilter={false} loop className="flex flex-col min-w-0 h-[100dvh] sm:h-auto sm:max-h-[85vh]">
           <div className="flex items-center gap-3 border-b px-4 py-3 shrink-0">
@@ -208,7 +201,7 @@ export function CommandPalette({open, onOpenChange}: {open: boolean; onOpenChang
               ref={inputRef}
               value={rawQuery}
               onValueChange={onQueryChange}
-              placeholder="Search people, notes, devotions, or type a command…"
+              placeholder="Search people, devotions, schedules, or type a command…"
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground text-sm"
             />
             {isLoading && <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin shrink-0" />}

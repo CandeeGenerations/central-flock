@@ -45,7 +45,6 @@ export function buildNavigationActions(): SearchItem[] {
   )
   const nonNavRoutes = [
     nav('/', 'Home', LayoutDashboard, ['dashboard', 'start']),
-    nav('/messages/compose', 'Compose Message', Mail, ['new message', 'send']),
     nav('/devotions/scan', 'Devotion Scan', ScanLine, ['scan', 'ocr', 'sheet', 'import']),
     nav('/devotions/missing', 'Devotion Missing', SearchX, ['missing', 'gaps', 'incomplete']),
     nav('/music/hymns', 'Hymn Prep', Music, ['hymn', 'prep', 'song service']),
@@ -159,17 +158,6 @@ export function buildCreateActions(): SearchItem[] {
       },
     },
     {
-      id: 'create-hymn-search',
-      label: 'New Hymn Search',
-      group: 'Create',
-      icon: Music,
-      keywords: ['new', 'hymn', 'suggest', 'music', 'sermon'],
-      action: ({navigate, close}) => {
-        navigate('/music/hymns')
-        close()
-      },
-    },
-    {
       id: 'create-nursery-schedule',
       label: 'Generate Nursery Schedule',
       group: 'Create',
@@ -193,17 +181,6 @@ export function buildCommandActions(ctx: ActionsBuildContext): SearchItem[] {
       keywords: ['dark', 'light', 'theme', 'toggle'],
       action: ({close}) => {
         ctx.toggleDark()
-        close()
-      },
-    },
-    {
-      id: 'cmd-open-settings',
-      label: 'Open Settings',
-      group: 'Commands',
-      icon: Settings,
-      keywords: ['settings', 'preferences', 'config'],
-      action: ({navigate, close}) => {
-        navigate('/settings')
         close()
       },
     },

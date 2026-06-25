@@ -18,6 +18,9 @@ export interface SearchItem {
   keywords: string[]
   action: (ctx: SearchActionContext) => void | Promise<void>
   keepOpen?: boolean
+  // Navigation target, when this item opens a route. Used to de-dupe a Recent
+  // entry against the same entity surfaced by its own provider.
+  navPath?: string
 }
 
 export interface SearchActionContext {

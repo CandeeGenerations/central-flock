@@ -9,12 +9,16 @@ import {memo, useCallback, useEffect, useMemo, useRef, useState, useTransition} 
 import {type NavigateFunction, useNavigate} from 'react-router-dom'
 
 const MAX_EMPTY_RESULTS_PER_GROUP = 6
-const MAX_SEARCH_RESULTS = 60
+const MAX_SEARCH_RESULTS = 25
+
+// Groups shown on the empty palette (no query). Typing searches everything.
+const EMPTY_STATE_GROUPS = new Set(['Navigation', 'Create', 'Commands', 'Recent'])
 
 const GROUP_ORDER = [
   'Navigation',
   'Create',
   'Commands',
+  'Recent',
   'People',
   'Groups',
   'Notes',
@@ -38,6 +42,8 @@ const PREFIX_TO_GROUP: Record<string, string> = {
   create: 'Create',
   cmd: 'Commands',
   command: 'Commands',
+  recent: 'Recent',
+  recents: 'Recent',
   p: 'People',
   person: 'People',
   people: 'People',
@@ -165,6 +171,7 @@ export function CommandPalette({open, onOpenChange}: {open: boolean; onOpenChang
       }
       const trimmedGroups = new Map<string, SearchItem[]>()
       for (const [g, list] of itemsByGroup) {
+        if (!EMPTY_STATE_GROUPS.has(g)) continue
         trimmedGroups.set(g, list.slice(0, MAX_EMPTY_RESULTS_PER_GROUP))
       }
       return trimmedGroups
@@ -172,6 +179,11 @@ export function CommandPalette({open, onOpenChange}: {open: boolean; onOpenChang
 
     const searchLimit = filterGroup ? MAX_SEARCH_RESULTS * 4 : MAX_SEARCH_RESULTS
     let matched = index.search(effective, searchLimit)
+    // De-dupe: drop an entity result already surfaced as a Recent.
+    const recentPaths = new Set(
+      (itemsByGroup.get('Recent') ?? []).map((i) => i.navPath).filter((p): p is string => !!p),
+    )
+    matched = matched.filter((i) => i.group === 'Recent' || !i.navPath || !recentPaths.has(i.navPath))
     if (filterGroup) matched = matched.filter((i) => i.group === filterGroup).slice(0, MAX_SEARCH_RESULTS)
     return groupBy(matched)
   }, [index, itemsByGroup, query])

@@ -20,6 +20,7 @@ export const gwendolynDevotionsProvider: SearchProvider<GwendolynDevotional> = {
       group: 'Gwendolyn Devotions',
       icon: Smartphone,
       keywords: [g.title, g.date, g.hashtags].filter(Boolean),
+      navPath: `/devotions/gwendolyn/${g.id}`,
       action: ({navigate, close}) => {
         navigate(`/devotions/gwendolyn/${g.id}`)
         close()

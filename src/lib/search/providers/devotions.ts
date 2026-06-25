@@ -28,6 +28,7 @@ export const devotionsProvider: SearchProvider<Devotion> = {
         group: 'Devotions',
         icon: BookOpen,
         keywords: [d.title ?? '', d.bibleReference ?? '', d.guestSpeaker ?? '', d.songName ?? ''].filter(Boolean),
+        navPath: `/devotions/${d.id}`,
         action: ({navigate, close}) => {
           navigate(`/devotions/${d.id}`)
           close()

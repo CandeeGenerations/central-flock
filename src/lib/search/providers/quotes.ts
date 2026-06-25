@@ -20,6 +20,7 @@ export const quotesProvider: SearchProvider<Quote> = {
       group: 'Quotes',
       icon: QuoteIcon,
       keywords: [q.title, q.author ?? '', q.summary ?? '', ...(q.tags ?? [])].filter(Boolean),
+      navPath: `/sermons/quotes/${q.id}`,
       action: ({navigate, close}) => {
         navigate(`/sermons/quotes/${q.id}`)
         close()

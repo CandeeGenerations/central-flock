@@ -39,6 +39,7 @@ import {settingsRouter} from './routes/settings.js'
 import {specialsRouter} from './routes/specials.js'
 import {statsRouter} from './routes/stats.js'
 import {templatesRouter} from './routes/templates.js'
+import {usageRouter} from './routes/usage.js'
 import {webhooksRouter} from './routes/webhooks.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
@@ -86,6 +87,7 @@ app.use('/api/hymns', hymnsRouter)
 app.use('/api/rsvp', rsvpRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/specials', specialsRouter)
+app.use('/api/usage', usageRouter)
 
 // Serve all uploaded media (scan images, nursery logos, special-music sheets, etc.)
 // Root is configurable via UPLOADS_DIR env var; defaults to ./data/.

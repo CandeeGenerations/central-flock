@@ -34,6 +34,7 @@ export const nurserySchedulesProvider: SearchProvider<NurserySchedule> = {
         group: 'Schedules',
         icon: Calendar,
         keywords: [monthName, String(s.year), s.status],
+        navPath: `/nursery/${s.id}`,
         action: ({navigate, close}) => {
           navigate(`/nursery/${s.id}`)
           close()

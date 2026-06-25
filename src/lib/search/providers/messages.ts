@@ -21,6 +21,7 @@ export const messagesProvider: SearchProvider<Message> = {
         group: 'Messages',
         icon: MessageSquare,
         keywords: [preview, groupLabel, m.status].filter(Boolean),
+        navPath: `/messages/${m.id}`,
         action: ({navigate, close}) => {
           navigate(`/messages/${m.id}`)
           close()

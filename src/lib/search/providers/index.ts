@@ -12,12 +12,17 @@ import {messagesProvider} from './messages'
 import {nurserySchedulesProvider} from './nursery-schedules'
 import {peopleProvider} from './people'
 import {quotesProvider} from './quotes'
+import {recentsProvider} from './recents'
 import {rsvpProvider} from './rsvp'
 import {specialMusicSchedulesProvider} from './special-music-schedules'
 import {specialsProvider} from './specials'
 import {templatesProvider} from './templates'
 
+// Recents always loads (it shows on the empty palette). The entity providers
+// populate the searchable index; their results only surface once you type
+// (see command-palette.tsx empty-state curation).
 export const providers: SearchProvider[] = [
+  recentsProvider as SearchProvider,
   peopleProvider as SearchProvider,
   groupsProvider as SearchProvider,
   devotionsProvider as SearchProvider,

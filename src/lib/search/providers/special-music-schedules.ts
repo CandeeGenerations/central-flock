@@ -17,6 +17,7 @@ export const specialMusicSchedulesProvider: SearchProvider<Schedule> = {
       group: 'Schedules',
       icon: Music,
       keywords: ['special music', s.scopeLabel, s.status],
+      navPath: `/special-music/${s.id}`,
       action: ({navigate, close}) => {
         navigate(`/special-music/${s.id}`)
         close()

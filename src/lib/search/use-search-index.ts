@@ -2,7 +2,8 @@ import {buildAllActions} from '@/lib/search/actions'
 import {providers} from '@/lib/search/providers'
 import type {SearchItem} from '@/lib/search/registry'
 import {useTheme} from '@/lib/theme-context'
-import {useQueries} from '@tanstack/react-query'
+import {fetchSectionScores} from '@/lib/usage-api'
+import {useQueries, useQuery} from '@tanstack/react-query'
 import {useMemo, useState} from 'react'
 
 const DEFAULT_STALE_TIME = 5 * 60 * 1000
@@ -33,6 +34,14 @@ export function useSearchIndex(enabled: boolean): SearchIndex {
 
   const actions = useMemo(() => buildAllActions({toggleDark}), [toggleDark])
 
+  // Frecency scores per section reorder the Navigation group (empty-state).
+  const sectionsQuery = useQuery({
+    queryKey: ['usage-sections', 'search-index'],
+    queryFn: fetchSectionScores,
+    staleTime: DEFAULT_STALE_TIME,
+    enabled,
+  })
+
   // `useQueries` returns a new `results` array on every render, so we keep a stable
   // tuple of `data` references in state and only update it when an element reference
   // actually changes. Without this, `items`/`fuse` would rebuild on every keystroke
@@ -55,7 +64,14 @@ export function useSearchIndex(enabled: boolean): SearchIndex {
       byGroup.set(item.group, bucket)
     }
 
-    for (const a of actions) push(a)
+    // Navigation reordered by section frecency; declared order breaks ties.
+    const scores = sectionsQuery.data ?? {}
+    const navItems = actions
+      .filter((a) => a.group === 'Navigation')
+      .slice()
+      .sort((a, b) => (scores[b.navPath ?? ''] ?? 0) - (scores[a.navPath ?? ''] ?? 0))
+    const otherActions = actions.filter((a) => a.group !== 'Navigation')
+    for (const a of [...navItems, ...otherActions]) push(a)
     for (let i = 0; i < providers.length; i++) {
       const rows = dataDeps[i]
       if (!rows) continue
@@ -64,7 +80,7 @@ export function useSearchIndex(enabled: boolean): SearchIndex {
     }
 
     return {items: all, itemsByGroup: byGroup}
-  }, [actions, dataDeps])
+  }, [actions, dataDeps, sectionsQuery.data])
 
   return {
     items,

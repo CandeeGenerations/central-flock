@@ -18,6 +18,7 @@ export const groupsProvider: SearchProvider<Group> = {
       group: 'Groups',
       icon: FolderOpen,
       keywords: [g.name, g.description ?? ''].filter(Boolean),
+      navPath: `/groups/${g.id}`,
       action: ({navigate, close}) => {
         navigate(`/groups/${g.id}`)
         close()

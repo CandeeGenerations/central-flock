@@ -30,6 +30,7 @@ export const peopleProvider: SearchProvider<Person> = {
       group: 'People',
       icon: Users,
       keywords: [p.firstName ?? '', p.lastName ?? '', p.phoneNumber ?? '', p.phoneDisplay ?? ''].filter(Boolean),
+      navPath: `/people/${p.id}`,
       action: ({navigate, close}) => {
         navigate(`/people/${p.id}`)
         close()

@@ -6,6 +6,7 @@ import {Spinner} from '@/components/ui/spinner'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useCommandPalette} from '@/hooks/use-command-palette'
 import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts'
+import {useRouteVisitLogger} from '@/hooks/use-route-visit-logger'
 import {useSidebarCollapsed} from '@/hooks/use-sidebar-collapsed'
 import {checkAuthStatus, logout} from '@/lib/api'
 import {findActiveGroup, isChildActive, navGroups} from '@/lib/nav-config'
@@ -377,6 +378,7 @@ function AppLayoutInner({
   collapsed: boolean
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>
 }) {
+  useRouteVisitLogger()
   return (
     <TooltipProvider delayDuration={150}>
       <div className="flex h-screen overflow-hidden">

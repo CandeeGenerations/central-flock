@@ -47,6 +47,7 @@ export const specialsProvider: SearchProvider<Special> = {
         ...s.performers.map(performerDisplayName),
         ...parseGuestPerformers(s.guestPerformers),
       ].filter(Boolean),
+      navPath: `/music/specials/${s.id}`,
       action: ({navigate, close}) => {
         navigate(`/music/specials/${s.id}`)
         close()

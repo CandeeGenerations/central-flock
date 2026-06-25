@@ -17,6 +17,7 @@ export const fairBoothSchedulesProvider: SearchProvider<Schedule> = {
       group: 'Schedules',
       icon: Tent,
       keywords: ['fair booth', s.scopeLabel, s.status],
+      navPath: `/schedules/fair-booth/${s.id}`,
       action: ({navigate, close}) => {
         navigate(`/schedules/fair-booth/${s.id}`)
         close()

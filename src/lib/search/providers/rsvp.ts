@@ -18,6 +18,7 @@ export const rsvpProvider: SearchProvider<RsvpListSummary> = {
       group: 'Calendar',
       icon: CheckSquare,
       keywords: [l.name, 'rsvp'],
+      navPath: `/rsvp/${l.id}`,
       action: ({navigate, close}) => {
         navigate(`/rsvp/${l.id}`)
         close()

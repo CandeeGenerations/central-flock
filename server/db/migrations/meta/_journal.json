@@ -204,6 +204,13 @@
       "when": 1782223789212,
       "tag": "0028_foamy_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1782415618818,
+      "tag": "0029_right_monster_badoon",
+      "breakpoints": true
     }
   ]
 }

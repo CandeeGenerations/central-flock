@@ -18,6 +18,7 @@ export const templatesProvider: SearchProvider<Template> = {
       group: 'Templates',
       icon: FileText,
       keywords: [t.name, t.content.slice(0, 200)].filter(Boolean),
+      navPath: `/templates/${t.id}/edit`,
       action: ({navigate, close}) => {
         navigate(`/templates/${t.id}/edit`)
         close()

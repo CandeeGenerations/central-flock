@@ -17,6 +17,7 @@ export const devotionPassagesProvider: SearchProvider<PoolPassage> = {
       group: 'Passages',
       icon: Sparkles,
       keywords: [p.title, p.bibleReference, p.notes ?? '', p.subcode ?? ''].filter(Boolean),
+      navPath: `/devotions/passages/${p.id}`,
       action: ({navigate, close}) => {
         navigate(`/devotions/passages/${p.id}`)
         close()

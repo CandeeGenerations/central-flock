@@ -1,11 +1,8 @@
-import {exportPeopleCSV} from '@/lib/api'
 import {navGroups} from '@/lib/nav-config'
 import type {ActionsBuildContext, SearchItem} from '@/lib/search/registry'
 import {
-  ArrowRight,
   BookOpen,
   CheckSquare,
-  Download,
   FileText,
   FolderPlus,
   LayoutDashboard,
@@ -31,6 +28,7 @@ function nav(to: string, label: string, icon: SearchItem['icon'], keywords: stri
     group: 'Navigation',
     icon,
     keywords: [label, to, ...keywords],
+    navPath: to,
     action: ({navigate, close}) => {
       navigate(to)
       close()
@@ -199,17 +197,6 @@ export function buildCommandActions(ctx: ActionsBuildContext): SearchItem[] {
       },
     },
     {
-      id: 'cmd-export-people',
-      label: 'Export People as CSV',
-      group: 'Commands',
-      icon: Download,
-      keywords: ['export', 'csv', 'people', 'download'],
-      action: async ({close}) => {
-        await exportPeopleCSV()
-        close()
-      },
-    },
-    {
       id: 'cmd-open-settings',
       label: 'Open Settings',
       group: 'Commands',
@@ -218,20 +205,6 @@ export function buildCommandActions(ctx: ActionsBuildContext): SearchItem[] {
       action: ({navigate, close}) => {
         navigate('/settings')
         close()
-      },
-    },
-    {
-      id: 'cmd-focus-table-search',
-      label: 'Focus Table Search',
-      group: 'Commands',
-      icon: ArrowRight,
-      keywords: ['search', 'focus', 'table', 'filter'],
-      action: ({close}) => {
-        close()
-        setTimeout(() => {
-          const el = document.querySelector<HTMLInputElement>('[data-search-input] input')
-          el?.focus()
-        }, 0)
       },
     },
   ]

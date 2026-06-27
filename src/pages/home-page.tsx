@@ -1,47 +1,45 @@
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
-import {Input} from '@/components/ui/input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {
-  type HomePinnedItem,
+  type HomeAttention,
+  type HomeResponse,
+  type HomeScheduledMessage,
   type HomeUpcomingChurchEvent,
   checkAuthStatus,
-  fetchGroups,
   fetchHome,
-  fetchPeople,
-  fetchTemplates,
   logout,
-  pinHomeItem,
-  unpinHomeItem,
 } from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
+import {type RecentEntity, fetchRecents} from '@/lib/usage-api'
 import {cn} from '@/lib/utils'
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {useQuery, useQueryClient} from '@tanstack/react-query'
 import {
+  AlertTriangle,
   Baby,
   BookOpen,
   Cake,
   Calendar,
+  CalendarCheck,
   FileText,
   FolderOpen,
   Hash,
   Heart,
   LogOut,
   MessageSquare,
-  Pin,
-  PinOff,
-  Plus,
+  Music,
   Quote,
   ScrollText,
+  Send,
   Settings,
+  Sparkles,
+  Tent,
   Users,
 } from 'lucide-react'
 import type {LucideIcon} from 'lucide-react'
-import {useMemo, useState} from 'react'
+import type {ReactNode} from 'react'
 import {Link} from 'react-router-dom'
-import {toast} from 'sonner'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -55,42 +53,26 @@ function daysLabel(days: number): string {
   return `${days} days`
 }
 
-function pinRoute(pin: HomePinnedItem): string {
-  if (pin.type === 'person') return `/people/${pin.itemId}`
-  if (pin.type === 'group') return `/groups/${pin.itemId}`
-  return `/templates/${pin.itemId}/edit`
-}
-
-const PIN_TYPE_ICON = {
-  person: Users,
-  group: FolderOpen,
-  template: FileText,
-}
-
 export function HomePage() {
   const queryClient = useQueryClient()
-  const {data, isLoading} = useQuery({
-    queryKey: queryKeys.home,
-    queryFn: fetchHome,
-  })
+  const {data, isLoading} = useQuery({queryKey: queryKeys.home, queryFn: fetchHome})
   const {data: authStatus} = useQuery({queryKey: ['auth-status'], queryFn: checkAuthStatus})
-
-  const [pinDialogOpen, setPinDialogOpen] = useState(false)
-
-  const unpinMutation = useMutation({
-    mutationFn: (id: number) => unpinHomeItem(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.home})
-      toast.success('Unpinned')
-    },
-  })
+  const {data: recents} = useQuery({queryKey: queryKeys.usageRecents, queryFn: fetchRecents})
 
   if (isLoading || !data) return <PageSpinner />
 
-  const {upcomingBirthdays, upcomingAnniversaries, upcomingChurchEvents, calendarColors, stats, pinnedItems} = data
+  const {
+    upcomingBirthdays,
+    upcomingAnniversaries,
+    upcomingChurchEvents,
+    calendarColors,
+    stats,
+    attention,
+    scheduledMessages,
+  } = data
 
-  // Merge and sort upcoming events
-  const events = [
+  // Merge and sort upcoming celebrations
+  const celebrations = [
     ...upcomingBirthdays.map((b) => ({...b, eventType: 'birthday' as const})),
     ...upcomingAnniversaries.map((a) => ({...a, eventType: 'anniversary' as const})),
   ].sort((a, b) => a.daysUntil - b.daysUntil)
@@ -99,98 +81,19 @@ export function HomePage() {
     <div className="p-4 md:p-6 space-y-6">
       <h1 className="text-2xl font-bold">Home</h1>
 
-      {/* Tool Launcher */}
-      <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Tools</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Link to="/dashboard">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
-              <CardContent className="flex items-start gap-4 p-5">
-                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
-                  <MessageSquare className="h-6 w-6 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-semibold">Messaging</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {stats.people.toLocaleString()} people &middot; {stats.groups.toLocaleString()} groups
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {stats.messagesSentThisMonth.toLocaleString()} sent this month
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link to="/devotions/stats">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
-              <CardContent className="flex items-start gap-4 p-5">
-                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
-                  <BookOpen className="h-6 w-6 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-semibold">Devotions</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {stats.devotionsTotal.toLocaleString()} total &middot; Latest #
-                    {stats.devotionsLatestNumber.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">{stats.devotionsCompletionRate}% pipeline completion</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link to="/nursery">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
-              <CardContent className="flex items-start gap-4 p-5">
-                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
-                  <Baby className="h-6 w-6 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-semibold">Nursery Schedule</h3>
-                  <p className="text-sm text-muted-foreground">Generate and manage monthly nursery schedules</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link to="/sermons/research">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
-              <CardContent className="flex items-start gap-4 p-5">
-                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
-                  <ScrollText className="h-6 w-6 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-semibold">Sermon Prep</h3>
-                  <p className="text-sm text-muted-foreground">{stats.quotesTotal.toLocaleString()} quotes</p>
-                  <p className="text-sm text-muted-foreground">AI-powered topic research</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link to="/calendar">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
-              <CardContent className="flex items-start gap-4 p-5">
-                <div className="rounded-lg bg-primary/10 p-3 shrink-0">
-                  <Calendar className="h-6 w-6 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-semibold">Calendar</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {stats.upcomingChurchEventsTotal.toLocaleString()} events in next 30 days
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </section>
+      {/* Needs attention */}
+      <NeedsAttention attention={attention} />
 
-      {/* Upcoming Events + Stats */}
+      {/* Jump back in */}
+      <JumpBackIn recents={recents ?? []} />
+
+      {/* Upcoming */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Upcoming Church Events */}
-        {upcomingChurchEvents && upcomingChurchEvents.length > 0 && (
-          <UpcomingChurchEventsCard events={upcomingChurchEvents} calendarColors={calendarColors} />
-        )}
-
-        {/* Upcoming Celebrations */}
+        <UpcomingCard
+          events={upcomingChurchEvents}
+          scheduledMessages={scheduledMessages}
+          calendarColors={calendarColors}
+        />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -199,13 +102,13 @@ export function HomePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {events.length === 0 ? (
+            {celebrations.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
                 No birthdays or anniversaries in the next 14 days.
               </p>
             ) : (
               <div className="space-y-1">
-                {events.map((event) => (
+                {celebrations.map((event) => (
                   <Link
                     key={`${event.eventType}-${event.personId}`}
                     to={`/people/${event.personId}`}
@@ -247,71 +150,42 @@ export function HomePage() {
         </Card>
       </div>
 
-      {/* At-a-Glance Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        <StatCard label="People" value={stats.people} to="/people" icon={Users} />
-        <StatCard label="Groups" value={stats.groups} to="/groups" icon={FolderOpen} />
-        <StatCard
-          label="Messages (this month)"
-          value={stats.messagesSentThisMonth}
-          to="/messages"
-          icon={MessageSquare}
-        />
-        <StatCard label="Templates" value={stats.templates} to="/templates" icon={FileText} />
-        <StatCard label="Devotions" value={stats.devotionsTotal} to="/devotions" icon={BookOpen} />
-        <StatCard label="Latest Devotion" value={stats.devotionsLatestNumber} to="/devotions" icon={Hash} />
-        <StatCard label="Quotes" value={stats.quotesTotal} to="/sermons/quotes" icon={Quote} />
-        <StatCard
-          label="Events (next 30 days)"
-          value={stats.upcomingChurchEventsTotal}
-          to="/calendar"
-          icon={Calendar}
-        />
-      </div>
-
-      {/* Pinned Items */}
+      {/* Tools */}
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Pinned</h2>
-          <Button variant="ghost" size="sm" onClick={() => setPinDialogOpen(true)}>
-            <Pin className="h-4 w-4 mr-1" />
-            Pin Item
-          </Button>
-        </div>
-        {pinnedItems.length === 0 ? (
-          <Card size="sm" className="p-6">
-            <p className="text-sm text-muted-foreground text-center">
-              Pin people, groups, or templates for quick access.
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Tools</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <ToolCard to="/dashboard" icon={MessageSquare} title="Messaging">
+            <p className="text-sm text-muted-foreground">
+              {stats.people.toLocaleString()} people &middot; {stats.groups.toLocaleString()} groups
             </p>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {pinnedItems.map((pin) => {
-              const Icon = PIN_TYPE_ICON[pin.type]
-              return (
-                <Card key={pin.id} size="sm" className="group relative hover:bg-muted/50 transition-colors">
-                  <Link to={pinRoute(pin)} className="block p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="text-sm font-medium truncate">{pin.name}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">{pin.subtitle}</p>
-                  </Link>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      unpinMutation.mutate(pin.id)
-                    }}
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
-                  >
-                    <PinOff className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                </Card>
-              )
-            })}
-          </div>
-        )}
+            <p className="text-sm text-muted-foreground">
+              {stats.messagesSentThisMonth.toLocaleString()} sent this month
+            </p>
+          </ToolCard>
+          <ToolCard to="/devotions/stats" icon={BookOpen} title="Devotions">
+            <p className="text-sm text-muted-foreground">
+              {stats.devotionsTotal.toLocaleString()} total &middot; Latest #
+              {stats.devotionsLatestNumber.toLocaleString()}
+            </p>
+            <p className="text-sm text-muted-foreground">{stats.devotionsCompletionRate}% pipeline completion</p>
+          </ToolCard>
+          <ToolCard to="/nursery" icon={Baby} title="Nursery Schedule">
+            <p className="text-sm text-muted-foreground">Generate and manage monthly nursery schedules</p>
+          </ToolCard>
+          <ToolCard to="/sermons/research" icon={ScrollText} title="Sermon Prep">
+            <p className="text-sm text-muted-foreground">{stats.quotesTotal.toLocaleString()} quotes</p>
+            <p className="text-sm text-muted-foreground">AI-powered topic research</p>
+          </ToolCard>
+          <ToolCard to="/calendar" icon={Calendar} title="Calendar">
+            <p className="text-sm text-muted-foreground">
+              {stats.upcomingChurchEventsTotal.toLocaleString()} events in next 30 days
+            </p>
+          </ToolCard>
+        </div>
       </section>
+
+      {/* Stats footer */}
+      <StatsFooter stats={stats} />
 
       {/* Mobile settings & logout */}
       <div className="md:hidden grid grid-cols-2 gap-3 pt-2">
@@ -335,15 +209,104 @@ export function HomePage() {
           </Button>
         )}
       </div>
-
-      <PinDialog open={pinDialogOpen} onOpenChange={setPinDialogOpen} existingPins={pinnedItems} />
     </div>
   )
 }
 
+// --- Needs attention -------------------------------------------------------
+
+function NeedsAttention({attention}: {attention: HomeAttention}) {
+  const segments: {label: string; to: string}[] = []
+  if (attention.draftsOlderThan2Days > 0)
+    segments.push({
+      label: `${attention.draftsOlderThan2Days} draft${attention.draftsOlderThan2Days !== 1 ? 's' : ''}`,
+      to: '/messages?tab=drafts',
+    })
+  if (attention.rsvpsNeedingReplies > 0)
+    segments.push({
+      label: `${attention.rsvpsNeedingReplies} RSVP${attention.rsvpsNeedingReplies !== 1 ? 's' : ''} need replies`,
+      to: '/rsvp',
+    })
+  if (attention.nurseryNextMonthUnfinalized)
+    segments.push({label: `Nursery (${attention.nurseryNextMonthLabel})`, to: '/nursery'})
+  if (attention.devotionsIncomplete > 0)
+    segments.push({
+      label: `${attention.devotionsIncomplete} devotion${attention.devotionsIncomplete !== 1 ? 's' : ''}`,
+      to: '/devotions/stats',
+    })
+
+  if (segments.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
+      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500 shrink-0" />
+      <span className="font-medium text-amber-700 dark:text-amber-400 mr-1">Needs attention</span>
+      {segments.map((seg, i) => (
+        <span key={seg.to} className="flex items-center gap-1">
+          {i > 0 && <span className="text-muted-foreground">&middot;</span>}
+          <Link to={seg.to} className="rounded px-1 py-0.5 font-medium hover:bg-amber-500/20 transition-colors">
+            {seg.label}
+          </Link>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// --- Jump back in ----------------------------------------------------------
+
+const ENTITY_ICON: Record<string, LucideIcon> = {
+  person: Users,
+  group: FolderOpen,
+  message: MessageSquare,
+  template: FileText,
+  devotion: BookOpen,
+  passage: Sparkles,
+  gwendolyn_devotion: BookOpen,
+  quote: Quote,
+  special: Music,
+  hymn_search: Music,
+  special_music_schedule: Music,
+  nursery_schedule: Baby,
+  fair_booth_schedule: Tent,
+  rsvp_list: CalendarCheck,
+}
+
+function JumpBackIn({recents}: {recents: RecentEntity[]}) {
+  if (recents.length === 0) return null
+  const items = recents.slice(0, 8)
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Jump back in</h2>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => {
+          const Icon = ENTITY_ICON[item.entityType] ?? Hash
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-sm hover:bg-muted/50 transition-colors"
+            >
+              <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="font-medium truncate max-w-[200px]">{item.label}</span>
+              <span className="text-xs text-muted-foreground">{item.typeLabel}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+// --- Upcoming (events + scheduled messages) --------------------------------
+
 function formatChurchEventTime(event: HomeUpcomingChurchEvent): string {
   if (event.allDay) return 'All day'
-  const d = new Date(event.startDate)
+  return formatTime(event.startDate)
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso)
   const h = d.getHours()
   const m = d.getMinutes()
   const ampm = h < 12 ? 'AM' : 'PM'
@@ -352,8 +315,8 @@ function formatChurchEventTime(event: HomeUpcomingChurchEvent): string {
   return `${h12}${mm} ${ampm}`
 }
 
-function formatChurchEventDate(event: HomeUpcomingChurchEvent): string {
-  const d = new Date(event.startDate)
+function relativeDay(iso: string): string {
+  const d = new Date(iso)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const target = new Date(d.getFullYear(), d.getMonth(), d.getDate())
@@ -363,13 +326,28 @@ function formatChurchEventDate(event: HomeUpcomingChurchEvent): string {
   return `${diff} days`
 }
 
-function UpcomingChurchEventsCard({
+type AgendaRow =
+  | {kind: 'event'; sort: number; event: HomeUpcomingChurchEvent}
+  | {kind: 'message'; sort: number; message: HomeScheduledMessage}
+
+function UpcomingCard({
   events,
+  scheduledMessages,
   calendarColors,
 }: {
   events: HomeUpcomingChurchEvent[]
+  scheduledMessages: HomeScheduledMessage[]
   calendarColors: Record<string, string>
 }) {
+  const rows: AgendaRow[] = [
+    ...events.map((event) => ({kind: 'event' as const, sort: new Date(event.startDate).getTime(), event})),
+    ...scheduledMessages
+      .filter((m) => m.scheduledAt)
+      .map((message) => ({kind: 'message' as const, sort: new Date(message.scheduledAt!).getTime(), message})),
+  ].sort((a, b) => a.sort - b.sort)
+
+  if (rows.length === 0) return null
+
   return (
     <Card>
       <CardHeader>
@@ -380,195 +358,124 @@ function UpcomingChurchEventsCard({
       </CardHeader>
       <CardContent>
         <div className="space-y-1">
-          {events.map((event, idx) => {
-            const calendarColor = calendarColors[event.calendarName] ?? '#6B7280'
-            const color = event.recurring ? '#9CA3AF' : calendarColor
-            return (
+          {rows.map((row, idx) =>
+            row.kind === 'event' ? (
               <Link
-                key={`${event.id}-${idx}`}
+                key={`event-${row.event.id}-${idx}`}
                 to="/calendar"
                 className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50 transition-colors"
               >
-                <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{backgroundColor: color}} />
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{
+                    backgroundColor: row.event.recurring
+                      ? '#9CA3AF'
+                      : (calendarColors[row.event.calendarName] ?? '#6B7280'),
+                  }}
+                />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{event.title || '(No title)'}</p>
-                  {event.location && (
-                    <p className="text-xs text-muted-foreground truncate">{event.location.split('\n')[0]}</p>
+                  <p className="text-sm font-medium truncate">{row.event.title || '(No title)'}</p>
+                  {row.event.location && (
+                    <p className="text-xs text-muted-foreground truncate">{row.event.location.split('\n')[0]}</p>
                   )}
                 </div>
                 <div className="text-right shrink-0">
                   <Badge variant="secondary" className="text-xs">
-                    {formatChurchEventDate(event)}
+                    {relativeDay(row.event.startDate)}
                   </Badge>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{formatChurchEventTime(event)}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{formatChurchEventTime(row.event)}</p>
                 </div>
               </Link>
-            )
-          })}
+            ) : (
+              <Link
+                key={`msg-${row.message.id}`}
+                to="/messages?tab=scheduled"
+                className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50 transition-colors opacity-70"
+              >
+                <Send className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    Scheduled message &middot; {row.message.totalRecipients} recipient
+                    {row.message.totalRecipients !== 1 ? 's' : ''}
+                  </p>
+                  {row.message.preview && (
+                    <p className="text-xs text-muted-foreground truncate">{row.message.preview}</p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <Badge variant="outline" className="text-xs">
+                    {relativeDay(row.message.scheduledAt!)}
+                  </Badge>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{formatTime(row.message.scheduledAt!)}</p>
+                </div>
+              </Link>
+            ),
+          )}
         </div>
       </CardContent>
     </Card>
   )
 }
 
-function StatCard({label, value, to, icon: Icon}: {label: string; value: number; to: string; icon: LucideIcon}) {
+// --- Tools -----------------------------------------------------------------
+
+function ToolCard({
+  to,
+  icon: Icon,
+  title,
+  children,
+}: {
+  to: string
+  icon: LucideIcon
+  title: string
+  children: ReactNode
+}) {
   return (
     <Link to={to}>
-      <Card size="sm" className="hover:bg-muted/50 transition-colors h-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-            <Icon className="h-4 w-4 shrink-0" />
-            {label}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <span className="text-2xl font-bold">{value.toLocaleString()}</span>
+      <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+        <CardContent className="flex items-start gap-4 p-5">
+          <div className="rounded-lg bg-primary/10 p-3 shrink-0">
+            <Icon className="h-6 w-6 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-semibold">{title}</h3>
+            {children}
+          </div>
         </CardContent>
       </Card>
     </Link>
   )
 }
 
-function PinDialog({
-  open,
-  onOpenChange,
-  existingPins,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  existingPins: HomePinnedItem[]
-}) {
-  const queryClient = useQueryClient()
-  const [tab, setTab] = useState<'person' | 'group' | 'template'>('person')
-  const [search, setSearch] = useState('')
+// --- Stats footer ----------------------------------------------------------
 
-  const {data: people} = useQuery({
-    queryKey: [...queryKeys.people, 'pin-search'],
-    queryFn: () => fetchPeople({limit: 500}),
-    enabled: open && tab === 'person',
-  })
-
-  const {data: groups} = useQuery({
-    queryKey: [...queryKeys.groups, 'pin-search'],
-    queryFn: fetchGroups,
-    enabled: open && tab === 'group',
-  })
-
-  const {data: templates} = useQuery({
-    queryKey: [...queryKeys.templates(), 'pin-search'],
-    queryFn: () => fetchTemplates(),
-    enabled: open && tab === 'template',
-  })
-
-  const pinnedSet = useMemo(() => new Set(existingPins.map((p) => `${p.type}:${p.itemId}`)), [existingPins])
-
-  const pinMutation = useMutation({
-    mutationFn: ({type, itemId}: {type: string; itemId: number}) => pinHomeItem(type, itemId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.home})
-      toast.success('Pinned')
-    },
-    onError: (error) => {
-      toast.error(error.message)
-    },
-  })
-
-  const items = useMemo(() => {
-    const q = search.toLowerCase()
-    if (tab === 'person' && people) {
-      return people.data
-        .filter((p) => {
-          const name = [p.firstName, p.lastName].filter(Boolean).join(' ').toLowerCase()
-          return name.includes(q)
-        })
-        .map((p) => ({
-          id: p.id,
-          name: [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unknown',
-          subtitle: p.phoneDisplay || '',
-          pinned: pinnedSet.has(`person:${p.id}`),
-        }))
-    }
-    if (tab === 'group' && groups) {
-      return groups
-        .filter((g) => g.name.toLowerCase().includes(q))
-        .map((g) => ({
-          id: g.id,
-          name: g.name,
-          subtitle: `${g.memberCount ?? 0} members`,
-          pinned: pinnedSet.has(`group:${g.id}`),
-        }))
-    }
-    if (tab === 'template' && templates) {
-      return templates
-        .filter((t) => t.name.toLowerCase().includes(q))
-        .map((t) => ({
-          id: t.id,
-          name: t.name,
-          subtitle: t.content.substring(0, 60) + (t.content.length > 60 ? '...' : ''),
-          pinned: pinnedSet.has(`template:${t.id}`),
-        }))
-    }
-    return []
-  }, [tab, search, people, groups, templates, pinnedSet])
-
-  const tabs: {key: typeof tab; label: string}[] = [
-    {key: 'person', label: 'People'},
-    {key: 'group', label: 'Groups'},
-    {key: 'template', label: 'Templates'},
+function StatsFooter({stats}: {stats: HomeResponse['stats']}) {
+  const chips: {label: string; value: number; to: string; icon: LucideIcon}[] = [
+    {label: 'People', value: stats.people, to: '/people', icon: Users},
+    {label: 'Groups', value: stats.groups, to: '/groups', icon: FolderOpen},
+    {label: 'Messages', value: stats.messagesSentThisMonth, to: '/messages', icon: MessageSquare},
+    {label: 'Templates', value: stats.templates, to: '/templates', icon: FileText},
+    {label: 'Devotions', value: stats.devotionsTotal, to: '/devotions', icon: BookOpen},
+    {label: 'Latest', value: stats.devotionsLatestNumber, to: '/devotions', icon: Hash},
+    {label: 'Quotes', value: stats.quotesTotal, to: '/sermons/quotes', icon: Quote},
+    {label: 'Events', value: stats.upcomingChurchEventsTotal, to: '/calendar', icon: Calendar},
   ]
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Pin Item</DialogTitle>
-        </DialogHeader>
-        <div className="flex gap-1 mb-3">
-          {tabs.map(({key, label}) => (
-            <button
-              key={key}
-              onClick={() => {
-                setTab(key)
-                setSearch('')
-              }}
-              className={cn(
-                'px-3 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer',
-                tab === key ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <div className="max-h-64 overflow-y-auto space-y-1 mt-2">
-          {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No items found.</p>
-          ) : (
-            items.map((item) => (
-              <button
-                key={item.id}
-                disabled={item.pinned}
-                onClick={() => pinMutation.mutate({type: tab, itemId: item.id})}
-                className={cn(
-                  'flex items-center gap-3 w-full px-3 py-2 rounded-md text-left transition-colors',
-                  item.pinned ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted cursor-pointer',
-                )}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
-                </div>
-                {item.pinned ? (
-                  <Badge variant="secondary">Pinned</Badge>
-                ) : (
-                  <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
-                )}
-              </button>
-            ))
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="flex flex-wrap gap-x-4 gap-y-2 border-t pt-4 text-sm text-muted-foreground">
+      {chips.map((chip) => {
+        const Icon = chip.icon
+        return (
+          <Link
+            key={chip.label}
+            to={chip.to}
+            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0" />
+            <span>{chip.label}</span>
+            <span className="font-semibold text-foreground">{chip.value.toLocaleString()}</span>
+          </Link>
+        )
+      })}
+    </div>
   )
 }

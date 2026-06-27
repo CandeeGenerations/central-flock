@@ -4,6 +4,63 @@ Glossary of domain terms used in Central Flock. Update inline as terms are resol
 
 ## Terms
 
+### Home screen
+
+The app's landing route (`/`, titled "Home" — distinct from the Messaging **Dashboard** at `/dashboard`). Organizing metaphor is **agenda + launchpad**: the top answers "what's happening soon" (upcoming events + celebrations) paired with "jump back to what I was doing" (frecency-driven [[Quick launch]]); stats are demoted to a thin footer; the static **Tools** cards become a secondary launcher row. Not a status/nag board — at most one "needs attention" strip, never a wall of widgets.
+
+### Quick launch
+
+Two frecency-driven strips on the [[Home screen]], each backed by an existing endpoint:
+
+- **Jump back in** — the recent _entities_ the user keeps returning to (people, groups, templates, devotions, specials…), from `/api/usage/recents`. Capped to ~6–8 on Home; the command palette handles the long tail (50). This is the only frecency-driven strip. **Rendered as compact chips** (`[type-icon] Label · TypeLabel`), each routing via its `path` with the live `label` (renames reflected automatically) — matches the recents payload exactly (which carries no subtitle). **All entity types** the resolver returns, no type filtering (real usage should show; one type dominating is correct). **The strip hides entirely when there are no recents** (same rule as Needs attention).
+- **Tools** — the curated, hand-ordered set of section cards with their rich subtitles, as today. **Exactly the existing five: Messaging, Devotions, Nursery, Sermon Prep, Calendar** — each justified by a useful at-a-glance subtitle (sent-this-month, pipeline %, quote count, events-30d). People/Groups are footer chips, not Tools; Music/Specials is still in progress; Fair Booth and RSVP are sub-features of represented groups. **Stable order, not frecency-ranked** — too small a set for frecency to add signal, and the subtitles carry the value. Revisit (add Specials card) once that feature stabilizes, pairing with its deferred `needs_review` attention feed.
+
+"Jump back in" answers "the record I was just editing"; "Tools" answers "the app area I use most." Frecency drives only the entity strip; `/api/usage/sections` continues to reorder the sidebar/command-palette nav, not the Home Tools row.
+
+**Home vertical order** (top → bottom), detail increasing downward:
+
+1. **Needs attention** strip — conditional, hidden when empty (shadcn "status callout first" pattern).
+2. **Jump back in** — frecency entity launchpad hero.
+3. **Upcoming** — Events + Celebrations, two columns (the agenda glance).
+4. **Tools** — curated launcher row.
+5. **Stats footer** — thin chip strip.
+
+Jump-back sits **above** Upcoming (launchpad-first: the page is opened to go do something). Chosen to try first; swap with Upcoming if the week-glance proves more valuable on landing.
+
+### Needs attention (Home strip)
+
+A single compact strip on the [[Home screen]] of genuinely actionable, time-sensitive items — the disciplined fold-in of the "status board" idea, never a wall of widgets. The **whole strip disappears when every feed is empty** (no "all caught up" placeholder). Initial feeds:
+
+- **Unsent drafts** — abandoned message drafts.
+- **Scheduled messages** firing soon.
+- **Active RSVP lists** with outstanding "No response" counts (event still upcoming).
+- **Upcoming-month Nursery schedule** not yet generated/finalized.
+- **Devotion pipeline gaps** — incomplete passages.
+
+**Specials in `needs_review` is intentionally excluded for now** (that feature is still under active development). It is the obvious next feed once it stabilizes.
+
+This is the only part of the Home rework that needs **new cross-app backend aggregation**; every other Home section reuses an existing endpoint.
+
+**Global rule:** every feed hides when its actionable count is zero (not just the whole strip) — a visible feed always means "act."
+
+**Per-feed trigger semantics:**
+
+- **Unsent drafts** — a draft exists **and is older than ~2 days** (don't flag what's being composed right now). Clears on send/delete.
+- **RSVP outstanding** — event is **within 7 days** AND the list has ≥1 "No response." Clears when the event passes or all respond.
+- **Nursery schedule** — **within ~10 days of month-end** AND next month's schedule not yet finalized. Clears on finalize.
+- **Devotion pipeline gaps** — **count of incomplete devotions dated first-of-current-month onward**, reusing the devotions-stats window logic (`server/routes/devotions.ts` ~L591–645: a devotion is incomplete if any of the 5 publish channels `produced`/`rendered`/`youtube`/`facebookInstagram`/`podcast` is false; past devotions excluded as "shipped"). Hidden at 0 (i.e. 100% complete).
+- **Scheduled messages — dropped from this strip** (fires automatically; nothing is required of the user). Instead they appear as **passive informational lines in the Upcoming Events column** of the agenda (see [[Home screen]] Upcoming): a muted send-icon entry like `📤 Message to Choir · Tue 9:00 AM`, interleaved with church events, for scheduled sends firing within the agenda window (next ~14 days). Visually distinct/muted so it reads "FYI, queued" — not an action item.
+
+**Rendering:** a single compact **amber-tinted alert row** with a leading warning icon, followed by linked segments separated by `·` — e.g. `⚠ Needs attention · 3 drafts · 2 RSVPs need replies · Nursery (July) · 4 devotions`. Each segment links to that feed's natural destination (drafts→messages drafts, RSVPs→`/rsvp`, nursery→`/nursery`, devotions→incomplete list). One quiet line, not a card with per-feed rows (that drifts toward a nag-board). **Responsive:** segments `flex-wrap` (no horizontal scroll — bad on touch) with the icon pinned leading; each segment stays an individually-tappable target at full size. With ≤4 feeds there's no overflow, so no "+N more" affordance is needed.
+
+### Pinned items (deprecated on Home)
+
+The manual pin feature (`pinned_items` table, `/api/home/pin` endpoints, `PinDialog`) is **removed from the Home UI** — frecency-driven [[Quick launch]] "Jump back in" supersedes it without manual curation. **Backend left dormant** (table + endpoints + `/api/home` pin payload stay) rather than ripped out: deletion is irreversible churn for no benefit, and a future "pin to top of Jump-back-in" override may revive it. The Home component just drops the `<section>` and `PinDialog`.
+
+### Home stats footer
+
+The 8 at-a-glance counters (People, Groups, Messages-this-month, Templates, Devotions, Latest Devotion #, Quotes, Events-30d) are **demoted to a thin single-row strip of small `label: value` chips at the very bottom** of the [[Home screen]] — kept (all 8, still click-through to their pages) but visually quieted. Not pruned, not collapsed: pruning risks "where did my number go" for near-zero savings; collapsing adds a click for something occasionally glanced at. Mirrors the shadcn-dashboard pattern of detail increasing toward the bottom.
+
 ### Devotion Topic
 
 An optional theme that steers AI generation of a devotion passage toward a special

@@ -1,5 +1,6 @@
 export const queryKeys = {
   home: ['home'] as const,
+  usageRecents: ['usage', 'recents'] as const,
   stats: ['stats'] as const,
   statsOverTime: ['stats-over-time'] as const,
   people: ['people'] as const,

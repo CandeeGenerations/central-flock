@@ -723,6 +723,21 @@ export interface HomeUpcomingChurchEvent {
   recurring: boolean
 }
 
+export interface HomeAttention {
+  draftsOlderThan2Days: number
+  rsvpsNeedingReplies: number
+  nurseryNextMonthUnfinalized: boolean
+  nurseryNextMonthLabel: string | null
+  devotionsIncomplete: number
+}
+
+export interface HomeScheduledMessage {
+  id: number
+  scheduledAt: string | null
+  totalRecipients: number
+  preview: string | null
+}
+
 export interface HomeResponse {
   upcomingBirthdays: HomeUpcomingBirthday[]
   upcomingAnniversaries: HomeUpcomingAnniversary[]
@@ -739,6 +754,8 @@ export interface HomeResponse {
     quotesTotal: number
     upcomingChurchEventsTotal: number
   }
+  attention: HomeAttention
+  scheduledMessages: HomeScheduledMessage[]
   pinnedItems: HomePinnedItem[]
 }
 

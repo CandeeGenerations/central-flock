@@ -1,4 +1,4 @@
-import {and, eq, gte, inArray, lte, sql} from 'drizzle-orm'
+import {and, eq, gte, inArray, lte, or, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema, sqlite} from '../db/index.js'
@@ -29,6 +29,21 @@ function getUpcomingDate(month: number, day: number): {daysUntil: number; year: 
 function formatName(person: {firstName: string | null; lastName: string | null}): string {
   return [person.firstName, person.lastName].filter(Boolean).join(' ') || 'Unknown'
 }
+
+const MONTH_NAMES_FULL = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
 
 // GET /api/home
 homeRouter.get(
@@ -119,6 +134,9 @@ homeRouter.get(
         podcast: sql<number>`sum(case when ${schema.devotions.podcast} = 1 then 1 else 0 end)`,
       })
       .from(schema.devotions)
+      // Match the devos dashboard "Pipeline Completion Rates" card: window from
+      // the first of the current month onward (past devotions are "shipped").
+      .where(sql`${schema.devotions.date} >= ${monthStart}`)
       .get()!
 
     const devotionsCompletionRate =
@@ -242,6 +260,108 @@ homeRouter.get(
       })
       .filter(Boolean)
 
+    // --- Needs attention feeds (each shows only when count > 0) ---
+
+    // Unsent drafts older than 2 days (don't flag what's being composed now)
+    const draftsOlderThan2Days = db
+      .select({total: sql<number>`count(*)`})
+      .from(schema.drafts)
+      .where(sql`${schema.drafts.updatedAt} < datetime('now', '-2 days')`)
+      .get()!.total
+
+    // Incomplete devotions this-month-onward (reuse devotions-stats window logic)
+    const devotionsIncomplete = db
+      .select({total: sql<number>`count(*)`})
+      .from(schema.devotions)
+      .where(
+        and(
+          sql`${schema.devotions.date} >= ${monthStart}`,
+          or(
+            eq(schema.devotions.produced, false),
+            eq(schema.devotions.rendered, false),
+            eq(schema.devotions.youtube, false),
+            eq(schema.devotions.facebookInstagram, false),
+            eq(schema.devotions.podcast, false),
+          ),
+        ),
+      )
+      .get()!.total
+
+    // RSVP lists whose event is within 7 days and have >=1 no_response entry
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const sevenDaysOut = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    let rsvpsNeedingReplies = 0
+    for (const list of db.select().from(schema.rsvpLists).all()) {
+      let eventDateStr: string | null = null
+      if (list.calendarEventId) {
+        eventDateStr =
+          db
+            .select({startDate: schema.calendarEvents.startDate})
+            .from(schema.calendarEvents)
+            .where(eq(schema.calendarEvents.id, list.calendarEventId))
+            .get()?.startDate ?? null
+      } else if (list.standaloneDate) {
+        eventDateStr = list.standaloneDate
+      }
+      if (!eventDateStr) continue
+      const eventDate = new Date(eventDateStr)
+      if (eventDate < todayMidnight || eventDate > sevenDaysOut) continue
+      const noResp = db
+        .select({total: sql<number>`count(*)`})
+        .from(schema.rsvpEntries)
+        .where(and(eq(schema.rsvpEntries.rsvpListId, list.id), eq(schema.rsvpEntries.status, 'no_response')))
+        .get()!.total
+      if (noResp > 0) rsvpsNeedingReplies++
+    }
+
+    // Nursery: within ~10 days of month-end and next month not finalized
+    let nurseryNextMonthUnfinalized = false
+    let nurseryNextMonthLabel: string | null = null
+    const lastDayThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    if (lastDayThisMonth - now.getDate() <= 10) {
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      const nm = nextMonth.getMonth() + 1
+      const ny = nextMonth.getFullYear()
+      const finalSched = db
+        .select({id: schema.schedules.id})
+        .from(schema.schedules)
+        .where(
+          and(
+            eq(schema.schedules.scheduleType, 'nursery'),
+            eq(schema.schedules.month, nm),
+            eq(schema.schedules.year, ny),
+            eq(schema.schedules.status, 'final'),
+          ),
+        )
+        .get()
+      if (!finalSched) {
+        nurseryNextMonthUnfinalized = true
+        nurseryNextMonthLabel = MONTH_NAMES_FULL[nm - 1]
+      }
+    }
+
+    // Scheduled messages firing in next 14 days (passive agenda heads-up)
+    const nowIsoSched = new Date().toISOString()
+    const fourteenDayIso = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+    const scheduledMessages = db
+      .select({
+        id: schema.messages.id,
+        scheduledAt: schema.messages.scheduledAt,
+        totalRecipients: schema.messages.totalRecipients,
+        preview: schema.messages.renderedPreview,
+      })
+      .from(schema.messages)
+      .where(
+        and(
+          eq(schema.messages.status, 'scheduled'),
+          sql`${schema.messages.scheduledAt} is not null`,
+          gte(schema.messages.scheduledAt, nowIsoSched),
+          lte(schema.messages.scheduledAt, fourteenDayIso),
+        ),
+      )
+      .orderBy(schema.messages.scheduledAt)
+      .all()
+
     res.json({
       upcomingBirthdays,
       upcomingAnniversaries,
@@ -258,6 +378,14 @@ homeRouter.get(
         quotesTotal,
         upcomingChurchEventsTotal,
       },
+      attention: {
+        draftsOlderThan2Days,
+        rsvpsNeedingReplies,
+        nurseryNextMonthUnfinalized,
+        nurseryNextMonthLabel,
+        devotionsIncomplete,
+      },
+      scheduledMessages,
       pinnedItems,
     })
   }),

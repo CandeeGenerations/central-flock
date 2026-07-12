@@ -352,6 +352,29 @@ fairBoothRouter.get(
   }),
 )
 
+// Next sort_order so a new signup lands at the BOTTOM of its slot.
+// Uses the same peer grouping as the move endpoint (schedule, day, role, slot)
+// and appends after the current max rather than defaulting to 0 (which would tie
+// with reordered peers and surface the new row near the top).
+function nextSortOrderForSlot(scheduleId: number, b: SignupBody): number {
+  const slots = slotsForDate(b.dayDate)
+  const mySlotIdx = slotIdxFor(b.startMinute, b.endMinute, slots)
+  const peers = db
+    .select()
+    .from(schema.fairBoothSignups)
+    .where(
+      and(
+        eq(schema.fairBoothSignups.scheduleId, scheduleId),
+        eq(schema.fairBoothSignups.dayDate, b.dayDate),
+        eq(schema.fairBoothSignups.shiftRole, b.shiftRole),
+      ),
+    )
+    .all()
+    .filter((p) => slotIdxFor(p.startMinute, p.endMinute, slots) === mySlotIdx)
+  if (peers.length === 0) return 0
+  return Math.max(...peers.map((p) => p.sortOrder)) + 1
+}
+
 fairBoothRouter.post(
   '/:id/signups',
   asyncHandler(async (req, res) => {
@@ -371,7 +394,7 @@ fairBoothRouter.post(
         startMinute: b.startMinute,
         endMinute: b.endMinute,
         shiftRole: b.shiftRole,
-        sortOrder: b.sortOrder ?? 0,
+        sortOrder: b.sortOrder ?? nextSortOrderForSlot(scheduleId, b),
         displayRowOverride: b.displayRowOverride ?? null,
       })
       .returning()

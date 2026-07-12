@@ -35,16 +35,14 @@ export function RsvpListEditDialog({open, onOpenChange, list}: Props) {
 
 function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (open: boolean) => void}) {
   const queryClient = useQueryClient()
-  const [mode, setMode] = useState<Mode>(list.calendarEventId ? 'calendar' : 'standalone')
+  const [mode, setMode] = useState<Mode>(list.calendarEventUid ? 'calendar' : 'standalone')
   const [name, setName] = useState(list.name)
-  const [calendarEventId, setCalendarEventId] = useState<string>(
-    list.calendarEventId ? String(list.calendarEventId) : '',
-  )
+  const [calendarEventUid, setCalendarEventUid] = useState<string>(list.calendarEventUid ?? '')
   const [standaloneDate, setStandaloneDate] = useState(list.standaloneDate || '')
   const [standaloneTime, setStandaloneTime] = useState(list.standaloneTime || '')
   const [standaloneEndTime, setStandaloneEndTime] = useState(list.standaloneEndTime || '')
   // In calendar mode this acts as the {{eventTitle}} override.
-  const [eventTitleOverride, setEventTitleOverride] = useState(list.calendarEventId ? list.standaloneTitle || '' : '')
+  const [eventTitleOverride, setEventTitleOverride] = useState(list.calendarEventUid ? list.standaloneTitle || '' : '')
 
   const {data: calendarEvents} = useQuery({
     queryKey: queryKeys.rsvpCalendarEvents,
@@ -54,10 +52,10 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
 
   // When the user picks a different calendar event, repopulate date/time from that event
   // (user can then override). Initial mount keeps the persisted override values.
-  const [lastSyncedEventId, setLastSyncedEventId] = useState(calendarEventId)
-  if (mode === 'calendar' && calendarEventId !== lastSyncedEventId && calendarEvents) {
-    setLastSyncedEventId(calendarEventId)
-    const ev = calendarEvents.find((e) => e.id === Number(calendarEventId))
+  const [lastSyncedEventUid, setLastSyncedEventUid] = useState(calendarEventUid)
+  if (mode === 'calendar' && calendarEventUid !== lastSyncedEventUid && calendarEvents) {
+    setLastSyncedEventUid(calendarEventUid)
+    const ev = calendarEvents.find((e) => e.eventUid === calendarEventUid)
     if (ev) {
       setStandaloneDate(ev.allDay ? ev.startDate.slice(0, 10) : localDateFromUTC(ev.startDate))
       setStandaloneTime(!ev.allDay ? localTimeFromUTC(ev.startDate) : '')
@@ -72,17 +70,13 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
     const fmt = (ev: {startDate: string; allDay: boolean}) =>
       ev.allDay ? formatDate(ev.startDate) : formatDateTime(ev.startDate)
     const base = (calendarEvents || []).map((ev) => ({
-      value: String(ev.id),
+      value: ev.eventUid,
       label: `${ev.title} — ${fmt(ev)}`,
     }))
-    if (
-      list.calendarEventId &&
-      list.calendarEventTitle &&
-      !base.some((o) => o.value === String(list.calendarEventId))
-    ) {
+    if (list.calendarEventUid && list.calendarEventTitle && !base.some((o) => o.value === list.calendarEventUid)) {
       // Linked event isn't in the fetch result; assume timed (allDay flag not available here).
       base.unshift({
-        value: String(list.calendarEventId),
+        value: list.calendarEventUid,
         label: `${list.calendarEventTitle}${list.calendarEventStartDate ? ` — ${formatDateTime(list.calendarEventStartDate)}` : ''}`,
       })
     }
@@ -93,7 +87,7 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
     mutationFn: () =>
       updateRsvpList(list.id, {
         name: name.trim(),
-        calendarEventId: mode === 'calendar' ? (calendarEventId ? Number(calendarEventId) : null) : null,
+        calendarEventUid: mode === 'calendar' ? calendarEventUid || null : null,
         standaloneTitle: mode === 'calendar' ? eventTitleOverride.trim() || null : name.trim(),
         standaloneDate: standaloneDate || null,
         standaloneTime: standaloneTime || null,
@@ -108,7 +102,8 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
     onError: (err: Error) => toast.error(err.message),
   })
 
-  const canSubmit = name.trim().length > 0 && (mode === 'calendar' ? Boolean(calendarEventId) : Boolean(standaloneDate))
+  const canSubmit =
+    name.trim().length > 0 && (mode === 'calendar' ? Boolean(calendarEventUid) : Boolean(standaloneDate))
 
   return (
     <>
@@ -126,8 +121,8 @@ function EditForm({list, onOpenChange}: {list: RsvpListDetail; onOpenChange: (op
             <div className="space-y-1">
               <Label htmlFor="rsvp-edit-event">Event</Label>
               <SearchableSelect
-                value={calendarEventId}
-                onValueChange={setCalendarEventId}
+                value={calendarEventUid}
+                onValueChange={setCalendarEventUid}
                 options={eventOptions}
                 placeholder="Pick a calendar event"
                 className="w-full"

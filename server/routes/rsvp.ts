@@ -47,9 +47,11 @@ function buildCounts(rows: {rsvpListId: number; status: Status; headcount: numbe
       c = {yes: 0, no: 0, maybe: 0, no_response: 0, total: 0, expectedAttendees: 0}
       map.set(row.rsvpListId, c)
     }
-    c[row.status as Status]++
-    c.total++
-    if (row.status === 'yes') c.expectedAttendees += row.headcount ?? 0
+    // People-based: every entry counts its effective headcount (blank = 1).
+    const eff = row.headcount ?? 1
+    c[row.status as Status] += eff
+    c.total += eff
+    if (row.status === 'yes') c.expectedAttendees += eff
   }
   return map
 }
@@ -65,7 +67,7 @@ rsvpRouter.get(
       .select({
         id: schema.rsvpLists.id,
         name: schema.rsvpLists.name,
-        calendarEventId: schema.rsvpLists.calendarEventId,
+        calendarEventUid: schema.rsvpLists.calendarEventUid,
         standaloneTitle: schema.rsvpLists.standaloneTitle,
         standaloneDate: schema.rsvpLists.standaloneDate,
         standaloneTime: schema.rsvpLists.standaloneTime,
@@ -79,7 +81,13 @@ rsvpRouter.get(
         effectiveDate: effectiveDateExpr(),
       })
       .from(schema.rsvpLists)
-      .leftJoin(schema.calendarEvents, eq(schema.rsvpLists.calendarEventId, schema.calendarEvents.id))
+      .leftJoin(
+        schema.calendarEvents,
+        and(
+          eq(schema.rsvpLists.calendarEventUid, schema.calendarEvents.eventUid),
+          eq(schema.calendarEvents.recurring, false),
+        ),
+      )
       .all()
 
     const filtered = includeArchived ? lists : lists.filter((l) => !l.effectiveDate || l.effectiveDate >= today)
@@ -119,7 +127,7 @@ rsvpRouter.get(
       .select({
         id: schema.rsvpLists.id,
         name: schema.rsvpLists.name,
-        calendarEventId: schema.rsvpLists.calendarEventId,
+        calendarEventUid: schema.rsvpLists.calendarEventUid,
         standaloneTitle: schema.rsvpLists.standaloneTitle,
         standaloneDate: schema.rsvpLists.standaloneDate,
         standaloneTime: schema.rsvpLists.standaloneTime,
@@ -133,7 +141,13 @@ rsvpRouter.get(
         effectiveDate: effectiveDateExpr(),
       })
       .from(schema.rsvpLists)
-      .leftJoin(schema.calendarEvents, eq(schema.rsvpLists.calendarEventId, schema.calendarEvents.id))
+      .leftJoin(
+        schema.calendarEvents,
+        and(
+          eq(schema.rsvpLists.calendarEventUid, schema.calendarEvents.eventUid),
+          eq(schema.calendarEvents.recurring, false),
+        ),
+      )
       .where(eq(schema.rsvpLists.id, id))
       .get()
 
@@ -175,7 +189,7 @@ rsvpRouter.get(
 
 type CreateBody = {
   name: string
-  calendarEventId?: number | null
+  calendarEventUid?: string | null
   standaloneTitle?: string | null
   standaloneDate?: string | null
   standaloneTime?: string | null
@@ -199,7 +213,7 @@ rsvpRouter.post(
         .insert(schema.rsvpLists)
         .values({
           name: body.name.trim(),
-          calendarEventId: body.calendarEventId ?? null,
+          calendarEventUid: body.calendarEventUid ?? null,
           standaloneTitle: body.standaloneTitle?.trim() || null,
           standaloneDate: body.standaloneDate || null,
           standaloneTime: body.standaloneTime || null,
@@ -241,13 +255,13 @@ rsvpRouter.patch(
   '/lists/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
-    const {name, calendarEventId, standaloneTitle, standaloneDate, standaloneTime, standaloneEndTime} =
+    const {name, calendarEventUid, standaloneTitle, standaloneDate, standaloneTime, standaloneEndTime} =
       req.body as Partial<CreateBody>
 
     const update: Record<string, unknown> = {updatedAt: sql`datetime('now')`}
     if (name !== undefined) update.name = String(name).trim()
-    if (calendarEventId !== undefined) {
-      update.calendarEventId = calendarEventId
+    if (calendarEventUid !== undefined) {
+      update.calendarEventUid = calendarEventUid
     }
     if (standaloneTitle !== undefined) update.standaloneTitle = standaloneTitle
     if (standaloneDate !== undefined) update.standaloneDate = standaloneDate
@@ -470,7 +484,13 @@ rsvpRouter.get(
         calendarEventEndDate: schema.calendarEvents.endDate,
       })
       .from(schema.rsvpLists)
-      .leftJoin(schema.calendarEvents, eq(schema.rsvpLists.calendarEventId, schema.calendarEvents.id))
+      .leftJoin(
+        schema.calendarEvents,
+        and(
+          eq(schema.rsvpLists.calendarEventUid, schema.calendarEvents.eventUid),
+          eq(schema.calendarEvents.recurring, false),
+        ),
+      )
       .where(eq(schema.rsvpLists.id, id))
       .get()
 
@@ -542,7 +562,7 @@ rsvpRouter.post(
 type MergeListMeta = {
   id: number
   name: string
-  calendarEventId: number | null
+  calendarEventUid: string | null
   calendarEventTitle: string | null
   calendarEventStartDate: string | null
   standaloneTitle: string | null
@@ -556,7 +576,7 @@ function loadMergeListsMeta(ids: number[]): MergeListMeta[] {
     .select({
       id: schema.rsvpLists.id,
       name: schema.rsvpLists.name,
-      calendarEventId: schema.rsvpLists.calendarEventId,
+      calendarEventUid: schema.rsvpLists.calendarEventUid,
       calendarEventTitle: schema.calendarEvents.title,
       calendarEventStartDate: schema.calendarEvents.startDate,
       standaloneTitle: schema.rsvpLists.standaloneTitle,
@@ -564,7 +584,13 @@ function loadMergeListsMeta(ids: number[]): MergeListMeta[] {
       standaloneTime: schema.rsvpLists.standaloneTime,
     })
     .from(schema.rsvpLists)
-    .leftJoin(schema.calendarEvents, eq(schema.rsvpLists.calendarEventId, schema.calendarEvents.id))
+    .leftJoin(
+      schema.calendarEvents,
+      and(
+        eq(schema.rsvpLists.calendarEventUid, schema.calendarEvents.eventUid),
+        eq(schema.calendarEvents.recurring, false),
+      ),
+    )
     .where(inArray(schema.rsvpLists.id, ids))
     .all()
 }
@@ -576,10 +602,10 @@ function eventLabel(meta: MergeListMeta): string {
 }
 
 function sameEvent(a: MergeListMeta, b: MergeListMeta): boolean {
-  if (a.calendarEventId !== null && b.calendarEventId !== null) {
-    return a.calendarEventId === b.calendarEventId
+  if (a.calendarEventUid !== null && b.calendarEventUid !== null) {
+    return a.calendarEventUid === b.calendarEventUid
   }
-  if (a.calendarEventId === null && b.calendarEventId === null) {
+  if (a.calendarEventUid === null && b.calendarEventUid === null) {
     return (
       (a.standaloneTitle ?? '') === (b.standaloneTitle ?? '') && (a.standaloneDate ?? '') === (b.standaloneDate ?? '')
     )

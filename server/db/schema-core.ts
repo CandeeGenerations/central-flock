@@ -222,22 +222,35 @@ export const pinnedItems = sqliteTable('pinned_items', {
     .notNull(),
 })
 
-export const calendarEvents = sqliteTable('calendar_events', {
-  id: integer('id').primaryKey({autoIncrement: true}),
-  eventUid: text('event_uid').notNull(),
-  title: text('title').notNull(),
-  startDate: text('start_date').notNull(),
-  endDate: text('end_date').notNull(),
-  allDay: integer('all_day', {mode: 'boolean'}).default(false).notNull(),
-  location: text('location'),
-  calendarName: text('calendar_name').notNull(),
-  recurring: integer('recurring', {mode: 'boolean'}).default(false).notNull(),
-})
+export const calendarEvents = sqliteTable(
+  'calendar_events',
+  {
+    id: integer('id').primaryKey({autoIncrement: true}),
+    eventUid: text('event_uid').notNull(),
+    title: text('title').notNull(),
+    startDate: text('start_date').notNull(),
+    endDate: text('end_date').notNull(),
+    allDay: integer('all_day', {mode: 'boolean'}).default(false).notNull(),
+    location: text('location'),
+    calendarName: text('calendar_name').notNull(),
+    recurring: integer('recurring', {mode: 'boolean'}).default(false).notNull(),
+  },
+  // Non-recurring events have a stable, unique event_uid; RSVP lists link by it.
+  // Recurring events share one uid across occurrences, so the guarantee is scoped.
+  (t) => [
+    uniqueIndex('calendar_events_uid_nonrecurring_uniq')
+      .on(t.eventUid)
+      .where(sql`${t.recurring} = 0`),
+  ],
+)
 
 export const rsvpLists = sqliteTable('rsvp_lists', {
   id: integer('id').primaryKey({autoIncrement: true}),
   name: text('name').notNull(),
-  calendarEventId: integer('calendar_event_id').references(() => calendarEvents.id, {onDelete: 'set null'}),
+  // Stable Calendar.app event_uid, not the churny autoincrement id — resolved by join
+  // at read time. Plain column (no FK): the value must survive sync rebuilds and
+  // events leaving the sync window. See docs/adr/0013-rsvp-event-link-by-uid.md.
+  calendarEventUid: text('calendar_event_uid'),
   standaloneTitle: text('standalone_title'),
   standaloneDate: text('standalone_date'),
   standaloneTime: text('standalone_time'),

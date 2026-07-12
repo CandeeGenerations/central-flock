@@ -19,7 +19,6 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   prefillGroupId?: number
-  prefillCalendarEventId?: number
   prefillCalendarEventUid?: string
   prefillName?: string
 }
@@ -39,16 +38,10 @@ export function RsvpListCreateDialog(props: Props) {
 
 type Mode = 'calendar' | 'standalone'
 
-function CreateForm({
-  onOpenChange,
-  prefillGroupId,
-  prefillCalendarEventId,
-  prefillCalendarEventUid,
-  prefillName,
-}: Props) {
+function CreateForm({onOpenChange, prefillGroupId, prefillCalendarEventUid, prefillName}: Props) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const hasCalendarPrefill = Boolean(prefillCalendarEventId || prefillCalendarEventUid)
+  const hasCalendarPrefill = Boolean(prefillCalendarEventUid)
   const [mode, setMode] = useState<Mode>(hasCalendarPrefill ? 'calendar' : 'standalone')
   const [nameInput, setNameInput] = useState(prefillName || '')
   const [nameTouched, setNameTouched] = useState(Boolean(prefillName))
@@ -65,25 +58,15 @@ function CreateForm({
     enabled: mode === 'calendar',
   })
 
-  // Resolve initial calendar event ID from either explicit numeric ID or eventUid.
-  const resolvedPrefillId = prefillCalendarEventId
-    ? String(prefillCalendarEventId)
-    : prefillCalendarEventUid
-      ? (calendarEvents?.find((e) => e.eventUid === prefillCalendarEventUid)?.id?.toString() ?? '')
-      : ''
-  const [calendarEventId, setCalendarEventId] = useState<string>(resolvedPrefillId)
-  const [hasResolved, setHasResolved] = useState(Boolean(resolvedPrefillId))
-  if (!hasResolved && resolvedPrefillId) {
-    setHasResolved(true)
-    setCalendarEventId(resolvedPrefillId)
-  }
+  // Link by the stable event_uid (prefill is already a uid).
+  const [calendarEventUid, setCalendarEventUid] = useState<string>(prefillCalendarEventUid ?? '')
 
   // When a calendar event is picked, repopulate the date/time fields from the event
   // (user can then override). Reset every time the picked event changes.
-  const [lastSyncedEventId, setLastSyncedEventId] = useState('')
-  if (mode === 'calendar' && calendarEventId !== lastSyncedEventId && calendarEvents) {
-    setLastSyncedEventId(calendarEventId)
-    const ev = calendarEvents.find((e) => e.id === Number(calendarEventId))
+  const [lastSyncedEventUid, setLastSyncedEventUid] = useState('')
+  if (mode === 'calendar' && calendarEventUid !== lastSyncedEventUid && calendarEvents) {
+    setLastSyncedEventUid(calendarEventUid)
+    const ev = calendarEvents.find((e) => e.eventUid === calendarEventUid)
     if (ev) {
       setStandaloneDate(ev.allDay ? ev.startDate.slice(0, 10) : localDateFromUTC(ev.startDate))
       setStandaloneTime(!ev.allDay ? localTimeFromUTC(ev.startDate) : '')
@@ -93,8 +76,8 @@ function CreateForm({
 
   // Derived name: if user hasn't typed, default from selected calendar event title.
   const derivedName =
-    mode === 'calendar' && calendarEventId
-      ? calendarEvents?.find((e) => e.id === Number(calendarEventId))?.title || ''
+    mode === 'calendar' && calendarEventUid
+      ? calendarEvents?.find((e) => e.eventUid === calendarEventUid)?.title || ''
       : ''
   const name = nameTouched ? nameInput : derivedName || nameInput
 
@@ -102,7 +85,7 @@ function CreateForm({
     mutationFn: () =>
       createRsvpList({
         name: name.trim(),
-        calendarEventId: mode === 'calendar' && calendarEventId ? Number(calendarEventId) : null,
+        calendarEventUid: mode === 'calendar' && calendarEventUid ? calendarEventUid : null,
         standaloneTitle: mode === 'calendar' ? eventTitleOverride.trim() || null : name.trim(),
         standaloneDate: standaloneDate || null,
         standaloneTime: standaloneTime || null,
@@ -118,7 +101,8 @@ function CreateForm({
     onError: (err: Error) => toast.error(err.message),
   })
 
-  const canSubmit = name.trim().length > 0 && (mode === 'calendar' ? Boolean(calendarEventId) : Boolean(standaloneDate))
+  const canSubmit =
+    name.trim().length > 0 && (mode === 'calendar' ? Boolean(calendarEventUid) : Boolean(standaloneDate))
 
   return (
     <>
@@ -136,10 +120,10 @@ function CreateForm({
             <div className="space-y-1">
               <Label htmlFor="rsvp-calendar-event">Event</Label>
               <SearchableSelect
-                value={calendarEventId}
-                onValueChange={setCalendarEventId}
+                value={calendarEventUid}
+                onValueChange={setCalendarEventUid}
                 options={(calendarEvents || []).map((ev) => ({
-                  value: String(ev.id),
+                  value: ev.eventUid,
                   label: `${ev.title} — ${ev.allDay ? formatDate(ev.startDate) : formatDateTime(ev.startDate)}`,
                 }))}
                 placeholder="Pick a calendar event"

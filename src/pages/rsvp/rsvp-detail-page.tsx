@@ -139,7 +139,7 @@ export function RsvpDetailPage() {
         return null
       }
     }
-    if (list.calendarEventId && list.calendarEventStartDate) {
+    if (list.calendarEventUid && list.calendarEventStartDate) {
       try {
         const startStr = formatDateTime(list.calendarEventStartDate)
         return eventEndTime ? `${startStr} – ${formatHHmm(eventEndTime)}` : startStr
@@ -149,8 +149,10 @@ export function RsvpDetailPage() {
     }
     return null
   })()
+  // People-based (each bucket is a sum of effective headcount). Both rates share the Total denominator.
   const responded = list.counts.total - list.counts.no_response
   const responseRate = list.counts.total > 0 ? Math.round((responded / list.counts.total) * 100) : 0
+  const attendanceRate = list.counts.total > 0 ? Math.round((list.counts.yes / list.counts.total) * 100) : 0
 
   // Audience for the Send buttons: row selection wins when there is one, otherwise the
   // current filter view. Both narrow scope from the full list.
@@ -262,7 +264,8 @@ export function RsvpDetailPage() {
             </span>
           </div>
           <div className="text-sm">
-            <span className="font-medium">Expected attendees:</span> {list.counts.expectedAttendees}
+            <span className="font-medium">Attendance rate:</span> {attendanceRate}% ({list.counts.yes}/
+            {list.counts.total})
           </div>
           <div className="text-sm">
             <span className="font-medium">Response rate:</span> {responseRate}% ({responded}/{list.counts.total})

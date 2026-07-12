@@ -31,7 +31,7 @@ export interface RsvpCounts {
 export interface RsvpListSummary {
   id: number
   name: string
-  calendarEventId: number | null
+  calendarEventUid: string | null
   standaloneTitle: string | null
   standaloneDate: string | null
   standaloneTime: string | null
@@ -82,7 +82,7 @@ export interface RsvpCalendarEvent {
 
 export interface CreateRsvpListBody {
   name: string
-  calendarEventId?: number | null
+  calendarEventUid?: string | null
   standaloneTitle?: string | null
   standaloneDate?: string | null
   standaloneTime?: string | null
@@ -93,7 +93,7 @@ export interface CreateRsvpListBody {
 
 export interface UpdateRsvpListBody {
   name?: string
-  calendarEventId?: number | null
+  calendarEventUid?: string | null
   standaloneTitle?: string | null
   standaloneDate?: string | null
   standaloneTime?: string | null

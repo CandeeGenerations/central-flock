@@ -132,13 +132,14 @@ export function RsvpListPage() {
                   <TableHead className="text-center">No</TableHead>
                   <TableHead className="text-center">Maybe</TableHead>
                   <TableHead className="text-center">No Response</TableHead>
-                  <TableHead className="text-center">Expected</TableHead>
+                  <TableHead className="text-center">Attend %</TableHead>
+                  <TableHead className="text-center">Resp %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       {showPast
                         ? 'No RSVP lists yet.'
                         : 'No active RSVP lists. Start one from the Calendar or a Group.'}
@@ -172,7 +173,15 @@ export function RsvpListPage() {
                     <TableCell className="text-center tabular-nums">{l.counts.no}</TableCell>
                     <TableCell className="text-center tabular-nums">{l.counts.maybe}</TableCell>
                     <TableCell className="text-center tabular-nums">{l.counts.no_response}</TableCell>
-                    <TableCell className="text-center tabular-nums font-medium">{l.counts.expectedAttendees}</TableCell>
+                    <TableCell className="text-center tabular-nums font-medium">
+                      {l.counts.total > 0 ? Math.round((l.counts.yes / l.counts.total) * 100) : 0}%
+                    </TableCell>
+                    <TableCell className="text-center tabular-nums">
+                      {l.counts.total > 0
+                        ? Math.round(((l.counts.total - l.counts.no_response) / l.counts.total) * 100)
+                        : 0}
+                      %
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

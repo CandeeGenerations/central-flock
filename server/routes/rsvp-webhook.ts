@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node'
-import {eq, sql} from 'drizzle-orm'
+import {and, eq, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
@@ -49,7 +49,13 @@ function loadEntryByToken(token: string) {
     .from(schema.rsvpEntries)
     .innerJoin(schema.people, eq(schema.rsvpEntries.personId, schema.people.id))
     .innerJoin(schema.rsvpLists, eq(schema.rsvpEntries.rsvpListId, schema.rsvpLists.id))
-    .leftJoin(schema.calendarEvents, eq(schema.rsvpLists.calendarEventId, schema.calendarEvents.id))
+    .leftJoin(
+      schema.calendarEvents,
+      and(
+        eq(schema.rsvpLists.calendarEventUid, schema.calendarEvents.eventUid),
+        eq(schema.calendarEvents.recurring, false),
+      ),
+    )
     .where(eq(schema.rsvpEntries.publicToken, token))
     .get()
 }

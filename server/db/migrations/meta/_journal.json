@@ -211,6 +211,20 @@
       "when": 1782415618818,
       "tag": "0029_right_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1783898191261,
+      "tag": "0030_simple_wrecker",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1783898223510,
+      "tag": "0031_cynical_proteus",
+      "breakpoints": true
     }
   ]
 }

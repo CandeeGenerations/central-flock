@@ -293,12 +293,17 @@ homeRouter.get(
     let rsvpsNeedingReplies = 0
     for (const list of db.select().from(schema.rsvpLists).all()) {
       let eventDateStr: string | null = null
-      if (list.calendarEventId) {
+      if (list.calendarEventUid) {
         eventDateStr =
           db
             .select({startDate: schema.calendarEvents.startDate})
             .from(schema.calendarEvents)
-            .where(eq(schema.calendarEvents.id, list.calendarEventId))
+            .where(
+              and(
+                eq(schema.calendarEvents.eventUid, list.calendarEventUid),
+                eq(schema.calendarEvents.recurring, false),
+              ),
+            )
             .get()?.startDate ?? null
       } else if (list.standaloneDate) {
         eventDateStr = list.standaloneDate

@@ -79,12 +79,12 @@ A tracker for who is coming to a specific Event. Seeded from a Group, then freel
 
 The thing being RSVP'd to (e.g., Extravaganza, 4th of July). May be:
 
-- **Linked Event** — a row from the synced `calendar_events` table (Calendar.app sync), or
+- **Linked Event** — a row from the synced `calendar_events` table (Calendar.app sync), referenced by its **stable Calendar.app `event_uid`** (stored as `rsvp_lists.calendar_event_uid`) and resolved by join at read time. **Not** referenced by the table's autoincrement `id`: the hourly sync deletes and re-inserts every `calendar_events` row, churning the ids, so an id-based FK gets nulled on the next sync. See [docs/adr/0013-rsvp-event-link-by-uid.md](docs/adr/0013-rsvp-event-link-by-uid.md).
 - **Standalone Event** — an ad-hoc event created inside Central Flock with a title and date (no calendar link).
 
 A single Event can have multiple RSVP Lists (e.g., "Extravaganza — Members" and "Extravaganza — Volunteers"). Each RSVP List has its own editable name, defaulting to the event title.
 
-**Standalone Event fields:** title, date, optional time. No location (most events are on church grounds; not worth tracking). Stored **inline on `rsvp_lists`** rather than in a separate table — RSVP lists hold either a `calendar_event_id` (Linked) or `standalone_title` + `standalone_date` + `standalone_time` (Standalone). No `events` wrapper table.
+**Standalone Event fields:** title, date, optional time. No location (most events are on church grounds; not worth tracking). Stored **inline on `rsvp_lists`** rather than in a separate table — RSVP lists hold either a `calendar_event_uid` (Linked) or `standalone_title` + `standalone_date` + `standalone_time` (Standalone). No `events` wrapper table.
 
 ### RSVP Entry
 
@@ -92,7 +92,13 @@ One person's row on an RSVP List. Always tied to a Person (`people.id`); guests-
 
 ### Headcount
 
-Total attendees represented by a single Yes RSVP (default 1, can be higher to cover spouse/kids/guests). Only meaningful when status = Yes.
+The number of people a single [[RSVP Entry]] represents (stored nullable, shown blank, **treated as 1** when blank). Set higher to cover spouse/kids/guests coming with the invitee. Editable for any status, though most meaningful on Yes.
+
+**Effective headcount = `headcount ?? 1`** — every entry counts as at least one person. All RSVP summary counts and rates are **people-based**: the Yes/No/Maybe/No-Response buckets and Total are sums of effective headcount across their entries, not row counts (so a 4-person household that declines counts as 4 in No). See [[Attendance rate]].
+
+### Attendance rate
+
+Of the [[Headcount|people]] tracked on an [[RSVP List]], the share confirmed coming: **Yes-people ÷ Total-people**. Numerator is **Yes only** (Maybe is not a commitment); denominator is the sum of effective headcount across every entry. Sits alongside **Response rate** = responded-people ÷ Total-people = `(Total − No-Response) ÷ Total`. Both rates share the same Total-people denominator.
 
 ### Group → RSVP List relationship
 
@@ -122,7 +128,7 @@ Visual and interaction patterns mirror the **Devotion List page** (`src/pages/de
 
 **Headcount default:** when an entry's status changes to Yes or Maybe and headcount is empty/null, auto-set headcount to 1. Don't touch headcount on transitions to No or No-Response (preserve any user-entered value).
 
-**Detail page summary header:** Event title (RSVP list name) · event date · time. Below that: counts row (Yes / No / Maybe / No-Response / Total), then "Expected attendees: N" (sum of headcount where status='yes'), then a "Response rate: X% (responded/total)" line. Counts are display-only — table filters handle drill-down.
+**Detail page summary header:** Event title (RSVP list name) · event date · time. Below that: a **people-based** counts row (Yes / No / Maybe / No-Response / Total, each a sum of [[Headcount|effective headcount]]), then two rate lines — **Attendance rate** and **Response rate** (see [[Attendance rate]]) — both `X% (n/Total)` sharing the Total-people denominator. No separate "Expected attendees" line: the Yes bucket already equals it. Counts are display-only (table filters handle drill-down); the header's Total-people figure intentionally differs from the number of table rows — rows are entries, the header counts people. The `/rsvp` overview table mirrors this: people-based Yes/No/Maybe/No-Response columns plus Attend % and Resp % columns (no Expected column).
 
 ### Send Message from an RSVP List
 

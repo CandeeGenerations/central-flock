@@ -31,7 +31,8 @@ export function FairBoothRoster({
 }: FairBoothRosterProps) {
   const rosterSet = new Set(rosterPersonIds)
   const signedUpIds = new Set(signups.map((s) => s.personId))
-  const inRoster = people.filter((p) => rosterSet.has(p.id) && signedUpIds.has(p.id))
+  const manualIncludeIds = new Set(rosterAttrs.filter((a) => a.manualInclude).map((a) => a.personId))
+  const inRoster = people.filter((p) => rosterSet.has(p.id) && (signedUpIds.has(p.id) || manualIncludeIds.has(p.id)))
   const attrsByPerson = new Map(rosterAttrs.map((a) => [a.personId, a]))
   const overrides = new Map<number, string>()
   for (const a of rosterAttrs) {
@@ -48,8 +49,11 @@ export function FairBoothRoster({
     }
     return {first: p.firstName ?? '', last: p.lastName ?? ''}
   }
+  // Compute initials over the FULL roster pool (same set the grid uses), not
+  // just the displayed rows — otherwise disambiguation differs and the legend's
+  // initials don't match the grid (e.g. grid shows JoeM, legend shows JM).
   const initials = computeInitialsForRoster(
-    inRoster.map((p) => {
+    people.map((p) => {
       const n = effectiveName(p)
       return {id: p.id, firstName: n.first, lastName: n.last, isHispanic: p.isHispanic}
     }),

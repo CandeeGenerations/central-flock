@@ -25,6 +25,8 @@ export const fairBoothRosterAttrs = sqliteTable(
     fairRole: text('fair_role', {enum: fairBoothFairRoles}).notNull().default('worker'),
     initialsOverride: text('initials_override'),
     nameOverride: text('name_override'),
+    // Manual roster inclusion: show this person on page 2 with (0) despite no signup.
+    manualInclude: integer('manual_include', {mode: 'boolean'}).notNull().default(false),
     createdAt: text('created_at')
       .default(sql`(datetime('now'))`)
       .notNull(),

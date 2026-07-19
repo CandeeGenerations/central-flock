@@ -23,6 +23,7 @@ interface Props {
   attrs: FairBoothRosterAttr | null
   signupCount: number
   onClose: () => void
+  onShowShifts: () => void
 }
 
 const FAIR_ROLES: {value: FairBoothFairRole; label: string}[] = [
@@ -33,7 +34,7 @@ const FAIR_ROLES: {value: FairBoothFairRole; label: string}[] = [
   {value: 'fair_mgr', label: '★★★★★ Fair Manager'},
 ]
 
-export function FairBoothRosterModal({scheduleId, personId, person, attrs, signupCount, onClose}: Props) {
+export function FairBoothRosterModal({scheduleId, personId, person, attrs, signupCount, onClose, onShowShifts}: Props) {
   const queryClient = useQueryClient()
   const [override, setOverride] = useState(attrs?.initialsOverride ?? '')
   const [nameOverride, setNameOverride] = useState(attrs?.nameOverride ?? '')
@@ -56,6 +57,20 @@ export function FairBoothRosterModal({scheduleId, personId, person, attrs, signu
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: schedulesKeys.fairBooth(scheduleId)})
       toast.success('Reset to defaults')
+      onClose()
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  })
+
+  const hasOtherOverride = fairRole !== 'worker' || override.trim() !== '' || nameOverride.trim() !== ''
+  const removeFromList = useMutation({
+    mutationFn: async () => {
+      if (hasOtherOverride) await upsertFairBoothRosterAttrs(scheduleId, personId, {manualInclude: false})
+      else await deleteFairBoothRosterAttrs(scheduleId, personId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: schedulesKeys.fairBooth(scheduleId)})
+      toast.success('Removed from list')
       onClose()
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
@@ -116,7 +131,23 @@ export function FairBoothRosterModal({scheduleId, personId, person, attrs, signu
               Hispanic — applies app-wide, not just this fair
             </Label>
           </div>
-          <p className="text-muted-foreground text-sm">Signups this fair: {signupCount}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-muted-foreground text-sm">Signups this fair: {signupCount}</p>
+            {signupCount > 0 ? (
+              <Button variant="outline" size="sm" onClick={onShowShifts}>
+                Show Shifts
+              </Button>
+            ) : attrs?.manualInclude ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => removeFromList.mutate()}
+                disabled={removeFromList.isPending}
+              >
+                Remove from list
+              </Button>
+            ) : null}
+          </div>
         </div>
         <DialogFooter className="flex flex-wrap gap-2">
           {attrs && (

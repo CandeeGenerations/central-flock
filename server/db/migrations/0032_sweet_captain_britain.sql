@@ -1,0 +1,1 @@
+ALTER TABLE `fair_booth_roster_attrs` ADD `manual_include` integer DEFAULT false NOT NULL;

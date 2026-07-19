@@ -180,10 +180,11 @@ export function hispanicCoverageForDay(
   return 'partial'
 }
 
-export type HeadcountColor = 'red' | 'orange' | 'yellow' | 'cyan' | 'blue' | 'green' | 'purple'
+export type HeadcountColor = 'darkred' | 'red' | 'orange' | 'yellow' | 'cyan' | 'blue' | 'green' | 'purple'
 
 export function colorForHeadcount(n: number): HeadcountColor {
-  if (n <= 3) return 'red'
+  if (n <= 2) return 'darkred'
+  if (n === 3) return 'red'
   if (n === 4) return 'orange'
   if (n === 5) return 'yellow'
   if (n === 6) return 'cyan'

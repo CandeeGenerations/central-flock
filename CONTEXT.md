@@ -485,7 +485,11 @@ The set of `people` eligible to appear on the Fair Booth schedule. Configured vi
 
 ### Fair Booth roster attrs
 
-Sparse per-schedule per-person overrides in `fair_booth_roster_attrs`. A row only exists when the user has set a non-default. Carries `fair_role` and `initials_override`. Reading the roster left-joins this table against the live roster pool; missing rows use defaults (`fair_role='worker'`, computed initials).
+Sparse per-schedule per-person overrides in `fair_booth_roster_attrs`. A row only exists when the user has set a non-default. Carries `fair_role`, `initials_override`, `name_override`, and `manual_include` (see [[Manual roster inclusion]]). Reading the roster left-joins this table against the live roster pool; missing rows use defaults (`fair_role='worker'`, computed initials, `manual_include=false`).
+
+### Manual roster inclusion
+
+By default page 2 lists only roster-Group members who have **≥1 signup** — zero-signup members are hidden so the printed legend isn't bloated by the whole Group. A manual roster inclusion deliberately puts one such person on the list showing `(0)`, without giving them a signup (they stay off the page-1 grid, which has nothing to render for them). Stored as `fair_booth_roster_attrs.manual_include = true`; the page-2 list predicate is **rostered AND (has a signup OR `manual_include`)**. Added via a **"+ Add person"** button on the Roster card whose picker is scoped to roster-Group members not already listed; removed via a **"Remove from list"** action in the [[Fair Booth roster row modal]] (shown only when the person has 0 signups). If a manually-included person later signs up they simply show their real count and the flag becomes moot. Non-Group contacts and true non-contacts (à la Special Music guest performers) are out of scope.
 
 ### Initials and collision resolution
 
@@ -513,7 +517,11 @@ The sub-page at `/schedules/fair-booth/:scheduleId/day/:date` reached by clickin
 
 ### Fair Booth roster row modal
 
-A modal opened by clicking a name row on page 2 of the schedule detail view. Fields: initials override (text; empty = use computed), fair role (1–5★ picker), Hispanic checkbox (writes to `people.is_hispanic` globally with a one-line note). Read-only signup count with "filter grid to this person" link. There is no "+ Add to roster" affordance on page 2 — roster membership flows from the configured Group(s) in settings.
+A modal opened by clicking a name row on page 2 of the schedule detail view. Fields: initials override (text; empty = use computed), fair role (1–5★ picker), Hispanic checkbox (writes to `people.is_hispanic` globally with a one-line note). Read-only signup count. When the person has **≥1 signup**, a **"Show Shifts"** button closes the modal and turns on [[Person focus mode]] (the button is hidden, not shown disabled, at 0 signups). When the person has **0 signups and was manually added** ([[Manual roster inclusion]]), a **"Remove from list"** action appears instead. Roster membership otherwise flows from the configured Group(s) in settings; the only per-schedule add affordance is the "+ Add person" button for manual inclusions.
+
+### Person focus mode
+
+A transient, screen-only view aid for answering "what times is this person on?" at a glance. Triggered by the **"Show Shifts"** button in the [[Fair Booth roster row modal]]; sets a single focused `person_id` on the schedule detail view. While active, page 1 keeps its **full** rendering — headcount cell colors and day-header coverage colors are unchanged (option B, not a blank/clean grid) — but every **other** person's initials render dimmed to low-opacity grey while the focused person's initials stay full-strength (contrast only; no highlight box). A dismissible banner above the grid ("Showing only {name}'s shifts — ✕ Clear") is the clear affordance (Escape also clears). Focus is not persisted (resets on reload), applies on **both desktop and mobile** (the mobile one-day `MobileGridNav` renders through the same grid), leaves **page 2 untouched**, and **never affects exports** — PDF/JPG/blank always render the full unfiltered sheet. A per-person printout would be a separate feature.
 
 ### Page 1 / Page 2 layout
 
@@ -525,7 +533,7 @@ Page 2 sort order: fair role descending (`fair_mgr` → `worker`) → `lastName`
 
 ### Italic and bold roster markers
 
-On page 2: **italic** = on the roster but zero signups for this schedule. **Bold** = signup count is below `schedules.fairBooth.minSignupsForBold` (default `3`). Both markers are computed per render against the live data; neither is a stored flag.
+On page 2: **italic** = zero signups for this schedule (only reachable via a [[Manual roster inclusion]], since the list otherwise requires ≥1 signup). **Bold** = signup count is below `schedules.fairBooth.minSignupsForBold` (default `3`). Both markers are computed per render against the live data; neither is a stored flag.
 
 ### No draft/final lifecycle for fair_booth
 

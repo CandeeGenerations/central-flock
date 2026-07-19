@@ -1,5 +1,6 @@
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 import {Input} from '@/components/ui/input'
 import {PageSpinner} from '@/components/ui/spinner'
@@ -9,9 +10,10 @@ import {
   fetchSchedulesSettings,
   schedulesKeys,
   updateFairBoothSchedule,
+  upsertFairBoothRosterAttrs,
 } from '@/lib/schedules-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, Pencil} from 'lucide-react'
+import {ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, Pencil, Plus, X} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -27,6 +29,8 @@ export function FairBoothSchedulePage() {
   const scheduleId = Number(id)
   const queryClient = useQueryClient()
   const [rosterPersonId, setRosterPersonId] = useState<number | null>(null)
+  const [focusedPersonId, setFocusedPersonId] = useState<number | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
   const [blank, setBlank] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -55,6 +59,16 @@ export function FairBoothSchedulePage() {
     return () => mq.removeEventListener('change', apply)
   }, [])
 
+  // Escape clears Person focus mode.
+  useEffect(() => {
+    if (focusedPersonId == null) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFocusedPersonId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [focusedPersonId])
+
   const {data: detail, isLoading} = useQuery({
     queryKey: schedulesKeys.fairBooth(scheduleId),
     queryFn: () => fetchFairBoothSchedule(scheduleId),
@@ -65,7 +79,15 @@ export function FairBoothSchedulePage() {
   const {schedule, people, rosterPersonIds, rosterAttrs, signups} = detail
   if (!schedule.scopeStart) return <div className="p-4">Schedule missing scope start.</div>
   const signedUpIds = new Set(signups.map((s) => s.personId))
-  const rosterSize = rosterPersonIds.filter((pid) => signedUpIds.has(pid)).length
+  const manualIncludeIds = new Set(rosterAttrs.filter((a) => a.manualInclude).map((a) => a.personId))
+  const rosterSize = rosterPersonIds.filter((pid) => signedUpIds.has(pid) || manualIncludeIds.has(pid)).length
+  const focusedName = (() => {
+    if (focusedPersonId == null) return null
+    const ov = rosterAttrs.find((a) => a.personId === focusedPersonId)?.nameOverride
+    if (ov && ov.trim()) return ov.trim()
+    const p = people.find((x) => x.id === focusedPersonId)
+    return p ? [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}` : null
+  })()
   const filenameBase = `fair-booth-${schedule.scopeLabel.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`
 
   async function withExport(fn: () => Promise<void>) {
@@ -191,6 +213,16 @@ export function FairBoothSchedulePage() {
           <CardTitle>Schedule</CardTitle>
         </CardHeader>
         <CardContent>
+          {focusedName && (
+            <div className="mb-3 flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm">
+              <span>
+                Showing only <span className="font-semibold">{focusedName}</span>&apos;s shifts
+              </span>
+              <Button variant="outline" size="sm" className="ml-auto h-7" onClick={() => setFocusedPersonId(null)}>
+                <X className="h-3 w-3 mr-1" /> Clear
+              </Button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             {isMobile ? (
               <MobileGridNav
@@ -202,6 +234,7 @@ export function FairBoothSchedulePage() {
                 blank={blank}
                 dayIdx={mobileDayIdx}
                 setDayIdx={setMobileDayIdx}
+                focusedPersonId={focusedPersonId}
               />
             ) : (
               <FairBoothGrid
@@ -211,15 +244,20 @@ export function FairBoothSchedulePage() {
                 rosterAttrs={rosterAttrs}
                 blank={blank}
                 scheduleId={scheduleId}
+                focusedPersonId={focusedPersonId}
               />
             )}
           </div>
+          {!blank && <PrintLegend textColor="inherit" />}
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Roster</CardTitle>
+          <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add person
+          </Button>
         </CardHeader>
         <CardContent>
           <FairBoothRoster
@@ -235,6 +273,19 @@ export function FairBoothSchedulePage() {
           />
         </CardContent>
       </Card>
+
+      {addOpen && (
+        <AddRosterPersonDialog
+          scheduleId={scheduleId}
+          candidates={people.filter(
+            (p) =>
+              rosterPersonIds.includes(p.id) &&
+              !signedUpIds.has(p.id) &&
+              !rosterAttrs.some((a) => a.personId === p.id && a.manualInclude),
+          )}
+          onClose={() => setAddOpen(false)}
+        />
+      )}
 
       <p className="text-muted-foreground text-xs">
         Tip: click any day column in the grid to edit that day. Click a name on the roster to edit fair role and
@@ -253,6 +304,10 @@ export function FairBoothSchedulePage() {
           attrs={rosterAttrs.find((a) => a.personId === rosterPersonId) ?? null}
           signupCount={signups.filter((s) => s.personId === rosterPersonId).length}
           onClose={() => setRosterPersonId(null)}
+          onShowShifts={() => {
+            setFocusedPersonId(rosterPersonId)
+            setRosterPersonId(null)
+          }}
         />
       )}
 
@@ -288,7 +343,6 @@ export function FairBoothSchedulePage() {
             rosterAttrs={rosterAttrs}
             blank={blank}
           />
-          {!blank && <PrintLegend />}
           <FooterBlocks blocks={settings.fairBooth.gridPageFooterBlocks} />
         </div>
         <div
@@ -325,6 +379,7 @@ export function FairBoothSchedulePage() {
             blankRowsPerColumn={blank ? 5 : 4}
             hideCounts={blank}
           />
+          {!blank && <PrintLegend />}
           <FooterBlocks blocks={settings.fairBooth.rosterPageFooterBlocks} />
         </div>
       </div>
@@ -341,6 +396,7 @@ interface MobileGridNavProps {
   blank: boolean
   dayIdx: number
   setDayIdx: (n: number) => void
+  focusedPersonId: number | null
 }
 
 function MobileGridNav({
@@ -352,6 +408,7 @@ function MobileGridNav({
   blank,
   dayIdx,
   setDayIdx,
+  focusedPersonId,
 }: MobileGridNavProps) {
   let days: ReturnType<typeof deriveFairDays>
   try {
@@ -387,14 +444,69 @@ function MobileGridNav({
         blank={blank}
         scheduleId={scheduleId}
         onlyDate={day.date}
+        focusedPersonId={focusedPersonId}
       />
     </div>
   )
 }
 
-function PrintLegend() {
+interface AddRosterPersonDialogProps {
+  scheduleId: number
+  candidates: {id: number; firstName: string | null; lastName: string | null}[]
+  onClose: () => void
+}
+
+function AddRosterPersonDialog({scheduleId, candidates, onClose}: AddRosterPersonDialogProps) {
+  const queryClient = useQueryClient()
+  const [query, setQuery] = useState('')
+  const add = useMutation({
+    mutationFn: (personId: number) => upsertFairBoothRosterAttrs(scheduleId, personId, {manualInclude: true}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: schedulesKeys.fairBooth(scheduleId)})
+      toast.success('Added to list')
+      onClose()
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  })
+  const named = candidates
+    .map((p) => ({...p, name: [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`}))
+    .sort((a, b) => a.name.localeCompare(b.name))
+  const q = query.trim().toLowerCase()
+  const shown = q === '' ? named : named.filter((p) => p.name.toLowerCase().includes(q))
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add person to list</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Input autoFocus placeholder="Search roster…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <div className="max-h-72 overflow-y-auto">
+            {shown.length === 0 ? (
+              <p className="text-muted-foreground p-2 text-sm">No roster members without signups to add.</p>
+            ) : (
+              shown.map((p) => (
+                <button
+                  key={p.id}
+                  className="hover:bg-muted/50 w-full rounded px-2 py-1.5 text-left text-sm disabled:opacity-50"
+                  onClick={() => add.mutate(p.id)}
+                  disabled={add.isPending}
+                >
+                  {p.name}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PrintLegend({textColor = '#111'}: {textColor?: string} = {}) {
   const headcount = [
-    {bg: '#fecaca', label: '≤ 3 people'},
+    {bg: '#fca5a5', label: '≤ 2 people'},
+    {bg: '#fecaca', label: '3 people'},
     {bg: '#fed7aa', label: '4 people'},
     {bg: '#fef08a', label: '5 people'},
     {bg: '#a5f3fc', label: '6 people'},
@@ -426,7 +538,7 @@ function PrintLegend() {
   }
   const item: React.CSSProperties = {padding: '3px 0'}
   return (
-    <div style={{marginTop: 24, fontSize: 13, color: '#111'}}>
+    <div style={{marginTop: 24, fontSize: 13, color: textColor}}>
       <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24}}>
         <div>
           <div style={sectionHeader}>Headcount</div>

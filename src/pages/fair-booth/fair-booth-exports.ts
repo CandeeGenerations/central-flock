@@ -1,7 +1,32 @@
 // Lightweight exporter for Fair Booth: two-page PDF (grid then roster) and
 // a single-page JPG of just the grid.
 
-async function captureNode(node: HTMLElement, width = 1100): Promise<string> {
+// Append blank rows to every roster table until the node is tall enough to
+// fill the target height, so the roster page uses the whole sheet instead of
+// leaving the bottom empty. No-op once the content already exceeds the target.
+function padTablesToHeight(clone: HTMLElement, targetHeight: number): void {
+  const tbodies = Array.from(clone.querySelectorAll<HTMLTableSectionElement>('table tbody'))
+  const sampleRow = clone.querySelector<HTMLTableRowElement>('table tbody tr')
+  if (!tbodies.length || !sampleRow) return
+  const rowHeight = sampleRow.getBoundingClientRect().height || 26
+  const deficit = targetHeight - clone.scrollHeight
+  if (deficit <= rowHeight) return
+  const rowsToAdd = Math.floor(deficit / rowHeight)
+  for (const tbody of tbodies) {
+    const template = tbody.lastElementChild
+    if (!template) continue
+    for (let i = 0; i < rowsToAdd; i++) {
+      const row = template.cloneNode(true) as HTMLElement
+      row.querySelectorAll('td').forEach((td) => {
+        td.textContent = ' '
+      })
+      tbody.appendChild(row)
+    }
+  }
+}
+
+async function captureNode(node: HTMLElement, opts: {width?: number; fillToHeight?: number} = {}): Promise<string> {
+  const {width = 1100, fillToHeight} = opts
   await document.fonts.ready
   const clone = node.cloneNode(true) as HTMLElement
   const container = document.createElement('div')
@@ -9,6 +34,7 @@ async function captureNode(node: HTMLElement, width = 1100): Promise<string> {
   container.appendChild(clone)
   document.body.appendChild(container)
   try {
+    if (fillToHeight) padTablesToHeight(clone, fillToHeight)
     const {toJpeg} = await import('html-to-image')
     return await toJpeg(clone, {
       quality: 0.95,
@@ -42,37 +68,84 @@ export async function exportFairBoothJpg(gridNode: HTMLElement, filename: string
   a.click()
 }
 
+// US Letter in mm.
+const LETTER_LONG = 279.4
+const LETTER_SHORT = 215.9
+const PAGE_MARGIN = 8
+// Fixed canvas width the print nodes render at before being scaled to fill the
+// sheet. On-page font size scales as 1/CAPTURE_WIDTH — a narrower canvas maps
+// each glyph to more mm on paper, enlarging the text. Floor is set by grid cell
+// wrapping (fixed columns): too narrow and long initials lines wrap.
+const CAPTURE_WIDTH = 900
+
+type Orientation = 'portrait' | 'landscape'
+
+function pageDims(orientation: Orientation): {pageWidth: number; pageHeight: number} {
+  return orientation === 'landscape'
+    ? {pageWidth: LETTER_LONG, pageHeight: LETTER_SHORT}
+    : {pageWidth: LETTER_SHORT, pageHeight: LETTER_LONG}
+}
+
+// Fit-to-page while preserving aspect ratio, centered on the sheet.
+function placement(orientation: Orientation, imgRatio: number) {
+  const {pageWidth, pageHeight} = pageDims(orientation)
+  const maxWidth = pageWidth - PAGE_MARGIN * 2
+  const maxHeight = pageHeight - PAGE_MARGIN * 2
+  const pageRatio = maxWidth / maxHeight
+  let renderWidth: number
+  let renderHeight: number
+  if (imgRatio > pageRatio) {
+    renderWidth = maxWidth
+    renderHeight = maxWidth / imgRatio
+  } else {
+    renderHeight = maxHeight
+    renderWidth = maxHeight * imgRatio
+  }
+  return {
+    pageWidth,
+    pageHeight,
+    renderWidth,
+    renderHeight,
+    x: (pageWidth - renderWidth) / 2,
+    y: (pageHeight - renderHeight) / 2,
+  }
+}
+
 export async function exportFairBoothPdf(
   gridNode: HTMLElement,
   rosterNode: HTMLElement,
   filename: string,
 ): Promise<void> {
   const {jsPDF} = await import('jspdf')
-  const pdf = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'letter'})
-  const pageWidth = 215.9
-  const pageHeight = 279.4
-  const margin = 10
-  const maxWidth = pageWidth - margin * 2
-  const maxHeight = pageHeight - margin * 2
-  const nodes = [gridNode, rosterNode]
-  for (let i = 0; i < nodes.length; i++) {
-    const dataUrl = await captureNode(nodes[i])
-    const img = await imageDataUrlToImg(dataUrl)
-    const imgRatio = img.width / img.height
-    const pageRatio = maxWidth / maxHeight
-    let renderWidth: number
-    let renderHeight: number
-    if (imgRatio > pageRatio) {
-      renderWidth = maxWidth
-      renderHeight = maxWidth / imgRatio
-    } else {
-      renderHeight = maxHeight
-      renderWidth = maxHeight * imgRatio
-    }
-    const x = (pageWidth - renderWidth) / 2
-    const y = margin
-    if (i > 0) pdf.addPage()
-    pdf.addImage(dataUrl, 'JPEG', x, y, renderWidth, renderHeight)
+
+  // Grid page: capture once, then pick whichever orientation scales the
+  // schedule largest (a wide grid gains ~30% in landscape; a tall one stays
+  // portrait). Roster page: always portrait, padded to fill the sheet.
+  const gridUrl = await captureNode(gridNode, {width: CAPTURE_WIDTH})
+  const gridImg = await imageDataUrlToImg(gridUrl)
+  const gridRatio = gridImg.width / gridImg.height
+  const gridOrientation: Orientation =
+    placement('landscape', gridRatio).renderWidth > placement('portrait', gridRatio).renderWidth
+      ? 'landscape'
+      : 'portrait'
+
+  const rosterPortrait = pageDims('portrait')
+  const rosterFillHeight =
+    (CAPTURE_WIDTH * (rosterPortrait.pageHeight - PAGE_MARGIN * 2)) / (rosterPortrait.pageWidth - PAGE_MARGIN * 2)
+  const rosterUrl = await captureNode(rosterNode, {width: CAPTURE_WIDTH, fillToHeight: rosterFillHeight})
+  const rosterImg = await imageDataUrlToImg(rosterUrl)
+  const rosterRatio = rosterImg.width / rosterImg.height
+
+  const pdf = new jsPDF({orientation: gridOrientation, unit: 'mm', format: 'letter'})
+  const pages: {url: string; orientation: Orientation; imgRatio: number}[] = [
+    {url: gridUrl, orientation: gridOrientation, imgRatio: gridRatio},
+    {url: rosterUrl, orientation: 'portrait', imgRatio: rosterRatio},
+  ]
+  for (let i = 0; i < pages.length; i++) {
+    const p = pages[i]
+    const pos = placement(p.orientation, p.imgRatio)
+    if (i > 0) pdf.addPage('letter', p.orientation)
+    pdf.addImage(p.url, 'JPEG', pos.x, pos.y, pos.renderWidth, pos.renderHeight)
   }
   pdf.save(`${filename}.pdf`)
 }

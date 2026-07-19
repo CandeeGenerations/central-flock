@@ -21,6 +21,7 @@ import {Link, useNavigate} from 'react-router-dom'
 const HOUR_ROWS = [14, 15, 16, 17, 18, 19, 20, 21] // 2pm-9pm rows; each row spans 1 hour ending at the next.
 
 const BG_BY_COLOR: Record<HeadcountColor, string> = {
+  darkred: 'bg-red-300',
   red: 'bg-red-200',
   orange: 'bg-orange-200',
   yellow: 'bg-yellow-200',
@@ -45,12 +46,14 @@ interface FairBoothGridProps {
   scheduleId?: number
   // When set, render only the column for this date (no two-half split).
   onlyDate?: string
+  // When set, dim every entry that isn't this person (Person focus mode).
+  focusedPersonId?: number | null
 }
 
 interface CellRender {
   bgClass: string
   dotted: boolean
-  entries: {signupId: number; line: string}[]
+  entries: {signupId: number; personId: number; line: string}[]
 }
 
 export function FairBoothGrid({
@@ -61,6 +64,7 @@ export function FairBoothGrid({
   blank = false,
   scheduleId,
   onlyDate,
+  focusedPersonId,
 }: FairBoothGridProps) {
   let days: FairDay[]
   try {
@@ -133,7 +137,7 @@ export function FairBoothGrid({
         const stars = fairRoleStars(fairRole)
         const slotFull = s.startMinute <= slot.startMinute && s.endMinute >= slot.endMinute
         const partial = slotFull ? '' : ` (${formatTimeShort(s.startMinute)}-${formatTimeShort(s.endMinute)})`
-        cell.entries.push({signupId: s.id, line: `${dashes}${init}${stars}${partial}`})
+        cell.entries.push({signupId: s.id, personId: s.personId, line: `${dashes}${init}${stars}${partial}`})
       }
     }
     return map
@@ -152,6 +156,7 @@ export function FairBoothGrid({
         hispanicIds={hispanicIds}
         scheduleId={scheduleId}
         clickable={false}
+        focusedPersonId={focusedPersonId}
       />
     )
   }
@@ -171,6 +176,7 @@ export function FairBoothGrid({
         signups={signups as FairSignup[]}
         hispanicIds={hispanicIds}
         scheduleId={scheduleId}
+        focusedPersonId={focusedPersonId}
       />
       <HalfGrid
         days={half2}
@@ -180,6 +186,7 @@ export function FairBoothGrid({
         signups={signups as FairSignup[]}
         hispanicIds={hispanicIds}
         scheduleId={scheduleId}
+        focusedPersonId={focusedPersonId}
       />
     </div>
   )
@@ -194,6 +201,7 @@ interface HalfGridProps {
   hispanicIds: Set<number>
   scheduleId?: number
   clickable?: boolean
+  focusedPersonId?: number | null
 }
 
 function dayHref(scheduleId: number | undefined, date: string): string {
@@ -209,6 +217,7 @@ function HalfGrid({
   hispanicIds,
   scheduleId,
   clickable = true,
+  focusedPersonId,
 }: HalfGridProps) {
   const navigate = useNavigate()
   return (
@@ -281,11 +290,20 @@ function HalfGrid({
                       onClick={clickable ? () => navigate(dayHref(scheduleId, d.date)) : undefined}
                     >
                       {inAnySlot &&
-                        cell.entries.map((e) => (
-                          <div key={e.signupId} className="font-mono font-bold leading-tight">
-                            {e.line}
-                          </div>
-                        ))}
+                        cell.entries.map((e) => {
+                          const focused = focusedPersonId != null && e.personId === focusedPersonId
+                          const dim = focusedPersonId != null && !focused
+                          return (
+                            <div
+                              key={e.signupId}
+                              className={`font-mono font-bold leading-tight ${dim ? 'opacity-25' : ''} ${
+                                focused ? 'inline-block rounded border border-gray-900 bg-white px-1' : ''
+                              }`}
+                            >
+                              {e.line}
+                            </div>
+                          )
+                        })}
                     </td>
                   )
                 })}

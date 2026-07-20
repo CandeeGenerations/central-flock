@@ -1,5 +1,6 @@
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
@@ -149,13 +150,13 @@ export function AttendanceDashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 w-44">
             <Label>From</Label>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+            <DatePicker value={from} onChange={(v) => v && setFrom(v)} />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 w-44">
             <Label>To</Label>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
+            <DatePicker value={to} onChange={(v) => v && setTo(v)} />
           </div>
           <Button variant={yoy ? 'default' : 'outline'} onClick={() => setYoy((v) => !v)}>
             vs Last Year

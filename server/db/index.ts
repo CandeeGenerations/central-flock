@@ -48,6 +48,21 @@ sqlite.exec(`
     ('wednesday_evening', 'Wednesday Evening Service', 2, 4)
 `)
 
+// Seed the 4 recurring service times on a fresh DB (idempotent: only when empty,
+// so admin edits/retirements are never clobbered). day_of_week: 0=Sun..6=Sat.
+{
+  const count = (sqlite.prepare(`SELECT count(*) as n FROM service_times`).get() as {n: number}).n
+  if (count === 0) {
+    const ins = sqlite.prepare(
+      `INSERT INTO service_times (name, day_of_week, time, active, sort_order) VALUES (?, ?, ?, 1, ?)`,
+    )
+    ins.run('Sunday 9:45am', 0, '09:45', 1)
+    ins.run('Sunday 11:00am', 0, '11:00', 2)
+    ins.run('Sunday 6:30pm', 0, '18:30', 3)
+    ins.run('Wednesday 7:30pm', 3, '19:30', 4)
+  }
+}
+
 // Seed per-schedule-type settings defaults (idempotent). See ADR 0006.
 {
   const seed = sqlite.prepare(`INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))`)

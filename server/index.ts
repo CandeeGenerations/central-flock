@@ -15,6 +15,7 @@ import {fileURLToPath} from 'url'
 import {sqlite} from './db/index.js'
 import {UPLOADS_DIR} from './lib/uploads.js'
 import {requireAuth} from './middleware/auth.js'
+import {attendanceRouter} from './routes/attendance.js'
 import {authRouter} from './routes/auth.js'
 import {calendarPrintRouter} from './routes/calendar-print.js'
 import {calendarRouter} from './routes/calendar.js'
@@ -85,6 +86,7 @@ app.use('/api/nursery', nurseryRouter)
 app.use('/api/quotes', quotesRouter)
 app.use('/api/hymns', hymnsRouter)
 app.use('/api/rsvp', rsvpRouter)
+app.use('/api/attendance', attendanceRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/specials', specialsRouter)
 app.use('/api/usage', usageRouter)

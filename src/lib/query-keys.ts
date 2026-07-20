@@ -48,4 +48,13 @@ export const queryKeys = {
     return ['rsvpNonEntries', String(listId)] as const
   },
   specials: ['specials'] as const,
+  serviceTimes: (includeInactive: boolean) => ['serviceTimes', includeInactive] as const,
+  attendanceRecords: (serviceTimeId: number | null, from?: string, to?: string) =>
+    ['attendanceRecords', serviceTimeId ?? 'all', from ?? '', to ?? ''] as const,
+  attendanceSeries: (metric: string, serviceTimeId: string, from?: string, to?: string) =>
+    ['attendanceSeries', metric, serviceTimeId, from ?? '', to ?? ''] as const,
+  attendanceSummary: (serviceTimeId: string) => ['attendanceSummary', serviceTimeId] as const,
+  attendanceRecorders: ['attendanceRecorders'] as const,
+  attendanceConfig: ['attendanceConfig'] as const,
+  attendanceRecordHistory: (recordId: number) => ['attendanceRecordHistory', recordId] as const,
 }

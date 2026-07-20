@@ -30,6 +30,7 @@ const GROUP_ORDER = [
   'Quotes',
   'Hymns',
   'Schedules',
+  'Attendance',
   'Calendar',
 ]
 
@@ -85,6 +86,13 @@ const PREFIX_TO_GROUP: Record<string, string> = {
   calendar: 'Calendar',
   rsvp: 'Calendar',
   rsvps: 'Calendar',
+  attendance: 'Attendance',
+  service: 'Attendance',
+  'service-time': 'Attendance',
+  servicetimes: 'Attendance',
+  stats: 'Attendance',
+  recorder: 'Attendance',
+  recorders: 'Attendance',
 }
 
 function parsePrefix(query: string): {group: string | null; rest: string} {

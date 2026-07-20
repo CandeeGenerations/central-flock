@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   Baby,
+  BarChart3,
   Book,
   BookOpen,
   Calendar,
@@ -102,6 +103,16 @@ export const navGroups: NavGroup[] = [
       {to: '/nursery/workers', label: 'Nursery Workers', icon: Users},
       {to: '/schedules/fair-booth', label: 'Fair Booth', icon: Tent},
       {to: '/schedules/settings', label: 'Settings', icon: Settings, matchPaths: ['/nursery/settings']},
+    ],
+  },
+  {
+    id: 'attendance',
+    label: 'Attendance',
+    icon: BarChart3,
+    children: [
+      {to: '/attendance', label: 'Dashboard', icon: LayoutDashboard, end: true},
+      {to: '/attendance/times', label: 'Service Times', icon: Clock},
+      {to: '/attendance/recorders', label: 'Recorders', icon: Contact},
     ],
   },
   {

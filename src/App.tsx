@@ -12,6 +12,9 @@ import {checkAuthStatus, logout} from '@/lib/api'
 import {findActiveGroup, isChildActive, navGroups} from '@/lib/nav-config'
 import {ThemeProvider, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
+import {AttendanceDashboardPage} from '@/pages/attendance/attendance-dashboard-page'
+import {RecordersPage} from '@/pages/attendance/recorders-page'
+import {ServiceTimesPage} from '@/pages/attendance/service-times-page'
 import {CalendarPage} from '@/pages/calendar-page'
 import {CalendarPrintPage} from '@/pages/calendar-print-page'
 import {ContactsImportPage} from '@/pages/contacts-import-page'
@@ -488,6 +491,9 @@ function AppLayoutInner({
               <Route path="/calendar/print" element={<CalendarPrintPage />} />
               <Route path="/rsvp" element={<RsvpListPage />} />
               <Route path="/rsvp/:id" element={<RsvpDetailPage />} />
+              <Route path="/attendance" element={<AttendanceDashboardPage />} />
+              <Route path="/attendance/times" element={<ServiceTimesPage />} />
+              <Route path="/attendance/recorders" element={<RecordersPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </main>

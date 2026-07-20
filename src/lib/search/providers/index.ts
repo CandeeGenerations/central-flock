@@ -13,7 +13,9 @@ import {nurserySchedulesProvider} from './nursery-schedules'
 import {peopleProvider} from './people'
 import {quotesProvider} from './quotes'
 import {recentsProvider} from './recents'
+import {recordersProvider} from './recorders'
 import {rsvpProvider} from './rsvp'
+import {serviceTimesProvider} from './service-times'
 import {specialMusicSchedulesProvider} from './special-music-schedules'
 import {specialsProvider} from './specials'
 import {templatesProvider} from './templates'
@@ -38,5 +40,7 @@ export const providers: SearchProvider[] = [
   specialMusicSchedulesProvider as SearchProvider,
   calendarProvider as SearchProvider,
   rsvpProvider as SearchProvider,
+  serviceTimesProvider as SearchProvider,
+  recordersProvider as SearchProvider,
   specialsProvider as SearchProvider,
 ]

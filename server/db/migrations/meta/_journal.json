@@ -232,6 +232,20 @@
       "when": 1784426869373,
       "tag": "0032_sweet_captain_britain",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1784564665255,
+      "tag": "0033_big_banshee",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1784566945588,
+      "tag": "0034_workable_justice",
+      "breakpoints": true
     }
   ]
 }

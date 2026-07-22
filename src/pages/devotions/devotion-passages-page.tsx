@@ -8,6 +8,7 @@ import {Label} from '@/components/ui/label'
 import {Pagination} from '@/components/ui/pagination'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {usePersistedState} from '@/hooks/use-persisted-state'
 import {useProgressOperation} from '@/hooks/use-sse'
 import {type PoolPassage, fetchPool, generatePoolPassages, setPoolPassageRecorded} from '@/lib/devotion-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
@@ -26,8 +27,11 @@ export function DevotionPassagesPage() {
   const navigate = useNavigate()
   const [count, setCount] = useState(10)
   const [topic, setTopic] = useState('')
-  const [filter, setFilter] = useState<FilterMode>('available')
-  const [recordedFilter, setRecordedFilter] = useState<RecordedFilter>('not-recorded')
+  const [filter, setFilter] = usePersistedState<FilterMode>('passages.filter.used', 'available')
+  const [recordedFilter, setRecordedFilter] = usePersistedState<RecordedFilter>(
+    'passages.filter.recorded',
+    'not-recorded',
+  )
   const [page, setPage] = useState(1)
   const [generateOpen, setGenerateOpen] = useState(false)
 

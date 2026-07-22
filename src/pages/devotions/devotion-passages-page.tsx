@@ -12,7 +12,7 @@ import {usePersistedState} from '@/hooks/use-persisted-state'
 import {useProgressOperation} from '@/hooks/use-sse'
 import {type PoolPassage, fetchPool, generatePoolPassages, setPoolPassageRecorded} from '@/lib/devotion-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Check, Loader2, Sparkles, X} from 'lucide-react'
+import {ArrowDown, ArrowUp, Check, ChevronsUpDown, Loader2, Sparkles, X} from 'lucide-react'
 import {useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -32,6 +32,7 @@ export function DevotionPassagesPage() {
     'passages.filter.recorded',
     'not-recorded',
   )
+  const [devoSort, setDevoSort] = usePersistedState<'none' | 'asc' | 'desc'>('passages.sort.devo', 'none')
   const [page, setPage] = useState(1)
   const [generateOpen, setGenerateOpen] = useState(false)
 
@@ -70,10 +71,28 @@ export function DevotionPassagesPage() {
     }
   }
 
-  const availableCount = allPassages.filter((p) => !p.used).length
-  const totalCount = passages.length
+  // Optional sort by assigned devotion number; unassigned always sink to the bottom.
+  const sortedPassages =
+    devoSort === 'none'
+      ? passages
+      : [...passages].sort((a, b) => {
+          const an = a.assignedDevotion?.number ?? null
+          const bn = b.assignedDevotion?.number ?? null
+          if (an === null && bn === null) return 0
+          if (an === null) return 1
+          if (bn === null) return -1
+          return devoSort === 'asc' ? an - bn : bn - an
+        })
 
-  const paginatedPassages = passages.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const availableCount = allPassages.filter((p) => !p.used).length
+  const totalCount = sortedPassages.length
+
+  const paginatedPassages = sortedPassages.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const toggleDevoSort = () => {
+    setDevoSort((s) => (s === 'none' ? 'asc' : s === 'asc' ? 'desc' : 'none'))
+    setPage(1)
+  }
 
   const handleFilterChange = (mode: FilterMode) => {
     setFilter(mode)
@@ -190,7 +209,21 @@ export function DevotionPassagesPage() {
                   <TableHead className="text-center">Recorded</TableHead>
                   <TableHead className="text-center">Used In</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Assigned Devo</TableHead>
+                  <TableHead>
+                    <button
+                      className="flex items-center gap-1 hover:text-foreground cursor-pointer"
+                      onClick={toggleDevoSort}
+                    >
+                      Assigned Devo
+                      {devoSort === 'asc' ? (
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      ) : devoSort === 'desc' ? (
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
+                      )}
+                    </button>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -1427,9 +1427,22 @@ devotionsRouter.get(
       }
     }
 
+    // Enrich with the assigned devotion (number + title) for quick reference.
+    const devotionIds = [...new Set(rows.map((r) => r.devotionId).filter((id): id is number => id != null))]
+    const devotionById = new Map<number, {id: number; number: number; title: string | null}>()
+    if (devotionIds.length > 0) {
+      const devs = db
+        .select({id: schema.devotions.id, number: schema.devotions.number, title: schema.devotions.title})
+        .from(schema.devotions)
+        .where(inArray(schema.devotions.id, devotionIds))
+        .all()
+      for (const d of devs) devotionById.set(d.id, d)
+    }
+
     const enriched = rows.map((r) => ({
       ...r,
       scriptureUsageCount: usageCounts.get(r.bibleReference) ?? 0,
+      assignedDevotion: r.devotionId != null ? (devotionById.get(r.devotionId) ?? null) : null,
     }))
 
     res.json(enriched)

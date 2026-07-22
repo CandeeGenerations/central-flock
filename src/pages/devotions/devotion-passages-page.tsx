@@ -186,6 +186,7 @@ export function DevotionPassagesPage() {
                   <TableHead className="text-center">Recorded</TableHead>
                   <TableHead className="text-center">Used In</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Assigned Devo</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -208,6 +209,7 @@ export function DevotionPassagesPage() {
 }
 
 function PassageRow({passage, onClick}: {passage: PoolPassage; onClick: () => void}) {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const toggleRecorded = useMutation({
     mutationFn: () => setPoolPassageRecorded(passage.id, !passage.recorded),
@@ -245,6 +247,22 @@ function PassageRow({passage, onClick}: {passage: PoolPassage; onClick: () => vo
       </TableCell>
       <TableCell>
         {passage.used ? <Badge variant="secondary">Used</Badge> : <Badge variant="default">Available</Badge>}
+      </TableCell>
+      <TableCell className="max-w-40">
+        {passage.assignedDevotion ? (
+          <button
+            className="text-left text-primary hover:underline cursor-pointer truncate max-w-full"
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/devotions/${passage.assignedDevotion!.id}`)
+            }}
+          >
+            #{passage.assignedDevotion.number}
+            {passage.assignedDevotion.title ? ` · ${passage.assignedDevotion.title}` : ''}
+          </button>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </TableCell>
     </TableRow>
   )

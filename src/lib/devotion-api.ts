@@ -347,6 +347,7 @@ export interface PoolPassage extends GeneratedPassage {
   createdAt: string
   usedAt: string | null
   scriptureUsageCount: number
+  assignedDevotion: {id: number; number: number; title: string | null} | null
 }
 
 export function generatePassage() {

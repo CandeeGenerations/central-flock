@@ -1,3 +1,4 @@
+import {DevotionSwapDialog} from '@/components/devotions/devotion-swap-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
@@ -34,6 +35,7 @@ import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowDown,
+  ArrowRightLeft,
   ArrowUp,
   ArrowUpDown,
   Camera,
@@ -43,6 +45,7 @@ import {
   Plus,
   X,
 } from 'lucide-react'
+import {useState} from 'react'
 import {Link, useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -108,6 +111,7 @@ function FlagCell({flagged, onClick}: {flagged: boolean; onClick: (e: React.Mous
 }
 
 function CopyMenu({devotion}: {devotion: Devotion}) {
+  const [swapOpen, setSwapOpen] = useState(false)
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(() => toast.success(`${label} copied`))
   }
@@ -121,31 +125,38 @@ function CopyMenu({devotion}: {devotion: Devotion}) {
   const hasSong = songTitle || songDesc
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="p-1 rounded hover:bg-muted cursor-pointer" onClick={(e) => e.stopPropagation()}>
-          <EllipsisVertical className="h-4 w-4 text-muted-foreground" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenuItem asChild>
-          <a href={youtubeSearchUrl(devotion.number)} target="_blank" rel="noopener noreferrer">
-            Find on YouTube
-          </a>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="font-bold">Copy</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => copy(podTitle, 'Title')}>Title</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => copy(ytDesc, 'YouTube description')}>YouTube Description</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => copy(fbDesc, 'FB/IG description')}>FB/IG Description</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => copy(podDesc, 'Podcast description')}>Podcast Description</DropdownMenuItem>
-        {hasSong && <DropdownMenuSeparator />}
-        {songTitle && <DropdownMenuItem onClick={() => copy(songTitle, 'Song title')}>Song Title</DropdownMenuItem>}
-        {songDesc && (
-          <DropdownMenuItem onClick={() => copy(songDesc, 'Song description')}>Song Description</DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="p-1 rounded hover:bg-muted cursor-pointer" onClick={(e) => e.stopPropagation()}>
+            <EllipsisVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuItem asChild>
+            <a href={youtubeSearchUrl(devotion.number)} target="_blank" rel="noopener noreferrer">
+              Find on YouTube
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setSwapOpen(true)}>
+            <ArrowRightLeft className="h-4 w-4 mr-2" />
+            Swap with…
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="font-bold">Copy</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => copy(podTitle, 'Title')}>Title</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => copy(ytDesc, 'YouTube description')}>YouTube Description</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => copy(fbDesc, 'FB/IG description')}>FB/IG Description</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => copy(podDesc, 'Podcast description')}>Podcast Description</DropdownMenuItem>
+          {hasSong && <DropdownMenuSeparator />}
+          {songTitle && <DropdownMenuItem onClick={() => copy(songTitle, 'Song title')}>Song Title</DropdownMenuItem>}
+          {songDesc && (
+            <DropdownMenuItem onClick={() => copy(songDesc, 'Song description')}>Song Description</DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DevotionSwapDialog devotion={devotion} open={swapOpen} onOpenChange={setSwapOpen} />
+    </>
   )
 }
 

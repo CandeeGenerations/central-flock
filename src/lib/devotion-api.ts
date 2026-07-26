@@ -186,6 +186,23 @@ export function deleteDevotion(id: number) {
   return request<{success: boolean}>(`/devotions/${id}`, {method: 'DELETE'})
 }
 
+// Swap content (box model) between two devotions; number+date stay, passages follow content.
+export function swapDevotions(id: number, targetId: number) {
+  return request<{a: Devotion; b: Devotion}>(`/devotions/${id}/swap`, {
+    method: 'POST',
+    body: JSON.stringify({targetId}),
+  })
+}
+
+export interface SwapCheck {
+  referencedNumbers: number[]
+  citations: Record<string, number[]>
+}
+
+export function checkDevotionSwap(id: number, targetId: number) {
+  return request<SwapCheck>(`/devotions/${id}/swap-check?targetId=${targetId}`)
+}
+
 export function toggleDevotionField(id: number, field: string) {
   return request<Devotion>(`/devotions/${id}/toggle/${field}`, {method: 'PATCH'})
 }

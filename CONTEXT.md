@@ -5,6 +5,24 @@ used across its features. New feature areas add their terms here as they are des
 
 ## Language
 
+### Devotions
+
+**Devotion Slot**:
+The durable position/identity of a **Devotion** — its `number` (unique, cited publicly and by
+other devotions' chains) and its `date`. Stays fixed when content is swapped.
+_Avoid_: Position, Episode.
+
+**Devotion Content**:
+Everything in a **Devotion** that isn't the slot — scripture, title, talking points, descriptions,
+production/publish flags, notes, type, and chain lineage — plus its linked generated passages.
+The part that moves in a **Swap**.
+
+**Swap**:
+Exchanging the **Devotion Content** of two devotions while each keeps its **Devotion Slot**
+(number + date). Linked passages follow the content; other devotions' chain references (by number)
+are left pointing at the number/box and are only warned about, not rewritten.
+_Avoid_: Reorder, Reschedule (those move the slot, not the content).
+
 ### Service Stats
 
 **Service Time**:

@@ -2017,6 +2017,124 @@ devotionsRouter.post(
   }),
 )
 
+// Content columns swapped between two devotions (box model: number+date+id+createdAt stay).
+// See docs/adr/0016-devotion-swap-box-model.md.
+const SWAP_FIELDS = [
+  'devotionType',
+  'subcode',
+  'guestSpeaker',
+  'guestNumber',
+  'referencedDevotions',
+  'bibleReference',
+  'songName',
+  'title',
+  'talkingPoints',
+  'youtubeDescription',
+  'facebookDescription',
+  'podcastDescription',
+  'produced',
+  'rendered',
+  'youtube',
+  'facebookInstagram',
+  'podcast',
+  'notes',
+  'flagged',
+  'chainIgnores',
+] as const
+
+function parseNumberList(raw: string | null): number[] {
+  if (!raw) return []
+  try {
+    const v = JSON.parse(raw)
+    return Array.isArray(v) ? v.filter((n) => typeof n === 'number') : []
+  } catch {
+    return []
+  }
+}
+
+// GET /api/devotions/:id/swap-check?targetId= — warn if either number is cited in other
+// devotions' chains (referencedDevotions/chainIgnores). Box model leaves those refs alone.
+devotionsRouter.get(
+  '/:id/swap-check',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const targetId = Number(req.query.targetId)
+    if (!Number.isInteger(id) || !Number.isInteger(targetId)) {
+      res.status(400).json({error: 'id and targetId required'})
+      return
+    }
+    const both = db
+      .select({id: schema.devotions.id, number: schema.devotions.number})
+      .from(schema.devotions)
+      .where(inArray(schema.devotions.id, [id, targetId]))
+      .all()
+    const numbers = both.map((d) => d.number)
+    const others = db
+      .select({
+        number: schema.devotions.number,
+        referencedDevotions: schema.devotions.referencedDevotions,
+        chainIgnores: schema.devotions.chainIgnores,
+      })
+      .from(schema.devotions)
+      .all()
+    const citedBy = new Map<number, number[]>() // swapped number -> citing devotion numbers
+    for (const o of others) {
+      if (numbers.includes(o.number)) continue // ignore the two being swapped
+      const refs = new Set([...parseNumberList(o.referencedDevotions), ...parseNumberList(o.chainIgnores)])
+      for (const n of numbers) if (refs.has(n)) citedBy.set(n, [...(citedBy.get(n) ?? []), o.number])
+    }
+    res.json({
+      referencedNumbers: [...citedBy.keys()],
+      citations: Object.fromEntries([...citedBy.entries()].map(([n, by]) => [n, by])),
+    })
+  }),
+)
+
+// POST /api/devotions/:id/swap { targetId } — swap content + passage links between two devotions.
+devotionsRouter.post(
+  '/:id/swap',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const targetId = Number((req.body as {targetId?: number}).targetId)
+    if (!Number.isInteger(id) || !Number.isInteger(targetId)) {
+      res.status(400).json({error: 'id and targetId required'})
+      return
+    }
+    if (id === targetId) {
+      res.status(400).json({error: 'cannot swap a devotion with itself'})
+      return
+    }
+    const a = db.select().from(schema.devotions).where(eq(schema.devotions.id, id)).get()
+    const b = db.select().from(schema.devotions).where(eq(schema.devotions.id, targetId)).get()
+    if (!a || !b) {
+      res.status(404).json({error: 'devotion not found'})
+      return
+    }
+
+    const pick = (row: typeof a) => Object.fromEntries(SWAP_FIELDS.map((f) => [f, row[f]]))
+
+    db.transaction((tx) => {
+      // A receives B's content and vice versa.
+      tx.update(schema.devotions)
+        .set({...pick(b), updatedAt: sql`datetime('now')`})
+        .where(eq(schema.devotions.id, id))
+        .run()
+      tx.update(schema.devotions)
+        .set({...pick(a), updatedAt: sql`datetime('now')`})
+        .where(eq(schema.devotions.id, targetId))
+        .run()
+      // Passages follow content: swap devotionId links A <-> B in one atomic statement.
+      tx.run(
+        sql`UPDATE generated_passages SET devotion_id = CASE devotion_id WHEN ${id} THEN ${targetId} WHEN ${targetId} THEN ${id} END WHERE devotion_id IN (${id}, ${targetId})`,
+      )
+    })
+
+    const updatedA = db.select().from(schema.devotions).where(eq(schema.devotions.id, id)).get()
+    const updatedB = db.select().from(schema.devotions).where(eq(schema.devotions.id, targetId)).get()
+    res.json({a: updatedA, b: updatedB})
+  }),
+)
+
 // GET /api/devotions/:id - Single devotion
 devotionsRouter.get(
   '/:id',

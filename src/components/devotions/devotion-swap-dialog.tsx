@@ -11,7 +11,7 @@ import {useState} from 'react'
 import {toast} from 'sonner'
 
 function label(d: Pick<Devotion, 'title' | 'bibleReference' | 'number'>): string {
-  return d.title?.trim() || d.bibleReference?.trim() || `#${d.number}`
+  return [d.title?.trim(), d.bibleReference?.trim()].filter(Boolean).join(' · ') || `#${d.number}`
 }
 
 export function DevotionSwapDialog({
@@ -68,7 +68,7 @@ export function DevotionSwapDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ArrowRightLeft className="h-4 w-4" />
-            Swap #{devotion.number} with…
+            {target ? `Swap ${devotion.number} with ${target.number}` : `Swap ${devotion.number} with…`}
           </DialogTitle>
         </DialogHeader>
 

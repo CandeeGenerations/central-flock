@@ -1,0 +1,22 @@
+{
+  "name": "Central Flock",
+  "short_name": "Flock",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/logos/central-flock-logo.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicons/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    }
+  ]
+}

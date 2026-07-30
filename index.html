@@ -6,6 +6,12 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/logos/central-flock-logo.png" />
+    <!-- display:'standalone' is load-bearing: the export helper keys off the
+         display-mode media query to pick the iOS share path over a download.
+         See docs/adr/0017-export-delivery-and-ios-standalone.md. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Flock" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
     <title>Central Flock</title>
   </head>

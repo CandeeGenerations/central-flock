@@ -1,3 +1,4 @@
+import {saveExportedDataUrl, saveExportedFile} from '@/lib/save-exported-file'
 import {useCallback, useState} from 'react'
 
 interface ExportOptions {
@@ -46,10 +47,7 @@ export function useScheduleExport(previewRef: React.RefObject<HTMLDivElement | n
         await new Promise((r) => setTimeout(r, 100))
         const dataUrl = await generateImage()
         if (format === 'jpg') {
-          const a = document.createElement('a')
-          a.href = dataUrl
-          a.download = `${opts.filename}.jpg`
-          a.click()
+          await saveExportedDataUrl(dataUrl, `${opts.filename}.jpg`)
         } else {
           const {jsPDF} = await import('jspdf')
           const img = new Image()
@@ -79,7 +77,7 @@ export function useScheduleExport(previewRef: React.RefObject<HTMLDivElement | n
           const y = (pageHeight - renderHeight) / 2
           const pdf = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'letter'})
           pdf.addImage(dataUrl, 'JPEG', x, y, renderWidth, renderHeight)
-          pdf.save(`${opts.filename}.pdf`)
+          await saveExportedFile(pdf.output('blob'), `${opts.filename}.pdf`, 'application/pdf')
         }
       } finally {
         setExporting(false)
@@ -134,7 +132,7 @@ export function useScheduleExport(previewRef: React.RefObject<HTMLDivElement | n
           if (i > 0) pdf.addPage()
           pdf.addImage(dataUrl, 'JPEG', x, y, renderWidth, renderHeight)
         }
-        pdf.save(`${opts.filename}.pdf`)
+        await saveExportedFile(pdf.output('blob'), `${opts.filename}.pdf`, 'application/pdf')
       } finally {
         setExporting(false)
       }

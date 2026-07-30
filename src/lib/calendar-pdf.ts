@@ -1,3 +1,4 @@
+import {saveExportedDataUrl, saveExportedFile} from '@/lib/save-exported-file'
 import {toCanvas} from 'html-to-image'
 import {jsPDF} from 'jspdf'
 
@@ -45,11 +46,7 @@ export async function generateCalendarExport({element, year, month, format}: Gen
   const base = fileBaseName(year, month)
 
   if (format === 'jpg') {
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.95)
-    const a = document.createElement('a')
-    a.href = dataUrl
-    a.download = `${base}.jpg`
-    a.click()
+    await saveExportedDataUrl(canvas.toDataURL('image/jpeg', 0.95), `${base}.jpg`)
     return
   }
 
@@ -58,5 +55,5 @@ export async function generateCalendarExport({element, year, month, format}: Gen
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   doc.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight)
-  doc.save(`${base}.pdf`)
+  await saveExportedFile(doc.output('blob'), `${base}.pdf`, 'application/pdf')
 }

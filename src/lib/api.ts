@@ -1,3 +1,5 @@
+import {saveExportedFile} from '@/lib/save-exported-file'
+
 const BASE_URL = '/api'
 
 // Read a response as JSON, but if the body isn't JSON (HTML error page, empty body,
@@ -159,13 +161,7 @@ export function togglePersonStatus(id: number) {
 export async function exportPeopleCSV() {
   const res = await fetch(`${BASE_URL}/people/export`, {credentials: 'include'})
   if (!res.ok) throw new Error('Export failed')
-  const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'people-export.csv'
-  a.click()
-  URL.revokeObjectURL(url)
+  await saveExportedFile(await res.blob(), 'people-export.csv', 'text/csv')
 }
 
 // Groups
@@ -219,13 +215,8 @@ export function addGroupMembers(groupId: number, personIds: number[]) {
 export async function exportGroupCSV(groupId: number) {
   const res = await fetch(`${BASE_URL}/groups/${groupId}/export`, {credentials: 'include'})
   if (!res.ok) throw new Error('Export failed')
-  const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'group-export.csv'
-  a.click()
-  URL.revokeObjectURL(url)
+  const filename = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'group-export.csv'
+  await saveExportedFile(await res.blob(), filename, 'text/csv')
 }
 
 export function removeGroupMembers(groupId: number, personIds: number[]) {

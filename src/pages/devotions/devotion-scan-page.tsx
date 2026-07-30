@@ -27,12 +27,14 @@ import {
   Upload,
   ZoomIn,
 } from 'lucide-react'
-import {useRef, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 interface ParsedDevotion {
   date: string
+  /** Day-of-week as written on the sheet — cross-checked against the date, never imported. */
+  dayOfWeek?: string | null
   number: number
   devotionType: 'original' | 'favorite' | 'guest' | 'revisit'
   subcode: string | null
@@ -63,6 +65,22 @@ interface RowState {
   existing: boolean
   selected: boolean
   enrichment?: EnrichResult
+}
+
+interface ScanIssueFix {
+  field: 'date' | 'number'
+  value: string | number
+  label: string
+}
+
+interface ScanIssue {
+  code: string
+  severity: 'error' | 'warning'
+  rowIndex: number | null
+  field?: 'date' | 'number' | 'dayOfWeek' | 'type' | 'chain'
+  message: string
+  fixes?: ScanIssueFix[]
+  shiftAll?: number
 }
 
 interface ScanDraft {
@@ -230,7 +248,44 @@ function isVerseMatch(row: RowState): boolean | null {
   return row.enrichment.originalReference.trim().toLowerCase() === row.devotion.bibleReference.trim().toLowerCase()
 }
 
-function RowStatusIcon({row}: {row: RowState}) {
+function IssueNote({issue, onFix}: {issue: ScanIssue; onFix: (fix: ScanIssueFix) => void}) {
+  // The row is obvious in context, so drop the "Row 12 (#2330)" prefix inline.
+  const text = issue.message.replace(/^Row \d+ \(#-?\d+\)[:,]?\s*/, '')
+  return (
+    <p
+      className={`text-[10px] leading-tight max-w-52 ${issue.severity === 'error' ? 'text-red-600' : 'text-amber-600'}`}
+    >
+      {text.charAt(0).toUpperCase() + text.slice(1)}
+      {issue.fixes?.map((fix) => (
+        <button
+          key={`${fix.field}-${fix.value}`}
+          className="ml-1 underline hover:opacity-70 cursor-pointer"
+          onClick={() => onFix(fix)}
+        >
+          {fix.label}
+        </button>
+      ))}
+    </p>
+  )
+}
+
+function RowStatusIcon({row, issues}: {row: RowState; issues: ScanIssue[]}) {
+  const errors = issues.filter((i) => i.severity === 'error')
+  if (errors.length > 0) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">{errors.map((e) => e.message).join(' ')}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
   const match = isVerseMatch(row)
   if (match === false) {
     return (
@@ -317,7 +372,39 @@ export function DevotionScanPage() {
     podcast: boolean
   } | null>(null)
   const [passagePickerRow, setPassagePickerRow] = useState<number | null>(null)
+  const [issues, setIssues] = useState<ScanIssue[]>([])
+  const [validating, setValidating] = useState(false)
+  const [importAnyway, setImportAnyway] = useState(false)
   const queryClient = useQueryClient()
+
+  // Re-run date/numbering validation whenever the reviewed rows change.
+  useEffect(() => {
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      if (rows.length === 0) {
+        setIssues([])
+        return
+      }
+      setValidating(true)
+      try {
+        const data = await apiPost<{issues: ScanIssue[]}>('/api/devotions/validate-parsed', {
+          devotions: rows.map((r) => r.devotion),
+          month: resultMeta?.month ?? null,
+          year: resultMeta?.year ?? null,
+        })
+        if (!cancelled) setIssues(data.issues)
+      } catch (err) {
+        console.error('Validation failed:', err)
+        if (!cancelled) setIssues([])
+      } finally {
+        if (!cancelled) setValidating(false)
+      }
+    }, 400)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [rows, resultMeta])
 
   // Load saved drafts
   const {data: drafts, refetch: refetchDrafts} = useQuery({
@@ -589,6 +676,48 @@ export function DevotionScanPage() {
     }
   }
 
+  const applyFix = (rowIndex: number, fix: ScanIssueFix) => {
+    if (fix.field === 'number') updateRow(rowIndex, {number: Number(fix.value)})
+    else updateRow(rowIndex, {date: String(fix.value)})
+  }
+
+  const refreshExisting = async (next: RowState[]) => {
+    try {
+      const {existing} = await apiPost<{existing: number[]}>('/api/devotions/check-existing', {
+        numbers: next.map((r) => r.devotion.number),
+      })
+      const existingSet = new Set(existing)
+      setRows((prev) => prev.map((r) => ({...r, existing: existingSet.has(r.devotion.number)})))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Shift every devotion number by the same delta — the usual repair when a
+  // misread day threw the whole sheet's numbering off by one.
+  const shiftAllNumbers = async (delta: number) => {
+    const shifted = rows.map((r) => ({...r, devotion: {...r.devotion, number: r.devotion.number + delta}}))
+    setRows(shifted)
+    toast.success(`Shifted ${shifted.length} numbers by ${delta > 0 ? '+' : ''}${delta}`)
+    await refreshExisting(shifted)
+  }
+
+  // Re-derive every number from the earliest row's date/number pair, one per day.
+  const renumberFromFirst = async () => {
+    const dated = rows.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.devotion.date))
+    if (dated.length === 0) return
+    const anchor = dated.reduce((a, b) => (a.devotion.date <= b.devotion.date ? a : b))
+    const anchorDay = Date.parse(`${anchor.devotion.date}T00:00:00Z`)
+    const renumbered = rows.map((r) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.devotion.date)) return r
+      const days = Math.round((Date.parse(`${r.devotion.date}T00:00:00Z`) - anchorDay) / 86400000)
+      return {...r, devotion: {...r.devotion, number: anchor.devotion.number + days}}
+    })
+    setRows(renumbered)
+    toast.success(`Renumbered from #${anchor.devotion.number} on ${anchor.devotion.date}`)
+    await refreshExisting(renumbered)
+  }
+
   const toggleRow = (index: number) => {
     setRows((prev) => prev.map((r, i) => (i === index ? {...r, selected: !r.selected} : r)))
   }
@@ -723,6 +852,23 @@ export function DevotionScanPage() {
     row.selected && row.devotion.generatedPassageId != null && duplicatePassageIds.has(row.devotion.generatedPassageId)
   const duplicatePassageCount = rows.filter(isDuplicatePassageRow).length
 
+  const sheetIssues = issues.filter((i) => i.rowIndex === null)
+  const issuesByRow = new Map<number, ScanIssue[]>()
+  for (const issue of issues) {
+    if (issue.rowIndex === null) continue
+    issuesByRow.set(issue.rowIndex, [...(issuesByRow.get(issue.rowIndex) ?? []), issue])
+  }
+  const rowIssues = (index: number) => issuesByRow.get(index) ?? []
+  const errorCount = issues.filter((i) => i.severity === 'error').length
+  const hasNumberingIssue = issues.some((i) =>
+    ['number_gap', 'number_out_of_order', 'number_date_mismatch', 'duplicate_number'].includes(i.code),
+  )
+  const warningCount = issues.filter((i) => i.severity === 'warning').length
+  // Only errors on rows actually being imported (plus sheet-wide ones) block import.
+  const blockingErrors = issues.filter(
+    (i) => i.severity === 'error' && (i.rowIndex === null || rows[i.rowIndex]?.selected),
+  ).length
+
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-5">
       <h2 className="text-2xl font-bold">Scan Handwritten Sheet</h2>
@@ -852,6 +998,72 @@ export function DevotionScanPage() {
         </CardContent>
       </Card>
 
+      {/* Validation */}
+      {rows.length > 0 && (issues.length > 0 || validating) && (
+        <Card size="sm" className={errorCount > 0 ? 'border-red-300 dark:border-red-800' : 'border-amber-300'}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 flex-wrap">
+              <AlertTriangle className={`h-4 w-4 ${errorCount > 0 ? 'text-red-500' : 'text-amber-500'}`} />
+              Date &amp; Numbering Checks
+              {errorCount > 0 && (
+                <Badge className="bg-red-100 text-red-800">
+                  {errorCount} error{errorCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+              {warningCount > 0 && (
+                <Badge className="bg-amber-100 text-amber-800">
+                  {warningCount} warning{warningCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+              {validating && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              {hasNumberingIssue && (
+                <Button variant="outline" size="sm" className="ml-auto" onClick={renumberFromFirst}>
+                  Renumber by date
+                </Button>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5 border-t pt-4">
+            {[...sheetIssues, ...issues.filter((i) => i.rowIndex !== null)].slice(0, 40).map((issue, i) => (
+              <div key={`${issue.code}-${issue.rowIndex}-${i}`} className="flex items-start gap-2 text-xs">
+                <span
+                  className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
+                    issue.severity === 'error' ? 'bg-red-500' : 'bg-amber-500'
+                  }`}
+                />
+                <span className="flex-1">
+                  <span className={issue.severity === 'error' ? 'text-red-700 dark:text-red-400' : ''}>
+                    {issue.message}
+                  </span>
+                  {issue.shiftAll != null && (
+                    <button
+                      className="ml-2 underline hover:text-foreground cursor-pointer"
+                      onClick={() => shiftAllNumbers(issue.shiftAll!)}
+                    >
+                      Shift all numbers by {issue.shiftAll > 0 ? '+' : ''}
+                      {issue.shiftAll}
+                    </button>
+                  )}
+                  {issue.rowIndex !== null &&
+                    issue.fixes?.map((fix) => (
+                      <button
+                        key={`${fix.field}-${fix.value}`}
+                        className="ml-2 underline hover:text-foreground cursor-pointer"
+                        onClick={() => applyFix(issue.rowIndex!, fix)}
+                      >
+                        {fix.label}
+                      </button>
+                    ))}
+                </span>
+              </div>
+            ))}
+            {issues.length > 40 && (
+              <p className="text-xs text-muted-foreground">&hellip;and {issues.length - 40} more.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Parsed Results */}
       {rows.length > 0 && (
         <Card>
@@ -906,226 +1118,244 @@ export function DevotionScanPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row, i) => (
-                  <TableRow
-                    key={i}
-                    className={`${
-                      row.existing && !row.selected
-                        ? 'opacity-50'
-                        : isDuplicatePassageRow(row)
-                          ? 'bg-red-50 dark:bg-red-950/20'
-                          : isVerseMatch(row) === false
+                {rows.map((row, i) => {
+                  const rIssues = rowIssues(i)
+                  const hasError = rIssues.some((x) => x.severity === 'error')
+                  const dateIssues = rIssues.filter((x) => x.field === 'date' || x.field === 'dayOfWeek')
+                  const numberIssues = rIssues.filter((x) => x.field === 'number')
+                  const otherIssues = rIssues.filter((x) => x.field === 'type' || x.field === 'chain')
+                  return (
+                    <TableRow
+                      key={i}
+                      className={`${
+                        row.existing && !row.selected
+                          ? 'opacity-50'
+                          : hasError || isDuplicatePassageRow(row) || isVerseMatch(row) === false
                             ? 'bg-red-50 dark:bg-red-950/20'
-                            : row.existing
+                            : rIssues.length > 0 || row.existing
                               ? 'bg-amber-50 dark:bg-amber-950/20'
                               : ''
-                    }`}
-                  >
-                    <TableCell className="px-2">
-                      <RowStatusIcon row={row} />
-                    </TableCell>
-                    <TableCell>
-                      <Checkbox checked={row.selected} onCheckedChange={() => toggleRow(i)} />
-                    </TableCell>
-                    <TableCell className="!align-top">
-                      <DatePicker value={row.devotion.date} onChange={(v) => updateRow(i, {date: v})} />
-                    </TableCell>
-                    <TableCell className="!align-top">
-                      <div className="space-y-1">
-                        <Input
-                          type="number"
-                          value={row.devotion.number}
-                          onChange={(e) => updateRow(i, {number: Number(e.target.value)})}
-                          className="w-30 h-8 text-xs"
-                        />
-                        {row.existing && <p className="text-[10px] text-amber-600">Duplicate #</p>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="!align-top">
-                      <Select
-                        value={
-                          row.devotion.devotionType === 'guest'
-                            ? `guest-${row.devotion.guestSpeaker || ''}`
-                            : row.devotion.devotionType
-                        }
-                        onValueChange={(v) => {
-                          if (v.startsWith('guest-')) {
-                            updateRow(i, {devotionType: 'guest', guestSpeaker: v.replace('guest-', '')})
-                          } else {
-                            updateRow(i, {devotionType: v as ParsedDevotion['devotionType'], guestSpeaker: null})
+                      }`}
+                    >
+                      <TableCell className="px-2">
+                        <RowStatusIcon row={row} issues={rIssues} />
+                      </TableCell>
+                      <TableCell>
+                        <Checkbox checked={row.selected} onCheckedChange={() => toggleRow(i)} />
+                      </TableCell>
+                      <TableCell className="!align-top">
+                        <div className="space-y-1">
+                          <DatePicker value={row.devotion.date} onChange={(v) => updateRow(i, {date: v})} />
+                          {dateIssues.map((issue, j) => (
+                            <IssueNote key={j} issue={issue} onFix={(fix) => applyFix(i, fix)} />
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="!align-top">
+                        <div className="space-y-1">
+                          <Input
+                            type="number"
+                            value={row.devotion.number}
+                            onChange={(e) => updateRow(i, {number: Number(e.target.value)})}
+                            className={`w-30 h-8 text-xs ${numberIssues.some((x) => x.severity === 'error') ? 'border-red-400' : ''}`}
+                          />
+                          {row.existing && <p className="text-[10px] text-amber-600">Duplicate #</p>}
+                          {numberIssues.map((issue, j) => (
+                            <IssueNote key={j} issue={issue} onFix={(fix) => applyFix(i, fix)} />
+                          ))}
+                          {otherIssues.map((issue, j) => (
+                            <IssueNote key={`o${j}`} issue={issue} onFix={(fix) => applyFix(i, fix)} />
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="!align-top">
+                        <Select
+                          value={
+                            row.devotion.devotionType === 'guest'
+                              ? `guest-${row.devotion.guestSpeaker || ''}`
+                              : row.devotion.devotionType
                           }
-                        }}
-                      >
-                        <SelectTrigger className="w-36">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="original">Original</SelectItem>
-                          <SelectItem value="favorite">Favorite</SelectItem>
-                          <SelectItem value="revisit">Revisit</SelectItem>
-                          <SelectItem value="guest-Tyler">Guest - Tyler</SelectItem>
-                          <SelectItem value="guest-Gabe">Guest - Gabe</SelectItem>
-                          <SelectItem value="guest-Ed">Guest - Ed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {row.devotion.devotionType === 'guest' && row.devotion.guestSpeaker === 'Tyler' && (
-                        <div className="mt-1 space-y-0.5">
-                          {row.devotion.generatedTitle ? (
-                            <button
-                              className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 cursor-pointer"
-                              onClick={() => setPassagePickerRow(i)}
-                            >
-                              <Sparkles className="h-3 w-3 shrink-0" />
-                              <span className="truncate max-w-28">{row.devotion.generatedTitle}</span>
-                              {row.devotion.generatedRecorded && <Check className="h-3 w-3 text-green-600 shrink-0" />}
-                            </button>
-                          ) : (
-                            <button
-                              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                              onClick={() => setPassagePickerRow(i)}
-                            >
-                              <Sparkles className="h-3 w-3" />
-                              Pick passage…
-                            </button>
-                          )}
-                          {row.devotion.subcode && (
-                            <p className="text-[10px] text-muted-foreground font-mono truncate max-w-32">
-                              {row.devotion.subcode}
-                            </p>
-                          )}
-                          {isDuplicatePassageRow(row) && (
-                            <p className="flex items-center gap-1 text-[10px] text-red-600">
-                              <AlertTriangle className="h-3 w-3 shrink-0" />
-                              Passage used by another devo
+                          onValueChange={(v) => {
+                            if (v.startsWith('guest-')) {
+                              updateRow(i, {devotionType: 'guest', guestSpeaker: v.replace('guest-', '')})
+                            } else {
+                              updateRow(i, {devotionType: v as ParsedDevotion['devotionType'], guestSpeaker: null})
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-36">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="original">Original</SelectItem>
+                            <SelectItem value="favorite">Favorite</SelectItem>
+                            <SelectItem value="revisit">Revisit</SelectItem>
+                            <SelectItem value="guest-Tyler">Guest - Tyler</SelectItem>
+                            <SelectItem value="guest-Gabe">Guest - Gabe</SelectItem>
+                            <SelectItem value="guest-Ed">Guest - Ed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {row.devotion.devotionType === 'guest' && row.devotion.guestSpeaker === 'Tyler' && (
+                          <div className="mt-1 space-y-0.5">
+                            {row.devotion.generatedTitle ? (
+                              <button
+                                className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 cursor-pointer"
+                                onClick={() => setPassagePickerRow(i)}
+                              >
+                                <Sparkles className="h-3 w-3 shrink-0" />
+                                <span className="truncate max-w-28">{row.devotion.generatedTitle}</span>
+                                {row.devotion.generatedRecorded && (
+                                  <Check className="h-3 w-3 text-green-600 shrink-0" />
+                                )}
+                              </button>
+                            ) : (
+                              <button
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                                onClick={() => setPassagePickerRow(i)}
+                              >
+                                <Sparkles className="h-3 w-3" />
+                                Pick passage…
+                              </button>
+                            )}
+                            {row.devotion.subcode && (
+                              <p className="text-[10px] text-muted-foreground font-mono truncate max-w-32">
+                                {row.devotion.subcode}
+                              </p>
+                            )}
+                            {isDuplicatePassageRow(row) && (
+                              <p className="flex items-center gap-1 text-[10px] text-red-600">
+                                <AlertTriangle className="h-3 w-3 shrink-0" />
+                                Passage used by another devo
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="!align-top">
+                        <div className="space-y-1">
+                          <Input
+                            value={row.devotion.bibleReference || ''}
+                            onChange={(e) => updateRow(i, {bibleReference: e.target.value || null})}
+                            className={`w-44 h-8 text-xs ${isVerseMatch(row) === false ? 'border-red-400' : !row.devotion.bibleReference ? 'border-amber-400' : ''}`}
+                            placeholder="e.g. John 3:16"
+                          />
+                          {isVerseMatch(row) === false && row.enrichment?.originalReference && (
+                            <p className="text-[10px] text-red-600">
+                              Original #{row.enrichment.originalNumber}: {row.enrichment.originalReference}{' '}
+                              <button
+                                className="underline hover:text-red-800 cursor-pointer"
+                                onClick={() => updateRow(i, {bibleReference: row.enrichment!.originalReference})}
+                              >
+                                Use this
+                              </button>
                             </p>
                           )}
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="!align-top">
-                      <div className="space-y-1">
+                      </TableCell>
+                      <TableCell className="!align-top">
                         <Input
-                          value={row.devotion.bibleReference || ''}
-                          onChange={(e) => updateRow(i, {bibleReference: e.target.value || null})}
-                          className={`w-44 h-8 text-xs ${isVerseMatch(row) === false ? 'border-red-400' : !row.devotion.bibleReference ? 'border-amber-400' : ''}`}
-                          placeholder="e.g. John 3:16"
+                          value={row.devotion.songName || ''}
+                          onChange={(e) => updateRow(i, {songName: e.target.value || null})}
+                          className="w-40 h-8 text-xs"
+                          placeholder="Song name"
                         />
-                        {isVerseMatch(row) === false && row.enrichment?.originalReference && (
-                          <p className="text-[10px] text-red-600">
-                            Original #{row.enrichment.originalNumber}: {row.enrichment.originalReference}{' '}
-                            <button
-                              className="underline hover:text-red-800 cursor-pointer"
-                              onClick={() => updateRow(i, {bibleReference: row.enrichment!.originalReference})}
-                            >
-                              Use this
-                            </button>
-                          </p>
+                      </TableCell>
+                      <TableCell>
+                        {row.devotion.devotionType === 'revisit' ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs">
+                              {row.devotion.referencedDevotions.map((n, j) => (
+                                <span key={n}>
+                                  {j > 0 && <span className="text-muted-foreground"> → </span>}
+                                  <button
+                                    className="text-primary hover:underline cursor-pointer"
+                                    onClick={() => showDevoDetail(n)}
+                                  >
+                                    #{n}
+                                  </button>
+                                </span>
+                              ))}
+                              {row.devotion.referencedDevotions.length === 0 && (
+                                <span className="text-muted-foreground">none</span>
+                              )}
+                            </span>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    className="p-0.5 rounded hover:bg-muted cursor-pointer shrink-0"
+                                    onClick={() => {
+                                      setEditChainRow(i)
+                                      setEditChainValue(String(row.devotion.referencedDevotions[0] || ''))
+                                    }}
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="12"
+                                      height="12"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      className="text-muted-foreground"
+                                    >
+                                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                    </svg>
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Edit reference number</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">&mdash;</span>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="!align-top">
-                      <Input
-                        value={row.devotion.songName || ''}
-                        onChange={(e) => updateRow(i, {songName: e.target.value || null})}
-                        className="w-40 h-8 text-xs"
-                        placeholder="Song name"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {row.devotion.devotionType === 'revisit' ? (
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-1">
-                          <span className="text-xs">
-                            {row.devotion.referencedDevotions.map((n, j) => (
-                              <span key={n}>
-                                {j > 0 && <span className="text-muted-foreground"> → </span>}
-                                <button
-                                  className="text-primary hover:underline cursor-pointer"
-                                  onClick={() => showDevoDetail(n)}
-                                >
-                                  #{n}
-                                </button>
-                              </span>
-                            ))}
-                            {row.devotion.referencedDevotions.length === 0 && (
-                              <span className="text-muted-foreground">none</span>
-                            )}
-                          </span>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button
-                                  className="p-0.5 rounded hover:bg-muted cursor-pointer shrink-0"
-                                  onClick={() => {
-                                    setEditChainRow(i)
-                                    setEditChainValue(String(row.devotion.referencedDevotions[0] || ''))
-                                  }}
+                                  className="p-1 rounded hover:bg-muted cursor-pointer"
+                                  onClick={() => toggleFlag(i)}
                                 >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="12"
-                                    height="12"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="text-muted-foreground"
-                                  >
-                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                                  </svg>
+                                  <Flag
+                                    className={`h-3.5 w-3.5 ${row.devotion.flagged ? 'text-red-500 fill-red-500' : 'text-muted-foreground'}`}
+                                  />
                                 </button>
                               </TooltipTrigger>
-                              <TooltipContent>Edit reference number</TooltipContent>
+                              <TooltipContent>{row.devotion.flagged ? 'Unflag' : 'Flag'}</TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className="p-1 rounded hover:bg-muted cursor-pointer"
+                                  onClick={() => openNotes(i)}
+                                >
+                                  <StickyNote
+                                    className={`h-3.5 w-3.5 ${row.devotion.notes ? 'text-amber-500 fill-amber-100' : 'text-muted-foreground'}`}
+                                  />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>{row.devotion.notes ? 'Edit notes' : 'Add notes'}</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <button
+                            className="p-1 rounded hover:bg-destructive/10 cursor-pointer"
+                            onClick={() => removeRow(i)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                          </button>
                         </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">&mdash;</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                className="p-1 rounded hover:bg-muted cursor-pointer"
-                                onClick={() => toggleFlag(i)}
-                              >
-                                <Flag
-                                  className={`h-3.5 w-3.5 ${row.devotion.flagged ? 'text-red-500 fill-red-500' : 'text-muted-foreground'}`}
-                                />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>{row.devotion.flagged ? 'Unflag' : 'Flag'}</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                className="p-1 rounded hover:bg-muted cursor-pointer"
-                                onClick={() => openNotes(i)}
-                              >
-                                <StickyNote
-                                  className={`h-3.5 w-3.5 ${row.devotion.notes ? 'text-amber-500 fill-amber-100' : 'text-muted-foreground'}`}
-                                />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>{row.devotion.notes ? 'Edit notes' : 'Add notes'}</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        <button
-                          className="p-1 rounded hover:bg-destructive/10 cursor-pointer"
-                          onClick={() => removeRow(i)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </div>
@@ -1165,6 +1395,20 @@ export function DevotionScanPage() {
               </p>
             )}
 
+            {blockingErrors > 0 && (
+              <div className="flex items-center gap-2 text-sm text-red-600">
+                <Checkbox
+                  id="import-anyway"
+                  checked={importAnyway}
+                  onCheckedChange={(checked) => setImportAnyway(!!checked)}
+                />
+                <label htmlFor="import-anyway" className="cursor-pointer">
+                  {blockingErrors} date/numbering error{blockingErrors > 1 ? 's' : ''} in the rows to import. Import
+                  anyway.
+                </label>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex items-center justify-end gap-2">
               <Button
@@ -1174,6 +1418,7 @@ export function DevotionScanPage() {
                   setResultMeta(null)
                   setRows([])
                   setCurrentDraftId(null)
+                  setImportAnyway(false)
                 }}
               >
                 <Trash2 className="h-4 w-4 mr-1.5" />
@@ -1186,7 +1431,9 @@ export function DevotionScanPage() {
               <Button
                 size="sm"
                 onClick={handleImport}
-                disabled={importing || selectedCount === 0 || duplicatePassageCount > 0}
+                disabled={
+                  importing || selectedCount === 0 || duplicatePassageCount > 0 || (blockingErrors > 0 && !importAnyway)
+                }
               >
                 {importing ? (
                   <>

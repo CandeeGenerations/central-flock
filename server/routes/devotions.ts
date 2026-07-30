@@ -14,6 +14,7 @@ import {uploadPath, uploadUrl, urlToDiskPath} from '../lib/uploads.js'
 import {generateDevotionPassage} from '../services/devotion-generation.js'
 import {importDevotions, parseSheetRows} from '../services/devotion-import.js'
 import {parseDevotionImage} from '../services/devotion-ocr.js'
+import {type ValidatableDevotion, validateParsedDevotions} from '../services/devotion-scan-validation.js'
 
 const anthropic = new Anthropic()
 
@@ -2539,12 +2540,32 @@ devotionsRouter.post(
 
     try {
       const result = await parseDevotionImage(image, mediaType)
-      res.json(result)
+      const issues = validateParsedDevotions(result.devotions, {month: result.month, year: result.year})
+      res.json({...result, issues})
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error)
       console.error('OCR error:', msg)
       res.status(500).json({error: msg})
     }
+  }),
+)
+
+// POST /api/devotions/validate-parsed - Re-check dates/numbering after edits
+devotionsRouter.post(
+  '/validate-parsed',
+  asyncHandler(async (req, res) => {
+    const {devotions, month, year} = req.body as {
+      devotions: ValidatableDevotion[]
+      month?: string | null
+      year?: number | null
+    }
+
+    if (!devotions || !Array.isArray(devotions)) {
+      res.status(400).json({error: 'devotions array is required'})
+      return
+    }
+
+    res.json({issues: validateParsedDevotions(devotions, {month, year})})
   }),
 )
 

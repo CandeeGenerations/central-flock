@@ -5,6 +5,8 @@ import {parseReference} from '../lib/bible-reference.js'
 
 export interface ParsedDevotionRow {
   date: string
+  /** Day-of-week exactly as written on the sheet — used for validation only. */
+  dayOfWeek: string | null
   number: number
   devotionType: 'original' | 'favorite' | 'guest' | 'revisit'
   subcode: string | null
@@ -37,8 +39,15 @@ The header area may contain:
 - Notes about removing revisit intros from specific dates
 - The series name (e.g., "FROM THE SHEPHERD TO THE SHEEP")
 
+Rules for dates and numbers:
+- There is exactly one devotion per calendar day, and the devotion number increases by exactly 1 each day. A full month sheet has one row per day of that month.
+- Always take the date from the DATE column and the month/year from the header. Never infer the date from the DAY column.
+- The handwritten DAY column is sometimes wrong. Copy it verbatim into dayOfWeek and do NOT correct it, do not shift dates to make it fit, and do not renumber rows because of it — a mismatch is checked separately.
+- Never skip a row, merge two rows, or invent a row to make the sequence look right. Transcribe what is on the sheet.
+
 For each row, output:
 - date: Full date as YYYY-MM-DD
+- dayOfWeek: The DAY column exactly as written (e.g. "MON", "Tues"), or null if the column is blank
 - number: The devotion number (integer)
 - devotionType: "original", "favorite", "guest", or "revisit"
 - subcode: Any letter/number code in parentheses (e.g., "G-16", "E-14", "35", "001 - R-G"), or null

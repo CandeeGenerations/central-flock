@@ -4,6 +4,18 @@ import {Router} from 'express'
 import {db, schema} from '../db/index.js'
 import type {FairBoothFairRole, FairBoothShiftRole} from '../db/schema-fair-booth.js'
 import {asyncHandler} from '../lib/route-helpers.js'
+import {
+  fireReminderRun,
+  getReminderSendTime,
+  resolveReminderRun,
+  sendAtForTargetDay,
+} from '../services/fair-booth-reminders.js'
+import {processSendJob} from './messages.js'
+import {getSetting, setSetting} from './settings.js'
+
+// Remembers the last template used for reminders, so queuing next year doesn't
+// need the picker again.
+const REMINDER_TEMPLATE_KEY = 'schedules.fairBooth.reminderTemplateId'
 
 export const fairBoothRouter = Router()
 
@@ -565,5 +577,193 @@ fairBoothRouter.post(
       .where(eq(schema.fairBoothSignups.id, signupId))
       .run()
     res.json({displayRowOverride: next})
+  }),
+)
+
+// ── Reminder Runs ──────────────────────────────────────────────────────
+// Nightly "you're up next" texts. A Run is a standing instruction, not
+// rendered text — see docs/adr/0018-fair-booth-reminder-runs.md.
+
+// GET /:id/reminders — the queue, with a LIVE recipient count per Run.
+// The count is computed now, not stored, so it reflects signups made since
+// the Run was queued. That's the whole point of the feature.
+fairBoothRouter.get(
+  '/:id/reminders',
+  asyncHandler(async (req, res) => {
+    const scheduleId = Number(req.params.id)
+    const runs = db
+      .select()
+      .from(schema.fairBoothReminderRuns)
+      .where(eq(schema.fairBoothReminderRuns.scheduleId, scheduleId))
+      .orderBy(schema.fairBoothReminderRuns.targetDay)
+      .all()
+
+    const counts = db
+      .select({
+        dayDate: schema.fairBoothSignups.dayDate,
+        n: sql<number>`count(distinct ${schema.fairBoothSignups.personId})`.as('n'),
+      })
+      .from(schema.fairBoothSignups)
+      .where(eq(schema.fairBoothSignups.scheduleId, scheduleId))
+      .groupBy(schema.fairBoothSignups.dayDate)
+      .all()
+    const byDay = new Map(counts.map((c) => [c.dayDate, c.n]))
+
+    const sent = runs.filter((r) => r.messageId != null).map((r) => r.messageId as number)
+    const msgs = sent.length ? db.select().from(schema.messages).where(inArray(schema.messages.id, sent)).all() : []
+    const msgById = new Map(msgs.map((m) => [m.id, m]))
+
+    res.json({
+      sendTime: getReminderSendTime(),
+      runs: runs.map((r) => ({
+        ...r,
+        recipientCount: byDay.get(r.targetDay) ?? 0,
+        message: r.messageId != null ? (msgById.get(r.messageId) ?? null) : null,
+      })),
+    })
+  }),
+)
+
+// POST /:id/reminders — queue one Run per fair day. Idempotent: the unique
+// index on (schedule_id, target_day) means re-running this can never create a
+// second Run for a day, so it doubles as "re-time everything to the current
+// setting" for days not yet sent.
+fairBoothRouter.post(
+  '/:id/reminders',
+  asyncHandler(async (req, res) => {
+    const scheduleId = Number(req.params.id)
+    const {templateId} = req.body as {templateId?: number}
+    const schedule = db.select().from(schema.schedules).where(eq(schema.schedules.id, scheduleId)).get()
+    if (!schedule?.scopeStart) {
+      res.status(404).json({error: 'Fair booth schedule not found'})
+      return
+    }
+
+    const tid = templateId ?? Number(getSetting(REMINDER_TEMPLATE_KEY) || 0)
+    const template = tid ? db.select().from(schema.templates).where(eq(schema.templates.id, tid)).get() : undefined
+    if (!template) {
+      res.status(400).json({error: 'Pick a template for the reminders'})
+      return
+    }
+    // Validate up front rather than discovering it at 7 PM. The resolver
+    // re-checks at fire time, since the template can be edited in between.
+    if (!template.content.includes('{{timeSlot}}')) {
+      res.status(400).json({error: `Template "${template.name}" must contain {{timeSlot}}`})
+      return
+    }
+    if (templateId) setSetting(REMINDER_TEMPLATE_KEY, String(templateId))
+
+    const sendTime = getReminderSendTime()
+    const days = Array.from({length: 9}, (_, i) => plusDays(schedule.scopeStart as string, i))
+    let created = 0
+    for (const targetDay of days) {
+      const existing = db
+        .select()
+        .from(schema.fairBoothReminderRuns)
+        .where(
+          and(
+            eq(schema.fairBoothReminderRuns.scheduleId, scheduleId),
+            eq(schema.fairBoothReminderRuns.targetDay, targetDay),
+          ),
+        )
+        .get()
+      if (existing) continue
+      db.insert(schema.fairBoothReminderRuns)
+        .values({
+          scheduleId,
+          targetDay,
+          templateId: template.id,
+          scheduledAt: sendAtForTargetDay(targetDay, sendTime),
+        })
+        .run()
+      created++
+    }
+    res.status(201).json({created, total: days.length})
+  }),
+)
+
+// GET /reminders/:runId/preview — every recipient, fully rendered, via the
+// same resolver the send uses. Not a sample and not a re-implementation.
+fairBoothRouter.get(
+  '/reminders/:runId/preview',
+  asyncHandler(async (req, res) => {
+    const run = db
+      .select()
+      .from(schema.fairBoothReminderRuns)
+      .where(eq(schema.fairBoothReminderRuns.id, Number(req.params.runId)))
+      .get()
+    if (!run) {
+      res.status(404).json({error: 'Reminder run not found'})
+      return
+    }
+    const {recipients, error} = resolveReminderRun(run)
+    res.json({targetDay: run.targetDay, scheduledAt: run.scheduledAt, status: run.status, error, recipients})
+  }),
+)
+
+fairBoothRouter.post(
+  '/reminders/:runId/cancel',
+  asyncHandler(async (req, res) => {
+    const runId = Number(req.params.runId)
+    const run = db.select().from(schema.fairBoothReminderRuns).where(eq(schema.fairBoothReminderRuns.id, runId)).get()
+    if (!run) {
+      res.status(404).json({error: 'Reminder run not found'})
+      return
+    }
+    if (run.status !== 'scheduled' && run.status !== 'past_due') {
+      res.status(400).json({error: `Cannot cancel a run that is ${run.status}`})
+      return
+    }
+    db.update(schema.fairBoothReminderRuns)
+      .set({status: 'canceled', updatedAt: sql`(datetime('now'))`})
+      .where(eq(schema.fairBoothReminderRuns.id, runId))
+      .run()
+    res.json({success: true})
+  }),
+)
+
+// Re-queue a canceled/past_due/skipped Run at its original time.
+fairBoothRouter.post(
+  '/reminders/:runId/reschedule',
+  asyncHandler(async (req, res) => {
+    const runId = Number(req.params.runId)
+    const run = db.select().from(schema.fairBoothReminderRuns).where(eq(schema.fairBoothReminderRuns.id, runId)).get()
+    if (!run) {
+      res.status(404).json({error: 'Reminder run not found'})
+      return
+    }
+    if (run.status === 'completed' || run.status === 'sending') {
+      res.status(400).json({error: `Cannot reschedule a run that is ${run.status}`})
+      return
+    }
+    db.update(schema.fairBoothReminderRuns)
+      .set({
+        status: 'scheduled',
+        error: null,
+        scheduledAt: sendAtForTargetDay(run.targetDay),
+        updatedAt: sql`(datetime('now'))`,
+      })
+      .where(eq(schema.fairBoothReminderRuns.id, runId))
+      .run()
+    res.json({success: true})
+  }),
+)
+
+// Fire immediately, ignoring scheduled_at and the late cutoff.
+fairBoothRouter.post(
+  '/reminders/:runId/send-now',
+  asyncHandler(async (req, res) => {
+    const runId = Number(req.params.runId)
+    const run = db.select().from(schema.fairBoothReminderRuns).where(eq(schema.fairBoothReminderRuns.id, runId)).get()
+    if (!run) {
+      res.status(404).json({error: 'Reminder run not found'})
+      return
+    }
+    if (run.status === 'completed' || run.status === 'sending') {
+      res.status(400).json({error: `Run already ${run.status}`})
+      return
+    }
+    const result = await fireReminderRun(run, processSendJob)
+    res.json(result)
   }),
 )

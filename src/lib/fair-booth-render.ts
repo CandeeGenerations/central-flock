@@ -1,6 +1,22 @@
 // Pure rendering computations for the Fair Booth schedule. See
 // docs/adr/0009-fair-booth-schedule.md and the glossary in CONTEXT.md.
+//
+// Shift derivation and formatting live in server/lib/fair-booth-shifts.ts — the
+// Reminder Run resolver needs them and the server can't import from src/. They
+// are re-exported here so every call site in src/ is unchanged, and so a Shifts
+// Card and a Shift Reminder are formatted by the same function.
 import type {FairBoothFairRole, FairBoothShiftRole} from '../../server/db/schema-fair-booth'
+import {formatLocalDate, parseLocalDate} from '../../server/lib/fair-booth-shifts'
+
+export {
+  computePersonShifts,
+  formatShiftDate,
+  formatShiftRanges,
+  formatShiftReminderTimeSlot,
+  formatTimeShort,
+  SHIFT_ROLE_LABEL,
+} from '../../server/lib/fair-booth-shifts'
+export type {ShiftDay, ShiftGroup, ShiftRange} from '../../server/lib/fair-booth-shifts'
 
 export type DayOfWeek = 'fri' | 'sat' | 'sun' | 'mon' | 'tue' | 'wed' | 'thu'
 
@@ -54,18 +70,6 @@ const MIN_2PM = 14 * 60
 const MIN_6PM = 18 * 60
 const MIN_10PM = 22 * 60
 const MIN_5PM = 17 * 60
-
-function parseLocalDate(date: string): Date {
-  const [y, m, d] = date.split('-').map(Number)
-  return new Date(y, m - 1, d)
-}
-
-function formatLocalDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 export function isFriday(date: string): boolean {
   return parseLocalDate(date).getDay() === 5
@@ -320,14 +324,6 @@ export function splitRosterColumns(ordered: RosterRow[]): {left: RosterRow[]; ri
   return {left: ordered.slice(0, mid), right: ordered.slice(mid)}
 }
 
-export function formatTimeShort(minute: number): string {
-  let h = Math.floor(minute / 60)
-  const m = minute % 60
-  if (h > 12) h -= 12
-  if (h === 0) h = 12
-  return m === 0 ? `${h}` : `${h}:${String(m).padStart(2, '0')}`
-}
-
 export function shiftRoleDashes(role: FairBoothShiftRole): string {
   return role === 'unit_leader' ? '-' : role === 'asst_unit' ? '--' : '---'
 }
@@ -349,102 +345,6 @@ export function maxShiftRoleFor(fr: FairBoothFairRole): FairBoothShiftRole {
   if (fr === 'worker') return 'worker'
   if (fr === 'asst_unit') return 'asst_unit'
   return 'unit_leader'
-}
-
-// ── Shifts (person-facing) ─────────────────────────────────────────────
-// A Signup is a stored row, always slot-sized — 3-7 PM on a two-slot day is
-// two rows. A Shift is what the volunteer experiences: one contiguous run of
-// their Signups on one day at one role. Derived here, never stored. See
-// CONTEXT.md.
-
-export interface ShiftRange {
-  startMinute: number
-  endMinute: number
-}
-
-export interface ShiftGroup {
-  shiftRole: FairBoothShiftRole
-  // Contiguous-merged. More than one entry means a real break in the day.
-  ranges: ShiftRange[]
-}
-
-export interface ShiftDay {
-  dayDate: string
-  // More than one group means the role changed mid-day; the card renders
-  // those as sub-bullets under a single date.
-  groups: ShiftGroup[]
-}
-
-function mergeRanges(ranges: ShiftRange[]): ShiftRange[] {
-  const sorted = [...ranges].sort((a, b) => a.startMinute - b.startMinute)
-  const out: ShiftRange[] = []
-  for (const r of sorted) {
-    const last = out[out.length - 1]
-    // Touching counts as contiguous: 2-6 followed by 6-10 is one Shift.
-    if (last && r.startMinute <= last.endMinute) {
-      last.endMinute = Math.max(last.endMinute, r.endMinute)
-    } else {
-      out.push({...r})
-    }
-  }
-  return out
-}
-
-// Group one person's signups by (day, role), merging contiguous runs within
-// each group. Days ordered chronologically; groups within a day by first start.
-export function computePersonShifts(signups: FairSignup[], personId: number): ShiftDay[] {
-  const byDay = new Map<string, Map<FairBoothShiftRole, ShiftRange[]>>()
-  for (const s of signups) {
-    if (s.personId !== personId) continue
-    if (!byDay.has(s.dayDate)) byDay.set(s.dayDate, new Map())
-    const byRole = byDay.get(s.dayDate)!
-    if (!byRole.has(s.shiftRole)) byRole.set(s.shiftRole, [])
-    byRole.get(s.shiftRole)!.push({startMinute: s.startMinute, endMinute: s.endMinute})
-  }
-  return [...byDay.entries()]
-    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-    .map(([dayDate, byRole]) => ({
-      dayDate,
-      groups: [...byRole.entries()]
-        .map(([shiftRole, ranges]) => ({shiftRole, ranges: mergeRanges(ranges)}))
-        .sort((a, b) => a.ranges[0].startMinute - b.ranges[0].startMinute),
-    }))
-}
-
-const SHORT_DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const SHORT_MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-// "Fri, Jul 24"
-export function formatShiftDate(dayDate: string): string {
-  const d = parseLocalDate(dayDate)
-  return `${SHORT_DAY[d.getDay()]}, ${SHORT_MONTH[d.getMonth()]} ${d.getDate()}`
-}
-
-function meridiem(minute: number): 'AM' | 'PM' {
-  return minute >= 12 * 60 ? 'PM' : 'AM'
-}
-
-// "5–10 PM", or "2–4 PM and 7–10 PM" when the day has a real break. Every fair
-// hour is PM today, so a single trailing marker reads best; the AM branch only
-// fires if the slot map ever changes.
-export function formatShiftRanges(ranges: ShiftRange[]): string {
-  const allPm = ranges.every((r) => meridiem(r.startMinute) === 'PM' && meridiem(r.endMinute) === 'PM')
-  // With a break in the day each range carries its own marker — "2–4 and
-  // 7–10 PM" reads as though only the last range is PM.
-  const suffix = allPm && ranges.length > 1 ? ' PM' : ''
-  const parts = ranges.map((r) =>
-    allPm
-      ? `${formatTimeShort(r.startMinute)}–${formatTimeShort(r.endMinute)}${suffix}`
-      : `${formatTimeShort(r.startMinute)} ${meridiem(r.startMinute)}–${formatTimeShort(r.endMinute)} ${meridiem(r.endMinute)}`,
-  )
-  const joined = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
-  return allPm && ranges.length === 1 ? `${joined} PM` : joined
-}
-
-export const SHIFT_ROLE_LABEL: Record<FairBoothShiftRole, string> = {
-  unit_leader: 'Unit Leader',
-  asst_unit: 'Asst Unit Leader',
-  worker: 'Worker',
 }
 
 // Render placement: which slot column does a signup belong to?

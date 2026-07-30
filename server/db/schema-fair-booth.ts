@@ -1,7 +1,7 @@
 import {sql} from 'drizzle-orm'
 import {integer, sqliteTable, text, uniqueIndex} from 'drizzle-orm/sqlite-core'
 
-import {people} from './schema-core.js'
+import {messages, people, templates} from './schema-core.js'
 import {schedules} from './schema-schedules.js'
 
 export const fairBoothFairRoles = ['worker', 'asst_unit', 'unit_leader', 'asst_fair_mgr', 'fair_mgr'] as const
@@ -60,3 +60,50 @@ export const fairBoothSignups = sqliteTable('fair_booth_signups', {
     .default(sql`(datetime('now'))`)
     .notNull(),
 })
+
+export const fairBoothReminderRunStatuses = [
+  'scheduled',
+  'sending',
+  'completed',
+  'skipped',
+  'past_due',
+  'canceled',
+] as const
+export type FairBoothReminderRunStatus = (typeof fairBoothReminderRunStatuses)[number]
+
+// A Reminder Run: "text everyone working <target_day>, the evening before."
+//
+// Deliberately stores no recipients and no rendered text — only the standing
+// instruction. Recipients and their Shifts are resolved when the Run fires, so
+// a Signup added after queuing is still included. This is the one queued send
+// in the app that is NOT pre-rendered; see docs/adr/0018-fair-booth-reminder-runs.md.
+export const fairBoothReminderRuns = sqliteTable(
+  'fair_booth_reminder_runs',
+  {
+    id: integer('id').primaryKey({autoIncrement: true}),
+    scheduleId: integer('schedule_id')
+      .notNull()
+      .references(() => schedules.id, {onDelete: 'cascade'}),
+    // The day being worked — NOT the day the text goes out (that's the evening before).
+    targetDay: text('target_day').notNull(),
+    // Live reference, not a snapshot: editing the template changes pending Runs.
+    // Re-validated at fire time; a template that lost {{timeSlot}} blocks the send.
+    templateId: integer('template_id')
+      .notNull()
+      .references(() => templates.id, {onDelete: 'restrict'}),
+    // UTC 'YYYY-MM-DD HH:MM:SS', same convention as messages.scheduled_at.
+    scheduledAt: text('scheduled_at').notNull(),
+    status: text('status', {enum: fairBoothReminderRunStatuses}).notNull().default('scheduled'),
+    // Set once the Run fires and creates an ordinary, fully-rendered message.
+    messageId: integer('message_id').references(() => messages.id, {onDelete: 'set null'}),
+    error: text('error'),
+    createdAt: text('created_at')
+      .default(sql`(datetime('now'))`)
+      .notNull(),
+    updatedAt: text('updated_at')
+      .default(sql`(datetime('now'))`)
+      .notNull(),
+  },
+  // The idempotency guarantee: queuing twice can never double-send a day.
+  (t) => [uniqueIndex('fair_booth_reminder_runs_schedule_day_uniq').on(t.scheduleId, t.targetDay)],
+)

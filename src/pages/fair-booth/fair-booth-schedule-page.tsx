@@ -21,6 +21,7 @@ import {toast} from 'sonner'
 
 import {exportFairBoothJpg, exportFairBoothPdf, exportShiftsCardJpg, renderShiftsCardJpeg} from './fair-booth-exports'
 import {FairBoothGrid} from './fair-booth-grid'
+import {FairBoothRemindersCard} from './fair-booth-reminders-card'
 import {FairBoothRoster} from './fair-booth-roster'
 import {FairBoothRosterModal} from './fair-booth-roster-modal'
 import {FairBoothShiftsCard} from './fair-booth-shifts-card'
@@ -305,6 +306,8 @@ export function FairBoothSchedulePage() {
           />
         </CardContent>
       </Card>
+
+      <FairBoothRemindersCard scheduleId={scheduleId} />
 
       {addOpen && (
         <AddRosterPersonDialog

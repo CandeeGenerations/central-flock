@@ -103,7 +103,7 @@ export const messages = sqliteTable('messages', {
     .default(sql`(datetime('now'))`)
     .notNull(),
   completedAt: text('completed_at'),
-  source: text('source', {enum: ['manual', 'birthday_scheduler']})
+  source: text('source', {enum: ['manual', 'birthday_scheduler', 'fair_booth_reminder']})
     .default('manual')
     .notNull(),
 })

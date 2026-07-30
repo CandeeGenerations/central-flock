@@ -303,6 +303,23 @@ export function SchedulesSettingsPage() {
                 }}
               />
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Reminder send time</Label>
+              <p className="text-muted-foreground text-xs">
+                What time the nightly &quot;you&apos;re up next&quot; texts go out, the evening before each fair day.
+                Changing this re-times every reminder still waiting to send.
+              </p>
+              <Input
+                type="time"
+                defaultValue={settings.fairBooth.reminderSendTime}
+                onBlur={(e) => {
+                  const v = e.target.value
+                  if (/^\d{2}:\d{2}$/.test(v) && v !== settings.fairBooth.reminderSendTime)
+                    saveType(queryClient, {fairBooth: {reminderSendTime: v}})
+                }}
+                className="w-32"
+              />
+            </div>
           </CardContent>
         </Card>
       </div>

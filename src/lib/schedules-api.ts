@@ -45,6 +45,9 @@ export interface SchedulesSettings {
     gridPageFooterBlocks: FooterBlock[]
     rosterPageFooterBlocks: FooterBlock[]
     personalShiftsIntro: string
+    // Local HH:MM a Reminder Run fires, the evening before the day it covers.
+    // Changing it re-times every Run still pending.
+    reminderSendTime: string
   }
 }
 
@@ -172,6 +175,8 @@ export const schedulesKeys = {
   cells: (id: number) => ['schedules', 'cells', id] as const,
   fairBoothList: ['schedules', 'fair-booth', 'list'] as const,
   fairBooth: (id: number) => ['schedules', 'fair-booth', id] as const,
+  fairBoothReminders: (id: number) => ['schedules', 'fair-booth', id, 'reminders'] as const,
+  fairBoothReminderPreview: (runId: number) => ['schedules', 'fair-booth', 'reminder-preview', runId] as const,
 }
 
 // ── Fair Booth ─────────────────────────────────────────────────────────
@@ -293,3 +298,62 @@ export const rowFairBoothSignup = (scheduleId: number, signupId: number, directi
     method: 'POST',
     body: JSON.stringify({direction}),
   })
+
+// ── Fair Booth Reminder Runs ───────────────────────────────────────────
+
+export type FairBoothReminderRunStatus = 'scheduled' | 'sending' | 'completed' | 'skipped' | 'past_due' | 'canceled'
+
+export interface FairBoothReminderRun {
+  id: number
+  scheduleId: number
+  // The day being worked — the text goes out the evening before.
+  targetDay: string
+  templateId: number
+  scheduledAt: string
+  status: FairBoothReminderRunStatus
+  messageId: number | null
+  error: string | null
+  // Computed live on every fetch, not stored — reflects signups made since
+  // the Run was queued.
+  recipientCount: number
+  message: {id: number; status: string; sentCount: number; failedCount: number; totalRecipients: number} | null
+}
+
+export interface FairBoothReminderPreviewRecipient {
+  personId: number
+  name: string
+  phoneNumber: string | null
+  timeSlot: string
+  rendered: string
+  skipReason?: 'no_phone' | 'inactive'
+}
+
+export const fetchFairBoothReminders = (scheduleId: number) =>
+  request<{sendTime: string; runs: FairBoothReminderRun[]}>(`/schedules/fair-booth/${scheduleId}/reminders`)
+
+export const queueFairBoothReminders = (scheduleId: number, templateId: number) =>
+  request<{created: number; total: number}>(`/schedules/fair-booth/${scheduleId}/reminders`, {
+    method: 'POST',
+    body: JSON.stringify({templateId}),
+  })
+
+export const fetchFairBoothReminderPreview = (runId: number) =>
+  request<{
+    targetDay: string
+    scheduledAt: string
+    status: FairBoothReminderRunStatus
+    error?: string
+    recipients: FairBoothReminderPreviewRecipient[]
+  }>(`/schedules/fair-booth/reminders/${runId}/preview`)
+
+export const cancelFairBoothReminder = (runId: number) =>
+  request<{success: true}>(`/schedules/fair-booth/reminders/${runId}/cancel`, {method: 'POST'})
+
+export const rescheduleFairBoothReminder = (runId: number) =>
+  request<{success: true}>(`/schedules/fair-booth/reminders/${runId}/reschedule`, {method: 'POST'})
+
+export const sendFairBoothReminderNow = (runId: number) =>
+  request<{status: FairBoothReminderRunStatus; sent: number; skipped: number; error?: string}>(
+    `/schedules/fair-booth/reminders/${runId}/send-now`,
+    {method: 'POST'},
+  )

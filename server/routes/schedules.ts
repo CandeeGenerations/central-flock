@@ -9,6 +9,11 @@ import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {uploadPath, uploadUrl} from '../lib/uploads.js'
 import {sendImageViaUI} from '../services/applescript.js'
+import {
+  DEFAULT_REMINDER_SEND_TIME,
+  REMINDER_SEND_TIME_KEY,
+  sendAtForTargetDay,
+} from '../services/fair-booth-reminders.js'
 
 export const schedulesRouter = Router()
 
@@ -50,6 +55,8 @@ interface SchedulesSettings {
     gridPageFooterBlocks: FooterBlock[]
     rosterPageFooterBlocks: FooterBlock[]
     personalShiftsIntro: string
+    // Local HH:MM a Reminder Run fires, the evening before the day it covers.
+    reminderSendTime: string
   }
 }
 
@@ -101,6 +108,7 @@ function readSettings(): SchedulesSettings {
         },
       ]),
       personalShiftsIntro: map.get('schedules.fairBooth.personalShiftsIntro') ?? DEFAULT_PERSONAL_SHIFTS_INTRO,
+      reminderSendTime: map.get(REMINDER_SEND_TIME_KEY) ?? DEFAULT_REMINDER_SEND_TIME,
     },
   }
 }
@@ -147,6 +155,26 @@ schedulesRouter.put(
       upsert('schedules.fairBooth.rosterPageFooterBlocks', JSON.stringify(body.fairBooth.rosterPageFooterBlocks))
     if (body.fairBooth?.personalShiftsIntro !== undefined)
       upsert('schedules.fairBooth.personalShiftsIntro', body.fairBooth.personalShiftsIntro)
+    if (body.fairBooth?.reminderSendTime !== undefined && /^\d{2}:\d{2}$/.test(body.fairBooth.reminderSendTime)) {
+      upsert(REMINDER_SEND_TIME_KEY, body.fairBooth.reminderSendTime)
+      // Re-time every Run still waiting, so the setting can't display one time
+      // while the queue holds another. Already-fired Runs are untouched.
+      // See docs/adr/0018-fair-booth-reminder-runs.md.
+      const pending = db
+        .select()
+        .from(schema.fairBoothReminderRuns)
+        .where(eq(schema.fairBoothReminderRuns.status, 'scheduled'))
+        .all()
+      for (const run of pending) {
+        db.update(schema.fairBoothReminderRuns)
+          .set({
+            scheduledAt: sendAtForTargetDay(run.targetDay, body.fairBooth.reminderSendTime),
+            updatedAt: sql`(datetime('now'))`,
+          })
+          .where(eq(schema.fairBoothReminderRuns.id, run.id))
+          .run()
+      }
+    }
     res.json(readSettings())
   }),
 )

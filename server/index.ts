@@ -44,6 +44,7 @@ import {usageRouter} from './routes/usage.js'
 import {webhooksRouter} from './routes/webhooks.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
+import {startFairBoothReminderScheduler} from './services/fair-booth-reminders.js'
 import {startScheduler} from './services/scheduler.js'
 import {startSpecialsScheduler} from './services/specials-scheduler.js'
 
@@ -140,6 +141,7 @@ app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
   startScheduler(processSendJob)
   startBirthdayScheduler()
+  startFairBoothReminderScheduler(processSendJob)
   startCalendarSyncScheduler()
   startSpecialsScheduler()
   cleanupOrphanedScanImages()

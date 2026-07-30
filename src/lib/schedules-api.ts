@@ -27,6 +27,8 @@ export interface FooterBlock {
 
 export interface SchedulesSettings {
   logoPath: string | null
+  // Squarer mark for image cards; falls back to logoPath when unset.
+  compactLogoPath: string | null
   nursery: {
     titlePrefix: string
     footerBlocks: FooterBlock[]
@@ -42,6 +44,7 @@ export interface SchedulesSettings {
     minSignupsForBold: number
     gridPageFooterBlocks: FooterBlock[]
     rosterPageFooterBlocks: FooterBlock[]
+    personalShiftsIntro: string
   }
 }
 
@@ -55,10 +58,10 @@ export const updateSchedulesSettings = (
   }>,
 ) => request<SchedulesSettings>('/schedules/settings', {method: 'PUT', body: JSON.stringify(body)})
 
-export const uploadSchedulesLogo = (imageData: string) =>
+export const uploadSchedulesLogo = (imageData: string, slot: 'print' | 'compact' = 'print') =>
   request<{logoPath: string}>('/schedules/settings/logo', {
     method: 'POST',
-    body: JSON.stringify({imageData}),
+    body: JSON.stringify({imageData, slot}),
   })
 
 export interface SendScheduleImageInput {

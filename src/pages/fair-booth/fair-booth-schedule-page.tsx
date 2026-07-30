@@ -1,3 +1,4 @@
+import {SendScheduleDialog} from '@/components/schedule/send-schedule-dialog'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
@@ -13,15 +14,19 @@ import {
   upsertFairBoothRosterAttrs,
 } from '@/lib/schedules-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, Pencil, Plus, X} from 'lucide-react'
+import {ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, Pencil, Plus, Send, X} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
-import {exportFairBoothJpg, exportFairBoothPdf} from './fair-booth-exports'
+import {exportFairBoothJpg, exportFairBoothPdf, exportShiftsCardJpg, renderShiftsCardJpeg} from './fair-booth-exports'
 import {FairBoothGrid} from './fair-booth-grid'
 import {FairBoothRoster} from './fair-booth-roster'
 import {FairBoothRosterModal} from './fair-booth-roster-modal'
+import {FairBoothShiftsCard} from './fair-booth-shifts-card'
+
+// Text body accompanying a texted Shifts Card. Editable in the dialog per send.
+const SHIFTS_SEND_CAPTION = 'Here are your shifts for the Fair this year! Please let me know if any changes are needed.'
 
 export function FairBoothSchedulePage() {
   const {id} = useParams<{id: string}>()
@@ -50,6 +55,8 @@ export function FairBoothSchedulePage() {
   })
   const printGridRef = useRef<HTMLDivElement | null>(null)
   const printRosterRef = useRef<HTMLDivElement | null>(null)
+  const shiftsCardRef = useRef<HTMLDivElement | null>(null)
+  const [sendShiftsOpen, setSendShiftsOpen] = useState(false)
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')
@@ -88,7 +95,13 @@ export function FairBoothSchedulePage() {
     const p = people.find((x) => x.id === focusedPersonId)
     return p ? [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}` : null
   })()
-  const filenameBase = `fair-booth-${schedule.scopeLabel.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`
+  const slug = (s: string) =>
+    s
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase()
+  const filenameBase = `fair-booth-${slug(schedule.scopeLabel)}`
+  const shiftsFilename = focusedName ? `${filenameBase}-${slug(focusedName)}-shifts` : filenameBase
 
   async function withExport(fn: () => Promise<void>) {
     setExporting(true)
@@ -214,13 +227,32 @@ export function FairBoothSchedulePage() {
         </CardHeader>
         <CardContent>
           {focusedName && (
-            <div className="mb-3 flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm">
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm">
               <span>
                 Showing only <span className="font-semibold">{focusedName}</span>&apos;s shifts
               </span>
-              <Button variant="outline" size="sm" className="ml-auto h-7" onClick={() => setFocusedPersonId(null)}>
-                <X className="h-3 w-3 mr-1" /> Clear
-              </Button>
+              <div className="ml-auto flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7"
+                  disabled={exporting}
+                  onClick={() =>
+                    withExport(async () => {
+                      if (!shiftsCardRef.current) return
+                      await exportShiftsCardJpg(shiftsCardRef.current, shiftsFilename)
+                    })
+                  }
+                >
+                  <Download className="h-3 w-3 mr-1" /> Export Shifts
+                </Button>
+                <Button variant="outline" size="sm" className="h-7" onClick={() => setSendShiftsOpen(true)}>
+                  <Send className="h-3 w-3 mr-1" /> Send Shifts
+                </Button>
+                <Button variant="outline" size="sm" className="h-7" onClick={() => setFocusedPersonId(null)}>
+                  <X className="h-3 w-3 mr-1" /> Clear
+                </Button>
+              </div>
             </div>
           )}
           <div className="overflow-x-auto">
@@ -309,6 +341,38 @@ export function FairBoothSchedulePage() {
             setRosterPersonId(null)
           }}
         />
+      )}
+
+      {/* Mounted only while open so initialRecipientId re-seeds on every open. */}
+      {sendShiftsOpen && focusedPersonId !== null && focusedName && (
+        <SendScheduleDialog
+          open
+          onOpenChange={setSendShiftsOpen}
+          title={`Send Shifts — ${focusedName}`}
+          defaultCaption={SHIFTS_SEND_CAPTION}
+          recipientStorageKey="fair-booth-shifts-recipient"
+          initialRecipientId={focusedPersonId}
+          getImage={async () => {
+            if (!shiftsCardRef.current) throw new Error('Shifts card not ready')
+            return renderShiftsCardJpeg(shiftsCardRef.current)
+          }}
+        />
+      )}
+
+      {/* Hidden Shifts Card — capture target for the per-person JPG/send. Only
+          mounted in focus mode so the card always matches the banner. */}
+      {focusedPersonId !== null && focusedName && (
+        <div style={{position: 'fixed', left: '-99999px', top: 0}}>
+          <div ref={shiftsCardRef}>
+            <FairBoothShiftsCard
+              signups={signups}
+              personId={focusedPersonId}
+              displayName={focusedName}
+              introText={settings.fairBooth.personalShiftsIntro}
+              logoPath={settings.compactLogoPath ?? settings.logoPath}
+            />
+          </div>
+        </div>
       )}
 
       {/* Hidden print-only renderings — capture targets for PDF/JPG/blank. */}

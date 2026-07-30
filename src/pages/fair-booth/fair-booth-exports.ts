@@ -1,5 +1,36 @@
-// Lightweight exporter for Fair Booth: two-page PDF (grid then roster) and
-// a single-page JPG of just the grid.
+// Lightweight exporter for Fair Booth: two-page PDF (grid then roster), a
+// single-page JPG of just the grid, and the per-person Shifts Card.
+import {saveExportedDataUrl, saveExportedFile} from '@/lib/save-exported-file'
+
+// Pre-resolve <img> srcs to data URLs. html-to-image fetches them itself
+// otherwise and swallows failures as a bare DOM Event — the logo just silently
+// vanishes from the capture. Mirrors use-schedule-export.ts.
+async function inlineImagesAsDataUrls(root: HTMLElement): Promise<void> {
+  await Promise.all(
+    Array.from(root.querySelectorAll('img')).map(async (img) => {
+      if (!img.src || img.src.startsWith('data:')) return
+      try {
+        const res = await fetch(img.src, {credentials: 'include'})
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const blob = await res.blob()
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(String(reader.result))
+          reader.onerror = () => reject(new Error('FileReader failed'))
+          reader.readAsDataURL(blob)
+        })
+        img.removeAttribute('crossorigin')
+        img.src = dataUrl
+      } catch (err) {
+        const wrapped = new Error(
+          `Failed to load image ${img.src}: ${err instanceof Error ? err.message : String(err)}`,
+        )
+        ;(wrapped as Error & {cause?: unknown}).cause = err
+        throw wrapped
+      }
+    }),
+  )
+}
 
 // Append blank rows to every roster table until the node is tall enough to
 // fill the target height, so the roster page uses the whole sheet instead of
@@ -34,6 +65,7 @@ async function captureNode(node: HTMLElement, opts: {width?: number; fillToHeigh
   container.appendChild(clone)
   document.body.appendChild(container)
   try {
+    await inlineImagesAsDataUrls(clone)
     if (fillToHeight) padTablesToHeight(clone, fillToHeight)
     const {toJpeg} = await import('html-to-image')
     return await toJpeg(clone, {
@@ -61,11 +93,43 @@ async function imageDataUrlToImg(dataUrl: string): Promise<HTMLImageElement> {
 }
 
 export async function exportFairBoothJpg(gridNode: HTMLElement, filename: string): Promise<void> {
-  const dataUrl = await captureNode(gridNode)
-  const a = document.createElement('a')
-  a.href = dataUrl
-  a.download = `${filename}.jpg`
-  a.click()
+  await saveExportedDataUrl(await captureNode(gridNode), `${filename}.jpg`)
+}
+
+// ── Shifts Card ────────────────────────────────────────────────────────
+// Facebook-story geometry so the card drops straight into a story or an
+// iMessage thread without cropping. Captured at 1:1 pixel ratio because the
+// node is already authored at output size; the component scales its own type
+// to fit (see fair-booth-shifts-card.tsx).
+export const SHIFTS_CARD_WIDTH = 1080
+export const SHIFTS_CARD_HEIGHT = 1920
+
+export async function renderShiftsCardJpeg(cardNode: HTMLElement): Promise<string> {
+  await document.fonts.ready
+  const clone = cardNode.cloneNode(true) as HTMLElement
+  const container = document.createElement('div')
+  container.style.cssText = `position:fixed;left:-99999px;top:0;width:${SHIFTS_CARD_WIDTH}px;background:#fff;`
+  container.appendChild(clone)
+  document.body.appendChild(container)
+  try {
+    await inlineImagesAsDataUrls(clone)
+    const {toJpeg} = await import('html-to-image')
+    return await toJpeg(clone, {
+      quality: 0.95,
+      pixelRatio: 1,
+      backgroundColor: '#ffffff',
+      cacheBust: false,
+      skipFonts: true,
+      width: SHIFTS_CARD_WIDTH,
+      height: SHIFTS_CARD_HEIGHT,
+    })
+  } finally {
+    document.body.removeChild(container)
+  }
+}
+
+export async function exportShiftsCardJpg(cardNode: HTMLElement, filename: string): Promise<void> {
+  await saveExportedDataUrl(await renderShiftsCardJpeg(cardNode), `${filename}.jpg`)
 }
 
 // US Letter in mm.
@@ -147,5 +211,5 @@ export async function exportFairBoothPdf(
     if (i > 0) pdf.addPage('letter', p.orientation)
     pdf.addImage(p.url, 'JPEG', pos.x, pos.y, pos.renderWidth, pos.renderHeight)
   }
-  pdf.save(`${filename}.pdf`)
+  await saveExportedFile(pdf.output('blob'), `${filename}.pdf`, 'application/pdf')
 }

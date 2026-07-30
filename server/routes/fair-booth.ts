@@ -298,7 +298,9 @@ function validateSignup(scheduleId: number, b: SignupBody, ignoreId?: number): s
   if (b.endMinute <= b.startMinute) return 'endMinute must be > startMinute'
   if (b.shiftRole !== 'worker' && b.shiftRole !== 'asst_unit' && b.shiftRole !== 'unit_leader')
     return 'invalid shiftRole'
-  if (b.shiftRole === 'unit_leader' || b.shiftRole === 'asst_unit') {
+  // Only the Unit Leader is capped at one per slot — there is exactly one
+  // person in charge. Asst Unit Leaders are unbounded (amends ADR 0009).
+  if (b.shiftRole === 'unit_leader') {
     const slots = slotsForDate(b.dayDate)
     // Find which slot this signup primarily occupies.
     let mySlot: {startMinute: number; endMinute: number} | null = null
@@ -339,7 +341,7 @@ function validateSignup(scheduleId: number, b: SignupBody, ignoreId?: number): s
           }
         }
         if (otherSlot && otherSlot.startMinute === mySlot.startMinute) {
-          return `Slot already has a ${b.shiftRole}`
+          return 'Slot already has a Unit Leader'
         }
       }
     }

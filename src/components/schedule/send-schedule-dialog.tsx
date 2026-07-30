@@ -18,6 +18,17 @@ interface SendScheduleDialogProps {
   // Identifier used for the persisted recipient memory key — same recipient
   // recurs across sessions per-schedule-type.
   recipientStorageKey: string
+  // When the image is about one specific person (a Shifts Card), seed the
+  // picker with them and ignore the persisted memory — otherwise the last-used
+  // recipient would leak across people and mis-route a send. Still swappable
+  // for a one-off; it just never sticks. Seeded at mount, so callers passing
+  // this should mount the dialog only while it's open.
+  initialRecipientId?: number
+  // Overrides the dialog title/button copy for per-person sends.
+  title?: string
+  // Pre-fills the caption textarea. Seeded at mount and restored after a
+  // successful send; still fully editable.
+  defaultCaption?: string
   // Caller's own onBeforeSend hook (e.g. flip out of edit mode, prep refs).
   onBeforeSend?: () => void
   // Caller-supplied error describer (export errors with image-load metadata).
@@ -31,9 +42,16 @@ export function SendScheduleDialog({
   recipientStorageKey,
   onBeforeSend,
   describeError,
+  initialRecipientId,
+  title = 'Send Schedule',
+  defaultCaption = '',
 }: SendScheduleDialogProps) {
-  const [recipientId, setRecipientId] = usePersistedState<number | null>(recipientStorageKey, null)
-  const [caption, setCaption] = useState('')
+  const [persistedRecipientId, setPersistedRecipientId] = usePersistedState<number | null>(recipientStorageKey, null)
+  const [overrideRecipientId, setOverrideRecipientId] = useState<number | null>(initialRecipientId ?? null)
+  const pinned = initialRecipientId != null
+  const recipientId = pinned ? overrideRecipientId : persistedRecipientId
+  const setRecipientId = pinned ? setOverrideRecipientId : setPersistedRecipientId
+  const [caption, setCaption] = useState(defaultCaption)
   const [sending, setSending] = useState(false)
 
   async function handleSend() {
@@ -54,7 +72,7 @@ export function SendScheduleDialog({
       if (failed.length === 0) {
         toast.success('Schedule sent')
         onOpenChange(false)
-        setCaption('')
+        setCaption(defaultCaption)
       } else {
         toast.error(`Send failed: ${failed[0].error || 'Unknown error'}`)
       }
@@ -70,7 +88,7 @@ export function SendScheduleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Send Schedule</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">

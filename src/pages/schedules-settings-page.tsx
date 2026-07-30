@@ -31,6 +31,7 @@ import {toast} from 'sonner'
 export function SchedulesSettingsPage() {
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const compactLogoInputRef = useRef<HTMLInputElement>(null)
 
   const {data: settings, isLoading: settingsLoading} = useQuery({
     queryKey: schedulesKeys.settings,
@@ -52,7 +53,8 @@ export function SchedulesSettingsPage() {
   })
 
   const uploadLogoMutation = useMutation({
-    mutationFn: uploadSchedulesLogo,
+    mutationFn: ({imageData, slot}: {imageData: string; slot: 'print' | 'compact'}) =>
+      uploadSchedulesLogo(imageData, slot),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: schedulesKeys.settings})
       toast.success('Logo uploaded')
@@ -60,11 +62,11 @@ export function SchedulesSettingsPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to upload logo'),
   })
 
-  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>, slot: 'print' | 'compact') {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => uploadLogoMutation.mutate(reader.result as string)
+    reader.onload = () => uploadLogoMutation.mutate({imageData: reader.result as string, slot})
     reader.readAsDataURL(file)
     e.target.value = ''
   }
@@ -94,7 +96,13 @@ export function SchedulesSettingsPage() {
                 <img src={settings.logoPath} alt="Schedule logo" className="max-h-24 object-contain" />
               </div>
             )}
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleLogoUpload(e, 'print')}
+            />
             <Button
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
@@ -102,6 +110,40 @@ export function SchedulesSettingsPage() {
             >
               <ImagePlus className="mr-2 h-4 w-4" />
               {settings.logoPath ? 'Replace Logo' : 'Upload Logo'}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Compact logo — the wide print logo reads too small on a 1080-wide
+            image card, so cards get their own squarer mark. */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Compact Logo</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              Used on shareable image cards (like a person&apos;s Fair Booth shifts), where the wide print logo would
+              render too small. Prefer a square or stacked mark. Falls back to the Schedule Logo when not set.
+            </p>
+            {settings.compactLogoPath && (
+              <div className="flex justify-center rounded-lg border bg-white p-4">
+                <img src={settings.compactLogoPath} alt="Compact logo" className="max-h-24 object-contain" />
+              </div>
+            )}
+            <input
+              ref={compactLogoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleLogoUpload(e, 'compact')}
+            />
+            <Button
+              variant="outline"
+              onClick={() => compactLogoInputRef.current?.click()}
+              disabled={uploadLogoMutation.isPending}
+            >
+              <ImagePlus className="mr-2 h-4 w-4" />
+              {settings.compactLogoPath ? 'Replace Compact Logo' : 'Upload Compact Logo'}
             </Button>
           </CardContent>
         </Card>
@@ -245,6 +287,22 @@ export function SchedulesSettingsPage() {
               blocks={settings.fairBooth.rosterPageFooterBlocks}
               onSave={(blocks) => saveType(queryClient, {fairBooth: {rosterPageFooterBlocks: blocks}})}
             />
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">&quot;Your Shifts&quot; card copy</Label>
+              <p className="text-muted-foreground text-xs">
+                Shown under the person&apos;s name on the shifts image you export or text them. Reword &quot;let me
+                know&quot; here if you want it to name someone.
+              </p>
+              <Textarea
+                rows={4}
+                defaultValue={settings.fairBooth.personalShiftsIntro}
+                onBlur={(e) => {
+                  const v = e.target.value
+                  if (v !== settings.fairBooth.personalShiftsIntro)
+                    saveType(queryClient, {fairBooth: {personalShiftsIntro: v}})
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>

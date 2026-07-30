@@ -351,6 +351,102 @@ export function maxShiftRoleFor(fr: FairBoothFairRole): FairBoothShiftRole {
   return 'unit_leader'
 }
 
+// ── Shifts (person-facing) ─────────────────────────────────────────────
+// A Signup is a stored row, always slot-sized — 3-7 PM on a two-slot day is
+// two rows. A Shift is what the volunteer experiences: one contiguous run of
+// their Signups on one day at one role. Derived here, never stored. See
+// CONTEXT.md.
+
+export interface ShiftRange {
+  startMinute: number
+  endMinute: number
+}
+
+export interface ShiftGroup {
+  shiftRole: FairBoothShiftRole
+  // Contiguous-merged. More than one entry means a real break in the day.
+  ranges: ShiftRange[]
+}
+
+export interface ShiftDay {
+  dayDate: string
+  // More than one group means the role changed mid-day; the card renders
+  // those as sub-bullets under a single date.
+  groups: ShiftGroup[]
+}
+
+function mergeRanges(ranges: ShiftRange[]): ShiftRange[] {
+  const sorted = [...ranges].sort((a, b) => a.startMinute - b.startMinute)
+  const out: ShiftRange[] = []
+  for (const r of sorted) {
+    const last = out[out.length - 1]
+    // Touching counts as contiguous: 2-6 followed by 6-10 is one Shift.
+    if (last && r.startMinute <= last.endMinute) {
+      last.endMinute = Math.max(last.endMinute, r.endMinute)
+    } else {
+      out.push({...r})
+    }
+  }
+  return out
+}
+
+// Group one person's signups by (day, role), merging contiguous runs within
+// each group. Days ordered chronologically; groups within a day by first start.
+export function computePersonShifts(signups: FairSignup[], personId: number): ShiftDay[] {
+  const byDay = new Map<string, Map<FairBoothShiftRole, ShiftRange[]>>()
+  for (const s of signups) {
+    if (s.personId !== personId) continue
+    if (!byDay.has(s.dayDate)) byDay.set(s.dayDate, new Map())
+    const byRole = byDay.get(s.dayDate)!
+    if (!byRole.has(s.shiftRole)) byRole.set(s.shiftRole, [])
+    byRole.get(s.shiftRole)!.push({startMinute: s.startMinute, endMinute: s.endMinute})
+  }
+  return [...byDay.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([dayDate, byRole]) => ({
+      dayDate,
+      groups: [...byRole.entries()]
+        .map(([shiftRole, ranges]) => ({shiftRole, ranges: mergeRanges(ranges)}))
+        .sort((a, b) => a.ranges[0].startMinute - b.ranges[0].startMinute),
+    }))
+}
+
+const SHORT_DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const SHORT_MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// "Fri, Jul 24"
+export function formatShiftDate(dayDate: string): string {
+  const d = parseLocalDate(dayDate)
+  return `${SHORT_DAY[d.getDay()]}, ${SHORT_MONTH[d.getMonth()]} ${d.getDate()}`
+}
+
+function meridiem(minute: number): 'AM' | 'PM' {
+  return minute >= 12 * 60 ? 'PM' : 'AM'
+}
+
+// "5–10 PM", or "2–4 PM and 7–10 PM" when the day has a real break. Every fair
+// hour is PM today, so a single trailing marker reads best; the AM branch only
+// fires if the slot map ever changes.
+export function formatShiftRanges(ranges: ShiftRange[]): string {
+  const allPm = ranges.every((r) => meridiem(r.startMinute) === 'PM' && meridiem(r.endMinute) === 'PM')
+  // With a break in the day each range carries its own marker — "2–4 and
+  // 7–10 PM" reads as though only the last range is PM.
+  const suffix = allPm && ranges.length > 1 ? ' PM' : ''
+  const parts = ranges.map((r) =>
+    allPm
+      ? `${formatTimeShort(r.startMinute)}–${formatTimeShort(r.endMinute)}${suffix}`
+      : `${formatTimeShort(r.startMinute)} ${meridiem(r.startMinute)}–${formatTimeShort(r.endMinute)} ${meridiem(r.endMinute)}`,
+  )
+  const joined = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  return allPm && ranges.length === 1 ? `${joined} PM` : joined
+}
+
+export const SHIFT_ROLE_LABEL: Record<FairBoothShiftRole, string> = {
+  unit_leader: 'Unit Leader',
+  asst_unit: 'Asst Unit Leader',
+  worker: 'Worker',
+}
+
 // Render placement: which slot column does a signup belong to?
 // "Majority of hours in slot wins; ties to later slot."
 export function slotIndexForSignup(signup: FairSignup, day: FairDay): number {

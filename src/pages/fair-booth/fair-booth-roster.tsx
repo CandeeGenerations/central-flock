@@ -132,7 +132,7 @@ export function FairBoothRoster({
           <div className="font-semibold">No longer on roster Group:</div>
           {orphans.map((o) => (
             <div key={o.personId}>
-              {o.firstName} {o.lastName} — {o.signupCount} shifts
+              {o.firstName} {o.lastName} — {o.signupCount} signups
             </div>
           ))}
         </div>

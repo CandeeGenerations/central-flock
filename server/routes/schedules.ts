@@ -24,8 +24,16 @@ export interface FooterBlock {
   bold?: boolean
 }
 
+// Default intro copy on the Shifts Card. Admin-editable so "let me know" can be
+// reworded to name a person without a deploy.
+const DEFAULT_PERSONAL_SHIFTS_INTRO =
+  "These are the shifts you signed up for at the fair booth. Please look them over — if anything needs to change, just let me know and I'll get it updated. Thank you for serving!"
+
 interface SchedulesSettings {
   logoPath: string | null
+  // Squarer mark for image cards, where the wide print logo reads too small.
+  // Falls back to logoPath when unset.
+  compactLogoPath: string | null
   nursery: {
     titlePrefix: string
     footerBlocks: FooterBlock[]
@@ -41,6 +49,7 @@ interface SchedulesSettings {
     minSignupsForBold: number
     gridPageFooterBlocks: FooterBlock[]
     rosterPageFooterBlocks: FooterBlock[]
+    personalShiftsIntro: string
   }
 }
 
@@ -58,6 +67,7 @@ function readSettings(): SchedulesSettings {
   }
   return {
     logoPath: map.get('schedulesLogoPath') ?? null,
+    compactLogoPath: map.get('schedulesCompactLogoPath') ?? null,
     nursery: {
       titlePrefix: map.get('schedules.nursery.titlePrefix') ?? 'Nursery Schedule',
       footerBlocks: parseJson<FooterBlock[]>('schedules.nursery.footerBlocks', []),
@@ -90,6 +100,7 @@ function readSettings(): SchedulesSettings {
           text: 'Please put your name and your initials above so we know who you are and which slot you signed up to serve.',
         },
       ]),
+      personalShiftsIntro: map.get('schedules.fairBooth.personalShiftsIntro') ?? DEFAULT_PERSONAL_SHIFTS_INTRO,
     },
   }
 }
@@ -134,6 +145,8 @@ schedulesRouter.put(
       upsert('schedules.fairBooth.gridPageFooterBlocks', JSON.stringify(body.fairBooth.gridPageFooterBlocks))
     if (body.fairBooth?.rosterPageFooterBlocks !== undefined)
       upsert('schedules.fairBooth.rosterPageFooterBlocks', JSON.stringify(body.fairBooth.rosterPageFooterBlocks))
+    if (body.fairBooth?.personalShiftsIntro !== undefined)
+      upsert('schedules.fairBooth.personalShiftsIntro', body.fairBooth.personalShiftsIntro)
     res.json(readSettings())
   }),
 )
@@ -141,26 +154,32 @@ schedulesRouter.put(
 schedulesRouter.post(
   '/settings/logo',
   asyncHandler(async (req, res) => {
-    const {imageData} = req.body as {imageData: string}
+    const {imageData, slot} = req.body as {imageData: string; slot?: 'print' | 'compact'}
     if (!imageData) {
       res.status(400).json({error: 'Image data is required'})
+      return
+    }
+    if (slot !== undefined && slot !== 'print' && slot !== 'compact') {
+      res.status(400).json({error: "slot must be 'print' or 'compact'"})
       return
     }
 
     if (!fs.existsSync(LOGOS_DIR)) fs.mkdirSync(LOGOS_DIR, {recursive: true})
 
-    const filename = `logo-${Date.now()}.png`
+    const isCompact = slot === 'compact'
+    const settingsKey = isCompact ? 'schedulesCompactLogoPath' : 'schedulesLogoPath'
+    const filename = `${isCompact ? 'logo-compact' : 'logo'}-${Date.now()}.png`
     const filePath = path.join(LOGOS_DIR, filename)
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '')
     fs.writeFileSync(filePath, Buffer.from(base64, 'base64'))
     const logoPath = uploadUrl('schedule-logos', filename)
 
-    const old = db.select().from(schema.settings).where(eq(schema.settings.key, 'schedulesLogoPath')).get()
+    const old = db.select().from(schema.settings).where(eq(schema.settings.key, settingsKey)).get()
     if (old) {
       const oldFull = path.join(LOGOS_DIR, path.basename(old.value))
       if (fs.existsSync(oldFull)) fs.unlinkSync(oldFull)
     }
-    upsert('schedulesLogoPath', logoPath)
+    upsert(settingsKey, logoPath)
     res.json({logoPath})
   }),
 )

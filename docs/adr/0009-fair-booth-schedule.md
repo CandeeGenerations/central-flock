@@ -128,6 +128,11 @@ schedule.
 Enforced in the day editor and on save. Workers are unbounded and reorderable
 within the tier via `sort_order` ↑↓.
 
+> **Amended:** the Asst Unit Leader cap was dropped — a slot may now hold any
+> number of Asst Unit Leaders. Only the Unit Leader stays capped at one, since
+> exactly one person is in charge of a slot. `validateSignup` in
+> `server/routes/fair-booth.ts` enforces the remaining cap.
+
 **Initials.** Computed at render time from `firstName[0] + lastName[0]`. When two
 people on the same schedule's roster would share the same 2-letter base, the
 alphabetically-first person (by `lastName`, then `firstName`) keeps the base

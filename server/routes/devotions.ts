@@ -9,6 +9,7 @@ import {YoutubeTranscript} from 'youtube-transcript'
 import {db, schema} from '../db/index.js'
 import {AI_MODELS} from '../lib/ai-models.js'
 import {parseReference, referenceKeys} from '../lib/bible-reference.js'
+import {retargetDescriptionHeader} from '../lib/devotion-description-header.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 import {uploadPath, uploadUrl, urlToDiskPath} from '../lib/uploads.js'
 import {generateDevotionPassage} from '../services/devotion-generation.js'
@@ -2112,16 +2113,26 @@ devotionsRouter.post(
       return
     }
 
-    const pick = (row: typeof a) => Object.fromEntries(SWAP_FIELDS.map((f) => [f, row[f]]))
+    // Descriptions are hand-authored (Timestamps blocks etc.) but open with a
+    // header naming the slot: "#2345 - August 27, 2026". That header describes
+    // the box, not the content, so it must stay behind when the text moves —
+    // otherwise the arriving devotion publishes under the number it came from.
+    // Only the header line is rewritten; everything typed is preserved.
+    const pick = (row: typeof a, dest: typeof a) => ({
+      ...Object.fromEntries(SWAP_FIELDS.map((f) => [f, row[f]])),
+      youtubeDescription: retargetDescriptionHeader(row.youtubeDescription, dest.number, dest.date),
+      facebookDescription: retargetDescriptionHeader(row.facebookDescription, dest.number, dest.date),
+      podcastDescription: retargetDescriptionHeader(row.podcastDescription, dest.number, dest.date),
+    })
 
     db.transaction((tx) => {
       // A receives B's content and vice versa.
       tx.update(schema.devotions)
-        .set({...pick(b), updatedAt: sql`datetime('now')`})
+        .set({...pick(b, a), updatedAt: sql`datetime('now')`})
         .where(eq(schema.devotions.id, id))
         .run()
       tx.update(schema.devotions)
-        .set({...pick(a), updatedAt: sql`datetime('now')`})
+        .set({...pick(a, b), updatedAt: sql`datetime('now')`})
         .where(eq(schema.devotions.id, targetId))
         .run()
       // Passages follow content: swap devotionId links A <-> B in one atomic statement.

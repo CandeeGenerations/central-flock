@@ -242,7 +242,7 @@ function ReminderPreviewDialog({runId, sendTime, onClose}: PreviewProps) {
           this one is a flex column that does NOT scroll: header pinned, list
           scrolls on its own. gap-3 over the default gap-6 keeps the header from
           eating a third of a short dialog. */}
-      <DialogContent className="flex flex-col gap-3 overflow-hidden sm:max-h-[85vh] sm:max-w-2xl">
+      <DialogContent className="flex flex-col gap-3 overflow-hidden sm:max-h-[85vh]">
         <DialogHeader className="shrink-0 pr-10">
           <DialogTitle>{data ? `Preview — ${formatShiftDate(data.targetDay)}` : 'Preview'}</DialogTitle>
           {data && !data.error && (
@@ -265,7 +265,7 @@ function ReminderPreviewDialog({runId, sendTime, onClose}: PreviewProps) {
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
             {data.recipients.map((r) => (
               <div key={r.personId} className="rounded border p-3">
-                <div className="mb-1 flex flex-wrap items-center gap-x-2">
+                <div className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span className="font-medium">{r.name}</span>
                   <span className="text-xs text-muted-foreground">{r.phoneNumber ?? 'no phone'}</span>
                   {r.skipReason && (

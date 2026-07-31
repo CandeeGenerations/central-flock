@@ -358,10 +358,25 @@ export function DevotionDetailPage() {
     enabled: isNew,
   })
 
-  const [loadedDevotionId, setLoadedDevotionId] = useState<number | null>(null)
-  if (devotion && loadedDevotionId !== devotion.id) {
-    setLoadedDevotionId(devotion.id)
-    setForm(devotionToForm(devotion))
+  // Seed the form from the server row, and RE-seed when the server row changes
+  // underneath us — e.g. a pipeline flag toggled from the list table. Keying
+  // only on devotion.id wasn't enough: React Query hands back the previously
+  // cached row on mount, the form seeded from that, and the fresh refetch was
+  // then ignored, so the detail page showed the pre-toggle value.
+  //
+  // Re-seeding is gated on the form being untouched since the last seed. A
+  // background refetch must never overwrite something half-typed; in that case
+  // the user's edits stand and Save resolves it.
+  const [seeded, setSeeded] = useState<{id: number; stamp: string; form: DevotionForm} | null>(null)
+  if (devotion) {
+    const isDifferentDevotion = seeded?.id !== devotion.id
+    const serverRowChanged = !!seeded && seeded.stamp !== devotion.updatedAt
+    const untouched = !!seeded && JSON.stringify(seeded.form) === JSON.stringify(form)
+    if (isDifferentDevotion || (serverRowChanged && untouched)) {
+      const next = devotionToForm(devotion)
+      setSeeded({id: devotion.id, stamp: devotion.updatedAt, form: next})
+      setForm(next)
+    }
   }
 
   const [loadedNextNumber, setLoadedNextNumber] = useState<number | null>(null)
@@ -420,12 +435,14 @@ export function DevotionDetailPage() {
 
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Devotion>) => updateDevotion(Number(id), data),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       queryClient.invalidateQueries({queryKey: ['devotion', id]})
       queryClient.invalidateQueries({queryKey: ['devotions']})
       queryClient.invalidateQueries({queryKey: ['devotion-chain-audit', id]})
       queryClient.invalidateQueries({queryKey: ['devotion-chain']})
       queryClient.invalidateQueries({queryKey: ['scripture-lookup']})
+      // Saved edits are now the baseline — see the seed guard above.
+      setSeeded({id: saved.id, stamp: saved.updatedAt, form: devotionToForm(saved)})
       toast.success('Devotion updated')
     },
     onError: (err: Error) => toast.error(err.message),
@@ -537,9 +554,12 @@ export function DevotionDetailPage() {
   const autosaveMutation = useMutation({
     mutationFn: (vars: {patch: Partial<Devotion>; revert: Partial<DevotionForm>}) =>
       updateDevotion(Number(id), vars.patch),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       queryClient.invalidateQueries({queryKey: ['devotion', id]})
       queryClient.invalidateQueries({queryKey: ['devotions']})
+      // Advance the seed snapshot to what the server now holds, so the refetch
+      // this invalidation triggers isn't mistaken for someone else's change.
+      setSeeded({id: saved.id, stamp: saved.updatedAt, form: devotionToForm(saved)})
       // Fixed id so ticking five boxes in a row replaces one toast rather than
       // stacking five. Same copy as the Save button's, since it's the same write.
       toast.success('Devotion updated', {id: 'devotion-autosave'})

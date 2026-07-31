@@ -257,6 +257,11 @@ export function DevotionListPage() {
     mutationFn: ({id, field}: {id: number; field: string}) => toggleDevotionField(id, field),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['devotions']})
+      // Also drop the per-devotion detail cache, or opening that devotion next
+      // shows the pre-toggle value it cached on a previous visit.
+      queryClient.invalidateQueries({queryKey: ['devotion']})
+      // Fixed id so ticking several boxes down the table replaces one toast.
+      toast.success('Devotion updated', {id: 'devotion-autosave'})
     },
     onError: (err: Error) => toast.error(err.message),
   })

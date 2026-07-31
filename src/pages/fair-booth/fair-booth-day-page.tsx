@@ -268,7 +268,12 @@ function SignupCard({
             : 'border'
       }`}
     >
-      <div className="flex flex-wrap items-center gap-2">
+      {/* One labelled control per line, sharing a w-14 label gutter. These
+          rows deliberately do NOT wrap: cramming Person + Row + the move/delete
+          cluster onto one flex-wrap line broke mid-row in the narrow two-column
+          layout, stranding a lone arrow on its own line. The selects flex to
+          fill instead, and the action cluster stays pinned right of Person. */}
+      <div className="flex items-center gap-2">
         <Label className="w-14 shrink-0 text-xs">Person</Label>
         <SearchableSelect
           value={String(s.personId)}
@@ -289,22 +294,11 @@ function SignupCard({
                   : [p.firstName, p.lastName].filter(Boolean).join(' ') || `Person ${p.id}`
               return {value: String(p.id), label}
             })}
-          className="w-56"
+          className="w-auto min-w-0 flex-1"
         />
-        {!onRoster && <span className="text-xs text-yellow-700">⚠ no longer on roster</span>}
-        <Label className="ml-4 shrink-0 text-xs">Row</Label>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onRow('up')}>
-          <ArrowUp className="h-3 w-3" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onRow('down')}>
-          <ArrowDown className="h-3 w-3" />
-        </Button>
-        {s.displayRowOverride !== null && (
-          <Button variant="link" size="sm" className="h-7 px-1 text-xs" onClick={() => onRow('reset')}>
-            reset
-          </Button>
-        )}
-        <div className="ml-auto flex gap-1">
+        {/* Reorder within the tier, and delete. Actions, not fields — pinned
+            right of the Person select rather than given their own row. */}
+        <div className="ml-auto flex shrink-0 gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMove('up')}>
             <ArrowUp className="h-3 w-3" />
           </Button>
@@ -316,14 +310,29 @@ function SignupCard({
           </Button>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs">
+      {!onRoster && <p className="pl-16 text-xs text-yellow-700">⚠ no longer on roster</p>}
+      <div className="flex items-center gap-2">
+        <Label className="w-14 shrink-0 text-xs">Row</Label>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onRow('up')}>
+          <ArrowUp className="h-3 w-3" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onRow('down')}>
+          <ArrowDown className="h-3 w-3" />
+        </Button>
+        {s.displayRowOverride !== null && (
+          <Button variant="link" size="sm" className="h-7 px-1 text-xs" onClick={() => onRow('reset')}>
+            reset
+          </Button>
+        )}
+      </div>
+      <div className="flex items-center gap-2 text-xs">
         <Label className="w-14 shrink-0 text-xs">Time</Label>
         <TimePicker value={s.startMinute} onChange={(v) => onUpdate({startMinute: v})} />
-        <span>→</span>
+        <span className="shrink-0">→</span>
         <TimePicker value={s.endMinute} onChange={(v) => onUpdate({endMinute: v})} />
-        {person?.isHispanic && <span className="ml-2 text-xs text-emerald-700">Hispanic</span>}
+        {person?.isHispanic && <span className="ml-2 shrink-0 text-xs text-emerald-700">Hispanic</span>}
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs">
+      <div className="flex items-center gap-2 text-xs">
         <Label className="w-14 shrink-0 text-xs">Role</Label>
         {allowedShifts.length === 1 ? (
           <span className="text-muted-foreground bg-muted/30 rounded border px-2 py-1 text-xs">

@@ -59,22 +59,34 @@ usageRouter.get(
       .all()
     const now = Date.now()
 
-    // Aggregate frecency per distinct entity path.
-    const agg = new Map<string, {section: string; entityId: number; score: number}>()
+    // Aggregate per ENTITY, not per path. Sub-routes of one entity
+    // (/schedules/fair-booth/22, /schedules/fair-booth/22/day/2026-08-01, ...)
+    // all parse to the same (section, id) and so resolve to the same label —
+    // keying by raw path listed the same schedule once per day page visited.
+    const agg = new Map<string, {section: string; entityId: number; score: number; byPath: Map<string, number>}>()
     for (const r of rows) {
       const {section, entityId} = parsePath(r.path)
       if (entityId == null) continue
-      const key = r.path
-      const prev = agg.get(key)
+      const key = `${section}/${entityId}`
       const w = visitWeight(parseSqliteUtc(r.visitedAt), now)
-      if (prev) prev.score += w
-      else agg.set(key, {section, entityId, score: w})
+      const prev = agg.get(key)
+      if (prev) {
+        prev.score += w
+        prev.byPath.set(r.path, (prev.byPath.get(r.path) ?? 0) + w)
+      } else {
+        agg.set(key, {section, entityId, score: w, byPath: new Map([[r.path, w]])})
+      }
     }
 
     const ranked = [...agg.entries()].sort((a, b) => b[1].score - a[1].score).slice(0, RECENTS_LIMIT)
 
     const items = []
-    for (const [path, {section, entityId, score}] of ranked) {
+    for (const [canonical, {section, entityId, score, byPath}] of ranked) {
+      // Link to the entity's own page when it's actually been visited — a chip
+      // labelled "2026 Fair Booth" landing on a single day editor reads as a
+      // bug. Entities only ever reached through a sub-route fall back to their
+      // most-used one.
+      const path = byPath.has(canonical) ? canonical : [...byPath.entries()].sort((a, b) => b[1] - a[1])[0][0]
       const resolved = resolveEntity(section, entityId)
       if (!resolved) continue // deleted entity -> drop
       items.push({path, entityType: resolved.entityType, typeLabel: resolved.typeLabel, label: resolved.label, score})

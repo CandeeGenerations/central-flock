@@ -519,7 +519,47 @@ export function DevotionDetailPage() {
     })
   }
 
+  // The third column holds Chain Audit, Revisit Chain and Scripture Usage —
+  // all conditional. On an original devotion with an unused scripture every one
+  // of them is hidden, and a 3-column grid then leaves a third of the page
+  // empty. Collapse to 2 columns and let the other two breathe instead.
+  const showChainAudit = isRevisit && !!chainAudit && (chainAudit.missing.length > 0 || chainAudit.ignored.length > 0)
+  const showRevisitChain = isRevisit && chainNumbers.length > 0
+  const showScriptureUsage = scriptureDevotions.length > 0
+  const hasSideColumn = showChainAudit || showRevisitChain || showScriptureUsage
+
   const update = (patch: Partial<DevotionForm>) => setForm((f) => ({...f, ...patch}))
+
+  // Toggle fields (flag, pipeline checkboxes) save on click instead of waiting
+  // for the Save button. Only the toggled key is PATCHed, so any unsaved text
+  // edits elsewhere in the form stay pending under Save rather than being
+  // committed behind the user's back. No success toast — the control's own
+  // state is the confirmation, and five checkboxes would be five toasts.
+  const autosaveMutation = useMutation({
+    mutationFn: (vars: {patch: Partial<Devotion>; revert: Partial<DevotionForm>}) =>
+      updateDevotion(Number(id), vars.patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: ['devotion', id]})
+      queryClient.invalidateQueries({queryKey: ['devotions']})
+    },
+    onError: (err: Error, vars) => {
+      // Put the control back where it was — a checkbox that stays checked after
+      // a failed save is a lie about what's stored.
+      update(vars.revert)
+      toast.error(err.message)
+    },
+  })
+
+  // Applies locally, then persists. On a new devotion there's nothing to PATCH
+  // yet, so it stays local until Create.
+  const updateAndSave = (patch: Partial<DevotionForm> & Partial<Devotion>) => {
+    update(patch)
+    if (isNew) return
+    const revert = Object.fromEntries(
+      Object.keys(patch).map((k) => [k, form[k as keyof DevotionForm]]),
+    ) as Partial<DevotionForm>
+    autosaveMutation.mutate({patch: patch as Partial<Devotion>, revert})
+  }
 
   const isSaving = createMutation.isPending || updateMutation.isPending
 
@@ -656,7 +696,7 @@ export function DevotionDetailPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 xl:gap-6">
+      <div className={`grid grid-cols-1 gap-4 xl:gap-6 ${hasSideColumn ? 'xl:grid-cols-3' : 'xl:grid-cols-2'}`}>
         {/* Col 1: Details */}
         <div className="space-y-4 order-1 xl:col-start-1 xl:row-start-1">
           {/* Main Fields */}
@@ -667,7 +707,7 @@ export function DevotionDetailPage() {
                 <Button
                   variant={form.flagged ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => update({flagged: !form.flagged})}
+                  onClick={() => updateAndSave({flagged: !form.flagged})}
                   className={form.flagged ? 'bg-red-500 hover:bg-red-600' : ''}
                 >
                   <Flag className={`h-4 w-4 mr-1.5 ${form.flagged ? 'fill-white' : ''}`} />
@@ -874,7 +914,7 @@ export function DevotionDetailPage() {
                     ] as const
                   ).map(([key, label]) => (
                     <label key={key} className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox checked={form[key]} onCheckedChange={(checked) => update({[key]: !!checked})} />
+                      <Checkbox checked={form[key]} onCheckedChange={(checked) => updateAndSave({[key]: !!checked})} />
                       <span className="text-sm">{label}</span>
                     </label>
                   ))}
@@ -902,101 +942,218 @@ export function DevotionDetailPage() {
           </div>
         </div>
 
-        {/* Col 3 (xl) / Col 2 (md): Chain Audit + Revisit Chain + Scripture Usage */}
-        <div className="space-y-4 order-3 xl:order-none xl:col-start-3 xl:row-span-1">
-          {/* Chain Audit (proposed fix) */}
-          {isRevisit && chainAudit && (chainAudit.missing.length > 0 || chainAudit.ignored.length > 0) && (
-            <Card className={chainAudit.missing.length > 0 ? 'border-amber-500/50' : ''}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+        {/* Col 3 (xl) / Col 2 (md): Chain Audit + Revisit Chain + Scripture Usage.
+            Dropped entirely when all three are empty — see hasSideColumn. */}
+        {hasSideColumn && (
+          <div className="space-y-4 order-3 xl:order-none xl:col-start-3 xl:row-span-1">
+            {/* Chain Audit (proposed fix) */}
+            {showChainAudit && chainAudit && (
+              <Card className={chainAudit.missing.length > 0 ? 'border-amber-500/50' : ''}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {chainAudit.missing.length > 0 ? (
+                      <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    ) : (
+                      <Check className="h-5 w-5 text-green-500" />
+                    )}
+                    Chain Issues
+                    {chainAudit.missing.length > 0 && <Badge variant="destructive">{chainAudit.missing.length}</Badge>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
                   {chainAudit.missing.length > 0 ? (
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    <p className="text-sm text-muted-foreground">
+                      Found {chainAudit.missing.length} prior devotion{chainAudit.missing.length === 1 ? '' : 's'}{' '}
+                      sharing this scripture that {chainAudit.missing.length === 1 ? 'is' : 'are'} not in the chain.
+                      Uncheck any that shouldn&rsquo;t be added, or ignore them to hide from future audits.
+                    </p>
                   ) : (
-                    <Check className="h-5 w-5 text-green-500" />
+                    <p className="text-sm text-muted-foreground">
+                      No chain issues — all prior devotions sharing this scripture are either in the chain or ignored.
+                    </p>
                   )}
-                  Chain Issues
-                  {chainAudit.missing.length > 0 && <Badge variant="destructive">{chainAudit.missing.length}</Badge>}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {chainAudit.missing.length > 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Found {chainAudit.missing.length} prior devotion{chainAudit.missing.length === 1 ? '' : 's'} sharing
-                    this scripture that {chainAudit.missing.length === 1 ? 'is' : 'are'} not in the chain. Uncheck any
-                    that shouldn&rsquo;t be added, or ignore them to hide from future audits.
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No chain issues — all prior devotions sharing this scripture are either in the chain or ignored.
-                  </p>
-                )}
-                {chainAudit.missing.length > 0 && (
+                  {chainAudit.missing.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-2 font-medium text-muted-foreground w-8">Add</th>
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground">#</th>
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground">Date</th>
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground">Type</th>
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground">Scripture</th>
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground">Song</th>
+                            <th className="text-right py-2 px-3 font-medium text-muted-foreground w-20" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {chainAudit.missing.map((m) => {
+                            const checked = !excludedFromFix.has(m.number)
+                            return (
+                              <tr key={m.number} className="border-b last:border-0">
+                                <td className="py-2 px-2">
+                                  <Checkbox
+                                    checked={checked}
+                                    onCheckedChange={(c) => {
+                                      setExcludedFromFix((prev) => {
+                                        const next = new Set(prev)
+                                        if (c) next.delete(m.number)
+                                        else next.add(m.number)
+                                        return next
+                                      })
+                                    }}
+                                  />
+                                </td>
+                                <td className="py-2 px-3">
+                                  <Link to={`/devotions/${m.id}`} className="text-primary hover:underline font-medium">
+                                    #{String(m.number).padStart(3, '0')}
+                                  </Link>
+                                </td>
+                                <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                                  {new Date(m.date + 'T00:00:00').toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  })}
+                                </td>
+                                <td className="py-2 px-3">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs"
+                                    style={{borderColor: TYPE_COLORS[m.type], color: TYPE_COLORS[m.type]}}
+                                  >
+                                    {TYPE_LABELS[m.type] || m.type}
+                                  </Badge>
+                                </td>
+                                <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                                  {m.bibleReference || '—'}
+                                </td>
+                                <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                                  {m.songName || '—'}
+                                </td>
+                                <td className="py-2 px-3 text-right">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-xs"
+                                    disabled={ignoreMutation.isPending}
+                                    onClick={() => ignoreMutation.mutate({add: [m.number]})}
+                                  >
+                                    Ignore
+                                  </Button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {chainAudit.ignored.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap pt-2 border-t">
+                      <span className="text-xs text-muted-foreground">Ignored:</span>
+                      {chainAudit.ignored.map((n) => (
+                        <button
+                          key={n}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-muted-foreground/30 text-xs text-muted-foreground hover:text-foreground hover:border-foreground cursor-pointer"
+                          onClick={() => ignoreMutation.mutate({remove: [n]})}
+                          disabled={ignoreMutation.isPending}
+                          title="Click to un-ignore"
+                        >
+                          #{String(n).padStart(3, '0')}
+                          <span className="text-[10px]">×</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {chainAudit.missing.length > 0 && (
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={handleApplyChainFix}
+                        disabled={
+                          insertChainMutation.isPending ||
+                          chainAudit.missing.every((m) => excludedFromFix.has(m.number))
+                        }
+                      >
+                        {insertChainMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 mr-1.5" />
+                        )}
+                        Apply Fix
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Revisit Chain */}
+            {showRevisitChain && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Revisit Chain
+                    <Badge variant="secondary">{chainNumbers.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground w-8">Add</th>
                           <th className="text-left py-2 px-3 font-medium text-muted-foreground">#</th>
-                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Date</th>
                           <th className="text-left py-2 px-3 font-medium text-muted-foreground">Type</th>
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Date</th>
                           <th className="text-left py-2 px-3 font-medium text-muted-foreground">Scripture</th>
                           <th className="text-left py-2 px-3 font-medium text-muted-foreground">Song</th>
-                          <th className="text-right py-2 px-3 font-medium text-muted-foreground w-20" />
                         </tr>
                       </thead>
                       <tbody>
-                        {chainAudit.missing.map((m) => {
-                          const checked = !excludedFromFix.has(m.number)
+                        {chainNumbers.map((num) => {
+                          const d = chainDevotions?.find((x) => x.number === num)
                           return (
-                            <tr key={m.number} className="border-b last:border-0">
-                              <td className="py-2 px-2">
-                                <Checkbox
-                                  checked={checked}
-                                  onCheckedChange={(c) => {
-                                    setExcludedFromFix((prev) => {
-                                      const next = new Set(prev)
-                                      if (c) next.delete(m.number)
-                                      else next.add(m.number)
-                                      return next
+                            <tr key={num} className="border-b last:border-0">
+                              <td className="py-2 px-3">
+                                {d ? (
+                                  <Link to={`/devotions/${d.id}`} className="text-primary hover:underline font-medium">
+                                    #{String(num).padStart(3, '0')}
+                                  </Link>
+                                ) : (
+                                  <span className="text-muted-foreground">#{String(num).padStart(3, '0')}</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3">
+                                {d ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs"
+                                    style={{
+                                      borderColor: TYPE_COLORS[d.devotionType],
+                                      color: TYPE_COLORS[d.devotionType],
+                                    }}
+                                  >
+                                    {TYPE_LABELS[d.devotionType] || d.devotionType}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">not found</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                                {d?.date
+                                  ? new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric',
                                     })
-                                  }}
-                                />
-                              </td>
-                              <td className="py-2 px-3">
-                                <Link to={`/devotions/${m.id}`} className="text-primary hover:underline font-medium">
-                                  #{String(m.number).padStart(3, '0')}
-                                </Link>
+                                  : '—'}
                               </td>
                               <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
-                                {new Date(m.date + 'T00:00:00').toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric',
-                                })}
-                              </td>
-                              <td className="py-2 px-3">
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs"
-                                  style={{borderColor: TYPE_COLORS[m.type], color: TYPE_COLORS[m.type]}}
-                                >
-                                  {TYPE_LABELS[m.type] || m.type}
-                                </Badge>
+                                {d?.bibleReference || '—'}
                               </td>
                               <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
-                                {m.bibleReference || '—'}
-                              </td>
-                              <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">{m.songName || '—'}</td>
-                              <td className="py-2 px-3 text-right">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 text-xs"
-                                  disabled={ignoreMutation.isPending}
-                                  onClick={() => ignoreMutation.mutate({add: [m.number]})}
-                                >
-                                  Ignore
-                                </Button>
+                                {d?.songName || '—'}
                               </td>
                             </tr>
                           )
@@ -1004,205 +1161,99 @@ export function DevotionDetailPage() {
                       </tbody>
                     </table>
                   </div>
-                )}
-                {chainAudit.ignored.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap pt-2 border-t">
-                    <span className="text-xs text-muted-foreground">Ignored:</span>
-                    {chainAudit.ignored.map((n) => (
-                      <button
-                        key={n}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-muted-foreground/30 text-xs text-muted-foreground hover:text-foreground hover:border-foreground cursor-pointer"
-                        onClick={() => ignoreMutation.mutate({remove: [n]})}
-                        disabled={ignoreMutation.isPending}
-                        title="Click to un-ignore"
-                      >
-                        #{String(n).padStart(3, '0')}
-                        <span className="text-[10px]">×</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {chainAudit.missing.length > 0 && (
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      onClick={handleApplyChainFix}
-                      disabled={
-                        insertChainMutation.isPending || chainAudit.missing.every((m) => excludedFromFix.has(m.number))
-                      }
-                    >
-                      {insertChainMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-4 w-4 mr-1.5" />
-                      )}
-                      Apply Fix
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Revisit Chain */}
-          {isRevisit && chainNumbers.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Revisit Chain
-                  <Badge variant="secondary">{chainNumbers.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">#</th>
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Type</th>
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Date</th>
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Scripture</th>
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Song</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {chainNumbers.map((num) => {
-                        const d = chainDevotions?.find((x) => x.number === num)
-                        return (
-                          <tr key={num} className="border-b last:border-0">
-                            <td className="py-2 px-3">
-                              {d ? (
-                                <Link to={`/devotions/${d.id}`} className="text-primary hover:underline font-medium">
-                                  #{String(num).padStart(3, '0')}
-                                </Link>
-                              ) : (
-                                <span className="text-muted-foreground">#{String(num).padStart(3, '0')}</span>
-                              )}
-                            </td>
-                            <td className="py-2 px-3">
-                              {d ? (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs"
-                                  style={{borderColor: TYPE_COLORS[d.devotionType], color: TYPE_COLORS[d.devotionType]}}
-                                >
-                                  {TYPE_LABELS[d.devotionType] || d.devotionType}
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">not found</span>
-                              )}
-                            </td>
-                            <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
-                              {d?.date
-                                ? new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                  })
-                                : '—'}
-                            </td>
-                            <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
-                              {d?.bibleReference || '—'}
-                            </td>
-                            <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">{d?.songName || '—'}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Scripture Usage */}
-          {scriptureDevotions.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Scripture Usage
-                  <Badge variant={scriptureDevotions.length > 2 ? 'destructive' : 'secondary'}>
-                    {scriptureDevotions.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {scriptureDevotions.map((d) => {
-                    const inChain = isRevisit && chainNumbers.includes(d.number)
-                    const today = new Date().toISOString().slice(0, 10)
-                    const isPastRevisit = d.devotionType === 'revisit' && d.date <= today
-                    const currentNumber = typeof form.number === 'number' ? form.number : 0
-                    const isEarlier = d.number < currentNumber
-                    const isIgnored = chainAudit?.ignored.includes(d.number) ?? false
-                    const currentOriginal = chainNumbers.length > 0 ? chainNumbers[chainNumbers.length - 1] : null
-                    const sameLineage =
-                      currentOriginal == null || d.originalNumber == null || d.originalNumber === currentOriginal
-                    const canAddToChain =
-                      isRevisit && !inChain && isPastRevisit && isEarlier && !isIgnored && sameLineage && !!id
-                    return (
-                      <div
-                        key={d.id}
-                        className={`flex items-center gap-3 py-2 border-b last:border-0 ${inChain ? 'bg-green-50 dark:bg-green-950/30 -mx-3 px-3 rounded' : ''}`}
-                      >
-                        <Link to={`/devotions/${d.id}`} className="text-primary hover:underline font-medium">
-                          #{String(d.number).padStart(3, '0')}
-                        </Link>
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className="text-xs"
-                          style={{borderColor: TYPE_COLORS[d.devotionType], color: TYPE_COLORS[d.devotionType]}}
+            {/* Scripture Usage */}
+            {showScriptureUsage && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Scripture Usage
+                    <Badge variant={scriptureDevotions.length > 2 ? 'destructive' : 'secondary'}>
+                      {scriptureDevotions.length}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {scriptureDevotions.map((d) => {
+                      const inChain = isRevisit && chainNumbers.includes(d.number)
+                      const today = new Date().toISOString().slice(0, 10)
+                      const isPastRevisit = d.devotionType === 'revisit' && d.date <= today
+                      const currentNumber = typeof form.number === 'number' ? form.number : 0
+                      const isEarlier = d.number < currentNumber
+                      const isIgnored = chainAudit?.ignored.includes(d.number) ?? false
+                      const currentOriginal = chainNumbers.length > 0 ? chainNumbers[chainNumbers.length - 1] : null
+                      const sameLineage =
+                        currentOriginal == null || d.originalNumber == null || d.originalNumber === currentOriginal
+                      const canAddToChain =
+                        isRevisit && !inChain && isPastRevisit && isEarlier && !isIgnored && sameLineage && !!id
+                      return (
+                        <div
+                          key={d.id}
+                          className={`flex items-center gap-3 py-2 border-b last:border-0 ${inChain ? 'bg-green-50 dark:bg-green-950/30 -mx-3 px-3 rounded' : ''}`}
                         >
-                          {TYPE_LABELS[d.devotionType] || d.devotionType}
-                          {d.guestSpeaker ? ` - ${d.guestSpeaker}` : ''}
-                        </Badge>
-                        {inChain && (
+                          <Link to={`/devotions/${d.id}`} className="text-primary hover:underline font-medium">
+                            #{String(d.number).padStart(3, '0')}
+                          </Link>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </span>
                           <Badge
                             variant="outline"
-                            className="text-xs border-green-500 text-green-700 dark:text-green-300 flex items-center gap-1"
+                            className="text-xs"
+                            style={{borderColor: TYPE_COLORS[d.devotionType], color: TYPE_COLORS[d.devotionType]}}
                           >
-                            <Check className="h-3 w-3" />
-                            In chain
+                            {TYPE_LABELS[d.devotionType] || d.devotionType}
+                            {d.guestSpeaker ? ` - ${d.guestSpeaker}` : ''}
                           </Badge>
-                        )}
-                        <span className="text-xs text-muted-foreground truncate flex-1">{d.bibleReference}</span>
-                        {canAddToChain && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs shrink-0"
-                            disabled={insertChainMutation.isPending}
-                            onClick={() => insertChainMutation.mutate([d.number])}
+                          {inChain && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs border-green-500 text-green-700 dark:text-green-300 flex items-center gap-1"
+                            >
+                              <Check className="h-3 w-3" />
+                              In chain
+                            </Badge>
+                          )}
+                          <span className="text-xs text-muted-foreground truncate flex-1">{d.bibleReference}</span>
+                          {canAddToChain && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs shrink-0"
+                              disabled={insertChainMutation.isPending}
+                              onClick={() => insertChainMutation.mutate([d.number])}
+                            >
+                              {insertChainMutation.isPending && insertChainMutation.variables?.includes(d.number) ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              ) : null}
+                              Add to chain
+                            </Button>
+                          )}
+                          <a
+                            href={youtubeSearchUrl(d.number)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-foreground shrink-0"
                           >
-                            {insertChainMutation.isPending && insertChainMutation.variables?.includes(d.number) ? (
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            ) : null}
-                            Add to chain
-                          </Button>
-                        )}
-                        <a
-                          href={youtubeSearchUrl(d.number)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground shrink-0"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         {/* Col 2 (xl) / Col 1 row 2 (md): Publishing + Song Upload */}
         <div className="space-y-4 order-2 xl:order-none xl:col-start-2 xl:row-start-1">

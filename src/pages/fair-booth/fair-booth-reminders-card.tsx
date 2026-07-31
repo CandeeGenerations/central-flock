@@ -236,9 +236,21 @@ function ReminderPreviewDialog({runId, sendTime, onClose}: PreviewProps) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      {/* DialogContent is normally the scroll container itself, but its close
+          button is absolutely positioned inside it — with a long recipient list
+          the button scrolls away down the page and the title goes with it. So
+          this one is a flex column that does NOT scroll: header pinned, list
+          scrolls on its own. gap-3 over the default gap-6 keeps the header from
+          eating a third of a short dialog. */}
+      <DialogContent className="flex flex-col gap-3 overflow-hidden sm:max-h-[85vh] sm:max-w-2xl">
+        <DialogHeader className="shrink-0 pr-10">
           <DialogTitle>{data ? `Preview — ${formatShiftDate(data.targetDay)}` : 'Preview'}</DialogTitle>
+          {data && !data.error && (
+            <p className="text-xs text-muted-foreground">
+              {willSend.length} recipient{willSend.length === 1 ? '' : 's'} · as of {asOf} — recomputed when it fires
+              {sendTime ? ` at ${sendTime}` : ''}, so anyone who signs up between now and then is included.
+            </p>
+          )}
         </DialogHeader>
         {isLoading && <Spinner />}
         {data?.error && (
@@ -248,31 +260,27 @@ function ReminderPreviewDialog({runId, sendTime, onClose}: PreviewProps) {
           </div>
         )}
         {data && !data.error && (
-          <>
-            <p className="text-xs text-muted-foreground">
-              {willSend.length} recipient{willSend.length === 1 ? '' : 's'} · as of {asOf} — recomputed when it fires
-              {sendTime ? ` at ${sendTime}` : ''}, so anyone who signs up between now and then is included.
-            </p>
-            <div className="space-y-3">
-              {data.recipients.map((r) => (
-                <div key={r.personId} className="rounded border p-3">
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className="font-medium">{r.name}</span>
-                    <span className="text-xs text-muted-foreground">{r.phoneNumber ?? 'no phone'}</span>
-                    {r.skipReason && (
-                      <Badge variant="secondary" className="text-xs">
-                        skipped — {r.skipReason === 'no_phone' ? 'no phone number' : 'inactive'}
-                      </Badge>
-                    )}
-                  </div>
-                  <pre className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">{r.rendered}</pre>
+          // min-h-0 is what actually lets this shrink inside the flex column —
+          // without it the list forces the dialog past the viewport instead.
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+            {data.recipients.map((r) => (
+              <div key={r.personId} className="rounded border p-3">
+                <div className="mb-1 flex flex-wrap items-center gap-x-2">
+                  <span className="font-medium">{r.name}</span>
+                  <span className="text-xs text-muted-foreground">{r.phoneNumber ?? 'no phone'}</span>
+                  {r.skipReason && (
+                    <Badge variant="secondary" className="text-xs">
+                      skipped — {r.skipReason === 'no_phone' ? 'no phone number' : 'inactive'}
+                    </Badge>
+                  )}
                 </div>
-              ))}
-              {data.recipients.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nobody is signed up for this day yet.</p>
-              )}
-            </div>
-          </>
+                <pre className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">{r.rendered}</pre>
+              </div>
+            ))}
+            {data.recipients.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nobody is signed up for this day yet.</p>
+            )}
+          </div>
         )}
       </DialogContent>
     </Dialog>

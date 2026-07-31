@@ -1226,7 +1226,15 @@ export function DevotionDetailPage() {
                         {copiedField === key ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
-                    <p className="text-sm bg-muted rounded-3xl p-4 font-mono whitespace-pre-wrap break-all">{value}</p>
+                    {/* PowerShell console blue — these are pasted into a
+                        PowerShell prompt, so the block reads as its terminal. */}
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(value, key)}
+                      className="w-full text-left text-sm bg-[#012456] text-white rounded-3xl p-4 font-mono whitespace-pre-wrap break-all cursor-pointer transition-opacity hover:opacity-90"
+                    >
+                      {value}
+                    </button>
                   </div>
                 ))}
               </CardContent>
@@ -1315,7 +1323,20 @@ export function DevotionDetailPage() {
                       )}
                     </Button>
                   </div>
-                  <p className="text-sm bg-muted rounded-3xl p-4 font-mono">{songTitle || '—'}</p>
+                  {/* YouTube red, matching the YouTube Description block above —
+                      both land in the same upload form. Empty stays muted and
+                      inert: there's nothing to copy. */}
+                  {songTitle ? (
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(songTitle, 'songTitle')}
+                      className="w-full text-left text-sm bg-[#FF0000] text-white rounded-3xl p-4 font-mono cursor-pointer transition-opacity hover:opacity-90"
+                    >
+                      {songTitle}
+                    </button>
+                  ) : (
+                    <p className="text-sm bg-muted rounded-3xl p-4 font-mono">—</p>
+                  )}
                 </div>
 
                 <div>
@@ -1335,9 +1356,17 @@ export function DevotionDetailPage() {
                       )}
                     </Button>
                   </div>
-                  <p className="text-sm bg-muted rounded-3xl p-4 font-mono whitespace-pre-wrap">
-                    {songDescription || '—'}
-                  </p>
+                  {songDescription ? (
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(songDescription, 'songDescription')}
+                      className="w-full text-left text-sm bg-[#FF0000] text-white rounded-3xl p-4 font-mono whitespace-pre-wrap cursor-pointer transition-opacity hover:opacity-90"
+                    >
+                      {songDescription}
+                    </button>
+                  ) : (
+                    <p className="text-sm bg-muted rounded-3xl p-4 font-mono whitespace-pre-wrap">—</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

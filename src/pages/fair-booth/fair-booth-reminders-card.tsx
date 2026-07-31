@@ -9,7 +9,7 @@ import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Spinner} from '@/components/ui/spinner'
 import {type Template, fetchTemplates} from '@/lib/api'
 import {formatShiftDate} from '@/lib/fair-booth-render'
@@ -105,9 +105,14 @@ export function FairBoothRemindersCard({scheduleId}: Props) {
   })
 
   const runs = data?.runs ?? []
-  // Only templates that can actually carry a Shift are offerable — the server
-  // rejects the rest anyway, so don't let the picker suggest them.
-  const eligible = (templates ?? []).filter((t: Template) => t.content.includes('{{timeSlot}}'))
+  // Every template is listed rather than only the ones already containing
+  // {{timeSlot}} — hiding the rest made a template you'd just edited look
+  // missing. Ones that can't carry a Shift are flagged instead, and the server
+  // still refuses to queue them.
+  const templateOptions = (templates ?? []).map((t: Template) => ({
+    value: String(t.id),
+    label: t.content.includes('{{timeSlot}}') ? t.name : `${t.name}  — no {{timeSlot}}`,
+  }))
 
   return (
     <Card>
@@ -118,18 +123,13 @@ export function FairBoothRemindersCard({scheduleId}: Props) {
         </CardTitle>
         {runs.length === 0 && (
           <div className="flex items-center gap-2">
-            <Select value={templateId} onValueChange={setTemplateId}>
-              <SelectTrigger className="h-8 w-56">
-                <SelectValue placeholder="Pick a template" />
-              </SelectTrigger>
-              <SelectContent>
-                {eligible.map((t: Template) => (
-                  <SelectItem key={t.id} value={String(t.id)}>
-                    {t.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={templateId}
+              onValueChange={setTemplateId}
+              options={templateOptions}
+              placeholder="Pick a template"
+              className="h-8 w-56"
+            />
             <Button size="sm" disabled={!templateId || queueMutation.isPending} onClick={() => queueMutation.mutate()}>
               Queue reminders
             </Button>

@@ -533,14 +533,16 @@ export function DevotionDetailPage() {
   // Toggle fields (flag, pipeline checkboxes) save on click instead of waiting
   // for the Save button. Only the toggled key is PATCHed, so any unsaved text
   // edits elsewhere in the form stay pending under Save rather than being
-  // committed behind the user's back. No success toast — the control's own
-  // state is the confirmation, and five checkboxes would be five toasts.
+  // committed behind the user's back.
   const autosaveMutation = useMutation({
     mutationFn: (vars: {patch: Partial<Devotion>; revert: Partial<DevotionForm>}) =>
       updateDevotion(Number(id), vars.patch),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['devotion', id]})
       queryClient.invalidateQueries({queryKey: ['devotions']})
+      // Fixed id so ticking five boxes in a row replaces one toast rather than
+      // stacking five. Same copy as the Save button's, since it's the same write.
+      toast.success('Devotion updated', {id: 'devotion-autosave'})
     },
     onError: (err: Error, vars) => {
       // Put the control back where it was — a checkbox that stays checked after

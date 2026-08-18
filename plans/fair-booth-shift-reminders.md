@@ -12,7 +12,7 @@ Domain terms (**Reminder Run**, **Shift Reminder**, **Shift**, **Signup**, **Slo
   (`2026-07-31` → `2026-08-08`), each firing the evening before the day it covers. The first fires
   the evening of **Thu Jul 30** for **Fri Jul 31**.
 - A Run is queued as a **standing instruction** — schedule + target day + template id — not as
-  rendered text. It resolves recipients and their **Shifts** *when it fires*, so a signup added
+  rendered text. It resolves recipients and their **Shifts** _when it fires_, so a signup added
   after queuing is still included.
 - Send time comes from a new setting `schedules.fairBooth.reminderSendTime` (default `19:00`).
   Changing it re-times every still-pending Run.
@@ -34,15 +34,15 @@ Brandon Cobb     Sat, Aug 8 — 3–6 PM  (Worker)             (role changed mid
 
 ### Recipient rules
 
-| Case | Behaviour |
-| --- | --- |
-| Has a Signup on the target day | Texted |
-| Two Signups that merge into one Shift | **One** text, merged range |
-| No phone number | Recorded as `skipped` on the message, Run still succeeds |
-| `status <> 'active'` | Recorded as `skipped` (matches `/api/messages/send`) |
+| Case                                          | Behaviour                                                              |
+| --------------------------------------------- | ---------------------------------------------------------------------- |
+| Has a Signup on the target day                | Texted                                                                 |
+| Two Signups that merge into one Shift         | **One** text, merged range                                             |
+| No phone number                               | Recorded as `skipped` on the message, Run still succeeds               |
+| `status <> 'active'`                          | Recorded as `skipped` (matches `/api/messages/send`)                   |
 | Has Signups but removed from the roster Group | **Still texted** — ADR 0009 makes Signups the record of who is working |
-| Signs up on the target day itself | Not texted; that Run already fired |
-| Target day has zero Signups | Run marked `skipped`, no message created |
+| Signs up on the target day itself             | Not texted; that Run already fired                                     |
+| Target day has zero Signups                   | Run marked `skipped`, no message created                               |
 
 Current data is clean: 39 distinct workers, all active, all with phones, all on roster Group 7, no
 shared numbers. Three names render oddly through `{{firstName}}` — people 60 (`Dad`), 61 (`Mom`),
@@ -84,22 +84,33 @@ In `server/db/schema-fair-booth.ts`:
 
 ```ts
 export const fairBoothReminderRunStatuses = [
-  'scheduled', 'sending', 'completed', 'skipped', 'past_due', 'canceled',
+  'scheduled',
+  'sending',
+  'completed',
+  'skipped',
+  'past_due',
+  'canceled',
 ] as const
 
 export const fairBoothReminderRuns = sqliteTable(
   'fair_booth_reminder_runs',
   {
     id: integer('id').primaryKey({autoIncrement: true}),
-    scheduleId: integer('schedule_id').notNull().references(() => schedules.id, {onDelete: 'cascade'}),
-    targetDay: text('target_day').notNull(),                 // 'YYYY-MM-DD' — the day worked
-    templateId: integer('template_id').notNull(),            // live reference; validated at fire time
-    scheduledAt: text('scheduled_at').notNull(),             // UTC 'YYYY-MM-DD HH:MM:SS', same convention as messages.scheduled_at
+    scheduleId: integer('schedule_id')
+      .notNull()
+      .references(() => schedules.id, {onDelete: 'cascade'}),
+    targetDay: text('target_day').notNull(), // 'YYYY-MM-DD' — the day worked
+    templateId: integer('template_id').notNull(), // live reference; validated at fire time
+    scheduledAt: text('scheduled_at').notNull(), // UTC 'YYYY-MM-DD HH:MM:SS', same convention as messages.scheduled_at
     status: text('status', {enum: fairBoothReminderRunStatuses}).notNull().default('scheduled'),
     messageId: integer('message_id').references(() => messages.id, {onDelete: 'set null'}),
     error: text('error'),
-    createdAt: text('created_at').default(sql`(datetime('now'))`).notNull(),
-    updatedAt: text('updated_at').default(sql`(datetime('now'))`).notNull(),
+    createdAt: text('created_at')
+      .default(sql`(datetime('now'))`)
+      .notNull(),
+    updatedAt: text('updated_at')
+      .default(sql`(datetime('now'))`)
+      .notNull(),
   },
   (t) => ({
     uniqScheduleDay: uniqueIndex('fair_booth_reminder_runs_schedule_day_uniq').on(t.scheduleId, t.targetDay),
@@ -158,15 +169,15 @@ staleness the whole design exists to prevent.
 
 Add to `server/routes/fair-booth.ts`:
 
-| Route | Purpose |
-| --- | --- |
-| `GET /api/fair-booth/:scheduleId/reminders` | List Runs + live recipient count per Run |
-| `POST /api/fair-booth/:scheduleId/reminders` | Queue one Run per fair day; idempotent via the unique index; validates the template contains `{{timeSlot}}` |
-| `GET /api/fair-booth/reminders/:runId/preview` | Full `resolveReminderRun` output — every recipient, every rendered message |
-| `POST /api/fair-booth/reminders/:runId/cancel` | `status='canceled'` |
-| `POST /api/fair-booth/reminders/:runId/send-now` | Fire immediately, ignoring `scheduled_at` |
+| Route                                            | Purpose                                                                                                     |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `GET /api/fair-booth/:scheduleId/reminders`      | List Runs + live recipient count per Run                                                                    |
+| `POST /api/fair-booth/:scheduleId/reminders`     | Queue one Run per fair day; idempotent via the unique index; validates the template contains `{{timeSlot}}` |
+| `GET /api/fair-booth/reminders/:runId/preview`   | Full `resolveReminderRun` output — every recipient, every rendered message                                  |
+| `POST /api/fair-booth/reminders/:runId/cancel`   | `status='canceled'`                                                                                         |
+| `POST /api/fair-booth/reminders/:runId/send-now` | Fire immediately, ignoring `scheduled_at`                                                                   |
 
-Queuing computes each `scheduled_at` as *(target day − 1) at `reminderSendTime` local*, converted to
+Queuing computes each `scheduled_at` as _(target day − 1) at `reminderSendTime` local_, converted to
 UTC the same way `messages.scheduled_at` is (`server/routes/messages.ts:76`).
 
 Client helpers in `src/lib/schedules-api.ts` alongside the existing fair booth calls.
@@ -197,8 +208,7 @@ header, then every recipient with name, masked phone and full rendered message. 
 
 ### 8. Deploy
 
-Working tree currently has 24 uncommitted files (export delivery, devotion scan validation, ADR
-0017) — **decide whether those ship tonight** before running deploy, since `deploy.sh` prompts on a
+Working tree currently has 24 uncommitted files (export delivery, devotion scan validation, ADR 0017) — **decide whether those ship tonight** before running deploy, since `deploy.sh` prompts on a
 dirty tree and will otherwise carry them.
 
 `pnpm eslint` + `pnpm prettier`, commit, then `./scripts/deploy.sh` (backs up the DB, migrates,

@@ -1,6 +1,6 @@
 # Fair Booth Reminder Runs are queued as standing instructions, not as rendered text
 
-Every other queued message in this app has its final text written *before* it enters the queue:
+Every other queued message in this app has its final text written _before_ it enters the queue:
 `/api/messages/send` renders each recipient's copy at compose time into
 `message_recipients.rendered_content`, and the scheduler only flips `status` and hands the frozen
 strings to the send queue. A **Reminder Run** deliberately breaks that. A Run stores a
@@ -60,5 +60,5 @@ for exactly that drift.
   single row therefore does not survive the next settings change — accepted, because a setting that
   displays one time while the queue holds another is the worse failure.
 - **A Run covers one day, so a same-day signup is never reminded.** Deliberate: someone who signs up
-  the morning of knows they are working. The case that must not happen is an *earlier* signup being
+  the morning of knows they are working. The case that must not happen is an _earlier_ signup being
   missed, and fire-time resolution is what guarantees that.

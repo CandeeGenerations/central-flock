@@ -5,8 +5,9 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 import {Input} from '@/components/ui/input'
 import {PageSpinner} from '@/components/ui/spinner'
-import {deriveFairDays} from '@/lib/fair-booth-render'
+import {type FairDay, deriveFairDays} from '@/lib/fair-booth-render'
 import {
+  type FooterBlock,
   fetchFairBoothSchedule,
   fetchSchedulesSettings,
   schedulesKeys,
@@ -15,7 +16,7 @@ import {
 } from '@/lib/schedules-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, Pencil, Plus, Send, X} from 'lucide-react'
-import {useEffect, useRef, useState} from 'react'
+import {type ReactNode, forwardRef, useEffect, useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -28,6 +29,17 @@ import {FairBoothShiftsCard} from './fair-booth-shifts-card'
 
 // Text body accompanying a texted Shifts Card. Editable in the dialog per send.
 const SHIFTS_SEND_CAPTION = 'Here are your shifts for the Fair this year! Please let me know if any changes are needed.'
+
+// "Fri Jul 31 – Tue Aug 4". Subtitles the split sheets: the day headers carry no
+// month, and a fair routinely straddles one.
+function formatDayRange(days: FairDay[]): string {
+  if (!days.length) return ''
+  const fmt = (date: string) =>
+    new Date(`${date}T12:00:00`)
+      .toLocaleDateString('en-US', {weekday: 'short', month: 'short', day: 'numeric'})
+      .replace(',', '')
+  return `${fmt(days[0].date)} – ${fmt(days[days.length - 1].date)}`
+}
 
 export function FairBoothSchedulePage() {
   const {id} = useParams<{id: string}>()
@@ -55,6 +67,8 @@ export function FairBoothSchedulePage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   })
   const printGridRef = useRef<HTMLDivElement | null>(null)
+  const printHalf0Ref = useRef<HTMLDivElement | null>(null)
+  const printHalf1Ref = useRef<HTMLDivElement | null>(null)
   const printRosterRef = useRef<HTMLDivElement | null>(null)
   const shiftsCardRef = useRef<HTMLDivElement | null>(null)
   const [sendShiftsOpen, setSendShiftsOpen] = useState(false)
@@ -86,6 +100,7 @@ export function FairBoothSchedulePage() {
   if (isLoading || !detail || !settings) return <PageSpinner />
   const {schedule, people, rosterPersonIds, rosterAttrs, signups} = detail
   if (!schedule.scopeStart) return <div className="p-4">Schedule missing scope start.</div>
+  const scopeStart = schedule.scopeStart // narrowing doesn't survive into callbacks below
   const signedUpIds = new Set(signups.map((s) => s.personId))
   const manualIncludeIds = new Set(rosterAttrs.filter((a) => a.manualInclude).map((a) => a.personId))
   const rosterSize = rosterPersonIds.filter((pid) => signedUpIds.has(pid) || manualIncludeIds.has(pid)).length
@@ -103,6 +118,15 @@ export function FairBoothSchedulePage() {
       .toLowerCase()
   const filenameBase = `fair-booth-${slug(schedule.scopeLabel)}`
   const shiftsFilename = focusedName ? `${filenameBase}-${slug(focusedName)}-shifts` : filenameBase
+  const [half0Range, half1Range] = (() => {
+    try {
+      const days = deriveFairDays(scopeStart)
+      return [formatDayRange(days.slice(0, 5)), formatDayRange(days.slice(5, 9))]
+    } catch {
+      return ['', '']
+    }
+  })()
+  const printTitle = `${settings.fairBooth.titlePrefix} ${schedule.scopeLabel}${blank ? '' : ` (${rosterSize})`}`
 
   async function withExport(fn: () => Promise<void>) {
     setExporting(true)
@@ -175,11 +199,25 @@ export function FairBoothSchedulePage() {
                 onClick={() =>
                   withExport(async () => {
                     if (!printGridRef.current || !printRosterRef.current) return
-                    await exportFairBoothPdf(printGridRef.current, printRosterRef.current, filenameBase)
+                    await exportFairBoothPdf([printGridRef.current], printRosterRef.current, filenameBase)
                   })
                 }
               >
                 PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  withExport(async () => {
+                    if (!printHalf0Ref.current || !printHalf1Ref.current || !printRosterRef.current) return
+                    await exportFairBoothPdf(
+                      [printHalf0Ref.current, printHalf1Ref.current],
+                      printRosterRef.current,
+                      `${filenameBase}-split`,
+                    )
+                  })
+                }
+              >
+                PDF (split pages)
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>
@@ -197,12 +235,29 @@ export function FairBoothSchedulePage() {
                   await new Promise((r) => setTimeout(r, 120))
                   await withExport(async () => {
                     if (!printGridRef.current || !printRosterRef.current) return
-                    await exportFairBoothPdf(printGridRef.current, printRosterRef.current, `${filenameBase}-blank`)
+                    await exportFairBoothPdf([printGridRef.current], printRosterRef.current, `${filenameBase}-blank`)
                   })
                   setBlank(false)
                 }}
               >
                 Blank PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async () => {
+                  setBlank(true)
+                  await new Promise((r) => setTimeout(r, 120))
+                  await withExport(async () => {
+                    if (!printHalf0Ref.current || !printHalf1Ref.current || !printRosterRef.current) return
+                    await exportFairBoothPdf(
+                      [printHalf0Ref.current, printHalf1Ref.current],
+                      printRosterRef.current,
+                      `${filenameBase}-blank-split`,
+                    )
+                  })
+                  setBlank(false)
+                }}
+              >
+                Blank PDF (split pages)
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={async () => {
@@ -380,29 +435,12 @@ export function FairBoothSchedulePage() {
 
       {/* Hidden print-only renderings — capture targets for PDF/JPG/blank. */}
       <div style={{position: 'fixed', left: '-99999px', top: 0, width: '1100px', background: '#fff'}}>
-        <div
+        <FairBoothPrintPage
           ref={printGridRef}
-          style={{
-            background: '#fff',
-            padding: 24,
-            fontFamily: 'Arial, sans-serif',
-            color: '#000',
-          }}
+          logoPath={settings.logoPath}
+          title={printTitle}
+          footerBlocks={settings.fairBooth.gridPageFooterBlocks}
         >
-          <div style={{textAlign: 'center', marginBottom: 24}}>
-            {settings.logoPath && (
-              <img
-                src={settings.logoPath}
-                alt=""
-                style={{maxHeight: 80, margin: '0 auto 8px', display: 'block', objectFit: 'contain'}}
-                crossOrigin="anonymous"
-              />
-            )}
-            <h2 style={{fontSize: 20, fontWeight: 700, color: '#000', margin: 0}}>
-              {settings.fairBooth.titlePrefix} {schedule.scopeLabel}
-              {blank ? '' : ` (${rosterSize})`}
-            </h2>
-          </div>
           <FairBoothGrid
             scopeStart={schedule.scopeStart}
             signups={signups}
@@ -410,31 +448,34 @@ export function FairBoothSchedulePage() {
             rosterAttrs={rosterAttrs}
             blank={blank}
           />
-          <FooterBlocks blocks={settings.fairBooth.gridPageFooterBlocks} />
-        </div>
-        <div
+        </FairBoothPrintPage>
+        {/* One sheet per Grid Half, for the split-page PDF. */}
+        {([0, 1] as const).map((half) => (
+          <FairBoothPrintPage
+            key={half}
+            ref={half === 0 ? printHalf0Ref : printHalf1Ref}
+            logoPath={settings.logoPath}
+            title={printTitle}
+            subtitle={half === 0 ? half0Range : half1Range}
+            footerBlocks={settings.fairBooth.gridPageFooterBlocks}
+            compact
+          >
+            <FairBoothGrid
+              scopeStart={scopeStart}
+              signups={signups}
+              people={people}
+              rosterAttrs={rosterAttrs}
+              blank={blank}
+              half={half}
+            />
+          </FairBoothPrintPage>
+        ))}
+        <FairBoothPrintPage
           ref={printRosterRef}
-          style={{
-            background: '#fff',
-            padding: 24,
-            fontFamily: 'Arial, sans-serif',
-            color: '#000',
-          }}
+          logoPath={settings.logoPath}
+          title={`${settings.fairBooth.titlePrefix} ${schedule.scopeLabel} — Roster${blank ? '' : ` (${rosterSize})`}`}
+          footerBlocks={settings.fairBooth.rosterPageFooterBlocks}
         >
-          <div style={{textAlign: 'center', marginBottom: 24}}>
-            {settings.logoPath && (
-              <img
-                src={settings.logoPath}
-                alt=""
-                style={{maxHeight: 80, margin: '0 auto 8px', display: 'block', objectFit: 'contain'}}
-                crossOrigin="anonymous"
-              />
-            )}
-            <h2 style={{fontSize: 20, fontWeight: 700, color: '#000', margin: 0}}>
-              {settings.fairBooth.titlePrefix} {schedule.scopeLabel} — Roster
-              {blank ? '' : ` (${rosterSize})`}
-            </h2>
-          </div>
           <FairBoothRoster
             people={people}
             rosterPersonIds={rosterPersonIds}
@@ -447,8 +488,7 @@ export function FairBoothSchedulePage() {
             hideCounts={blank}
           />
           {!blank && <PrintLegend />}
-          <FooterBlocks blocks={settings.fairBooth.rosterPageFooterBlocks} />
-        </div>
+        </FairBoothPrintPage>
       </div>
     </div>
   )
@@ -641,10 +681,66 @@ function PrintLegend({textColor = '#111'}: {textColor?: string} = {}) {
   )
 }
 
-function FooterBlocks({blocks}: {blocks: {kind: 'quote' | 'note' | 'spacer'; text: string; bold?: boolean}[]}) {
+// One offscreen print sheet: logo, title, optional subtitle, body, footer.
+// `compact` shrinks the chrome for the split-page export — a lone Grid Half
+// sheet is landscape, where usable height is short enough that header/footer
+// space can come straight out of the grid's printed size.
+interface FairBoothPrintPageProps {
+  logoPath?: string | null
+  title: string
+  subtitle?: string
+  footerBlocks: FooterBlock[]
+  compact?: boolean
+  children: ReactNode
+}
+
+const FairBoothPrintPage = forwardRef<HTMLDivElement, FairBoothPrintPageProps>(function FairBoothPrintPage(
+  {logoPath, title, subtitle, footerBlocks, compact = false, children},
+  ref,
+) {
+  return (
+    <div
+      ref={ref}
+      style={{
+        background: '#fff',
+        padding: compact ? 12 : 24,
+        fontFamily: 'Arial, sans-serif',
+        color: '#000',
+      }}
+    >
+      <div style={{textAlign: 'center', marginBottom: compact ? 12 : 24}}>
+        {logoPath && (
+          <img
+            src={logoPath}
+            alt=""
+            style={{
+              maxHeight: compact ? 56 : 80,
+              margin: compact ? '0 auto 4px' : '0 auto 8px',
+              display: 'block',
+              objectFit: 'contain',
+            }}
+            crossOrigin="anonymous"
+          />
+        )}
+        <h2 style={{fontSize: 20, fontWeight: 700, color: '#000', margin: 0}}>{title}</h2>
+        {subtitle && <div style={{fontSize: 15, fontWeight: 600, color: '#000', marginTop: 2}}>{subtitle}</div>}
+      </div>
+      {children}
+      <FooterBlocks blocks={footerBlocks} marginTop={compact ? 20 : 48} />
+    </div>
+  )
+})
+
+function FooterBlocks({
+  blocks,
+  marginTop = 48,
+}: {
+  blocks: {kind: 'quote' | 'note' | 'spacer'; text: string; bold?: boolean}[]
+  marginTop?: number
+}) {
   if (!blocks || blocks.length === 0) return null
   return (
-    <div style={{marginTop: 48, textAlign: 'center', color: '#000'}}>
+    <div style={{marginTop, textAlign: 'center', color: '#000'}}>
       {blocks.map((b, i) => {
         if (b.kind === 'spacer') return <div key={i} style={{height: 8}} />
         if (b.kind === 'quote')

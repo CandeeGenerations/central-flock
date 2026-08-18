@@ -46,6 +46,9 @@ interface FairBoothGridProps {
   scheduleId?: number
   // When set, render only the column for this date (no two-half split).
   onlyDate?: string
+  // When set, render only one Grid Half (0 = days 1-5, 1 = days 6-9 + filler).
+  // Used by the split-page PDF export, which puts each Half on its own sheet.
+  half?: 0 | 1
   // When set, dim every entry that isn't this person (Person focus mode).
   focusedPersonId?: number | null
 }
@@ -64,6 +67,7 @@ export function FairBoothGrid({
   blank = false,
   scheduleId,
   onlyDate,
+  half,
   focusedPersonId,
 }: FairBoothGridProps) {
   let days: FairDay[]
@@ -165,6 +169,25 @@ export function FairBoothGrid({
   // slot so both halves render the same column count and align visually.
   const half1 = days.slice(0, 5)
   const half2 = days.slice(5, 9)
+
+  // One Grid Half on its own. Keeps the filler column, so both Halves share an
+  // aspect ratio and therefore print at the same scale on their own sheets.
+  if (half !== undefined) {
+    const halfDays = half === 0 ? half1 : half2
+    return (
+      <HalfGrid
+        days={halfDays}
+        emptyTrailing={5 - halfDays.length}
+        renderFn={renderFn}
+        blank={blank}
+        signups={signups as FairSignup[]}
+        hispanicIds={hispanicIds}
+        scheduleId={scheduleId}
+        clickable={false}
+        focusedPersonId={focusedPersonId}
+      />
+    )
+  }
 
   return (
     <div className="space-y-4">

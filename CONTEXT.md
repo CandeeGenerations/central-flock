@@ -42,6 +42,12 @@ role. 3-6 plus 6-7 on the same day is one Shift; a genuine gap or a role change 
 Shift is one bullet on a **Shifts Card**. Derived at render time — never stored.
 _Avoid_: Signup, Block.
 
+**Grid Half**:
+One of the two stacked bands of day-columns the schedule grid renders as — days 1-5 (Fri-Tue)
+and days 6-9 (Wed-Sat) plus one filler column so both bands are the same width. A presentation
+unit, not data: it's what the split PDF export puts on its own sheet.
+_Avoid_: Row (rows are hours, days are columns), Page, Slot, Week.
+
 **Shifts Card**:
 A single 1080×1920 image of one person's **Shifts** for one fair — titled "Your Shifts", with the
 person's name, an admin-configured intro line, and the bullets. Exported as JPG or texted to that

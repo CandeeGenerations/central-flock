@@ -135,11 +135,21 @@ export async function exportShiftsCardJpg(cardNode: HTMLElement, filename: strin
 // US Letter in mm.
 const LETTER_LONG = 279.4
 const LETTER_SHORT = 215.9
-const PAGE_MARGIN = 8
+// Trimmed from 8mm: every page is fit-to-page, so a thinner margin scales the
+// whole capture up. 5mm stays clear of the ~4.2mm non-printable edge a laser
+// printer clips; going to 4 risks losing the outer grid border.
+const PAGE_MARGIN = 5
 // Fixed canvas width the print nodes render at before being scaled to fill the
 // sheet. On-page font size scales as 1/CAPTURE_WIDTH — a narrower canvas maps
 // each glyph to more mm on paper, enlarging the text. Floor is set by grid cell
 // wrapping (fixed columns): too narrow and long initials lines wrap.
+//
+// Do not narrow this for the split-page export. A lone Grid Half is wide and
+// short (ratio ~1.5), so its sheet goes landscape — where the usable box is only
+// ~206mm tall and the node already sits near the width/height-limited boundary.
+// Narrowing the capture adds wrapped lines, tips the node into height-limited,
+// and the type comes out *smaller*. (Portrait behaves the opposite way, which is
+// why the split sheets are landscape and the roster page is not.)
 const CAPTURE_WIDTH = 900
 
 type Orientation = 'portrait' | 'landscape'
@@ -175,21 +185,31 @@ function placement(orientation: Orientation, imgRatio: number) {
   }
 }
 
+// gridNodes is one node for the combined grid, or one node per Grid Half for
+// the split-page export. Every grid page shares a single orientation — decided
+// from the tallest node so it fits — because a doc you have to rotate halfway
+// through reads as a mistake.
 export async function exportFairBoothPdf(
-  gridNode: HTMLElement,
+  gridNodes: HTMLElement[],
   rosterNode: HTMLElement,
   filename: string,
 ): Promise<void> {
   const {jsPDF} = await import('jspdf')
 
-  // Grid page: capture once, then pick whichever orientation scales the
-  // schedule largest (a wide grid gains ~30% in landscape; a tall one stays
-  // portrait). Roster page: always portrait, padded to fill the sheet.
-  const gridUrl = await captureNode(gridNode, {width: CAPTURE_WIDTH})
-  const gridImg = await imageDataUrlToImg(gridUrl)
-  const gridRatio = gridImg.width / gridImg.height
+  // Grid pages: capture, then pick whichever orientation scales the schedule
+  // largest (a wide grid gains ~30% in landscape; a tall one stays portrait).
+  // Roster page: always portrait, padded to fill the sheet.
+  const gridRatios: number[] = []
+  const gridUrls: string[] = []
+  for (const node of gridNodes) {
+    const url = await captureNode(node, {width: CAPTURE_WIDTH})
+    const img = await imageDataUrlToImg(url)
+    gridUrls.push(url)
+    gridRatios.push(img.width / img.height)
+  }
+  const tallestRatio = Math.min(...gridRatios)
   const gridOrientation: Orientation =
-    placement('landscape', gridRatio).renderWidth > placement('portrait', gridRatio).renderWidth
+    placement('landscape', tallestRatio).renderWidth > placement('portrait', tallestRatio).renderWidth
       ? 'landscape'
       : 'portrait'
 
@@ -202,7 +222,7 @@ export async function exportFairBoothPdf(
 
   const pdf = new jsPDF({orientation: gridOrientation, unit: 'mm', format: 'letter'})
   const pages: {url: string; orientation: Orientation; imgRatio: number}[] = [
-    {url: gridUrl, orientation: gridOrientation, imgRatio: gridRatio},
+    ...gridUrls.map((url, i) => ({url, orientation: gridOrientation, imgRatio: gridRatios[i]})),
     {url: rosterUrl, orientation: 'portrait', imgRatio: rosterRatio},
   ]
   for (let i = 0; i < pages.length; i++) {

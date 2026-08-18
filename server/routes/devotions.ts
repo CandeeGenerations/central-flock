@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx'
 import {YoutubeTranscript} from 'youtube-transcript'
 
 import {db, schema} from '../db/index.js'
-import {AI_MODELS} from '../lib/ai-models.js'
+import {AI_MODELS, effortConfig} from '../lib/ai-models.js'
 import {parseReference, referenceKeys} from '../lib/bible-reference.js'
 import {retargetDescriptionHeader} from '../lib/devotion-description-header.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
@@ -2211,7 +2211,8 @@ devotionsRouter.post(
 
     const message = await anthropic.messages.create({
       model: AI_MODELS.sonnet,
-      max_tokens: 4096,
+      max_tokens: 8192,
+      ...effortConfig(AI_MODELS.sonnet, 'low'),
       system: `You analyze YouTube video transcripts to identify Bible verse references.
 
 First, look ONLY for direct references — places where the speaker explicitly names a Bible book, chapter, and/or verse (e.g., "John 3:16", "Romans chapter 8", "in First Corinthians Paul says..."), or directly reads/quotes scripture by name.

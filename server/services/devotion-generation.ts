@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import {and, desc, eq, sql} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
-import {resolveModel} from '../lib/ai-models.js'
+import {effortConfig, resolveModel} from '../lib/ai-models.js'
 import {parseReference} from '../lib/bible-reference.js'
 
 export interface GeneratedPassage {
@@ -169,7 +169,8 @@ export async function generateDevotionPassage(
 
     const response = await client.messages.create({
       model,
-      max_tokens: 1024,
+      max_tokens: 4096,
+      ...effortConfig(model, 'medium'),
       system: SYSTEM_PROMPT,
       messages: [{role: 'user', content: userMessage}],
     })

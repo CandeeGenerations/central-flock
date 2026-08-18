@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import {eq} from 'drizzle-orm'
 
 import {db, schema, sqlite} from '../db/index.js'
-import {resolveModel} from '../lib/ai-models.js'
+import {effortConfig, resolveModel} from '../lib/ai-models.js'
 
 const PREFILTER_THRESHOLD = 300
 
@@ -188,7 +188,8 @@ export async function computeQuoteResearch(topic: string): Promise<QuoteComputeR
 
   const response = await client.messages.create({
     model,
-    max_tokens: 2048,
+    max_tokens: 8192,
+    ...effortConfig(model, 'medium'),
     system: SYSTEM_PROMPT,
     messages: [
       {

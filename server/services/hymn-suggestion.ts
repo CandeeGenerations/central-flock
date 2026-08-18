@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import {eq} from 'drizzle-orm'
 
 import {db, schema, sqlite} from '../db/index.js'
-import {resolveModel} from '../lib/ai-models.js'
+import {effortConfig, resolveModel} from '../lib/ai-models.js'
 
 export type HymnBook = 'burgundy' | 'silver'
 export type HymnalFilter = 'burgundy' | 'silver' | 'both'
@@ -340,7 +340,8 @@ export async function runHymnSuggestion(input: HymnSuggestionInput): Promise<Hym
 
   const response = await client.messages.create({
     model,
-    max_tokens: 2048,
+    max_tokens: 8192,
+    ...effortConfig(model, 'medium'),
     system: SYSTEM_PROMPT,
     messages: [
       {

@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-import {AI_MODELS} from '../lib/ai-models.js'
+import {AI_MODELS, effortConfig} from '../lib/ai-models.js'
 import {parseReference} from '../lib/bible-reference.js'
 
 export interface ParsedDevotionRow {
@@ -88,7 +88,8 @@ export async function parseDevotionImage(
 
   const response = await client.messages.create({
     model: AI_MODELS.sonnet,
-    max_tokens: 4096,
+    max_tokens: 8192,
+    ...effortConfig(AI_MODELS.sonnet, 'low'),
     messages: [
       {
         role: 'user',

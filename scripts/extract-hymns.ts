@@ -21,7 +21,7 @@ import fs from 'fs'
 import path from 'path'
 import {fileURLToPath} from 'url'
 
-import {AI_MODELS} from '../server/lib/ai-models.js'
+import {AI_MODELS, effortConfig} from '../server/lib/ai-models.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = path.join(__dirname, '..', 'data')
@@ -126,6 +126,7 @@ async function callClaudeForChunk(
   const response = await client.messages.create({
     model,
     max_tokens: 16000,
+    ...effortConfig(model, 'low'),
     system: SYSTEM_PROMPT,
     messages: [
       {

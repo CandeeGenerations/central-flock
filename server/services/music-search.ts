@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import {eq} from 'drizzle-orm'
 
 import {db, schema, sqlite} from '../db/index.js'
-import {resolveModel} from '../lib/ai-models.js'
+import {effortConfig, resolveModel, webSearchTool} from '../lib/ai-models.js'
 
 export type HymnBook = 'burgundy' | 'silver'
 
@@ -208,9 +208,10 @@ export async function runMusicSearch(topic: string): Promise<{model: string; res
 
   const response = await client.messages.create({
     model,
-    max_tokens: 4096,
+    max_tokens: 8192,
+    ...effortConfig(model, 'medium'),
     system: SYSTEM_PROMPT,
-    tools: [{type: 'web_search_20250305', name: 'web_search', max_uses: 8}],
+    tools: [webSearchTool(model, 8)],
     messages: [
       {
         role: 'user',

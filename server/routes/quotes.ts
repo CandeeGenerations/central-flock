@@ -253,7 +253,8 @@ quotesRouter.post(
       ],
     })
 
-    const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+    const textBlock = message.content.find((b) => b.type === 'text')
+    const raw = textBlock?.type === 'text' ? textBlock.text.trim() : ''
     // Strip markdown code fences if the model wraps its response (e.g. ```json ... ```)
     const cleaned = raw
       .replace(/^```(?:json)?\s*/i, '')

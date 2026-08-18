@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import {YoutubeTranscript} from 'youtube-transcript'
 
 import {db, schema} from '../db/index.js'
-import {AI_MODELS} from '../lib/ai-models.js'
+import {AI_MODELS, effortConfig} from '../lib/ai-models.js'
 
 const anthropic = new Anthropic()
 
@@ -152,7 +152,8 @@ async function extractFieldsViaClaude(input: {
 
   const message = await anthropic.messages.create({
     model: AI_MODELS.sonnet,
-    max_tokens: 1024,
+    max_tokens: 4096,
+    ...effortConfig(AI_MODELS.sonnet, 'low'),
     system: `You extract structured metadata about a special musical performance from a YouTube video's title, description, and upload date.
 
 Return ONLY a single JSON object (no prose, no code fence) with these optional fields:

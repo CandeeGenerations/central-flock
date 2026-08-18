@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import {eq} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
-import {resolveModel} from '../lib/ai-models.js'
+import {effortConfig, resolveModel} from '../lib/ai-models.js'
 
 function getConfiguredModel(): string {
   const row = db
@@ -27,7 +27,8 @@ export async function generateHashtags(deriveText: string): Promise<string> {
 
   const response = await client.messages.create({
     model,
-    max_tokens: 512,
+    max_tokens: 2048,
+    ...effortConfig(model, 'low'),
     system: SYSTEM_PROMPT,
     messages: [{role: 'user', content: deriveText}],
   })

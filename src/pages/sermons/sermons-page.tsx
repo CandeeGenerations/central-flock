@@ -1,3 +1,4 @@
+import {AIProgress} from '@/components/ai-progress'
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
@@ -14,6 +15,7 @@ import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
+import {useProgressOperation} from '@/hooks/use-sse'
 import {fetchServiceTimes} from '@/lib/attendance-api'
 import {type SermonListItem, createSermon, deleteSermon, listSermons} from '@/lib/sermons-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
@@ -55,6 +57,21 @@ export function SermonsPage() {
   const [pendingDelete, setPendingDelete] = useState<SermonListItem | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
 
+  // Mirrors the devotion generators: timed stages, since the Anthropic call is a single request
+  // with no server-side progress to report.
+  const {state: genState, start: startGenerate} = useProgressOperation(
+    [
+      {message: 'Reading the transcript\u2026', progress: 8},
+      {message: 'Skipping announcements and prayers\u2026', progress: 18},
+      {message: 'Pulling quotable lines\u2026', progress: 32},
+      {message: 'Still working\u2026', progress: 48},
+      {message: 'Writing reflections\u2026', progress: 64},
+      {message: 'Collecting scripture references\u2026', progress: 78},
+      {message: 'Verifying quotes against the transcript\u2026', progress: 90},
+    ],
+    5000,
+  )
+
   // Remembered between uploads — the same service and speaker week after week.
   const [serviceTimeId, setServiceTimeId] = usePersistedState<number | null>('sermons.new.serviceTimeId', null)
   const [speakerPersonId, setSpeakerPersonId] = usePersistedState<number | null>('sermons.new.speakerPersonId', null)
@@ -73,14 +90,16 @@ export function SermonsPage() {
 
   const createMutation = useMutation({
     mutationFn: () =>
-      createSermon({
-        serviceTimeId: serviceTimeId as number,
-        sermonDate,
-        speakerPersonId: speakerPersonId as number,
-        title: title.trim() || undefined,
-        series: series.trim() || undefined,
-        transcript,
-      }),
+      startGenerate(() =>
+        createSermon({
+          serviceTimeId: serviceTimeId as number,
+          sermonDate,
+          speakerPersonId: speakerPersonId as number,
+          title: title.trim() || undefined,
+          series: series.trim() || undefined,
+          transcript,
+        }),
+      ),
     onSuccess: (res) => {
       queryClient.invalidateQueries({queryKey: ['sermons']})
       if (res.skippedQuotes > 0) {
@@ -251,7 +270,12 @@ export function SermonsPage() {
             </div>
             <div className="space-y-2">
               <Label>Speaker</Label>
-              <PersonPicker value={speakerPersonId} onChange={setSpeakerPersonId} placeholder="Select speaker…" />
+              <PersonPicker
+                value={speakerPersonId}
+                onChange={setSpeakerPersonId}
+                placeholder="Select speaker…"
+                preachersOnly
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="sermon-series">Series (optional)</Label>
@@ -305,6 +329,8 @@ export function SermonsPage() {
               </label>
             )}
           </div>
+
+          {genState.isRunning && <AIProgress message={genState.message} progress={genState.progress} />}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={createMutation.isPending}>

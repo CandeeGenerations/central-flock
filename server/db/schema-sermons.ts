@@ -56,6 +56,9 @@ export const sermonSocialQuotes = sqliteTable('sermon_social_quotes', {
   sensitive: integer('sensitive', {mode: 'boolean'}).notNull().default(false),
   sensitiveReason: text('sensitive_reason'),
   editedText: text('edited_text'),
+  // Hand-picked by the preacher. Outranks the model's Rank — a hearted quote sorts to the top
+  // regardless of tier.
+  favorite: integer('favorite', {mode: 'boolean'}).notNull().default(false),
   used: integer('used', {mode: 'boolean'}).notNull().default(false),
   promotedQuoteId: integer('promoted_quote_id').references(() => quotes.id, {onDelete: 'set null'}),
   createdAt: text('created_at')
@@ -77,6 +80,7 @@ export const sermonReflections = sqliteTable('sermon_reflections', {
   sensitive: integer('sensitive', {mode: 'boolean'}).notNull().default(false),
   sensitiveReason: text('sensitive_reason'),
   editedBody: text('edited_body'),
+  favorite: integer('favorite', {mode: 'boolean'}).notNull().default(false),
   used: integer('used', {mode: 'boolean'}).notNull().default(false),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)

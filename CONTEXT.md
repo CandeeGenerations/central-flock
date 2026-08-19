@@ -116,8 +116,11 @@ _Avoid_: Message (means an SMS in this app), Service, Recording.
 
 **Speaker**:
 The **Person** who preached a **Sermon**. Always a contact — guest evangelists and missionaries are
-added to Contacts before their sermon is recorded, rather than stored as loose names.
-_Avoid_: Preacher, Author, Presenter.
+added to Contacts before their sermon is recorded, rather than stored as loose names. Only contacts
+flagged `isPreacher` are offered as a Speaker, so the picker lists the handful of men who preach
+rather than the whole church directory. The flag is person-level and stable, like `isHispanic` — a
+guest evangelist keeps it between visits.
+_Avoid_: Preacher (that is the flag, not the role on a given sermon), Author, Presenter.
 
 **Social Quote**:
 An excerpt of something the preacher said, lifted out of a **Sermon** transcript for use as a social
@@ -165,6 +168,11 @@ with a one-line reason, so the strongest results sort to the top. Advisory only 
 by a low rank, and the preacher is always the editor. Deliberately a tier and an order rather than a
 number, because models rank within a batch far better than they self-score.
 _Avoid_: Score, Confidence (imply a calibrated number).
+
+**Favorite**:
+A **Social Quote** or **Reflection** the preacher hearted. Outranks **Rank** entirely — a favorite
+sorts to the top whatever tier the model gave it, because his judgement beats the model's. Ordering
+is favorites, then unused before used, then Rank tier, then the model's within-batch order.
 
 **Big Idea**:
 The single statement the preacher wanted people to leave with, extracted as its own field on the

@@ -201,18 +201,32 @@ sermonsRouter.get(
     const sermon = loadSermonRow(id)
     if (!sermon) return void res.status(404).json({error: 'Not found'})
 
+    // Hearted first, then unused before used, then the model's Rank tier (high → low), then its
+    // within-batch order. The preacher's pick always outranks the model's.
+    const tierRank = (col: string) => sql`CASE ${sql.raw(col)} WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END`
+
     const quotes = db
       .select()
       .from(schema.sermonSocialQuotes)
       .where(eq(schema.sermonSocialQuotes.sermonId, id))
-      .orderBy(asc(schema.sermonSocialQuotes.used), asc(schema.sermonSocialQuotes.rankOrder))
+      .orderBy(
+        desc(schema.sermonSocialQuotes.favorite),
+        asc(schema.sermonSocialQuotes.used),
+        tierRank('rank_tier'),
+        asc(schema.sermonSocialQuotes.rankOrder),
+      )
       .all()
 
     const reflections = db
       .select()
       .from(schema.sermonReflections)
       .where(eq(schema.sermonReflections.sermonId, id))
-      .orderBy(asc(schema.sermonReflections.used), asc(schema.sermonReflections.rankOrder))
+      .orderBy(
+        desc(schema.sermonReflections.favorite),
+        asc(schema.sermonReflections.used),
+        tierRank('rank_tier'),
+        asc(schema.sermonReflections.rankOrder),
+      )
       .all()
 
     const scriptures = db
@@ -336,11 +350,16 @@ sermonsRouter.patch(
   '/:id/quotes/:quoteId',
   asyncHandler(async (req, res) => {
     const quoteId = parseInt(String(req.params.quoteId))
-    const {editedText, used} = req.body as {editedText?: string | null; used?: boolean}
+    const {editedText, used, favorite} = req.body as {
+      editedText?: string | null
+      used?: boolean
+      favorite?: boolean
+    }
 
     const updates: Record<string, unknown> = {}
     if (editedText !== undefined) updates.editedText = editedText === null ? null : String(editedText).trim() || null
     if (typeof used === 'boolean') updates.used = used
+    if (typeof favorite === 'boolean') updates.favorite = favorite
     if (Object.keys(updates).length === 0) return void res.status(400).json({error: 'Nothing to update'})
 
     db.update(schema.sermonSocialQuotes).set(updates).where(eq(schema.sermonSocialQuotes.id, quoteId)).run()
@@ -397,11 +416,16 @@ sermonsRouter.patch(
   '/:id/reflections/:reflectionId',
   asyncHandler(async (req, res) => {
     const reflectionId = parseInt(String(req.params.reflectionId))
-    const {editedBody, used} = req.body as {editedBody?: string | null; used?: boolean}
+    const {editedBody, used, favorite} = req.body as {
+      editedBody?: string | null
+      used?: boolean
+      favorite?: boolean
+    }
 
     const updates: Record<string, unknown> = {}
     if (editedBody !== undefined) updates.editedBody = editedBody === null ? null : String(editedBody).trim() || null
     if (typeof used === 'boolean') updates.used = used
+    if (typeof favorite === 'boolean') updates.favorite = favorite
     if (Object.keys(updates).length === 0) return void res.status(400).json({error: 'Nothing to update'})
 
     db.update(schema.sermonReflections).set(updates).where(eq(schema.sermonReflections.id, reflectionId)).run()

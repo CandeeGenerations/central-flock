@@ -99,6 +99,7 @@ export interface Person {
   // Special Music schedule can flip this on or off for a specific cell.
   displayFirstNameOnly: boolean
   isHispanic: boolean
+  isPreacher: boolean
   createdAt: string
   updatedAt: string
   groups?: {id: number; name: string}[]
@@ -124,6 +125,7 @@ export function fetchPeople(params?: {
   search?: string
   status?: string
   groupId?: string
+  isPreacher?: string
   page?: number
   limit?: number
   sort?: string

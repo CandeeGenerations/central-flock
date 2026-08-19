@@ -5,7 +5,7 @@ import {Textarea} from '@/components/ui/textarea'
 import {type Reflection, updateReflection} from '@/lib/sermons-api'
 import {cn} from '@/lib/utils'
 import {useMutation, useQueryClient} from '@tanstack/react-query'
-import {Check, Copy, Pencil, X} from 'lucide-react'
+import {Check, Copy, Heart, Pencil, X} from 'lucide-react'
 import {useState} from 'react'
 import {toast} from 'sonner'
 
@@ -17,7 +17,8 @@ export function ReflectionCard({sermonId, reflection}: {sermonId: number; reflec
   const displayed = reflection.editedBody || reflection.body
 
   const saveMutation = useMutation({
-    mutationFn: (data: {editedBody?: string | null; used?: boolean}) => updateReflection(sermonId, reflection.id, data),
+    mutationFn: (data: {editedBody?: string | null; used?: boolean; favorite?: boolean}) =>
+      updateReflection(sermonId, reflection.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['sermons', 'detail', sermonId]})
       setEditing(false)
@@ -26,9 +27,18 @@ export function ReflectionCard({sermonId, reflection}: {sermonId: number; reflec
   })
 
   return (
-    <Card size="sm" className={cn(reflection.used && 'opacity-60')}>
+    <Card size="sm" className={cn(reflection.used && 'opacity-60', reflection.favorite && 'border-red-300')}>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-ml-1 h-7 w-7"
+            aria-label={reflection.favorite ? 'Remove from favorites' : 'Add to favorites'}
+            onClick={() => saveMutation.mutate({favorite: !reflection.favorite})}
+          >
+            <Heart className={cn('h-4 w-4', reflection.favorite && 'fill-red-500 text-red-500')} />
+          </Button>
           <RankBadge tier={reflection.rankTier} note={reflection.rankNote} />
           {reflection.sensitive && <SensitiveBadge reason={reflection.sensitiveReason} />}
           <span className="ml-auto text-xs text-muted-foreground">{displayed.trim().split(/\s+/).length} words</span>

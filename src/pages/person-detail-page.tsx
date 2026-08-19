@@ -154,6 +154,7 @@ export function PersonDetailPage() {
         anniversaryYear: person.anniversaryYear,
         displayFirstNameOnly: person.displayFirstNameOnly,
         isHispanic: person.isHispanic,
+        isPreacher: person.isPreacher,
       })
       setEditing(true)
     }
@@ -386,6 +387,16 @@ export function PersonDetailPage() {
                 />
                 <Label htmlFor="is-hispanic" className="cursor-pointer text-sm font-normal">
                   Hispanic (drives Fair Booth coverage)
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="is-preacher"
+                  checked={!!form.isPreacher}
+                  onCheckedChange={(v) => setForm((f) => ({...f, isPreacher: v === true}))}
+                />
+                <Label htmlFor="is-preacher" className="cursor-pointer text-sm font-normal">
+                  Preacher (offered as a sermon speaker)
                 </Label>
               </div>
               <div className="flex gap-2">

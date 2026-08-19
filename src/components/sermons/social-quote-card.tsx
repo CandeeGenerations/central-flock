@@ -5,7 +5,7 @@ import {Textarea} from '@/components/ui/textarea'
 import {type SocialQuote, getQuoteContext, promoteSocialQuote, updateSocialQuote} from '@/lib/sermons-api'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {BookmarkPlus, Check, Copy, Pencil, X} from 'lucide-react'
+import {BookmarkPlus, Check, Copy, Heart, Pencil, X} from 'lucide-react'
 import {useState} from 'react'
 import {toast} from 'sonner'
 
@@ -30,7 +30,8 @@ export function SocialQuoteCard({sermonId, quote}: {sermonId: number; quote: Soc
   const invalidate = () => queryClient.invalidateQueries({queryKey: ['sermons', 'detail', sermonId]})
 
   const saveMutation = useMutation({
-    mutationFn: (data: {editedText?: string | null; used?: boolean}) => updateSocialQuote(sermonId, quote.id, data),
+    mutationFn: (data: {editedText?: string | null; used?: boolean; favorite?: boolean}) =>
+      updateSocialQuote(sermonId, quote.id, data),
     onSuccess: () => {
       invalidate()
       setEditing(false)
@@ -58,9 +59,18 @@ export function SocialQuoteCard({sermonId, quote}: {sermonId: number; quote: Soc
   }
 
   return (
-    <Card size="sm" className={cn(quote.used && 'opacity-60')}>
+    <Card size="sm" className={cn(quote.used && 'opacity-60', quote.favorite && 'border-red-300')}>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-ml-1 h-7 w-7"
+            aria-label={quote.favorite ? 'Remove from favorites' : 'Add to favorites'}
+            onClick={() => saveMutation.mutate({favorite: !quote.favorite})}
+          >
+            <Heart className={cn('h-4 w-4', quote.favorite && 'fill-red-500 text-red-500')} />
+          </Button>
           <RankBadge tier={quote.rankTier} note={quote.rankNote} />
           {quote.sensitive && <SensitiveBadge reason={quote.sensitiveReason} />}
           <div className="ml-auto flex gap-1">

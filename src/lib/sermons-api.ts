@@ -56,6 +56,7 @@ export interface SocialQuote {
   sensitive: boolean
   sensitiveReason: string | null
   editedText: string | null
+  favorite: boolean
   used: boolean
   promotedQuoteId: number | null
 }
@@ -70,6 +71,7 @@ export interface Reflection {
   sensitive: boolean
   sensitiveReason: string | null
   editedBody: string | null
+  favorite: boolean
   used: boolean
 }
 
@@ -163,7 +165,7 @@ export function getQuoteContext(sermonId: number, quoteId: number) {
 export function updateSocialQuote(
   sermonId: number,
   quoteId: number,
-  data: {editedText?: string | null; used?: boolean},
+  data: {editedText?: string | null; used?: boolean; favorite?: boolean},
 ) {
   return request<{success: boolean}>(`/sermons/${sermonId}/quotes/${quoteId}`, {
     method: 'PATCH',
@@ -178,7 +180,7 @@ export function promoteSocialQuote(sermonId: number, quoteId: number) {
 export function updateReflection(
   sermonId: number,
   reflectionId: number,
-  data: {editedBody?: string | null; used?: boolean},
+  data: {editedBody?: string | null; used?: boolean; favorite?: boolean},
 ) {
   return request<{success: boolean}>(`/sermons/${sermonId}/reflections/${reflectionId}`, {
     method: 'PATCH',

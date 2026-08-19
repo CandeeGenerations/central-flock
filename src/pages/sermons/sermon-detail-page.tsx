@@ -1,3 +1,4 @@
+import {AIProgress} from '@/components/ai-progress'
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {ReflectionCard} from '@/components/sermons/reflection-card'
 import {SocialQuoteCard} from '@/components/sermons/social-quote-card'
@@ -12,6 +13,7 @@ import {PersonPicker} from '@/components/ui/person-picker'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
+import {useProgressOperation} from '@/hooks/use-sse'
 import {fetchServiceTimes} from '@/lib/attendance-api'
 import {getSermon, regenerateSermon, updateSermon} from '@/lib/sermons-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
@@ -75,8 +77,21 @@ export function SermonDetailPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Update failed'),
   })
 
+  const {state: genState, start: startGenerate} = useProgressOperation(
+    [
+      {message: 'Reading the transcript\u2026', progress: 8},
+      {message: 'Skipping announcements and prayers\u2026', progress: 18},
+      {message: 'Pulling quotable lines\u2026', progress: 32},
+      {message: 'Still working\u2026', progress: 48},
+      {message: 'Writing reflections\u2026', progress: 64},
+      {message: 'Collecting scripture references\u2026', progress: 78},
+      {message: 'Verifying quotes against the transcript\u2026', progress: 90},
+    ],
+    5000,
+  )
+
   const regenerateMutation = useMutation({
-    mutationFn: () => regenerateSermon(sermonId),
+    mutationFn: () => startGenerate(() => regenerateSermon(sermonId)),
     onSuccess: (res) => {
       queryClient.invalidateQueries({queryKey: ['sermons']})
       toast.success(res.skippedQuotes > 0 ? `Regenerated — ${res.skippedQuotes} quote(s) skipped` : 'Regenerated')
@@ -126,6 +141,14 @@ export function SermonDetailPage() {
           </Button>
         </div>
       </div>
+
+      {genState.isRunning && (
+        <Card size="sm">
+          <CardContent>
+            <AIProgress message={genState.message} progress={genState.progress} />
+          </CardContent>
+        </Card>
+      )}
 
       {sermon.bigIdea && (
         <Card size="sm">
@@ -218,6 +241,7 @@ export function SermonDetailPage() {
               <PersonPicker
                 value={form.speakerPersonId}
                 onChange={(id) => setForm((f) => ({...f, speakerPersonId: id}))}
+                preachersOnly
               />
             </div>
             <div className="space-y-2">

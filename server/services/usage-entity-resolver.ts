@@ -136,6 +136,26 @@ const RESOLVERS: Record<string, ResolverDef> = {
       get(db.select({title: schema.quotes.title}).from(schema.quotes).where(eq(schema.quotes.id, id)).get())?.title ??
       null,
   },
+  '/sermons/social': {
+    entityType: 'sermon',
+    typeLabel: 'Sermon',
+    resolveLabel: (id) => {
+      const r = get(
+        db
+          .select({
+            title: schema.sermons.title,
+            sermonDate: schema.sermons.sermonDate,
+            serviceTimeName: schema.serviceTimes.name,
+          })
+          .from(schema.sermons)
+          .innerJoin(schema.serviceTimes, eq(schema.serviceTimes.id, schema.sermons.serviceTimeId))
+          .where(eq(schema.sermons.id, id))
+          .get(),
+      )
+      if (!r) return null
+      return r.title || `${r.serviceTimeName} — ${r.sermonDate}`
+    },
+  },
   '/music/specials': {
     entityType: 'special',
     typeLabel: 'Special',

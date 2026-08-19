@@ -36,6 +36,7 @@ import {peopleRouter} from './routes/people.js'
 import {quotesRouter} from './routes/quotes.js'
 import {rsvpRouter} from './routes/rsvp.js'
 import {schedulesRouter} from './routes/schedules.js'
+import {sermonsRouter} from './routes/sermons.js'
 import {settingsRouter} from './routes/settings.js'
 import {specialsRouter} from './routes/specials.js'
 import {statsRouter} from './routes/stats.js'
@@ -86,6 +87,7 @@ app.use('/api/nursery/schedules', nurserySchedulesRouter)
 app.use('/api/nursery', nurseryRouter)
 app.use('/api/quotes', quotesRouter)
 app.use('/api/hymns', hymnsRouter)
+app.use('/api/sermons', sermonsRouter)
 app.use('/api/rsvp', rsvpRouter)
 app.use('/api/attendance', attendanceRouter)
 app.use('/api/settings', settingsRouter)

@@ -61,6 +61,8 @@ import {QuoteSearchDetailPage} from '@/pages/sermons/quote-search-detail-page'
 import {QuoteSearchesPage} from '@/pages/sermons/quote-searches-page'
 import {QuotesPage} from '@/pages/sermons/quotes-page'
 import {QuotesResearchPage} from '@/pages/sermons/quotes-research-page'
+import {SermonDetailPage} from '@/pages/sermons/sermon-detail-page'
+import {SermonsPage} from '@/pages/sermons/sermons-page'
 import {VerseStripsPage} from '@/pages/sermons/verse-strips-page'
 import {SettingsPage} from '@/pages/settings-page'
 import {SpecialMusicScheduleViewPage} from '@/pages/special-music/special-music-schedule-view-page'
@@ -480,6 +482,8 @@ function AppLayoutInner({
               <Route path="/sermons/research" element={<QuotesResearchPage />} />
               <Route path="/sermons/searches" element={<QuoteSearchesPage />} />
               <Route path="/sermons/searches/:id" element={<QuoteSearchDetailPage />} />
+              <Route path="/sermons/social" element={<SermonsPage />} />
+              <Route path="/sermons/social/:id" element={<SermonDetailPage />} />
               <Route path="/sermons/verse-strips" element={<VerseStripsPage />} />
               <Route path="/music/hymns" element={<HymnsPrepPage />} />
               <Route path="/music/hymns/searches" element={<HymnSearchesPage />} />

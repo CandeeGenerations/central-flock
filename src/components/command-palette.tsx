@@ -28,6 +28,7 @@ const GROUP_ORDER = [
   'Drafts',
   'Templates',
   'Quotes',
+  'Sermons',
   'Hymns',
   'Schedules',
   'Attendance',

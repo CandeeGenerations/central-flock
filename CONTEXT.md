@@ -104,6 +104,89 @@ One entry of an **Attendance**/**Streaming** value against a **Service Record**,
 **Service Record** keeps the latest edit's values and recorder for display.
 _Avoid_: Revision, Log entry.
 
+### Social Media
+
+**Sermon**:
+One preached message, recorded in the app by uploading its transcript. Identified by its
+**Service Time** and date — the same key a **Service Record** uses, so AM and PM on one Sunday are
+two Sermons. Owns the raw transcript and everything derived from it — **Social Quotes** and social
+posts. Only sermons preached at a regular **Service Time** are recorded; funerals and outside
+meetings are out of scope.
+_Avoid_: Message (means an SMS in this app), Service, Recording.
+
+**Speaker**:
+The **Person** who preached a **Sermon**. Always a contact — guest evangelists and missionaries are
+added to Contacts before their sermon is recorded, rather than stored as loose names.
+_Avoid_: Preacher, Author, Presenter.
+
+**Social Quote**:
+An excerpt of something the preacher said, lifted out of a **Sermon** transcript for use as a social
+media story or post. Never paraphrased or rewritten — it carries the preacher's own words in three
+forms (**Verbatim**, **Cleaned**, **Polished**) so the choice of how literal to be stays with him.
+Distinct from a **Quote** (`quotes` table), which is a quote by _another author_ captured into the
+sermon-prep research corpus.
+_Avoid_: Quote (means the research corpus), Pull quote, Soundbite.
+
+**Verbatim**:
+The exact transcript span behind a **Social Quote**, character-for-character apart from sentence
+spacing. The receipt — what was actually said, always viewable, never posted directly.
+
+**Cleaned**:
+The **Social Quote** with disfluencies removed — "uh", stutters, false starts, doubled words. No word
+added, substituted, or reordered. The default form, and the one shown first.
+_Avoid_: Edited, Corrected.
+
+**Polished**:
+An alternative form of the **Social Quote** offered alongside the **Cleaned** one, allowed to fix
+grammar and supply elided words so the line stands alone out of context. Still the preacher's words
+and meaning — it may repair a sentence, never write one. Offered, never chosen automatically.
+_Avoid_: Rewritten, Paraphrased.
+
+**Reflection**:
+A short social post (~100-200 words) written from one portion of a **Sermon** — the second thing a
+Sermon produces alongside its **Social Quotes**. Unlike a Social Quote it is not the preacher's exact
+words: the AI may frame, connect, and write engagingly in order to give people something to sit with
+during the week. What it may not do is add doctrine or **Scripture** the sermon did not preach.
+A Sermon yields 3-5.
+_Avoid_: Blog post (too long), Caption (too short), Devotional (means a Gwendolyn devotional here).
+
+**Scripture Floor**:
+The one hard limit on a **Reflection**'s liberty: it may reference only passages the preacher
+actually cited in that sermon, and must render them in the **AKJV**. It may never introduce a
+passage the sermon did not preach. Matches the existing rule in devotion generation.
+
+**AKJV**:
+The Authorized King James Version — the only Bible text this church uses, and the only wording any
+generated **Reflection** may quote. Scripture references link to BibleGateway with `version=AKJV`.
+
+**Rank**:
+The ordering and `high`/`medium`/`low` tier the AI assigns each **Social Quote** and **Reflection**,
+with a one-line reason, so the strongest results sort to the top. Advisory only — nothing is hidden
+by a low rank, and the preacher is always the editor. Deliberately a tier and an order rather than a
+number, because models rank within a batch far better than they self-score.
+_Avoid_: Score, Confidence (imply a calibrated number).
+
+**Big Idea**:
+The single statement the preacher wanted people to leave with, extracted as its own field on the
+**Sermon** rather than as one more **Social Quote**. Usually said outright ("I want you to leave with
+one statement…"). The anchor the week's **Reflections** are written around.
+_Avoid_: Theme, Thesis, Takeaway.
+
+**Cited Scripture**:
+A passage the preacher actually referenced in a **Sermon**, recorded per sermon so the archive can
+answer "have I preached this before, and when?" Also the whitelist the **Scripture Floor** enforces —
+a **Reflection** may reference only these.
+_Avoid_: Text, Reference (too generic), Passage (means a generated devotion passage here).
+
+**Series**:
+An optional name grouping **Sermons** preached as one arc — e.g. "Jesus is the Way, the Truth, and
+the Life". Typed by the preacher, not inferred. A Sermon with no Series is normal, not incomplete.
+
+**Quote Context**:
+The few sentences on either side of a **Social Quote** in the transcript, shown so the preacher can
+widen or narrow the cut to find the right line. Derived from the stored span offsets at render
+time — never stored.
+
 ## Relationships
 
 - A fair day has one or two **Slots**; a **Signup** is created against exactly one **Slot**
@@ -117,6 +200,19 @@ _Avoid_: Revision, Log entry.
 - A **Service Record** has many **Record Edits**; its current value is the latest **Record Edit**
 - A **Record Edit** is attributed to one **Recorder** (or to the admin, for in-app corrections)
 - **Total Attendance** is derived, never entered directly
+- A **Sermon** belongs to exactly one **Service Time** on exactly one date; that pair is unique
+- A **Sermon** has exactly one **Speaker**, who is always a **Person**
+- A **Sermon** and a **Service Record** for the same (**Service Time**, date) describe the same gathering
+- A **Sermon** has many **Social Quotes**; each belongs to exactly one Sermon
+- Every **Social Quote** has one **Verbatim** span, one **Cleaned** form, and one **Polished** form
+- **Quote Context** is derived from a **Social Quote**'s span offsets, never stored
+- A **Sermon** has 3-5 **Reflections**; each belongs to exactly one Sermon
+- Every **Social Quote** and **Reflection** carries a **Rank**
+- A **Reflection** is bound by the **Scripture Floor**; a **Social Quote** is bound by the transcript itself
+- Re-uploading a transcript deletes that **Sermon**'s **Social Quotes** and **Reflections** and regenerates
+- A **Sermon** has at most one **Big Idea**, many **Cited Scriptures**, and optionally one **Series**
+- A **Reflection** may reference only the **Cited Scriptures** of its own **Sermon**
+- A **Social Quote** may be promoted into the **Quote** corpus, citing its **Sermon** as the source
 
 ## Example dialogue
 

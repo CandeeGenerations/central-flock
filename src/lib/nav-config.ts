@@ -22,6 +22,7 @@ import {
   Scissors,
   ScrollText,
   Settings,
+  Share2,
   Smartphone,
   Sparkles,
   Tent,
@@ -126,11 +127,12 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: 'sermons',
-    label: 'Sermon Prep',
+    label: 'Sermons',
     icon: ScrollText,
     children: [
       {to: '/sermons/quotes', label: 'Quotes', icon: Quote, end: true},
       {to: '/sermons/searches', label: 'Quote Searches', icon: Sparkles, matchPaths: ['/sermons/research']},
+      {to: '/sermons/social', label: 'Social Content', icon: Share2},
       {to: '/sermons/verse-strips', label: 'Verse Strips', icon: Scissors},
     ],
   },

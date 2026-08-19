@@ -2,6 +2,7 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
+import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
@@ -11,13 +12,12 @@ import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {Textarea} from '@/components/ui/textarea'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {fetchServiceTimes} from '@/lib/attendance-api'
 import {type SermonListItem, createSermon, deleteSermon, listSermons} from '@/lib/sermons-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Plus, Trash2, Upload} from 'lucide-react'
+import {FileText, Plus, Trash2, Upload, X} from 'lucide-react'
 import {useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -51,6 +51,7 @@ export function SermonsPage() {
   const [title, setTitle] = useState('')
   const [series, setSeries] = useState('')
   const [transcript, setTranscript] = useState('')
+  const [fileName, setFileName] = useState('')
 
   const {data, isLoading} = useQuery({
     queryKey: ['sermons', 'list', debouncedSearch, page],
@@ -78,6 +79,7 @@ export function SermonsPage() {
       }
       setDialogOpen(false)
       setTranscript('')
+      setFileName('')
       setTitle('')
       navigate(`/sermons/social/${res.id}`)
     },
@@ -94,10 +96,15 @@ export function SermonsPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Delete failed'),
   })
 
+  // The transcript is read here and sent to the server on save — it is never rendered into the
+  // dialog. 40 KB of unbroken ASR in a textarea is unreadable and invites accidental edits.
   function handleFile(file: File | undefined) {
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => setTranscript(String(reader.result ?? ''))
+    reader.onload = () => {
+      setTranscript(String(reader.result ?? ''))
+      setFileName(file.name)
+    }
     reader.onerror = () => toast.error('Could not read that file')
     reader.readAsText(file)
   }
@@ -226,8 +233,8 @@ export function SermonsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sermon-date">Date</Label>
-              <Input id="sermon-date" type="date" value={sermonDate} onChange={(e) => setSermonDate(e.target.value)} />
+              <Label>Date</Label>
+              <DatePicker value={sermonDate} onChange={setSermonDate} />
             </div>
             <div className="space-y-2">
               <Label>Speaker</Label>
@@ -249,11 +256,32 @@ export function SermonsPage() {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="sermon-transcript">Transcript</Label>
-              <label className="inline-flex cursor-pointer items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-                <Upload className="h-4 w-4" />
-                Upload .txt
+            <Label>Transcript</Label>
+            {fileName ? (
+              <div className="flex items-center gap-3 rounded-md border p-3">
+                <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{fileName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {transcript.trim().split(/\s+/).length.toLocaleString()} words
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setTranscript('')
+                    setFileName('')
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer flex-col items-center gap-1 rounded-md border border-dashed p-6 text-center hover:bg-muted/50">
+                <Upload className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm font-medium">Choose a .txt transcript</span>
+                <span className="text-xs text-muted-foreground">The file's text is saved with the sermon</span>
                 <input
                   type="file"
                   accept=".txt,text/plain"
@@ -261,18 +289,6 @@ export function SermonsPage() {
                   onChange={(e) => handleFile(e.target.files?.[0])}
                 />
               </label>
-            </div>
-            <Textarea
-              id="sermon-transcript"
-              value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
-              rows={10}
-              placeholder="Paste the transcript, or upload a .txt file…"
-            />
-            {transcript.trim().length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {transcript.trim().split(/\s+/).length.toLocaleString()} words
-              </p>
             )}
           </div>
 

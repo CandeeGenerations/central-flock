@@ -773,6 +773,14 @@ export function CalendarGrid({
   )
   const footerWrapper = <div style={{position: 'absolute', inset: 0, zIndex: 2, display: 'flex'}}>{footerNode}</div>
 
+  // If the footer would render nothing (schedule hidden/empty and no theme or verse
+  // placed in it), drop it entirely rather than leaving a blank strip at the bottom.
+  const footerShowsSchedule =
+    !hideNormalScheduleFooter && scheduleItems.some((it) => !it.hidden && it.type !== 'spacer')
+  const footerShowsTheme = isFooterPlacement(effThemePlacement) && !!theme
+  const footerShowsVerse = isFooterPlacement(effVersePlacement) && !!(verseText || verseReference)
+  const footerHasContent = footerShowsSchedule || footerShowsTheme || footerShowsVerse
+
   const titleHorizontalInline = (
     <div
       style={{
@@ -879,7 +887,8 @@ export function CalendarGrid({
 
   const isCellLastCol = (rc: RenderCell) => rc.colIndex + rc.span - 1 === 6
   const lastInMonthRowIndex = layout.weeksNeeded - 1
-  const totalRowsRendered = layout.totalRows
+  const renderFooterRow = !layout.footerInTrailing && footerHasContent
+  const totalRowsRendered = renderFooterRow ? layout.weeksNeeded + 1 : layout.weeksNeeded
   const lastRenderedRowIndex = totalRowsRendered - 1
 
   const dayNameRow = (
@@ -909,7 +918,7 @@ export function CalendarGrid({
 
   // Identify which trailing cell of the last in-month row hosts the footer (if footerInTrailing)
   let trailingFooterCellKey: string | null = null
-  if (layout.footerInTrailing) {
+  if (layout.footerInTrailing && footerHasContent) {
     const lastInMonthRow = renderRows[lastInMonthRowIndex]
     const lastCell = lastInMonthRow[lastInMonthRow.length - 1]
     if (lastCell.type === 'merged_out_trailing') {
@@ -926,9 +935,9 @@ export function CalendarGrid({
         flex: 1,
         display: 'grid',
         gridTemplateColumns: 'repeat(7, 1fr)',
-        gridTemplateRows: layout.footerInTrailing
-          ? `repeat(${totalRowsRendered}, 1fr)`
-          : `repeat(${layout.weeksNeeded}, 1fr) auto`,
+        gridTemplateRows: renderFooterRow
+          ? `repeat(${layout.weeksNeeded}, 1fr) auto`
+          : `repeat(${layout.weeksNeeded}, 1fr)`,
       }}
     >
       {renderRows.map((row) =>
@@ -973,7 +982,7 @@ export function CalendarGrid({
         }),
       )}
       {/* Extra footer row, if needed */}
-      {!layout.footerInTrailing && (
+      {renderFooterRow && (
         <div
           style={{
             gridColumn: 'span 7',

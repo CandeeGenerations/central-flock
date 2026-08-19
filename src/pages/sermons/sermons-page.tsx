@@ -30,6 +30,17 @@ function fmtDate(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})
 }
 
+// Recording filenames carry the date the message was preached
+// ("sunpm_2026-08-16_18-23-01-trimmed.mp4.txt"). Read it rather than defaulting to the day of
+// upload, which is almost never the day it was preached.
+function dateFromFilename(name: string): string | null {
+  const iso = name.match(/(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+  const us = name.match(/(\d{1,2})[-_.](\d{1,2})[-_.](\d{4})/)
+  if (us) return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`
+  return null
+}
+
 function todayIso(): string {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -104,6 +115,8 @@ export function SermonsPage() {
     reader.onload = () => {
       setTranscript(String(reader.result ?? ''))
       setFileName(file.name)
+      const fromName = dateFromFilename(file.name)
+      if (fromName) setSermonDate(fromName)
     }
     reader.onerror = () => toast.error('Could not read that file')
     reader.readAsText(file)
@@ -264,6 +277,7 @@ export function SermonsPage() {
                   <p className="truncate text-sm font-medium">{fileName}</p>
                   <p className="text-xs text-muted-foreground">
                     {transcript.trim().split(/\s+/).length.toLocaleString()} words
+                    {dateFromFilename(fileName) ? ' · date read from filename' : ''}
                   </p>
                 </div>
                 <Button

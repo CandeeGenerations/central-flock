@@ -4,11 +4,18 @@ import {SocialQuoteCard} from '@/components/sermons/social-quote-card'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
+import {DatePicker} from '@/components/ui/date-time-picker'
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
+import {PersonPicker} from '@/components/ui/person-picker'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
-import {getSermon, regenerateSermon} from '@/lib/sermons-api'
+import {fetchServiceTimes} from '@/lib/attendance-api'
+import {getSermon, regenerateSermon, updateSermon} from '@/lib/sermons-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, RefreshCw} from 'lucide-react'
+import {ArrowLeft, Pencil, RefreshCw} from 'lucide-react'
 import {useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -30,11 +37,42 @@ export function SermonDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [confirmRegenerate, setConfirmRegenerate] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [form, setForm] = useState<{
+    serviceTimeId: number | null
+    sermonDate: string
+    speakerPersonId: number | null
+    title: string
+    series: string
+  }>({serviceTimeId: null, sermonDate: '', speakerPersonId: null, title: '', series: ''})
 
   const {data: sermon, isLoading} = useQuery({
     queryKey: ['sermons', 'detail', sermonId],
     queryFn: () => getSermon(sermonId),
     enabled: Number.isFinite(sermonId),
+  })
+
+  const {data: serviceTimes} = useQuery({
+    queryKey: ['service-times'],
+    queryFn: () => fetchServiceTimes(),
+    enabled: editOpen,
+  })
+
+  const editMutation = useMutation({
+    mutationFn: () =>
+      updateSermon(sermonId, {
+        serviceTimeId: form.serviceTimeId ?? undefined,
+        sermonDate: form.sermonDate || undefined,
+        speakerPersonId: form.speakerPersonId ?? undefined,
+        title: form.title,
+        series: form.series,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: ['sermons']})
+      toast.success('Sermon updated')
+      setEditOpen(false)
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Update failed'),
   })
 
   const regenerateMutation = useMutation({
@@ -66,10 +104,27 @@ export function SermonDetailPage() {
             {sermon.series ? ` · ${sermon.series}` : ''}
           </p>
         </div>
-        <Button variant="outline" onClick={() => setConfirmRegenerate(true)} disabled={regenerateMutation.isPending}>
-          <RefreshCw className="h-4 w-4 mr-1" />
-          {regenerateMutation.isPending ? 'Regenerating…' : 'Regenerate'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setForm({
+                serviceTimeId: sermon.serviceTimeId,
+                sermonDate: sermon.sermonDate,
+                speakerPersonId: sermon.speakerPersonId,
+                title: sermon.title ?? '',
+                series: sermon.series ?? '',
+              })
+              setEditOpen(true)
+            }}
+          >
+            <Pencil className="h-4 w-4 mr-1" /> Edit
+          </Button>
+          <Button variant="outline" onClick={() => setConfirmRegenerate(true)} disabled={regenerateMutation.isPending}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            {regenerateMutation.isPending ? 'Regenerating…' : 'Regenerate'}
+          </Button>
+        </div>
       </div>
 
       {sermon.bigIdea && (
@@ -129,6 +184,69 @@ export function SermonDetailPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit sermon</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Service</Label>
+              <Select
+                value={form.serviceTimeId ? String(form.serviceTimeId) : undefined}
+                onValueChange={(v) => setForm((f) => ({...f, serviceTimeId: Number(v)}))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select service…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(serviceTimes ?? []).map((st) => (
+                    <SelectItem key={st.id} value={String(st.id)}>
+                      {st.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Date preached</Label>
+              <DatePicker value={form.sermonDate} onChange={(v) => setForm((f) => ({...f, sermonDate: v}))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Speaker</Label>
+              <PersonPicker
+                value={form.speakerPersonId}
+                onChange={(id) => setForm((f) => ({...f, speakerPersonId: id}))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-series">Series</Label>
+              <Input
+                id="edit-series"
+                value={form.series}
+                onChange={(e) => setForm((f) => ({...f, series: e.target.value}))}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={form.title}
+                onChange={(e) => setForm((f) => ({...f, title: e.target.value}))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => editMutation.mutate()} disabled={editMutation.isPending}>
+              {editMutation.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmRegenerate}

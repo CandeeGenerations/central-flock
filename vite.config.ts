@@ -19,6 +19,10 @@ export default defineConfig({
           authToken: process.env.SENTRY_AUTH_TOKEN,
           release: {name: process.env.SENTRY_RELEASE},
           sourcemaps: {assets: './dist/**'},
+          // The upload report is ~20 lines of debug-id tables on every deploy
+          // and nobody reads it; failures still surface as build errors.
+          silent: true,
+          telemetry: false,
         })
       : null,
   ],

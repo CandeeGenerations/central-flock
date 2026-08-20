@@ -34,10 +34,17 @@ echo "==> Deploying $BRANCH @ $SHA"
 # 1. Working-tree check (warn but don't block — operator may want to ship a hotfix WIP)
 if ! git diff --quiet HEAD; then
   echo "    WARN: working tree has uncommitted changes; the SHA tag won't reflect what runs"
-  read -r -p "    Continue anyway? [y/N] " reply
-  if [[ ! "$reply" =~ ^[Yy]$ ]]; then
-    echo "Aborted"
-    exit 1
+  # Only prompt when there's a human attached. The post-commit hook redirects
+  # output to a log file, so a prompt there would block forever on a question
+  # nobody can see.
+  if [[ -t 0 ]]; then
+    read -r -p "    Continue anyway? [y/N] " reply
+    if [[ ! "$reply" =~ ^[Yy]$ ]]; then
+      echo "Aborted"
+      exit 1
+    fi
+  else
+    echo "    (non-interactive — continuing)"
   fi
 fi
 
@@ -98,7 +105,12 @@ else
   echo "    Sentry env vars not set — skipping source map upload"
 fi
 
-SENTRY_RELEASE="$SHA" VITE_SENTRY_RELEASE="$SHA" pnpm build
+# --logLevel warn drops vite's per-asset size table (~90 font files on this
+# project) while keeping warnings and errors. Pass DEPLOY_VERBOSE=1 to get the
+# full build output back when diagnosing a build problem.
+BUILD_LOG_LEVEL="warn"
+[[ -n "${DEPLOY_VERBOSE:-}" ]] && BUILD_LOG_LEVEL="info"
+SENTRY_RELEASE="$SHA" VITE_SENTRY_RELEASE="$SHA" pnpm build --logLevel "$BUILD_LOG_LEVEL"
 
 # 4. Update plist SENTRY_RELEASE so runtime errors tag with the new SHA
 if [[ -f "$PLIST" ]]; then

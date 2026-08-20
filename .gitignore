@@ -43,3 +43,6 @@ dist-ssr
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Deploy output from the post-commit hook
+.deploy.log

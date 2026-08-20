@@ -1,4 +1,5 @@
-import {jsPDF} from 'jspdf'
+// jspdf is imported dynamically so it stays out of the main bundle; every other
+// export path in the app does the same.
 
 export interface GenerateVerseStripsPdfOptions {
   strips: string[]
@@ -16,6 +17,7 @@ const LINE_HEIGHT_RATIO = 1.0
 export async function generateVerseStripsPdf(options: GenerateVerseStripsPdfOptions): Promise<void> {
   const {strips, wordFontSize, filename} = options
 
+  const {jsPDF} = await import('jspdf')
   const doc = new jsPDF({orientation: 'portrait', unit: 'pt', format: 'letter'})
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()

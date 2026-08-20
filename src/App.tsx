@@ -75,7 +75,11 @@ import {VerseStripsPage} from '@/pages/sermons/verse-strips-page'
 import {SettingsPage} from '@/pages/settings-page'
 import {SpecialMusicScheduleViewPage} from '@/pages/special-music/special-music-schedule-view-page'
 import {SpecialMusicSchedulesPage} from '@/pages/special-music/special-music-schedules-page'
+import {WorkersNotesBlocksPage} from '@/pages/sunday-school/workers-notes-blocks-page'
+import {WorkersNotesLessonsPage} from '@/pages/sunday-school/workers-notes-lessons-page'
 import {WorkersNotesListPage} from '@/pages/sunday-school/workers-notes-list-page'
+import {WorkersNotesMonthsPage} from '@/pages/sunday-school/workers-notes-months-page'
+import {WorkersNotesThemePage} from '@/pages/sunday-school/workers-notes-theme-page'
 import {WorkersNotesViewPage} from '@/pages/sunday-school/workers-notes-view-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
@@ -485,6 +489,10 @@ function AppLayoutInner({
               <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
               <Route path="/schedules/sunday-school" element={<WorkersNotesListPage />} />
               <Route path="/schedules/sunday-school/:id" element={<WorkersNotesViewPage />} />
+              <Route path="/schedules/sunday-school/:id/theme" element={<WorkersNotesThemePage />} />
+              <Route path="/schedules/sunday-school/:id/blocks" element={<WorkersNotesBlocksPage />} />
+              <Route path="/schedules/sunday-school/:id/months" element={<WorkersNotesMonthsPage />} />
+              <Route path="/schedules/sunday-school/:id/lessons" element={<WorkersNotesLessonsPage />} />
               <Route path="/schedules/settings" element={<SchedulesSettingsLayout />}>
                 <Route index element={<Navigate to="general" replace />} />
                 <Route path="general" element={<GeneralSettingsSection />} />

@@ -17,7 +17,7 @@ import {ArrowLeft, Plus, Trash2} from 'lucide-react'
 import {useState} from 'react'
 import {toast} from 'sonner'
 
-type ThemeFields = Omit<YearlyTheme, 'id' | 'year'>
+export type ThemeFields = Omit<YearlyTheme, 'id' | 'year'>
 
 const EMPTY: ThemeFields = {
   songTitle: '',
@@ -176,7 +176,7 @@ export function SundaySchoolThemesPane() {
  * Keyed by year, so switching years remounts with fresh initial state instead
  * of syncing props into state through an effect.
  */
-function ThemeForm({
+export function ThemeForm({
   theme,
   saving,
   onSave,

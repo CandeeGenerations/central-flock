@@ -1,4 +1,4 @@
-import {and, asc, eq} from 'drizzle-orm'
+import {and, asc, eq, like, or, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {
@@ -196,6 +196,32 @@ workersNotesRouter.delete(
       .where(eq(schema.bettyLukensStories.number, Number(req.params.number)))
       .run()
     res.status(204).end()
+  }),
+)
+
+// ── Hymn picker ─────────────────────────────────────────────────────────
+// A thin list for the month Song picker. Lives here rather than on the hymns
+// router because it exists to serve this one control.
+
+workersNotesRouter.get(
+  '/hymns',
+  asyncHandler(async (req, res) => {
+    const q = String(req.query.q ?? '').trim()
+    const base = db
+      .select({id: schema.hymns.id, book: schema.hymns.book, number: schema.hymns.number, title: schema.hymns.title})
+      .from(schema.hymns)
+    const rows = q
+      ? base
+          .where(
+            or(
+              like(sql`lower(${schema.hymns.title})`, `%${q.toLowerCase()}%`),
+              eq(schema.hymns.number, Number.isFinite(Number(q)) ? Number(q) : -1),
+            ),
+          )
+          .limit(50)
+          .all()
+      : base.orderBy(asc(schema.hymns.book), asc(schema.hymns.number)).limit(50).all()
+    res.json(rows)
   }),
 )
 

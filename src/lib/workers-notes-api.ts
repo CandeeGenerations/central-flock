@@ -95,6 +95,7 @@ export const workersNotesKeys = {
   themes: ['workers-notes', 'themes'] as const,
   theme: (year: number) => ['workers-notes', 'themes', year] as const,
   stories: ['workers-notes', 'stories'] as const,
+  hymns: (q: string) => ['workers-notes', 'hymns', q] as const,
 }
 
 export const fetchWorkersNotesEditions = () => request<WorkersNotesEditionSummary[]>('/')
@@ -121,6 +122,15 @@ export const saveWorkersNotesMonths = (
 
 export const saveWorkersNotesLessons = (id: number, rows: LessonRowPayload[]) =>
   request<{lessonRows: ResolvedLessonRow[]}>(`/${id}/lessons`, {method: 'PUT', body: JSON.stringify({rows})})
+
+export interface HymnOption {
+  id: number
+  book: 'burgundy' | 'silver'
+  number: number
+  title: string
+}
+
+export const searchHymns = (q: string) => request<HymnOption[]>(`/hymns?q=${encodeURIComponent(q)}`)
 
 export const fetchYearlyThemes = () => request<YearlyTheme[]>('/themes')
 

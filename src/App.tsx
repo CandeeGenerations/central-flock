@@ -55,7 +55,15 @@ import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
 import {RsvpDetailPage} from '@/pages/rsvp/rsvp-detail-page'
 import {RsvpListPage} from '@/pages/rsvp/rsvp-list-page'
-import {SchedulesSettingsPage} from '@/pages/schedules-settings-page'
+import {FairBoothSettingsSection} from '@/pages/schedules-settings/fair-booth-section'
+import {GeneralSettingsSection} from '@/pages/schedules-settings/general-section'
+import {NurserySettingsSection} from '@/pages/schedules-settings/nursery-section'
+import {SchedulesSettingsLayout} from '@/pages/schedules-settings/schedules-settings-layout'
+import {SpecialMusicSettingsSection} from '@/pages/schedules-settings/special-music-section'
+import {SundaySchoolDefaultsPane} from '@/pages/schedules-settings/sunday-school-defaults'
+import {SundaySchoolLessonsPane} from '@/pages/schedules-settings/sunday-school-lessons'
+import {SundaySchoolSettingsSection} from '@/pages/schedules-settings/sunday-school-section'
+import {SundaySchoolThemesPane} from '@/pages/schedules-settings/sunday-school-themes'
 import {QuoteDetailPage} from '@/pages/sermons/quote-detail-page'
 import {QuoteSearchDetailPage} from '@/pages/sermons/quote-search-detail-page'
 import {QuoteSearchesPage} from '@/pages/sermons/quote-searches-page'
@@ -473,7 +481,19 @@ function AppLayoutInner({
               <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
               <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
               <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
-              <Route path="/schedules/settings" element={<SchedulesSettingsPage />} />
+              <Route path="/schedules/settings" element={<SchedulesSettingsLayout />}>
+                <Route index element={<Navigate to="general" replace />} />
+                <Route path="general" element={<GeneralSettingsSection />} />
+                <Route path="nursery" element={<NurserySettingsSection />} />
+                <Route path="special-music" element={<SpecialMusicSettingsSection />} />
+                <Route path="fair-booth" element={<FairBoothSettingsSection />} />
+                <Route path="sunday-school" element={<SundaySchoolSettingsSection />}>
+                  <Route index element={<Navigate to="defaults" replace />} />
+                  <Route path="defaults" element={<SundaySchoolDefaultsPane />} />
+                  <Route path="themes" element={<SundaySchoolThemesPane />} />
+                  <Route path="lessons" element={<SundaySchoolLessonsPane />} />
+                </Route>
+              </Route>
               <Route path="/schedules/fair-booth" element={<FairBoothSchedulesPage />} />
               <Route path="/schedules/fair-booth/:id" element={<FairBoothSchedulePage />} />
               <Route path="/schedules/fair-booth/:id/day/:date" element={<FairBoothDayPage />} />

@@ -1,15 +1,10 @@
 import {Button} from '@/components/ui/button'
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {MultiSelect} from '@/components/ui/multi-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {PageSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
-import {type GroupWithMembers, fetchGroup, fetchGroups} from '@/lib/api'
-import {fetchServiceConfig, updateServiceConfig} from '@/lib/nursery-api'
-import type {ServiceType as NurseryServiceType} from '@/lib/nursery-api'
-import {nurseryKeys} from '@/lib/nursery-query-keys'
+import {type GroupWithMembers, fetchGroup} from '@/lib/api'
 import {
   type FooterBlock,
   type Household,
@@ -17,317 +12,20 @@ import {
   createHousehold,
   deleteHousehold,
   fetchHouseholds,
-  fetchSchedulesSettings,
   schedulesKeys,
   updateHousehold,
   updateSchedulesSettings,
-  uploadSchedulesLogo,
 } from '@/lib/schedules-api'
 import {useMutation, useQueries, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, ImagePlus, Plus, Settings, Trash2, Users} from 'lucide-react'
-import {useEffect, useRef, useState} from 'react'
+import {ArrowDown, ArrowUp, Plus, Trash2, Users} from 'lucide-react'
+import {useEffect, useState} from 'react'
 import {toast} from 'sonner'
 
-export function SchedulesSettingsPage() {
-  const queryClient = useQueryClient()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const compactLogoInputRef = useRef<HTMLInputElement>(null)
+// Shared building blocks for the Schedules Settings sections. Extracted from the
+// former single-scroll settings page when it became a left rail of routed
+// sections; the components themselves are unchanged.
 
-  const {data: settings, isLoading: settingsLoading} = useQuery({
-    queryKey: schedulesKeys.settings,
-    queryFn: fetchSchedulesSettings,
-  })
-  const {data: serviceConfig, isLoading: configLoading} = useQuery({
-    queryKey: nurseryKeys.serviceConfig,
-    queryFn: fetchServiceConfig,
-  })
-  const {data: groups} = useQuery({queryKey: ['groups'], queryFn: fetchGroups})
-
-  const updateConfigMutation = useMutation({
-    mutationFn: ({type, workerCount}: {type: NurseryServiceType; workerCount: number}) =>
-      updateServiceConfig(type, workerCount),
-    onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: nurseryKeys.serviceConfig})
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to update'),
-  })
-
-  const uploadLogoMutation = useMutation({
-    mutationFn: ({imageData, slot}: {imageData: string; slot: 'print' | 'compact'}) =>
-      uploadSchedulesLogo(imageData, slot),
-    onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: schedulesKeys.settings})
-      toast.success('Logo uploaded')
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to upload logo'),
-  })
-
-  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>, slot: 'print' | 'compact') {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => uploadLogoMutation.mutate({imageData: reader.result as string, slot})
-    reader.readAsDataURL(file)
-    e.target.value = ''
-  }
-
-  if (settingsLoading || configLoading || !settings) return <PageSpinner />
-
-  return (
-    <div className="space-y-4 p-4 md:p-6">
-      <div className="mb-6 flex items-center gap-3">
-        <Settings className="h-6 w-6" />
-        <h2 className="text-2xl font-bold">Settings</h2>
-      </div>
-
-      <div className="max-w-2xl space-y-4">
-        {/* Global */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Schedule Logo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground text-sm">
-              Header image at the top of every printed Schedule (nursery + special music). Should include your church
-              name and tagline.
-            </p>
-            {settings.logoPath && (
-              <div className="flex justify-center rounded-lg border bg-white p-4">
-                <img src={settings.logoPath} alt="Schedule logo" className="max-h-24 object-contain" />
-              </div>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handleLogoUpload(e, 'print')}
-            />
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadLogoMutation.isPending}
-            >
-              <ImagePlus className="mr-2 h-4 w-4" />
-              {settings.logoPath ? 'Replace Logo' : 'Upload Logo'}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Compact logo — the wide print logo reads too small on a 1080-wide
-            image card, so cards get their own squarer mark. */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Compact Logo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground text-sm">
-              Used on shareable image cards (like a person&apos;s Fair Booth shifts), where the wide print logo would
-              render too small. Prefer a square or stacked mark. Falls back to the Schedule Logo when not set.
-            </p>
-            {settings.compactLogoPath && (
-              <div className="flex justify-center rounded-lg border bg-white p-4">
-                <img src={settings.compactLogoPath} alt="Compact logo" className="max-h-24 object-contain" />
-              </div>
-            )}
-            <input
-              ref={compactLogoInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handleLogoUpload(e, 'compact')}
-            />
-            <Button
-              variant="outline"
-              onClick={() => compactLogoInputRef.current?.click()}
-              disabled={uploadLogoMutation.isPending}
-            >
-              <ImagePlus className="mr-2 h-4 w-4" />
-              {settings.compactLogoPath ? 'Replace Compact Logo' : 'Upload Compact Logo'}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Nursery */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Nursery</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <TypeDefaultsCard
-              titleLabel="Title prefix"
-              titlePrefix={settings.nursery.titlePrefix}
-              footerBlocks={settings.nursery.footerBlocks}
-              onSave={(p) => saveType(queryClient, {nursery: p})}
-              middleSlot={
-                <div>
-                  <Label className="mb-2 block text-sm font-medium">Service worker counts</Label>
-                  {serviceConfig?.map((svc) => (
-                    <div
-                      key={svc.serviceType}
-                      className="flex items-center justify-between border-b py-2 last:border-0"
-                    >
-                      <span className="text-sm">{svc.label}</span>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant={svc.workerCount === 1 ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => updateConfigMutation.mutate({type: svc.serviceType, workerCount: 1})}
-                        >
-                          1
-                        </Button>
-                        <Button
-                          variant={svc.workerCount === 2 ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => updateConfigMutation.mutate({type: svc.serviceType, workerCount: 2})}
-                        >
-                          2
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              }
-            />
-          </CardContent>
-        </Card>
-
-        {/* Special Music */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Special Music</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <TypeDefaultsCard
-              titleLabel="Title prefix"
-              titlePrefix={settings.specialMusic.titlePrefix}
-              footerBlocks={settings.specialMusic.footerBlocks}
-              onSave={(p) => saveType(queryClient, {specialMusic: p})}
-              middleSlot={
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Singer pool (groups)</Label>
-                  <p className="text-muted-foreground text-xs">
-                    Cell editor's people picker filters to members of these groups, deduplicated.
-                  </p>
-                  <MultiSelect
-                    value={settings.specialMusic.singerGroupIds.map(String)}
-                    onValueChange={(v) =>
-                      saveType(queryClient, {
-                        specialMusic: {singerGroupIds: v.map(Number).filter((n) => !Number.isNaN(n))},
-                      })
-                    }
-                    options={(groups ?? []).map((g) => ({value: String(g.id), label: g.name}))}
-                    placeholder="Pick groups"
-                    className="w-full"
-                  />
-                </div>
-              }
-            />
-            <HouseholdsSection singerGroupIds={settings.specialMusic.singerGroupIds} />
-          </CardContent>
-        </Card>
-
-        {/* Fair Booth */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Fair Booth</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Title prefix</Label>
-              <Input
-                defaultValue={settings.fairBooth.titlePrefix}
-                onBlur={(e) => {
-                  const v = e.target.value
-                  if (v !== settings.fairBooth.titlePrefix) saveType(queryClient, {fairBooth: {titlePrefix: v}})
-                }}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Roster groups</Label>
-              <p className="text-muted-foreground text-xs">
-                Union of these groups becomes the live fair roster (page 2 of the schedule).
-              </p>
-              <MultiSelect
-                value={settings.fairBooth.rosterGroupIds.map(String)}
-                onValueChange={(v) =>
-                  saveType(queryClient, {
-                    fairBooth: {rosterGroupIds: v.map(Number).filter((n) => !Number.isNaN(n))},
-                  })
-                }
-                options={(groups ?? []).map((g) => ({value: String(g.id), label: g.name}))}
-                placeholder="Pick groups"
-                className="w-full"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Bold threshold (signups)</Label>
-              <p className="text-muted-foreground text-xs">
-                Roster names with fewer than this many signups render bold. Default 3.
-              </p>
-              <Input
-                type="number"
-                min={0}
-                defaultValue={settings.fairBooth.minSignupsForBold}
-                onBlur={(e) => {
-                  const n = Number(e.target.value)
-                  if (!Number.isNaN(n) && n !== settings.fairBooth.minSignupsForBold)
-                    saveType(queryClient, {fairBooth: {minSignupsForBold: n}})
-                }}
-                className="w-24"
-              />
-            </div>
-            <FairBoothFooterEditor
-              label="Grid page footer"
-              blocks={settings.fairBooth.gridPageFooterBlocks}
-              onSave={(blocks) => saveType(queryClient, {fairBooth: {gridPageFooterBlocks: blocks}})}
-            />
-            <FairBoothFooterEditor
-              label="Roster page footer"
-              blocks={settings.fairBooth.rosterPageFooterBlocks}
-              onSave={(blocks) => saveType(queryClient, {fairBooth: {rosterPageFooterBlocks: blocks}})}
-            />
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">&quot;Your Shifts&quot; card copy</Label>
-              <p className="text-muted-foreground text-xs">
-                Shown under the person&apos;s name on the shifts image you export or text them. Reword &quot;let me
-                know&quot; here if you want it to name someone.
-              </p>
-              <Textarea
-                rows={4}
-                defaultValue={settings.fairBooth.personalShiftsIntro}
-                onBlur={(e) => {
-                  const v = e.target.value
-                  if (v !== settings.fairBooth.personalShiftsIntro)
-                    saveType(queryClient, {fairBooth: {personalShiftsIntro: v}})
-                }}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Reminder send time</Label>
-              <p className="text-muted-foreground text-xs">
-                What time the nightly &quot;you&apos;re up next&quot; texts go out, the evening before each fair day.
-                Changing this re-times every reminder still waiting to send.
-              </p>
-              <Input
-                type="time"
-                defaultValue={settings.fairBooth.reminderSendTime}
-                onBlur={(e) => {
-                  const v = e.target.value
-                  if (/^\d{2}:\d{2}$/.test(v) && v !== settings.fairBooth.reminderSendTime)
-                    saveType(queryClient, {fairBooth: {reminderSendTime: v}})
-                }}
-                className="w-32"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
-}
-
-function FairBoothFooterEditor({
+export function FairBoothFooterEditor({
   label,
   blocks,
   onSave,
@@ -434,7 +132,7 @@ function FairBoothFooterEditor({
   )
 }
 
-async function saveType(
+export async function saveType(
   queryClient: ReturnType<typeof useQueryClient>,
   body: Parameters<typeof updateSchedulesSettings>[0],
 ) {
@@ -462,7 +160,7 @@ interface TypeDefaultsCardProps {
   ) => Promise<void> | void
 }
 
-function TypeDefaultsCard({titleLabel, titlePrefix, footerBlocks, middleSlot, onSave}: TypeDefaultsCardProps) {
+export function TypeDefaultsCard({titleLabel, titlePrefix, footerBlocks, middleSlot, onSave}: TypeDefaultsCardProps) {
   const [prefix, setPrefix] = useState(titlePrefix)
   const [blocks, setBlocks] = useState<FooterBlock[]>(footerBlocks)
 
@@ -583,7 +281,7 @@ function TypeDefaultsCard({titleLabel, titlePrefix, footerBlocks, middleSlot, on
 
 // ── Households editor ──────────────────────────────────────────────────
 
-function HouseholdsSection({singerGroupIds}: {singerGroupIds: number[]}) {
+export function HouseholdsSection({singerGroupIds}: {singerGroupIds: number[]}) {
   const queryClient = useQueryClient()
   const {data: households} = useQuery({queryKey: schedulesKeys.households, queryFn: fetchHouseholds})
   const groupQueries = useQueries({

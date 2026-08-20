@@ -25,6 +25,15 @@ export interface FooterBlock {
   bold?: boolean
 }
 
+// Page-1 bullet list of a Workers' Notes Edition. The three placeholder kinds
+// carry no text — they render from the edition's own Term, Yearly Theme, and
+// Mottos, so they cannot go stale when copied forward.
+export interface WorkersNotesBlockSeed {
+  kind: 'note' | 'spacer' | 'next_term_forms' | 'growth_plan' | 'month_themes'
+  text: string
+  bold?: boolean
+}
+
 export interface SchedulesSettings {
   logoPath: string | null
   // Squarer mark for image cards; falls back to logoPath when unset.
@@ -49,6 +58,11 @@ export interface SchedulesSettings {
     // Changing it re-times every Run still pending.
     reminderSendTime: string
   }
+  workersNotes: {
+    churchName: string
+    // Seeds a first edition's bullets only; later editions copy forward.
+    defaultBlocks: WorkersNotesBlockSeed[]
+  }
 }
 
 export const fetchSchedulesSettings = () => request<SchedulesSettings>('/schedules/settings')
@@ -58,6 +72,7 @@ export const updateSchedulesSettings = (
     nursery: Partial<SchedulesSettings['nursery']>
     specialMusic: Partial<SchedulesSettings['specialMusic']>
     fairBooth: Partial<SchedulesSettings['fairBooth']>
+    workersNotes: Partial<SchedulesSettings['workersNotes']>
   }>,
 ) => request<SchedulesSettings>('/schedules/settings', {method: 'PUT', body: JSON.stringify(body)})
 

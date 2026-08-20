@@ -52,6 +52,28 @@ export function buildNavigationActions(): SearchItem[] {
     nav('/import', 'Import CSV', Upload, ['upload']),
     nav('/import/contacts', 'Import Mac Contacts', Upload),
     nav('/settings', 'Settings', Settings),
+    // Schedule Settings sections are routed panes off a left rail, so they are
+    // not sidebar entries and need naming here explicitly.
+    nav('/schedules/settings/general', 'Schedule Settings General', Settings, ['logo', 'compact logo']),
+    nav('/schedules/settings/nursery', 'Schedule Settings Nursery', Settings, ['nursery', 'worker counts']),
+    nav('/schedules/settings/special-music', 'Schedule Settings Special Music', Settings, ['singers', 'households']),
+    nav('/schedules/settings/fair-booth', 'Schedule Settings Fair Booth', Settings, ['roster', 'reminders']),
+    nav('/schedules/settings/sunday-school/defaults', 'Schedule Settings Sunday School Defaults', Settings, [
+      'workers notes',
+      'bullets',
+      'church name',
+    ]),
+    nav('/schedules/settings/sunday-school/themes', 'Yearly Themes', Settings, [
+      'theme song',
+      'chorus',
+      'growth plan',
+      'sunday school',
+    ]),
+    nav('/schedules/settings/sunday-school/lessons', 'Betty Lukens Lessons', Settings, [
+      'catalogue',
+      'stories',
+      'sunday school',
+    ]),
   ]
   return [...nonNavRoutes, ...fromSidebar]
 }

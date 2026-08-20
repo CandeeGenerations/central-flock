@@ -75,6 +75,8 @@ import {VerseStripsPage} from '@/pages/sermons/verse-strips-page'
 import {SettingsPage} from '@/pages/settings-page'
 import {SpecialMusicScheduleViewPage} from '@/pages/special-music/special-music-schedule-view-page'
 import {SpecialMusicSchedulesPage} from '@/pages/special-music/special-music-schedules-page'
+import {WorkersNotesListPage} from '@/pages/sunday-school/workers-notes-list-page'
+import {WorkersNotesViewPage} from '@/pages/sunday-school/workers-notes-view-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
 import {
@@ -481,6 +483,8 @@ function AppLayoutInner({
               <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
               <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
               <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
+              <Route path="/schedules/sunday-school" element={<WorkersNotesListPage />} />
+              <Route path="/schedules/sunday-school/:id" element={<WorkersNotesViewPage />} />
               <Route path="/schedules/settings" element={<SchedulesSettingsLayout />}>
                 <Route index element={<Navigate to="general" replace />} />
                 <Route path="general" element={<GeneralSettingsSection />} />

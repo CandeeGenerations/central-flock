@@ -1,22 +1,6 @@
+import {renderWithUnderlines} from '@/lib/render-underlines'
 import type {FooterBlock} from '@/lib/schedules-api'
-import {Fragment, type ReactNode, forwardRef} from 'react'
-
-// Renders the text with _underscores_ converted into <u>underlines</u>.
-// Pairs of underscores; lone underscores render literally. No nesting.
-function renderWithUnderlines(text: string): ReactNode {
-  const parts: ReactNode[] = []
-  const regex = /_([^_]+)_/g
-  let last = 0
-  let m: RegExpExecArray | null
-  let key = 0
-  while ((m = regex.exec(text)) !== null) {
-    if (m.index > last) parts.push(<Fragment key={key++}>{text.slice(last, m.index)}</Fragment>)
-    parts.push(<u key={key++}>{m[1]}</u>)
-    last = m.index + m[0].length
-  }
-  if (last < text.length) parts.push(<Fragment key={key}>{text.slice(last)}</Fragment>)
-  return parts.length > 0 ? parts : text
-}
+import {type ReactNode, forwardRef} from 'react'
 
 interface SchedulePreviewFrameProps {
   // Full computed title (e.g., "Nursery Schedule - January 2026" or

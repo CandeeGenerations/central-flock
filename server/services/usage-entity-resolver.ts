@@ -195,6 +195,21 @@ const RESOLVERS: Record<string, ResolverDef> = {
     typeLabel: 'Fair Booth',
     resolveLabel: (id) => resolveScheduleLabel(id),
   },
+  // The route id is the edition, not the schedule envelope — so this resolves
+  // through workers_notes_editions rather than reusing resolveScheduleLabel.
+  '/schedules/sunday-school': {
+    entityType: 'workers_notes_edition',
+    typeLabel: "Workers' Notes",
+    resolveLabel: (id) =>
+      get(
+        db
+          .select({label: schema.schedules.scopeLabel})
+          .from(schema.workersNotesEditions)
+          .innerJoin(schema.schedules, eq(schema.schedules.id, schema.workersNotesEditions.scheduleId))
+          .where(eq(schema.workersNotesEditions.id, id))
+          .get(),
+      )?.label ?? null,
+  },
   '/rsvp': {
     entityType: 'rsvp_list',
     typeLabel: 'RSVP List',

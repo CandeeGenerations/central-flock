@@ -38,9 +38,11 @@ export const WorkersNotesPage2 = forwardRef<HTMLDivElement, Page2Props>(function
 
   return (
     <WorkersNotesPage ref={ref}>
-      <TitleBox fontSize={13}>Songs, Mottos, and Verses of the Month &ndash; {year}</TitleBox>
+      <div data-wn-region="months">
+        <TitleBox fontSize={13}>Songs, Mottos, and Verses of the Month &ndash; {year}</TitleBox>
+      </div>
 
-      <div style={{margin: '18px 0 24px'}}>
+      <div data-wn-region="months" style={{margin: '18px 0 24px'}}>
         {months.map((m) => (
           <div key={m.month} style={{display: 'grid', gridTemplateColumns: '120px 1fr', marginBottom: 16}}>
             <div style={{fontSize: ROW_FONT, fontWeight: 700}}>{MONTH_NAMES[m.month - 1].toUpperCase()}</div>
@@ -62,9 +64,14 @@ export const WorkersNotesPage2 = forwardRef<HTMLDivElement, Page2Props>(function
         ))}
       </div>
 
-      <TitleBox fontSize={13}>Betty Lukens Lessons for {termRangeLabel(year, term)}</TitleBox>
+      <div data-wn-region="lessons">
+        <TitleBox fontSize={13}>Betty Lukens Lessons for {termRangeLabel(year, term)}</TitleBox>
+      </div>
 
-      <table style={{width: '100%', borderCollapse: 'collapse', marginTop: 16, fontSize: ROW_FONT}}>
+      <table
+        data-wn-region="lessons"
+        style={{width: '100%', borderCollapse: 'collapse', marginTop: 16, fontSize: ROW_FONT}}
+      >
         <thead>
           <tr>
             <th style={{width: 110, textAlign: 'left', borderBottom: '1px solid #000', paddingBottom: 2}}>Date</th>

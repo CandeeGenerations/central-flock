@@ -3,10 +3,11 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {PageSpinner} from '@/components/ui/spinner'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Textarea} from '@/components/ui/textarea'
 import {type YearlyTheme, fetchYearlyThemes, saveYearlyTheme, workersNotesKeys} from '@/lib/workers-notes-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Plus} from 'lucide-react'
+import {ArrowLeft, Plus} from 'lucide-react'
 import {useState} from 'react'
 import {toast} from 'sonner'
 
@@ -30,9 +31,10 @@ export function SundaySchoolThemesPane() {
   const {data: themes, isLoading} = useQuery({queryKey: workersNotesKeys.themes, queryFn: fetchYearlyThemes})
   // Selection is derived rather than stored, so it can't go stale when the
   // list refetches after a save.
+  // null = list view. A year number opens that year's form; -1 returns to the
+  // list without clearing which year was last opened.
   const [pickedYear, setPickedYear] = useState<number | null>(null)
-  const selectedYear = pickedYear ?? themes?.[themes.length - 1]?.year ?? null
-  const selected = themes?.find((t) => t.year === selectedYear) ?? null
+  const selected = pickedYear == null || pickedYear < 0 ? null : (themes?.find((t) => t.year === pickedYear) ?? null)
 
   const save = useMutation({
     mutationFn: ({year, body}: {year: number; body: ThemeFields}) => saveYearlyTheme(year, body),
@@ -59,34 +61,64 @@ export function SundaySchoolThemesPane() {
     save.mutate({year, body: seed})
   }
 
-  return (
-    <div className="max-w-2xl space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {themes?.map((t) => (
-          <Button
-            key={t.year}
-            size="sm"
-            variant={t.year === selectedYear ? 'default' : 'outline'}
-            onClick={() => setPickedYear(t.year)}
-          >
-            {t.year}
-          </Button>
-        ))}
-        <Button size="sm" variant="ghost" onClick={addNextYear} disabled={save.isPending}>
-          <Plus className="mr-1 h-4 w-4" />
-          Add year
+  // One row per year, so a couple of decades of themes stay scannable. Picking
+  // a year swaps the list for that year's form.
+  if (selected) {
+    return (
+      <div className="max-w-2xl space-y-4">
+        <Button variant="ghost" size="sm" onClick={() => setPickedYear(-1)}>
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          All years
         </Button>
-      </div>
-
-      {selected === null ? (
-        <p className="text-muted-foreground text-sm">No themes yet. Add a year to get started.</p>
-      ) : (
         <ThemeForm
           key={selected.year}
           theme={selected}
           saving={save.isPending}
           onSave={(body) => save.mutate({year: selected.year, body})}
         />
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-muted-foreground text-sm">One theme per year, shared by all three editions of that year.</p>
+        <Button size="sm" variant="outline" onClick={addNextYear} disabled={save.isPending}>
+          <Plus className="mr-1 h-4 w-4" />
+          Add year
+        </Button>
+      </div>
+
+      {themes?.length ? (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-20">Year</TableHead>
+                <TableHead>Theme song</TableHead>
+                <TableHead className="hidden sm:table-cell">Verse</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...themes]
+                .sort((a, b) => b.year - a.year)
+                .map((t) => (
+                  <TableRow
+                    key={t.year}
+                    className="hover:bg-muted/50 cursor-pointer"
+                    onClick={() => setPickedYear(t.year)}
+                  >
+                    <TableCell className="font-medium">{t.year}</TableCell>
+                    <TableCell>{t.songTitle || <span className="text-muted-foreground">—</span>}</TableCell>
+                    <TableCell className="text-muted-foreground hidden sm:table-cell">{t.verseRef || '—'}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <p className="text-muted-foreground text-sm">No themes yet. Add a year to get started.</p>
       )}
     </div>
   )

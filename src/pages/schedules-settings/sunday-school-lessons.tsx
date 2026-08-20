@@ -1,6 +1,7 @@
 import {Button} from '@/components/ui/button'
 import {Input} from '@/components/ui/input'
 import {PageSpinner} from '@/components/ui/spinner'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {
   type BettyLukensStory,
   fetchBettyLukensStories,
@@ -65,22 +66,22 @@ export function SundaySchoolLessonsPane() {
         className="max-w-sm"
       />
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="w-16 px-3 py-2 text-left font-medium">#</th>
-              <th className="px-3 py-2 text-left font-medium">Title</th>
-              <th className="w-20 px-3 py-2 text-left font-medium">Page</th>
-              <th className="px-3 py-2 text-left font-medium">Last points written</th>
-              <th className="w-20 px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">#</TableHead>
+              <TableHead>Title</TableHead>
+              <TableHead className="w-20">Page</TableHead>
+              <TableHead className="hidden md:table-cell">Last points written</TableHead>
+              <TableHead className="w-20" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {filtered.map((s) => (
-              <tr key={s.number} className="border-t">
-                <td className="px-3 py-1.5 font-mono">{s.number}</td>
-                <td className="px-3 py-1.5">
+              <TableRow key={s.number}>
+                <TableCell className="font-mono">{s.number}</TableCell>
+                <TableCell>
                   {editing === s.number ? (
                     <Input
                       value={draft.title}
@@ -90,8 +91,8 @@ export function SundaySchoolLessonsPane() {
                   ) : (
                     s.title
                   )}
-                </td>
-                <td className="px-3 py-1.5">
+                </TableCell>
+                <TableCell>
                   {editing === s.number ? (
                     <Input
                       value={draft.page}
@@ -101,9 +102,11 @@ export function SundaySchoolLessonsPane() {
                   ) : (
                     (s.page ?? '—')
                   )}
-                </td>
-                <td className="text-muted-foreground px-3 py-1.5 text-xs">{s.lastPoints ?? '—'}</td>
-                <td className="px-3 py-1.5 text-right">
+                </TableCell>
+                <TableCell className="text-muted-foreground hidden text-xs md:table-cell">
+                  {s.lastPoints ?? '—'}
+                </TableCell>
+                <TableCell className="text-right">
                   {editing === s.number ? (
                     <div className="flex justify-end gap-1">
                       <Button
@@ -130,11 +133,11 @@ export function SundaySchoolLessonsPane() {
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   )

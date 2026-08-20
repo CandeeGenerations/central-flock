@@ -1,10 +1,10 @@
 import {Button} from '@/components/ui/button'
-import {Card, CardContent} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {createWorkersNotesEdition, fetchWorkersNotesEditions, workersNotesKeys} from '@/lib/workers-notes-api'
 import {type WorkersNotesTerm, termLabel, termRangeLabel} from '@/lib/workers-notes-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
@@ -62,31 +62,41 @@ export function WorkersNotesListPage() {
       </p>
 
       {editions?.length ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {editions.map((e) => (
-            <Card
-              key={e.id}
-              className="hover:bg-muted/40 cursor-pointer transition-colors"
-              onClick={() => navigate(`/schedules/sunday-school/${e.id}`)}
-            >
-              <CardContent className="space-y-1 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{termRangeLabel(e.year, e.term as WorkersNotesTerm)}</span>
-                  <span
-                    className={
-                      e.status === 'final'
-                        ? 'rounded bg-green-100 px-2 py-0.5 text-xs text-green-800'
-                        : 'bg-muted rounded px-2 py-0.5 text-xs'
-                    }
-                  >
-                    {e.status}
-                  </span>
-                </div>
-                <div className="text-muted-foreground text-xs">{e.scopeLabel}</div>
-                <div className="text-muted-foreground text-xs">Lessons from #{e.startingLessonNumber}</div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Term</TableHead>
+                <TableHead className="hidden sm:table-cell">Months</TableHead>
+                <TableHead className="w-28">Lessons</TableHead>
+                <TableHead className="w-24">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {editions.map((e) => (
+                <TableRow
+                  key={e.id}
+                  className="hover:bg-muted/50 cursor-pointer"
+                  onClick={() => navigate(`/schedules/sunday-school/${e.id}`)}
+                >
+                  <TableCell className="font-medium">{termRangeLabel(e.year, e.term as WorkersNotesTerm)}</TableCell>
+                  <TableCell className="text-muted-foreground hidden sm:table-cell">{e.scopeLabel}</TableCell>
+                  <TableCell className="text-muted-foreground">from #{e.startingLessonNumber}</TableCell>
+                  <TableCell>
+                    <span
+                      className={
+                        e.status === 'final'
+                          ? 'rounded bg-green-100 px-2 py-0.5 text-xs text-green-800'
+                          : 'bg-muted rounded px-2 py-0.5 text-xs'
+                      }
+                    >
+                      {e.status}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       ) : (
         <p className="text-muted-foreground text-sm">No editions yet.</p>

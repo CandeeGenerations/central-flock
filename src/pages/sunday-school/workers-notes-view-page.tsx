@@ -13,11 +13,11 @@ import {
 import {type WorkersNotesTerm, termRangeLabel} from '@/lib/workers-notes-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowLeft, Lock, LockOpen, Trash2} from 'lucide-react'
-import {useState} from 'react'
+import {useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
-import {EditableRegion} from './editable-region'
+import {RegionOverlay} from './region-overlay'
 
 const ZOOMS: {value: ZoomMode; label: string}[] = [
   {value: 'fit', label: 'Fit'},
@@ -32,6 +32,8 @@ export function WorkersNotesViewPage() {
   const queryClient = useQueryClient()
   const [zoom, setZoom] = useState<ZoomMode>('fit')
   const [editMode, setEditMode] = useState(true)
+  const page1Ref = useRef<HTMLDivElement>(null)
+  const page2Ref = useRef<HTMLDivElement>(null)
 
   const {data: edition, isLoading} = useQuery({
     queryKey: workersNotesKeys.detail(editionId),
@@ -135,6 +137,7 @@ export function WorkersNotesViewPage() {
           <ScaledPage zoom={zoom}>
             <div style={{position: 'relative'}}>
               <WorkersNotesPage1
+                ref={page1Ref}
                 churchName={settings.workersNotes.churchName}
                 year={edition.year}
                 term={term}
@@ -142,15 +145,9 @@ export function WorkersNotesViewPage() {
                 blocks={edition.blocks}
                 months={edition.months}
               />
-              {editMode ? (
-                <>
-                  {/* Hit zones sit over an untouched render, so no edit chrome
-                      can reach the export path (ADR 0005). */}
-                  <EditableRegion label="Yearly Theme" top={130} height={300} onClick={() => go('theme')} />
-                  <EditableRegion label="Bullets" top={430} height={430} onClick={() => go('blocks')} />
-                  <EditableRegion label="Month themes" top={860} height={150} onClick={() => go('months')} />
-                </>
-              ) : null}
+              {/* Hit zones are measured from the page's own DOM, so they track
+                  content instead of drifting (ADR 0005 keeps them in a wrapper). */}
+              {editMode ? <RegionOverlay pageRef={page1Ref} onOpen={go} deps={edition} /> : null}
             </div>
           </ScaledPage>
         </div>
@@ -159,17 +156,13 @@ export function WorkersNotesViewPage() {
           <ScaledPage zoom={zoom}>
             <div style={{position: 'relative'}}>
               <WorkersNotesPage2
+                ref={page2Ref}
                 year={edition.year}
                 term={term}
                 months={edition.months}
                 lessonRows={edition.lessonRows}
               />
-              {editMode ? (
-                <>
-                  <EditableRegion label="Songs, mottos, verses" top={48} height={330} onClick={() => go('months')} />
-                  <EditableRegion label="Lessons" top={378} height={630} onClick={() => go('lessons')} />
-                </>
-              ) : null}
+              {editMode ? <RegionOverlay pageRef={page2Ref} onOpen={go} deps={edition} /> : null}
             </div>
           </ScaledPage>
         </div>

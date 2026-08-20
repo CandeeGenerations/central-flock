@@ -26,8 +26,8 @@ export function ScaledPage({children, zoom}: {children: ReactNode; zoom: ZoomMod
   const scale = zoom === 'fit' ? fitScale : zoom
 
   return (
-    <div ref={containerRef} className="overflow-auto">
-      <div style={{width: PAGE_WIDTH_PX * scale, height: PAGE_HEIGHT_PX * scale}}>
+    <div ref={containerRef} className="flex justify-center overflow-auto">
+      <div style={{width: PAGE_WIDTH_PX * scale, height: PAGE_HEIGHT_PX * scale, flexShrink: 0}}>
         <div style={{transform: `scale(${scale})`, transformOrigin: 'top left', width: PAGE_WIDTH_PX}}>{children}</div>
       </div>
     </div>

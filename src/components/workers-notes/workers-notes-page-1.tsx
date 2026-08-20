@@ -26,9 +26,9 @@ const BULLET_STYLE: React.CSSProperties = {
   textAlign: 'justify',
 }
 
-function Bullet({children, bold}: {children: ReactNode; bold?: boolean}) {
+function Bullet({children, bold, region}: {children: ReactNode; bold?: boolean; region?: string}) {
   return (
-    <div style={{...BULLET_STYLE, fontWeight: bold ? 700 : 400}}>
+    <div data-wn-region={region} style={{...BULLET_STYLE, fontWeight: bold ? 700 : 400}}>
       <span aria-hidden style={{fontSize: '7pt', lineHeight: 1.9}}>
         ▪
       </span>
@@ -72,7 +72,7 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
       </div>
 
       {theme ? (
-        <>
+        <div data-wn-region="theme">
           <div style={{fontSize: '11pt', marginBottom: 8}}>
             <strong>{year} Theme Song</strong> &ndash;{' '}
             <strong style={{textDecoration: 'underline'}}>{theme.songTitle}</strong>
@@ -101,7 +101,7 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
           <div style={{fontSize: '11pt', fontWeight: 700, textAlign: 'center', marginBottom: 14}}>
             Verse: &ldquo;{theme.verseText}&rdquo; {theme.verseRef}
           </div>
-        </>
+        </div>
       ) : (
         <div style={{fontSize: '11pt', fontStyle: 'italic', marginBottom: 14}}>
           No {year} theme yet — add one in Schedule Settings.
@@ -114,25 +114,25 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
             return <div key={i} style={{height: 10}} />
           case 'note':
             return (
-              <Bullet key={i} bold={block.bold}>
+              <Bullet key={i} bold={block.bold} region="blocks">
                 {renderWithUnderlines(block.text)}
               </Bullet>
             )
           case 'next_term_forms':
             return (
-              <Bullet key={i}>
+              <Bullet key={i} region="blocks">
                 Forms for {termThroughLabel(next.year, next.term)} will be distributed (as before).
               </Bullet>
             )
           case 'growth_plan':
             return (
-              <Bullet key={i}>
+              <Bullet key={i} region="theme">
                 Our growth plan for the year {year} will be: {renderWithUnderlines(theme?.growthPlan ?? '')}
               </Bullet>
             )
           case 'month_themes':
             return (
-              <div key={i}>
+              <div key={i} data-wn-region="months">
                 <Bullet>Our themes for the next four months are:</Bullet>
                 <div style={{margin: '4px 0 0 60px'}}>
                   {months.map((m) => (

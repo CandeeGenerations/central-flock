@@ -1,7 +1,9 @@
 import {Button} from '@/components/ui/button'
+import {Card, CardContent} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
@@ -27,6 +29,7 @@ export function WorkersNotesListPage() {
   const [year, setYear] = useState(String(currentYear))
   const [term, setTerm] = useState<string>('1')
   const [startOverride, setStartOverride] = useState('')
+  const [search, setSearch] = useState('')
 
   const {data: editions, isLoading} = useQuery({
     queryKey: workersNotesKeys.list,
@@ -45,6 +48,16 @@ export function WorkersNotesListPage() {
 
   if (isLoading) return <PageSpinner />
 
+  const q = search.trim().toLowerCase()
+  const filtered = (editions ?? []).filter(
+    (e) =>
+      !q ||
+      e.scopeLabel.toLowerCase().includes(q) ||
+      termRangeLabel(e.year, e.term as WorkersNotesTerm)
+        .toLowerCase()
+        .includes(q),
+  )
+
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div className="mb-6 flex items-center gap-3">
@@ -61,46 +74,53 @@ export function WorkersNotesListPage() {
         and mottos, and the Betty Lukens lesson schedule.
       </p>
 
-      {editions?.length ? (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Term</TableHead>
-                <TableHead className="hidden sm:table-cell">Months</TableHead>
-                <TableHead className="w-28">Lessons</TableHead>
-                <TableHead className="w-24">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {editions.map((e) => (
-                <TableRow
-                  key={e.id}
-                  className="hover:bg-muted/50 cursor-pointer"
-                  onClick={() => navigate(`/schedules/sunday-school/${e.id}`)}
-                >
-                  <TableCell className="font-medium">{termRangeLabel(e.year, e.term as WorkersNotesTerm)}</TableCell>
-                  <TableCell className="text-muted-foreground hidden sm:table-cell">{e.scopeLabel}</TableCell>
-                  <TableCell className="text-muted-foreground">from #{e.startingLessonNumber}</TableCell>
-                  <TableCell>
-                    <span
-                      className={
-                        e.status === 'final'
-                          ? 'rounded bg-green-100 px-2 py-0.5 text-xs text-green-800'
-                          : 'bg-muted rounded px-2 py-0.5 text-xs'
-                      }
-                    >
-                      {e.status}
-                    </span>
-                  </TableCell>
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search by term or months..." />
+          {filtered.length === 0 ? (
+            <div className="text-muted-foreground py-8 text-center text-sm">
+              {editions?.length
+                ? 'No editions match that search.'
+                : 'No editions yet. Click "New Edition" to create one.'}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Term</TableHead>
+                  <TableHead className="hidden sm:table-cell">Months</TableHead>
+                  <TableHead className="w-28">Lessons</TableHead>
+                  <TableHead className="w-24">Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <p className="text-muted-foreground text-sm">No editions yet.</p>
-      )}
+              </TableHeader>
+              <TableBody>
+                {filtered.map((e) => (
+                  <TableRow
+                    key={e.id}
+                    className="hover:bg-muted/50 cursor-pointer"
+                    onClick={() => navigate(`/schedules/sunday-school/${e.id}`)}
+                  >
+                    <TableCell className="font-medium">{termRangeLabel(e.year, e.term as WorkersNotesTerm)}</TableCell>
+                    <TableCell className="text-muted-foreground hidden sm:table-cell">{e.scopeLabel}</TableCell>
+                    <TableCell className="text-muted-foreground">from #{e.startingLessonNumber}</TableCell>
+                    <TableCell>
+                      <span
+                        className={
+                          e.status === 'final'
+                            ? 'rounded bg-green-100 px-2 py-0.5 text-xs text-green-800'
+                            : 'bg-muted rounded px-2 py-0.5 text-xs'
+                        }
+                      >
+                        {e.status}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

@@ -65,11 +65,10 @@ export function WorkersNotesViewPage() {
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/schedules/sunday-school')}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Sunday School
+        <Button variant="ghost" size="icon" onClick={() => navigate('/schedules/sunday-school')}>
+          <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-xl font-bold">{termRangeLabel(edition.year, term)}</h2>
+        <h2 className="text-2xl font-bold">{termRangeLabel(edition.year, term)}</h2>
         <span
           className={
             edition.status === 'final'

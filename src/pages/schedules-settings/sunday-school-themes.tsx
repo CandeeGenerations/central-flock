@@ -5,9 +5,15 @@ import {Label} from '@/components/ui/label'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Textarea} from '@/components/ui/textarea'
-import {type YearlyTheme, fetchYearlyThemes, saveYearlyTheme, workersNotesKeys} from '@/lib/workers-notes-api'
+import {
+  type YearlyTheme,
+  deleteYearlyTheme,
+  fetchYearlyThemes,
+  saveYearlyTheme,
+  workersNotesKeys,
+} from '@/lib/workers-notes-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Plus} from 'lucide-react'
+import {ArrowLeft, Plus, Trash2} from 'lucide-react'
 import {useState} from 'react'
 import {toast} from 'sonner'
 
@@ -47,6 +53,17 @@ export function SundaySchoolThemesPane() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to save'),
   })
 
+  const remove = useMutation({
+    mutationFn: (year: number) => deleteYearlyTheme(year),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: workersNotesKeys.themes})
+      queryClient.invalidateQueries({queryKey: workersNotesKeys.all})
+      setPickedYear(-1)
+      toast.success('Theme deleted')
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to delete'),
+  })
+
   if (isLoading) return <PageSpinner />
 
   // A new year starts from the most recent one — the shape (chorus, tag, verse)
@@ -55,8 +72,10 @@ export function SundaySchoolThemesPane() {
     const latest = themes?.[themes.length - 1]
     const year = latest ? latest.year + 1 : new Date().getFullYear()
     if (themes?.some((t) => t.year === year)) return
+    // The shape carries over, the words don't — a new year needs its own song,
+    // chorus, tag, and verse. Only the growth plan tends to survive intact.
     const seed: ThemeFields = latest
-      ? {...latest, songTitle: '', songCredit: '', chorusLyrics: '', tagLyrics: ''}
+      ? {...latest, songTitle: '', songCredit: '', chorusLyrics: '', tagLyrics: '', verseText: '', verseRef: ''}
       : EMPTY
     save.mutate({year, body: seed})
   }
@@ -65,11 +84,31 @@ export function SundaySchoolThemesPane() {
   // a year swaps the list for that year's form.
   if (selected) {
     return (
-      <div className="max-w-2xl space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => setPickedYear(-1)}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          All years
-        </Button>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setPickedYear(-1)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-2xl font-bold">{selected.year} Theme</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={remove.isPending}
+            onClick={() => {
+              if (
+                confirm(
+                  `Delete the ${selected.year} theme? Any ${selected.year} edition will print without a theme until you add one back.`,
+                )
+              )
+                remove.mutate(selected.year)
+            }}
+          >
+            <Trash2 className="mr-1 h-4 w-4" />
+            Delete
+          </Button>
+        </div>
         <ThemeForm
           key={selected.year}
           theme={selected}
@@ -81,45 +120,54 @@ export function SundaySchoolThemesPane() {
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground text-sm">One theme per year, shared by all three editions of that year.</p>
-        <Button size="sm" variant="outline" onClick={addNextYear} disabled={save.isPending}>
-          <Plus className="mr-1 h-4 w-4" />
-          Add year
-        </Button>
-      </div>
-
-      {themes?.length ? (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-20">Year</TableHead>
-                <TableHead>Theme song</TableHead>
-                <TableHead className="hidden sm:table-cell">Verse</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...themes]
-                .sort((a, b) => b.year - a.year)
-                .map((t) => (
-                  <TableRow
-                    key={t.year}
-                    className="hover:bg-muted/50 cursor-pointer"
-                    onClick={() => setPickedYear(t.year)}
-                  >
-                    <TableCell className="font-medium">{t.year}</TableCell>
-                    <TableCell>{t.songTitle || <span className="text-muted-foreground">—</span>}</TableCell>
-                    <TableCell className="text-muted-foreground hidden sm:table-cell">{t.verseRef || '—'}</TableCell>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+          <CardTitle>Yearly Themes</CardTitle>
+          <Button size="sm" variant="outline" onClick={addNextYear} disabled={save.isPending}>
+            <Plus className="mr-1 h-4 w-4" />
+            Add year
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-muted-foreground text-sm">
+            One theme per year, shared by all three editions of that year. Pick a year to edit its song, chorus, verse,
+            and growth plan.
+          </p>
+          {themes?.length ? (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-20">Year</TableHead>
+                    <TableHead>Theme song</TableHead>
+                    <TableHead className="hidden sm:table-cell">Verse</TableHead>
                   </TableRow>
-                ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <p className="text-muted-foreground text-sm">No themes yet. Add a year to get started.</p>
-      )}
+                </TableHeader>
+                <TableBody>
+                  {[...themes]
+                    .sort((a, b) => b.year - a.year)
+                    .map((t) => (
+                      <TableRow
+                        key={t.year}
+                        className="hover:bg-muted/50 cursor-pointer"
+                        onClick={() => setPickedYear(t.year)}
+                      >
+                        <TableCell className="font-medium">{t.year}</TableCell>
+                        <TableCell>{t.songTitle || <span className="text-muted-foreground">—</span>}</TableCell>
+                        <TableCell className="text-muted-foreground hidden sm:table-cell">
+                          {t.verseRef || '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">No themes yet. Add a year to get started.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

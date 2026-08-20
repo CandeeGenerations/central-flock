@@ -43,6 +43,7 @@ import {statsRouter} from './routes/stats.js'
 import {templatesRouter} from './routes/templates.js'
 import {usageRouter} from './routes/usage.js'
 import {webhooksRouter} from './routes/webhooks.js'
+import {workersNotesRouter} from './routes/workers-notes.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
 import {startFairBoothReminderScheduler} from './services/fair-booth-reminders.js'
@@ -82,6 +83,7 @@ app.use('/api/home', homeRouter)
 app.use('/api/devotions', devotionsRouter)
 app.use('/api/gwendolyn-devotions', gwendolynDevotionsRouter)
 app.use('/api/schedules/fair-booth', fairBoothRouter)
+app.use('/api/schedules/workers-notes', workersNotesRouter)
 app.use('/api/schedules', schedulesRouter)
 app.use('/api/nursery/schedules', nurserySchedulesRouter)
 app.use('/api/nursery', nurseryRouter)

@@ -29,6 +29,15 @@ export interface FooterBlock {
   bold?: boolean
 }
 
+// Page-1 bullet list of a Workers' Notes Edition. The three placeholder kinds
+// carry no text — they render from the edition's own Term, Yearly Theme, and
+// Mottos, so they cannot go stale when copied forward.
+export interface WorkersNotesBlockSeed {
+  kind: 'note' | 'spacer' | 'next_term_forms' | 'growth_plan' | 'month_themes'
+  text: string
+  bold?: boolean
+}
+
 // Default intro copy on the Shifts Card. Admin-editable so "let me know" can be
 // reworded to name a person without a deploy.
 const DEFAULT_PERSONAL_SHIFTS_INTRO =
@@ -57,6 +66,12 @@ interface SchedulesSettings {
     personalShiftsIntro: string
     // Local HH:MM a Reminder Run fires, the evening before the day it covers.
     reminderSendTime: string
+  }
+  workersNotes: {
+    churchName: string
+    // Seeds the Notes Blocks of a first edition only; later editions copy
+    // forward from their predecessor instead. See ADR 0006 amendment.
+    defaultBlocks: WorkersNotesBlockSeed[]
   }
 }
 
@@ -110,6 +125,15 @@ function readSettings(): SchedulesSettings {
       personalShiftsIntro: map.get('schedules.fairBooth.personalShiftsIntro') ?? DEFAULT_PERSONAL_SHIFTS_INTRO,
       reminderSendTime: map.get(REMINDER_SEND_TIME_KEY) ?? DEFAULT_REMINDER_SEND_TIME,
     },
+    workersNotes: {
+      churchName: map.get('schedules.workersNotes.churchName') ?? 'Central Baptist Church',
+      defaultBlocks: parseJson<WorkersNotesBlockSeed[]>('schedules.workersNotes.defaultBlocks', [
+        {kind: 'note', text: ''},
+        {kind: 'next_term_forms', text: ''},
+        {kind: 'growth_plan', text: ''},
+        {kind: 'month_themes', text: ''},
+      ]),
+    },
   }
 }
 
@@ -134,6 +158,7 @@ schedulesRouter.put(
       nursery: Partial<SchedulesSettings['nursery']>
       specialMusic: Partial<SchedulesSettings['specialMusic']>
       fairBooth: Partial<SchedulesSettings['fairBooth']>
+      workersNotes: Partial<SchedulesSettings['workersNotes']>
     }>
     if (body.nursery?.titlePrefix !== undefined) upsert('schedules.nursery.titlePrefix', body.nursery.titlePrefix)
     if (body.nursery?.footerBlocks !== undefined)
@@ -175,6 +200,10 @@ schedulesRouter.put(
           .run()
       }
     }
+    if (body.workersNotes?.churchName !== undefined)
+      upsert('schedules.workersNotes.churchName', body.workersNotes.churchName)
+    if (body.workersNotes?.defaultBlocks !== undefined)
+      upsert('schedules.workersNotes.defaultBlocks', JSON.stringify(body.workersNotes.defaultBlocks))
     res.json(readSettings())
   }),
 )
@@ -338,7 +367,7 @@ schedulesRouter.get(
   asyncHandler(async (req, res) => {
     const type = typeof req.query.type === 'string' ? req.query.type : undefined
     const where =
-      type === 'nursery' || type === 'special_music' || type === 'fair_booth'
+      type === 'nursery' || type === 'special_music' || type === 'fair_booth' || type === 'workers_notes'
         ? eq(schema.schedules.scheduleType, type)
         : undefined
     const rows = db

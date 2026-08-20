@@ -66,3 +66,40 @@ The envelope-plus-body model captures the genuine shared concept (the printable 
 - **No carryover concept for Special Music.** Nursery's 5-Sundays-borrow-from-prior-month logic stays Nursery-specific in `nursery-scheduler.ts`. Special Music's date range is taken literally — `scope_start` and `scope_end` define exactly which Sundays render. Future schedule types decide their own scope semantics.
 - **`schedules.schedule_type` is closed.** New schedule types require a code change (migration to extend the enum, new route module, new body table or query strategy, new preview component). This is acceptable; "schedule types" is a small, slow-growing set.
 - **The "New Schedule" verb is shared.** Every list page uses the same button label and the same dialog shell (date pickers vary by `scope_kind`). The word "Generate" is retired from user-facing copy; it lives on only as the internal function name in `nursery-scheduler.ts`.
+
+---
+
+## Amendment (Workers' Notes, the fourth type)
+
+This ADR anticipated a fourth Schedule type as `sunday_school` with "same export/send/logo
+plumbing; bespoke body." When the document itself was examined, three of those expectations did
+not survive. They are recorded here so the divergences read as deliberate rather than as drift.
+
+- **The type is `workers_notes`, not `sunday_school`.** The document's own title is "Four-Month
+  Workers' Notes," and "Sunday School" is reserved as the _ministry area_ — the sidebar entry it
+  lives under, and where a future teacher roster or class-attendance feature would join it. The
+  entity is the document; the area is the nav group. See
+  [CONTEXT.md → Workers' Notes](../../CONTEXT.md).
+
+- **It does not use `SchedulePreviewFrame`.** Every feature of the frame is wrong for this
+  document: it wants a typeset text header rather than a logo, its bullet blocks sit in the body
+  above the month themes rather than in a footer, its pages are a fixed 816×1056 box rather than
+  800px-wide-by-content, and there are two of them. Adding a `variant` prop would have produced
+  one component with two mutually exclusive halves and put the nursery schedule's pixels at risk
+  on every notes-layout change — the same merge hazard this ADR warns about for
+  `CalendarGrid`/`CalendarGridEditor`. `renderWithUnderlines` is extracted from
+  `schedule-preview-frame.tsx` into a shared module and reused; nothing else is.
+  (A logo on page 1 is wanted as a later addition, so the page-1 header takes an optional logo
+  slot — but the frame is still not the vehicle.)
+
+- **Draft does not block export for this type**, contradicting "Draft = editable + send/export
+  disabled […] No per-type variation." That rule protects rosters from being distributed before
+  the casting is settled. Workers' Notes has **no Send action at all** — it exports PDF only — so
+  a draft export reaches nobody but its author, and proof-printing a dense lesson table on paper
+  is the normal way to check it. Requiring Finalize → export → Reopen to proof would mostly train
+  the user to leave editions Final. Send remains gated for every type that has it.
+
+Also unchanged from this ADR and worth restating: the envelope, `scope_kind='date_range'`,
+Draft/Final, the list-page shape, and the "New Schedule" verb are all reused as designed. Workers'
+Notes stores its scope as `(year, term)` — one of three fixed four-month thirds — and derives
+`scope_start`/`scope_end` from that pair for the envelope.

@@ -67,6 +67,68 @@ rendered through a template. One person with two **Signups** that merge into one
 Shift Reminder, not two.
 _Avoid_: Notification, Alert.
 
+### Workers' Notes
+
+**Workers' Notes Edition**:
+One printed two-page "Four-Month Workers' Notes" document covering one four-month period —
+page 1 the yearly theme, chorus, verse and the standing bullet paragraphs; page 2 the monthly
+songs/mottos/verses and the Betty Lukens lesson table. Lives in the shared `schedules` envelope
+as `schedule_type='workers_notes'` (see docs/adr/0006-multi-type-schedule-envelope.md), so it
+inherits draft/final status, the logo, and the JPG/PDF export path.
+_Avoid_: Sunday School Schedule (a future teacher roster would want that name), Notes, Handout.
+
+**Yearly Theme**:
+The church's theme for one calendar year — theme song title and writer credit, chorus lyrics,
+tag lyrics, theme verse and reference, and the year's growth-plan sentence. Stored once per year
+and shared by all three **Workers' Notes Editions** of that year, so the chorus is typed once and
+an old edition re-exports with the theme it was printed with rather than the current one.
+_Avoid_: Theme (the calendar-print page has its own per-month `theme` field), Motto (that is the
+per-month line on page 2).
+
+**Term**:
+One of the three fixed four-month periods a **Workers' Notes Edition** covers — Jan-Apr, May-Aug,
+Sep-Dec. Always inside a single calendar year, which is what lets the edition print one
+**Yearly Theme** and derive every month label, box title, and the "Forms for <next Term>" sentence
+without them being typed.
+_Avoid_: Quarter (it is a third, not a quarter), Period, Trimester.
+
+**Lesson Row**:
+One line of the Betty Lukens table on page 2 of a **Workers' Notes Edition** — normally one Sunday
+in the **Term**. Its kind decides whether it consumes a number from the running sequence:
+`regular` consumes the next one, `special` (an out-of-sequence lesson or range like `151-153`)
+consumes none, `combined` (no Sunday School that day) consumes none, and `note` is the italic
+parenthetical line with no date or number. Regular numbers are derived from the edition's
+starting number plus position, never stored per row.
+_Avoid_: Lesson (that is the catalogued **Story**), Entry, Slot.
+
+**Story**:
+One entry in the Betty Lukens catalogue — a number (1-182), a title, and a page in the book.
+The number is what a **Lesson Row** prints; the title never prints, it only labels the picker and
+seeds the **Points to Emphasize**. About fifty are used a year, so the catalogue wraps roughly
+every three and a half years.
+_Avoid_: Lesson (means the row on the page).
+
+**Points to Emphasize**:
+The application sentence printed beside a lesson number — "We'll reap what we sow. (Galatians 6:7)"
+— written by the Sunday School director, not taken from the **Story** title. Prefilled from the
+last Points written for that Story in any prior edition, falling back to the Story's title, and
+always editable.
+_Avoid_: Application, Aim, Points (bare).
+
+**Motto**:
+The one-sentence line for a month on page 2 ("Rejoice that we're growing in grace!"), printed
+verbatim on page 1 as that month's theme. One stored field feeding both pages — no capitalisation
+transform; it prints as typed.
+_Avoid_: Theme (that is the **Yearly Theme**), Slogan.
+
+**Notes Block**:
+One item in the ordered list that makes up the bullet section of page 1. Kind `note` is free text
+(with `_underscore_` underlining) and copies forward verbatim into the next edition; kinds
+`next_term_forms`, `growth_plan`, and `month_themes` are placeholders that render from the
+edition's own **Term**, its **Yearly Theme**, and its **Mottos** respectively, so they can never
+go stale when copied forward. `spacer` is a blank gap.
+_Avoid_: Footer Block (that is the nursery/special-music footer), Bullet, Paragraph.
+
 ### Service Stats
 
 **Service Time**:

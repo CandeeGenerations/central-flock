@@ -10,14 +10,15 @@ import {
   updateWorkersNotesEdition,
   workersNotesKeys,
 } from '@/lib/workers-notes-api'
-import {type WorkersNotesTerm, termRangeLabel} from '@/lib/workers-notes-core'
+import {type WorkersNotesTerm, termRangeLabel, termSlug} from '@/lib/workers-notes-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Lock, LockOpen, Trash2} from 'lucide-react'
+import {ArrowLeft, Download, Lock, LockOpen, Trash2} from 'lucide-react'
 import {useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 import {RegionOverlay} from './region-overlay'
+import {exportWorkersNotesPdf} from './workers-notes-export'
 
 const ZOOMS: {value: ZoomMode; label: string}[] = [
   {value: 'fit', label: 'Fit'},
@@ -32,6 +33,7 @@ export function WorkersNotesViewPage() {
   const queryClient = useQueryClient()
   const [zoom, setZoom] = useState<ZoomMode>('fit')
   const [editMode, setEditMode] = useState(true)
+  const [exporting, setExporting] = useState(false)
   const page1Ref = useRef<HTMLDivElement>(null)
   const page2Ref = useRef<HTMLDivElement>(null)
 
@@ -92,6 +94,28 @@ export function WorkersNotesViewPage() {
               </Button>
             ))}
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={exporting}
+            onClick={async () => {
+              if (!page1Ref.current || !page2Ref.current) return
+              setExporting(true)
+              try {
+                await exportWorkersNotesPdf(
+                  [page1Ref.current, page2Ref.current],
+                  `workers-notes-${termSlug(edition.year, term)}`,
+                )
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Export failed')
+              } finally {
+                setExporting(false)
+              }
+            }}
+          >
+            <Download className="mr-1 h-4 w-4" />
+            {exporting ? 'Exporting…' : 'PDF'}
+          </Button>
           <Button size="sm" variant={editMode ? 'default' : 'outline'} onClick={() => setEditMode((v) => !v)}>
             {editMode ? 'Editing' : 'Edit'}
           </Button>

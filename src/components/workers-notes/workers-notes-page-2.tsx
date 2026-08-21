@@ -75,7 +75,7 @@ export const WorkersNotesPage2 = forwardRef<HTMLDivElement, Page2Props>(function
         <thead>
           <tr>
             <th style={{width: 110, textAlign: 'left', borderBottom: '1px solid #000', paddingBottom: 2}}>Date</th>
-            <th style={{width: 80, textAlign: 'left', borderBottom: '1px solid #000', paddingBottom: 2}}>Lesson</th>
+            <th style={{width: 80, textAlign: 'center', borderBottom: '1px solid #000', paddingBottom: 2}}>Lesson</th>
             <th style={{textAlign: 'left', borderBottom: '1px solid #000', paddingBottom: 2}}>Points to Emphasize</th>
           </tr>
         </thead>
@@ -105,7 +105,7 @@ export const WorkersNotesPage2 = forwardRef<HTMLDivElement, Page2Props>(function
                   </td>
                 ) : (
                   <>
-                    <td style={{paddingTop: gap ? 12 : 2}}>{row.lessonLabel}</td>
+                    <td style={{paddingTop: gap ? 12 : 2, textAlign: 'center'}}>{row.lessonLabel}</td>
                     <td style={{paddingTop: gap ? 12 : 2}}>{row.text}</td>
                   </>
                 )}

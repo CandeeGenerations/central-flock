@@ -1,4 +1,6 @@
 import {Button} from '@/components/ui/button'
+import {Checkbox} from '@/components/ui/checkbox'
+import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Textarea} from '@/components/ui/textarea'
 import type {BlockKind, WorkersNotesBlock} from '@/lib/workers-notes-api'
@@ -98,10 +100,16 @@ export function NotesBlockEditor({
                 onChange={(e) => update(i, {text: e.target.value})}
                 placeholder="Bullet text. Wrap a word in _underscores_ to underline it."
               />
-              <label className="text-muted-foreground flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={b.bold} onChange={(e) => update(i, {bold: e.target.checked})} />
-                Bold
-              </label>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={`block-bold-${i}`}
+                  checked={b.bold}
+                  onCheckedChange={(v) => update(i, {bold: v === true})}
+                />
+                <Label htmlFor={`block-bold-${i}`} className="text-muted-foreground cursor-pointer text-xs font-normal">
+                  Bold
+                </Label>
+              </div>
             </>
           ) : isPlaceholder(b.kind) ? (
             <p className="text-muted-foreground text-xs italic">{PLACEHOLDER_HINTS[b.kind]}</p>

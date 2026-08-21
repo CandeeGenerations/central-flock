@@ -1,4 +1,5 @@
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {PageSpinner} from '@/components/ui/spinner'
@@ -21,21 +22,21 @@ export function SundaySchoolDefaultsPane() {
           <CardTitle>Page 1 heading</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
+          <div className="flex items-start gap-2">
+            <Checkbox
+              id="workers-notes-logo-header"
               className="mt-1"
               checked={settings.workersNotes.useLogoHeader}
-              onChange={(e) => saveType(queryClient, {workersNotes: {useLogoHeader: e.target.checked}})}
+              onCheckedChange={(v) => saveType(queryClient, {workersNotes: {useLogoHeader: v === true}})}
             />
-            <span>
-              <span className="font-medium">Use the schedule logo</span>
+            <Label htmlFor="workers-notes-logo-header" className="cursor-pointer text-sm font-normal">
+              <span className="block font-medium">Use the schedule logo</span>
               <span className="text-muted-foreground block text-xs">
                 Page 1 heads with the logo from Settings &rarr; General instead of the church name typed below. The
                 &ldquo;FOUR-MONTH WORKERS&rsquo; NOTES&rdquo; line stays either way.
               </span>
-            </span>
-          </label>
+            </Label>
+          </div>
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">Church name</Label>
             <Input

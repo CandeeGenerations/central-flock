@@ -48,7 +48,12 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
       <div style={{textAlign: 'center', marginBottom: 14}}>
         {logoPath ? (
           <div style={{marginBottom: 4}}>
-            <img src={logoPath} alt="" style={{maxHeight: 76, objectFit: 'contain'}} crossOrigin="anonymous" />
+            <img
+              src={logoPath}
+              alt=""
+              style={{maxHeight: 76, maxWidth: '100%', objectFit: 'contain', display: 'block', margin: '0 auto'}}
+              crossOrigin="anonymous"
+            />
           </div>
         ) : (
           <div style={{fontSize: '20pt', fontWeight: 700, fontFamily: 'Georgia, serif', letterSpacing: 0.5}}>
@@ -132,9 +137,7 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
             )
           case 'month_themes':
             return (
-              // Pulls the themes bullet up against the bullet above it; the
-              // month list below supplies its own spacing.
-              <div key={i} data-wn-region="months" style={{marginTop: -8}}>
+              <div key={i} data-wn-region="months">
                 <Bullet>Our themes for the next four months are:</Bullet>
                 <div style={{margin: '4px 0 0 60px'}}>
                   {months.map((m) => (

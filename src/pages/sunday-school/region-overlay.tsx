@@ -72,9 +72,25 @@ export function RegionOverlay({
 
   useLayoutEffect(() => {
     measure()
-    // Fonts land after first paint and shift everything down a few pixels.
+    // Anything that lands after first paint shifts the layout under the boxes:
+    // fonts by a few pixels, a header logo by its whole height. Remeasure when
+    // each settles rather than trusting the first pass.
     document.fonts?.ready.then(measure).catch(() => {})
-  }, [measure, deps])
+
+    const root = pageRef.current
+    if (!root) return
+    const pending = Array.from(root.querySelectorAll('img')).filter((img) => !img.complete)
+    pending.forEach((img) => {
+      img.addEventListener('load', measure)
+      img.addEventListener('error', measure)
+    })
+    return () => {
+      pending.forEach((img) => {
+        img.removeEventListener('load', measure)
+        img.removeEventListener('error', measure)
+      })
+    }
+  }, [measure, pageRef, deps])
 
   return (
     <>

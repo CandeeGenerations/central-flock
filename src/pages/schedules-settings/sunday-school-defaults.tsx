@@ -20,15 +20,33 @@ export function SundaySchoolDefaultsPane() {
         <CardHeader>
           <CardTitle>Page 1 heading</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-1.5">
-          <Label className="text-sm font-medium">Church name</Label>
-          <Input
-            defaultValue={settings.workersNotes.churchName}
-            onBlur={(e) => {
-              const v = e.target.value
-              if (v !== settings.workersNotes.churchName) saveType(queryClient, {workersNotes: {churchName: v}})
-            }}
-          />
+        <CardContent className="space-y-4">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={settings.workersNotes.useLogoHeader}
+              onChange={(e) => saveType(queryClient, {workersNotes: {useLogoHeader: e.target.checked}})}
+            />
+            <span>
+              <span className="font-medium">Use the schedule logo</span>
+              <span className="text-muted-foreground block text-xs">
+                Page 1 heads with the logo from Settings &rarr; General instead of the church name typed below. The
+                &ldquo;FOUR-MONTH WORKERS&rsquo; NOTES&rdquo; line stays either way.
+              </span>
+            </span>
+          </label>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Church name</Label>
+            <Input
+              defaultValue={settings.workersNotes.churchName}
+              disabled={settings.workersNotes.useLogoHeader}
+              onBlur={(e) => {
+                const v = e.target.value
+                if (v !== settings.workersNotes.churchName) saveType(queryClient, {workersNotes: {churchName: v}})
+              }}
+            />
+          </div>
         </CardContent>
       </Card>
 

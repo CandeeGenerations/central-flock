@@ -60,6 +60,8 @@ export interface SchedulesSettings {
   }
   workersNotes: {
     churchName: string
+    // Page 1 heads with the shared logo instead of the church-name line.
+    useLogoHeader: boolean
     // Seeds a first edition's bullets only; later editions copy forward.
     defaultBlocks: WorkersNotesBlockSeed[]
   }

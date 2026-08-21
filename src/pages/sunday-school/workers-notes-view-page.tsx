@@ -162,6 +162,7 @@ export function WorkersNotesViewPage() {
               <WorkersNotesPage1
                 ref={page1Ref}
                 churchName={settings.workersNotes.churchName}
+                logoPath={settings.workersNotes.useLogoHeader ? settings.logoPath : null}
                 year={edition.year}
                 term={term}
                 theme={edition.theme}

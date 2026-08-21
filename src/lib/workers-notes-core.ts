@@ -192,7 +192,7 @@ export function parseSpecialLesson(value: string): number[] {
   return out
 }
 
-/** "(B-448)" / "(S-34)" from a hymn's book and number. */
+/** "(B #488)" / "(S #34)" from a hymn's book and number. */
 export function hymnRefLabel(book: 'burgundy' | 'silver', number: number): string {
-  return `(${book === 'burgundy' ? 'B' : 'S'}-${number})`
+  return `(${book === 'burgundy' ? 'B' : 'S'} #${number})`
 }

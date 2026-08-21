@@ -12,13 +12,13 @@ interface Page1Props {
   theme: YearlyTheme | null
   blocks: WorkersNotesBlock[]
   months: WorkersNotesMonth[]
-  /** Optional logo above the church name — deferred, slot kept so adding it is small. */
+  /** Shown instead of the church-name line when the setting is on. */
   logoPath?: string | null
 }
 
 const BULLET_STYLE: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '14px 1fr',
+  gridTemplateColumns: '18px 1fr',
   columnGap: 8,
   fontSize: '11pt',
   lineHeight: 1.35,
@@ -29,7 +29,7 @@ const BULLET_STYLE: React.CSSProperties = {
 function Bullet({children, bold, region}: {children: ReactNode; bold?: boolean; region?: string}) {
   return (
     <div data-wn-region={region} style={{...BULLET_STYLE, fontWeight: bold ? 700 : 400}}>
-      <span aria-hidden style={{fontSize: '7pt', lineHeight: 1.9}}>
+      <span aria-hidden style={{fontSize: '11pt', lineHeight: 1.25}}>
         ▪
       </span>
       <span>{children}</span>
@@ -45,16 +45,16 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
 
   return (
     <WorkersNotesPage ref={ref}>
-      {logoPath ? (
-        <div style={{textAlign: 'center', marginBottom: 6}}>
-          <img src={logoPath} alt="" style={{maxHeight: 64, objectFit: 'contain'}} crossOrigin="anonymous" />
-        </div>
-      ) : null}
-
       <div style={{textAlign: 'center', marginBottom: 14}}>
-        <div style={{fontSize: '20pt', fontWeight: 700, fontFamily: 'Georgia, serif', letterSpacing: 0.5}}>
-          {churchName}
-        </div>
+        {logoPath ? (
+          <div style={{marginBottom: 4}}>
+            <img src={logoPath} alt="" style={{maxHeight: 76, objectFit: 'contain'}} crossOrigin="anonymous" />
+          </div>
+        ) : (
+          <div style={{fontSize: '20pt', fontWeight: 700, fontFamily: 'Georgia, serif', letterSpacing: 0.5}}>
+            {churchName}
+          </div>
+        )}
         <div style={{fontSize: '18pt', fontWeight: 700, fontFamily: 'Georgia, serif', letterSpacing: 0.5}}>
           FOUR-MONTH WORKERS&rsquo; NOTES
         </div>
@@ -98,7 +98,7 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
             </div>
           ) : null}
 
-          <div style={{fontSize: '11pt', fontWeight: 700, textAlign: 'center', marginBottom: 14}}>
+          <div style={{fontSize: '11pt', fontWeight: 700, textAlign: 'center', marginBottom: 26}}>
             Verse: &ldquo;{theme.verseText}&rdquo; {theme.verseRef}
           </div>
         </div>
@@ -132,7 +132,9 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
             )
           case 'month_themes':
             return (
-              <div key={i} data-wn-region="months">
+              // Pulls the themes bullet up against the bullet above it; the
+              // month list below supplies its own spacing.
+              <div key={i} data-wn-region="months" style={{marginTop: -8}}>
                 <Bullet>Our themes for the next four months are:</Bullet>
                 <div style={{margin: '4px 0 0 60px'}}>
                   {months.map((m) => (

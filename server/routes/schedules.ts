@@ -69,6 +69,9 @@ interface SchedulesSettings {
   }
   workersNotes: {
     churchName: string
+    // When true, page 1 heads with the shared schedules logo instead of the
+    // church-name line. The logo carries the church identity itself.
+    useLogoHeader: boolean
     // Seeds the Notes Blocks of a first edition only; later editions copy
     // forward from their predecessor instead. See ADR 0006 amendment.
     defaultBlocks: WorkersNotesBlockSeed[]
@@ -127,6 +130,7 @@ function readSettings(): SchedulesSettings {
     },
     workersNotes: {
       churchName: map.get('schedules.workersNotes.churchName') ?? 'Central Baptist Church',
+      useLogoHeader: map.get('schedules.workersNotes.useLogoHeader') === 'true',
       defaultBlocks: parseJson<WorkersNotesBlockSeed[]>('schedules.workersNotes.defaultBlocks', [
         {kind: 'note', text: ''},
         {kind: 'next_term_forms', text: ''},
@@ -202,6 +206,8 @@ schedulesRouter.put(
     }
     if (body.workersNotes?.churchName !== undefined)
       upsert('schedules.workersNotes.churchName', body.workersNotes.churchName)
+    if (body.workersNotes?.useLogoHeader !== undefined)
+      upsert('schedules.workersNotes.useLogoHeader', String(body.workersNotes.useLogoHeader))
     if (body.workersNotes?.defaultBlocks !== undefined)
       upsert('schedules.workersNotes.defaultBlocks', JSON.stringify(body.workersNotes.defaultBlocks))
     res.json(readSettings())

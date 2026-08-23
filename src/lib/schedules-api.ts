@@ -58,6 +58,14 @@ export interface SchedulesSettings {
     // Changing it re-times every Run still pending.
     reminderSendTime: string
   }
+  musicSchedule: {
+    titlePrefix: string
+    // Two printed headings per Service Time, keyed by service_time_id.
+    serviceHeadings: Record<string, {music: string; booth: string}>
+    footerBlocks: FooterBlock[]
+    footerImagePath: string | null
+    footerPlacement: 'last' | 'every' | 'never'
+  }
   workersNotes: {
     churchName: string
     // Page 1 heads with the shared logo instead of the church-name line.
@@ -74,6 +82,7 @@ export const updateSchedulesSettings = (
     nursery: Partial<SchedulesSettings['nursery']>
     specialMusic: Partial<SchedulesSettings['specialMusic']>
     fairBooth: Partial<SchedulesSettings['fairBooth']>
+    musicSchedule: Partial<SchedulesSettings['musicSchedule']>
     workersNotes: Partial<SchedulesSettings['workersNotes']>
   }>,
 ) => request<SchedulesSettings>('/schedules/settings', {method: 'PUT', body: JSON.stringify(body)})

@@ -58,6 +58,12 @@ export function buildNavigationActions(): SearchItem[] {
     nav('/schedules/settings/nursery', 'Schedule Settings Nursery', Settings, ['nursery', 'worker counts']),
     nav('/schedules/settings/special-music', 'Schedule Settings Special Music', Settings, ['singers', 'households']),
     nav('/schedules/settings/fair-booth', 'Schedule Settings Fair Booth', Settings, ['roster', 'reminders']),
+    nav('/schedules/settings/music', 'Schedule Settings Music Schedule', Settings, [
+      'music schedule',
+      'sound booth',
+      'service headings',
+      'footer',
+    ]),
     nav('/schedules/settings/sunday-school/defaults', 'Schedule Settings Sunday School Defaults', Settings, [
       'workers notes',
       'bullets',

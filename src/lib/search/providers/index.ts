@@ -9,6 +9,7 @@ import {groupsProvider} from './groups'
 import {gwendolynDevotionsProvider} from './gwendolyn-devotions'
 import {hymnsProvider} from './hymns'
 import {messagesProvider} from './messages'
+import {musicSchedulesProvider} from './music-schedules'
 import {nurserySchedulesProvider} from './nursery-schedules'
 import {peopleProvider} from './people'
 import {quotesProvider} from './quotes'
@@ -40,6 +41,7 @@ export const providers: SearchProvider[] = [
   gwendolynDevotionsProvider as SearchProvider,
   nurserySchedulesProvider as SearchProvider,
   specialMusicSchedulesProvider as SearchProvider,
+  musicSchedulesProvider as SearchProvider,
   calendarProvider as SearchProvider,
   rsvpProvider as SearchProvider,
   serviceTimesProvider as SearchProvider,

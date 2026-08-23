@@ -1,9 +1,8 @@
+import {PrintPage, TitleBox} from '@/components/print/page-frame'
 import {renderWithUnderlines} from '@/lib/render-underlines'
 import type {WorkersNotesBlock, WorkersNotesMonth, YearlyTheme} from '@/lib/workers-notes-api'
 import {MONTH_NAMES, type WorkersNotesTerm, nextTerm, termLabel, termThroughLabel} from '@/lib/workers-notes-core'
 import {type ReactNode, forwardRef} from 'react'
-
-import {TitleBox, WorkersNotesPage} from './page-frame'
 
 interface Page1Props {
   churchName: string
@@ -44,7 +43,7 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
   const next = nextTerm(year, term)
 
   return (
-    <WorkersNotesPage ref={ref}>
+    <PrintPage ref={ref}>
       <div style={{textAlign: 'center', marginBottom: 14}}>
         {logoPath ? (
           <div style={{marginBottom: 4}}>
@@ -152,6 +151,6 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
             return null
         }
       })}
-    </WorkersNotesPage>
+    </PrintPage>
   )
 })

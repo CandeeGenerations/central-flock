@@ -288,6 +288,13 @@
       "when": 1787252629288,
       "tag": "0040_betty_lukens_catalogue",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1787344840022,
+      "tag": "0041_round_silverclaw",
+      "breakpoints": true
     }
   ]
 }

@@ -129,6 +129,71 @@ edition's own **Term**, its **Yearly Theme**, and its **Mottos** respectively, s
 go stale when copied forward. `spacer` is a blank gap.
 _Avoid_: Footer Block (that is the nursery/special-music footer), Bullet, Paragraph.
 
+### Music Schedule
+
+**Music Schedule**:
+One week's printed service planning, covering the Sunday (Sunday School, Morning, Evening) and the
+Wednesday that follows it. Keyed by the week's Sunday date. Prints three pages from one body of
+data: the **Music Sheet** for Sunday, the **Music Sheet** for Midweek, and the **Sound Booth Sheet**.
+Lives in the shared `schedules` envelope as `schedule_type='music_schedule'`, so it inherits
+draft/final status and the fixed-page-box PDF export.
+_Avoid_: Special Music (that is the `special_music` feature — a soloist's number, not the run of a
+service), Service Schedule (that is the printed title of one of its three pages), Order of Worship.
+
+**Service Order**:
+The ordered run of one service inside a **Music Schedule** — every song, every prose line, in the
+order they happen. The master: the **Music Sheet** prints it whole, the **Sound Booth Sheet** prints
+a selection of it. Seeded from the app's active **Service Times**, so a service carries its Service
+Time, its date (derived from the week's Sunday plus day-of-week), and per-week overrides for time
+and label. A service can be marked as not meeting that week, and one-off services (a revival night)
+can be added without a Service Time.
+_Avoid_: Service (means a **Service Time** or a meeting generally), Program, Lineup.
+
+**Order Line**:
+One row of a **Service Order**, printed as a row of a two-column table. A _split_ row fills both
+cells — a song puts its `hymns` reference left and its title right; a labelled role puts "Choir:"
+or "Motto:" left and the value right. A _merged_ row spans the full width, left-aligned on a
+**Music Sheet** ("Prayer, Announcements") or centred on the **Sound Booth Sheet** ("Motto, Verse,
+Theme Song"). Split-vs-merged and the left cell's text both default from the **Line Role** and are
+both overridable, which is what makes a one-off row like "NO CHOIR | Cong. B #324 …" possible.
+Carries whole-line bold/italic/highlight toggles, `_underscore_` inline underlining (the same
+markup as a **Notes Block**), and an optional song suffix — `(x2)`, `(Invitation)`, `(Optional)` —
+kept as its own field so it prints unbolded beside a bold title. The unit that gets reordered, and
+the unit the **Sound Booth Sheet** lifts.
+_Avoid_: Item, Element, Row (bare).
+
+**Line Role**:
+What an **Order Line** is for — opening, choir, congregational, motto, verse, theme, pastor's
+selection, invitation, special, message, plain. Drives three things: the label the **Sound Booth
+Sheet** prints, whether that sheet includes the line by default, and the wording when a role is
+_absent_ — no `choir` line prints "Cong. Opener (No Choir)", no `pastor_selection` line prints
+"NO Pastor's Selection TODAY". Every line still has an explicit include/exclude override.
+_Avoid_: Type (that is song vs prose), Category, Tag.
+
+**Music Sheet**:
+The musicians' and song leader's page — one service block after another, each showing its time,
+every **Order Line** in order, with the hymn reference in the left column and the title in the
+right. Two of them per **Music Schedule**: Sunday (Sunday School, Morning, Evening) and Midweek.
+_Avoid_: Music Schedule (that is the whole week's edition).
+
+**Sound Booth Sheet**:
+The sound team's single page — all four services, each condensed to its **Title**, its Text, and
+the handful of **Order Lines** their **Line Role** marks for the booth. Its label and value columns
+share one width across all four service blocks and the whole grid is centred on the page. Its
+condensed prose lines ("Motto, Verse, Theme Song"; "Prayer, Announcements, Pastor's Selection") are
+drafted from the roles present and then freely editable, and those edits copy forward to the next
+week.
+_Avoid_: Service Schedule (its printed title, but too generic in code).
+
+**Episode Number**:
+The podcast number of a service's recorded message, printed on the **Sound Booth Sheet** as
+`Title: (#100)`. Sequential in date order and **reset each calendar year** — the first uploaded
+service of a year is #1 — scoped by the year of the service's own date, so a week straddling New
+Year's numbers its Sunday from the old year and its Wednesday from the new. Assigned automatically
+when a week is created and adjustable per service; Sunday School has none, because it is not
+uploaded.
+_Avoid_: Number (bare — a **Devotion** has one too), Sermon Number.
+
 ### Service Stats
 
 **Service Time**:

@@ -67,6 +67,17 @@ interface SchedulesSettings {
     // Local HH:MM a Reminder Run fires, the evening before the day it covers.
     reminderSendTime: string
   }
+  musicSchedule: {
+    titlePrefix: string
+    // Two printed headings per Service Time — the Music Sheet says "MORNING
+    // SERVICE" where the Sound Booth Sheet says "SUNDAY MORNING". Keyed by
+    // service_time_id. See CONTEXT.md → Music Sheet / Sound Booth Sheet.
+    serviceHeadings: Record<string, {music: string; booth: string}>
+    footerBlocks: FooterBlock[]
+    // The music-note graphic under the footer quote.
+    footerImagePath: string | null
+    footerPlacement: 'last' | 'every' | 'never'
+  }
   workersNotes: {
     churchName: string
     // When true, page 1 heads with the shared schedules logo instead of the
@@ -128,6 +139,17 @@ function readSettings(): SchedulesSettings {
       personalShiftsIntro: map.get('schedules.fairBooth.personalShiftsIntro') ?? DEFAULT_PERSONAL_SHIFTS_INTRO,
       reminderSendTime: map.get(REMINDER_SEND_TIME_KEY) ?? DEFAULT_REMINDER_SEND_TIME,
     },
+    musicSchedule: {
+      titlePrefix: map.get('schedules.musicSchedule.titlePrefix') ?? 'Music Schedule',
+      serviceHeadings: parseJson<Record<string, {music: string; booth: string}>>(
+        'schedules.musicSchedule.serviceHeadings',
+        {},
+      ),
+      footerBlocks: parseJson<FooterBlock[]>('schedules.musicSchedule.footerBlocks', []),
+      footerImagePath: map.get('schedules.musicSchedule.footerImagePath') ?? null,
+      footerPlacement:
+        (map.get('schedules.musicSchedule.footerPlacement') as 'last' | 'every' | 'never' | undefined) ?? 'last',
+    },
     workersNotes: {
       churchName: map.get('schedules.workersNotes.churchName') ?? 'Central Baptist Church',
       useLogoHeader: map.get('schedules.workersNotes.useLogoHeader') === 'true',
@@ -162,6 +184,7 @@ schedulesRouter.put(
       nursery: Partial<SchedulesSettings['nursery']>
       specialMusic: Partial<SchedulesSettings['specialMusic']>
       fairBooth: Partial<SchedulesSettings['fairBooth']>
+      musicSchedule: Partial<SchedulesSettings['musicSchedule']>
       workersNotes: Partial<SchedulesSettings['workersNotes']>
     }>
     if (body.nursery?.titlePrefix !== undefined) upsert('schedules.nursery.titlePrefix', body.nursery.titlePrefix)
@@ -173,6 +196,16 @@ schedulesRouter.put(
       upsert('schedules.specialMusic.footerBlocks', JSON.stringify(body.specialMusic.footerBlocks))
     if (body.specialMusic?.singerGroupIds !== undefined)
       upsert('schedules.specialMusic.singerGroupIds', JSON.stringify(body.specialMusic.singerGroupIds))
+    if (body.musicSchedule?.titlePrefix !== undefined)
+      upsert('schedules.musicSchedule.titlePrefix', body.musicSchedule.titlePrefix)
+    if (body.musicSchedule?.serviceHeadings !== undefined)
+      upsert('schedules.musicSchedule.serviceHeadings', JSON.stringify(body.musicSchedule.serviceHeadings))
+    if (body.musicSchedule?.footerBlocks !== undefined)
+      upsert('schedules.musicSchedule.footerBlocks', JSON.stringify(body.musicSchedule.footerBlocks))
+    if (body.musicSchedule?.footerImagePath !== undefined)
+      upsert('schedules.musicSchedule.footerImagePath', body.musicSchedule.footerImagePath ?? '')
+    if (body.musicSchedule?.footerPlacement !== undefined)
+      upsert('schedules.musicSchedule.footerPlacement', body.musicSchedule.footerPlacement)
     if (body.fairBooth?.titlePrefix !== undefined) upsert('schedules.fairBooth.titlePrefix', body.fairBooth.titlePrefix)
     if (body.fairBooth?.rosterGroupIds !== undefined)
       upsert('schedules.fairBooth.rosterGroupIds', JSON.stringify(body.fairBooth.rosterGroupIds))

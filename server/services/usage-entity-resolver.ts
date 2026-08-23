@@ -210,6 +210,21 @@ const RESOLVERS: Record<string, ResolverDef> = {
           .get(),
       )?.label ?? null,
   },
+  // Same shape as the Workers' Notes entry: the route id is the week, not the
+  // schedule envelope, so it resolves through music_schedules.
+  '/schedules/music': {
+    entityType: 'music_schedule',
+    typeLabel: 'Music Schedule',
+    resolveLabel: (id) =>
+      get(
+        db
+          .select({label: schema.schedules.scopeLabel})
+          .from(schema.musicSchedules)
+          .innerJoin(schema.schedules, eq(schema.schedules.id, schema.musicSchedules.scheduleId))
+          .where(eq(schema.musicSchedules.id, id))
+          .get(),
+      )?.label ?? null,
+  },
   '/rsvp': {
     entityType: 'rsvp_list',
     typeLabel: 'RSVP List',

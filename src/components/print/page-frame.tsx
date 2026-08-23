@@ -18,30 +18,33 @@ export const CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - PAGE_PADDING_Y_PX * 2
  * One printed page. Pure render — no handlers, no hover, no cursor styles, so
  * the export path can mount it directly and no edit chrome can reach the PDF
  * (the ADR 0005 rule). Interaction lives in a wrapper.
+ *
+ * Shared by the Workers' Notes and the Music Schedule; it belongs to neither.
  */
-export const WorkersNotesPage = forwardRef<HTMLDivElement, {children: ReactNode; className?: string}>(
-  function WorkersNotesPage({children, className}, ref) {
-    return (
-      <div
-        ref={ref}
-        className={className}
-        style={{
-          width: PAGE_WIDTH_PX,
-          height: PAGE_HEIGHT_PX,
-          padding: `${PAGE_PADDING_Y_PX}px ${PAGE_PADDING_X_PX}px`,
-          boxSizing: 'border-box',
-          backgroundColor: '#ffffff',
-          color: '#000000',
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          overflow: 'hidden',
-          position: 'relative',
-        }}
-      >
-        {children}
-      </div>
-    )
-  },
-)
+export const PrintPage = forwardRef<HTMLDivElement, {children: ReactNode; className?: string}>(function PrintPage(
+  {children, className},
+  ref,
+) {
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        width: PAGE_WIDTH_PX,
+        height: PAGE_HEIGHT_PX,
+        padding: `${PAGE_PADDING_Y_PX}px ${PAGE_PADDING_X_PX}px`,
+        boxSizing: 'border-box',
+        backgroundColor: '#ffffff',
+        color: '#000000',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+    >
+      {children}
+    </div>
+  )
+})
 
 /** The boxed headings — a hairline rule around a centred bold line. */
 export function TitleBox({children, fontSize = 14}: {children: ReactNode; fontSize?: number}) {

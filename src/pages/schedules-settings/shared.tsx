@@ -156,7 +156,10 @@ interface TypeDefaultsCardProps {
   // pool) above the footer per UX preference.
   middleSlot?: React.ReactNode
   onSave: (
-    patch: Partial<SchedulesSettings['nursery']> | Partial<SchedulesSettings['specialMusic']>,
+    patch:
+      | Partial<SchedulesSettings['nursery']>
+      | Partial<SchedulesSettings['specialMusic']>
+      | Partial<SchedulesSettings['musicSchedule']>,
   ) => Promise<void> | void
 }
 

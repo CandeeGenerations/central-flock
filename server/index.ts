@@ -30,6 +30,7 @@ import {homeRouter} from './routes/home.js'
 import {hymnsRouter} from './routes/hymns.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter, processSendJob} from './routes/messages.js'
+import {musicSchedulesRouter} from './routes/music-schedules.js'
 import {nurserySchedulesRouter} from './routes/nursery-schedules.js'
 import {nurseryRouter} from './routes/nursery.js'
 import {peopleRouter} from './routes/people.js'
@@ -83,6 +84,7 @@ app.use('/api/home', homeRouter)
 app.use('/api/devotions', devotionsRouter)
 app.use('/api/gwendolyn-devotions', gwendolynDevotionsRouter)
 app.use('/api/schedules/fair-booth', fairBoothRouter)
+app.use('/api/schedules/music', musicSchedulesRouter)
 app.use('/api/schedules/workers-notes', workersNotesRouter)
 app.use('/api/schedules', schedulesRouter)
 app.use('/api/nursery/schedules', nurserySchedulesRouter)

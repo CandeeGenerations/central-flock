@@ -1,8 +1,9 @@
+import {ScaledPage, type ZoomMode} from '@/components/print/scaled-page'
 import {Button} from '@/components/ui/button'
 import {PageSpinner} from '@/components/ui/spinner'
-import {ScaledPage, type ZoomMode} from '@/components/workers-notes/scaled-page'
 import {WorkersNotesPage1} from '@/components/workers-notes/workers-notes-page-1'
 import {WorkersNotesPage2} from '@/components/workers-notes/workers-notes-page-2'
+import {exportFixedPagePdf} from '@/lib/fixed-page-pdf'
 import {fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
 import {
   deleteWorkersNotesEdition,
@@ -18,7 +19,6 @@ import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 import {RegionOverlay} from './region-overlay'
-import {exportWorkersNotesPdf} from './workers-notes-export'
 
 const ZOOMS: {value: ZoomMode; label: string}[] = [
   {value: 'fit', label: 'Fit'},
@@ -102,7 +102,7 @@ export function WorkersNotesViewPage() {
               if (!page1Ref.current || !page2Ref.current) return
               setExporting(true)
               try {
-                await exportWorkersNotesPdf(
+                await exportFixedPagePdf(
                   [page1Ref.current, page2Ref.current],
                   `workers-notes-${termSlug(edition.year, term)}`,
                 )

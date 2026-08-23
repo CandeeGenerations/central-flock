@@ -1,4 +1,4 @@
-import {PAGE_HEIGHT_PX, PAGE_WIDTH_PX} from '@/components/workers-notes/page-frame'
+import {PAGE_HEIGHT_PX, PAGE_WIDTH_PX} from '@/components/print/page-frame'
 import {saveExportedFile} from '@/lib/save-exported-file'
 
 // US Letter in mm.
@@ -36,7 +36,11 @@ async function capturePage(node: HTMLElement): Promise<string> {
   }
 }
 
-export async function exportWorkersNotesPdf(pages: HTMLElement[], filename: string): Promise<void> {
+/**
+ * One PDF from a list of fixed-size page nodes, one node per sheet. Shared by
+ * every fixed-page-box export — the capture is type-agnostic.
+ */
+export async function exportFixedPagePdf(pages: HTMLElement[], filename: string): Promise<void> {
   const images: string[] = []
   for (const node of pages) images.push(await capturePage(node))
 

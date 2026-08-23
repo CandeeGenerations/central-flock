@@ -42,6 +42,9 @@ import {LoginPage} from '@/pages/login-page'
 import {MessageComposePage} from '@/pages/message-compose-page'
 import {MessageDetailPage} from '@/pages/message-detail-page'
 import {MessageHistoryPage} from '@/pages/message-history-page'
+import {MusicSchedulesListPage} from '@/pages/music-schedule/music-schedules-list-page'
+import {MusicWeekViewPage} from '@/pages/music-schedule/music-week-view-page'
+import {MusicServiceEditorPage} from '@/pages/music-schedule/service-editor-page'
 import {HymnSearchDetailPage} from '@/pages/music/hymn-search-detail-page'
 import {HymnSearchesPage} from '@/pages/music/hymn-searches-page'
 import {HymnsPrepPage} from '@/pages/music/hymns-prep-page'
@@ -57,6 +60,7 @@ import {RsvpDetailPage} from '@/pages/rsvp/rsvp-detail-page'
 import {RsvpListPage} from '@/pages/rsvp/rsvp-list-page'
 import {FairBoothSettingsSection} from '@/pages/schedules-settings/fair-booth-section'
 import {GeneralSettingsSection} from '@/pages/schedules-settings/general-section'
+import {MusicScheduleSettingsSection} from '@/pages/schedules-settings/music-schedule-section'
 import {NurserySettingsSection} from '@/pages/schedules-settings/nursery-section'
 import {SchedulesSettingsLayout} from '@/pages/schedules-settings/schedules-settings-layout'
 import {SpecialMusicSettingsSection} from '@/pages/schedules-settings/special-music-section'
@@ -487,6 +491,9 @@ function AppLayoutInner({
               <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
               <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
               <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
+              <Route path="/schedules/music" element={<MusicSchedulesListPage />} />
+              <Route path="/schedules/music/:id" element={<MusicWeekViewPage />} />
+              <Route path="/schedules/music/:id/service/:serviceId" element={<MusicServiceEditorPage />} />
               <Route path="/schedules/sunday-school" element={<WorkersNotesListPage />} />
               <Route path="/schedules/sunday-school/:id" element={<WorkersNotesViewPage />} />
               <Route path="/schedules/sunday-school/:id/theme" element={<WorkersNotesThemePage />} />
@@ -499,6 +506,7 @@ function AppLayoutInner({
                 <Route path="nursery" element={<NurserySettingsSection />} />
                 <Route path="special-music" element={<SpecialMusicSettingsSection />} />
                 <Route path="fair-booth" element={<FairBoothSettingsSection />} />
+                <Route path="music" element={<MusicScheduleSettingsSection />} />
                 <Route path="sunday-school" element={<SundaySchoolSettingsSection />}>
                   <Route index element={<Navigate to="defaults" replace />} />
                   <Route path="defaults" element={<SundaySchoolDefaultsPane />} />

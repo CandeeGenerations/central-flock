@@ -1,3 +1,4 @@
+import {PrintPage, TitleBox} from '@/components/print/page-frame'
 import type {WorkersNotesMonth} from '@/lib/workers-notes-api'
 import {
   MONTH_NAMES,
@@ -8,8 +9,6 @@ import {
   termRangeLabel,
 } from '@/lib/workers-notes-core'
 import {forwardRef} from 'react'
-
-import {TitleBox, WorkersNotesPage} from './page-frame'
 
 interface Page2Props {
   year: number
@@ -37,7 +36,7 @@ export const WorkersNotesPage2 = forwardRef<HTMLDivElement, Page2Props>(function
   let lastMonth: number | null = null
 
   return (
-    <WorkersNotesPage ref={ref}>
+    <PrintPage ref={ref}>
       <div data-wn-region="months">
         <TitleBox fontSize={13}>Songs, Mottos, and Verses of the Month &ndash; {year}</TitleBox>
       </div>
@@ -114,6 +113,6 @@ export const WorkersNotesPage2 = forwardRef<HTMLDivElement, Page2Props>(function
           })}
         </tbody>
       </table>
-    </WorkersNotesPage>
+    </PrintPage>
   )
 })

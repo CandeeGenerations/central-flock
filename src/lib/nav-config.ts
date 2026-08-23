@@ -104,6 +104,7 @@ export const navGroups: NavGroup[] = [
       {to: '/nursery', label: 'Nursery', icon: Baby, end: true},
       {to: '/nursery/workers', label: 'Nursery Workers', icon: Users},
       {to: '/schedules/fair-booth', label: 'Fair Booth', icon: Tent},
+      {to: '/schedules/music', label: 'Music Schedule', icon: ListMusic},
       {to: '/schedules/sunday-school', label: 'Sunday School', icon: GraduationCap},
       {to: '/schedules/settings', label: 'Settings', icon: Settings, matchPaths: ['/nursery/settings']},
     ],

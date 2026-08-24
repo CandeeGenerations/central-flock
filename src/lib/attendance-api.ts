@@ -51,6 +51,9 @@ export interface Recorder {
 export interface RecordEdit {
   id: number
   recorderName: string
+  /** A tally carries its ±1; a correction wrote the value outright. See ADR-0027. */
+  kind: 'tally' | 'correction'
+  adjustment: number | null
   attendance: number | null
   streaming: number | null
   createdAt: string

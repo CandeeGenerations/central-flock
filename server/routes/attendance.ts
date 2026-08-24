@@ -281,6 +281,8 @@ attendanceRouter.get(
       .select({
         id: schema.serviceRecordEdits.id,
         recorderName: schema.serviceRecordEdits.recorderName,
+        kind: schema.serviceRecordEdits.kind,
+        adjustment: schema.serviceRecordEdits.adjustment,
         attendance: schema.serviceRecordEdits.attendance,
         streaming: schema.serviceRecordEdits.streaming,
         createdAt: schema.serviceRecordEdits.createdAt,

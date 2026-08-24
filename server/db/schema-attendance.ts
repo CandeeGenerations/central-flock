@@ -62,6 +62,10 @@ export const serviceRecords = sqliteTable(
 
 // Full change log. One row per save. recorderId null = admin edit. recorderName snapshotted
 // so history survives recorder deletion.
+//
+// kind splits the two ways a count changes (ADR-0027): a 'tally' carries its ±1 in `adjustment`
+// plus the value that adjustment produced, a 'correction' carries only the value it wrote.
+// Pre-existing rows are corrections — snapshots are all the old endpoint could write.
 export const serviceRecordEdits = sqliteTable('service_record_edits', {
   id: integer('id').primaryKey({autoIncrement: true}),
   serviceRecordId: integer('service_record_id')
@@ -69,6 +73,11 @@ export const serviceRecordEdits = sqliteTable('service_record_edits', {
     .references(() => serviceRecords.id, {onDelete: 'cascade'}),
   recorderId: integer('recorder_id').references(() => recorders.id, {onDelete: 'set null'}),
   recorderName: text('recorder_name').notNull(),
+  kind: text('kind', {enum: ['tally', 'correction']})
+    .notNull()
+    .default('correction'),
+  /** Signed change for a tally; null for a correction. */
+  adjustment: integer('adjustment'),
   attendance: integer('attendance'),
   streaming: integer('streaming'),
   createdAt: text('created_at')

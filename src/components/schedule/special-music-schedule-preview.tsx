@@ -1,13 +1,24 @@
-import type {SpecialMusicCell} from '@/lib/schedules-api'
+import type {DoubleBooking, SpecialMusicCell} from '@/lib/schedules-api'
 import {Plus} from 'lucide-react'
+
+// One printed column. Which Service Times the schedule covers is configurable
+// rather than a hardcoded AM/PM pair. See docs/adr/0025.
+export interface PreviewService {
+  id: number
+  label: string
+}
 
 interface Props {
   scopeStart: string
   scopeEnd: string
   cells: SpecialMusicCell[]
+  services: PreviewService[]
   editMode?: boolean
-  onCellClick?: (date: string, serviceType: 'sunday_am' | 'sunday_pm') => void
+  onCellClick?: (date: string, serviceTimeId: number) => void
   exporting?: boolean
+  // Advisory Double Bookings. Suppressed when `exporting` — the printed sheet
+  // goes to the musicians. See docs/adr/0026.
+  doubleBookings?: DoubleBooking[]
   // When set, render those cells + the date column on those rows with a
   // highlight background. Used by the per-recipient PDF pages.
   highlightCellIds?: Set<number>
@@ -98,15 +109,25 @@ export function SpecialMusicSchedulePreview({
   scopeStart,
   scopeEnd,
   cells,
+  services,
   editMode,
   onCellClick,
   exporting,
+  doubleBookings,
   highlightCellIds,
   highlightDates,
 }: Props) {
   const sundays = sundaysBetween(scopeStart, scopeEnd)
   const byKey = new Map<string, SpecialMusicCell>()
-  for (const c of cells) byKey.set(`${c.date}:${c.serviceType}`, c)
+  for (const c of cells) byKey.set(`${c.date}:${c.serviceTimeId}`, c)
+  const conflictsByCell = new Map<number, DoubleBooking[]>()
+  if (!exporting) {
+    for (const c of doubleBookings ?? []) {
+      const list = conflictsByCell.get(c.specialMusicId) ?? []
+      list.push(c)
+      conflictsByCell.set(c.specialMusicId, list)
+    }
+  }
   const HIGHLIGHT = '#fde68a' // amber-200; readable against black text in print
 
   const cellWidth = '290px'
@@ -121,34 +142,24 @@ export function SpecialMusicSchedulePreview({
             >
               DATE
             </th>
-            <th
-              className="px-3 py-2 text-left text-sm font-bold"
-              style={{
-                width: cellWidth,
-                borderBottom: '1.5px solid #000',
-                borderLeft: '1.5px solid #000',
-                backgroundColor: '#f3f4f6',
-              }}
-            >
-              SUNDAY AM
-            </th>
-            <th
-              className="px-3 py-2 text-left text-sm font-bold"
-              style={{
-                width: cellWidth,
-                borderBottom: '1.5px solid #000',
-                borderLeft: '1.5px solid #000',
-                backgroundColor: '#f3f4f6',
-              }}
-            >
-              SUNDAY PM
-            </th>
+            {services.map((svc) => (
+              <th
+                key={svc.id}
+                className="px-3 py-2 text-left text-sm font-bold"
+                style={{
+                  width: cellWidth,
+                  borderBottom: '1.5px solid #000',
+                  borderLeft: '1.5px solid #000',
+                  backgroundColor: '#f3f4f6',
+                }}
+              >
+                {svc.label.toUpperCase()}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {sundays.map((d, rowIdx) => {
-            const am = byKey.get(`${d}:sunday_am`)
-            const pm = byKey.get(`${d}:sunday_pm`)
             const rowBorder = rowIdx > 0 ? ('1.5px solid #000' as const) : undefined
             const dateHighlighted = highlightDates?.has(d) ?? false
             return (
@@ -163,8 +174,10 @@ export function SpecialMusicSchedulePreview({
                 >
                   {formatDate(d)}
                 </td>
-                {(['sunday_am', 'sunday_pm'] as const).map((slot) => {
-                  const cell = slot === 'sunday_am' ? am : pm
+                {services.map((svc) => {
+                  const slot = svc.id
+                  const cell = byKey.get(`${d}:${svc.id}`)
+                  const conflicts = cell ? (conflictsByCell.get(cell.id) ?? []) : []
                   const clickable = editMode && !exporting && onCellClick
                   const cellHighlighted = cell && highlightCellIds?.has(cell.id)
                   const baseStyle = {
@@ -200,6 +213,25 @@ export function SpecialMusicSchedulePreview({
                     >
                       <span style={{fontWeight: 600}}>{cellPrefix(cell)}</span>
                       <span> – {performerListText(cell)}</span>
+                      {conflicts.map((c) => (
+                        <span
+                          key={c.nurseryAssignmentId}
+                          title={`${c.personName} is also working the nursery for ${c.serviceName} on ${c.date}`}
+                          style={{
+                            marginLeft: 6,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            color: '#92400e',
+                            backgroundColor: '#fef3c7',
+                            border: '1px solid #fbbf24',
+                            borderRadius: 4,
+                            padding: '1px 5px',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {c.personName.split(/\s+/)[0]} in nursery
+                        </span>
+                      ))}
                     </td>
                   )
                 })}
@@ -208,7 +240,7 @@ export function SpecialMusicSchedulePreview({
           })}
           {sundays.length === 0 && (
             <tr>
-              <td colSpan={3} className="text-muted-foreground px-3 py-4 text-center text-sm">
+              <td colSpan={services.length + 1} className="text-muted-foreground px-3 py-4 text-center text-sm">
                 No Sundays in this date range.
               </td>
             </tr>

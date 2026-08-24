@@ -1,4 +1,5 @@
 import {and, asc, desc, eq, gte, lte, sql} from 'drizzle-orm'
+import type {SQLiteColumn, SQLiteTable} from 'drizzle-orm/sqlite-core'
 import {Router} from 'express'
 import {randomBytes} from 'node:crypto'
 
@@ -133,13 +134,39 @@ attendanceRouter.delete(
       res.status(400).json({error: 'bad id'})
       return
     }
-    const count = db
-      .select({n: sql<number>`count(*)`})
-      .from(schema.serviceRecords)
-      .where(eq(schema.serviceRecords.serviceTimeId, id))
-      .get()!.n
-    if (count > 0) {
-      res.status(409).json({error: `has ${count} records — retire it instead`, recordCount: count})
+    // Nursery and special music reference service_times too since docs/adr/0025.
+    // Counting only service_records here would let a Service Time with no
+    // attendance but hundreds of nursery assignments delete and cascade them.
+    const countOf = (col: SQLiteColumn) =>
+      db
+        .select({n: sql<number>`count(*)`})
+        .from(col.table as SQLiteTable)
+        .where(eq(col, id))
+        .get()!.n
+
+    const recordCount = countOf(schema.serviceRecords.serviceTimeId)
+    const references = [
+      {label: 'attendance records', n: recordCount},
+      {label: 'sermons', n: countOf(schema.sermons.serviceTimeId)},
+      {label: 'nursery assignments', n: countOf(schema.nurseryAssignments.serviceTimeId)},
+      {
+        label: 'nursery worker eligibility rows',
+        n: countOf(schema.nurseryWorkerServices.serviceTimeId),
+      },
+      {
+        label: 'nursery service config',
+        n: countOf(schema.nurseryServiceConfig.serviceTimeId),
+      },
+      {label: 'special music', n: countOf(schema.specialMusic.serviceTimeId)},
+      {
+        label: 'music schedule services',
+        n: countOf(schema.musicScheduleServices.serviceTimeId),
+      },
+    ].filter((r) => r.n > 0)
+
+    if (references.length > 0) {
+      const detail = references.map((r) => `${r.n} ${r.label}`).join(', ')
+      res.status(409).json({error: `has ${detail} — retire it instead`, recordCount, references})
       return
     }
     db.delete(schema.serviceTimes).where(eq(schema.serviceTimes.id, id)).run()

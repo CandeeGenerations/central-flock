@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node'
-import {and, asc, between, desc, eq, inArray, lt, sql} from 'drizzle-orm'
+import {and, asc, between, desc, eq, inArray, isNull, lt, sql} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'fs'
 import os from 'os'
@@ -9,6 +9,7 @@ import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {uploadPath, uploadUrl} from '../lib/uploads.js'
 import {sendImageViaUI} from '../services/applescript.js'
+import {findForSpecialMusic} from '../services/double-booking.js'
 import {
   DEFAULT_REMINDER_SEND_TIME,
   REMINDER_SEND_TIME_KEY,
@@ -56,6 +57,10 @@ interface SchedulesSettings {
     titlePrefix: string
     footerBlocks: FooterBlock[]
     singerGroupIds: number[]
+    // Which Service Times the Special Music Schedule covers — was a hardcoded
+    // ['sunday_am','sunday_pm'] before service times became the vocabulary.
+    // Seeded by migration 0042. See docs/adr/0025.
+    serviceTimeIds: number[]
   }
   fairBooth: {
     titlePrefix: string
@@ -89,6 +94,20 @@ interface SchedulesSettings {
   }
 }
 
+// Which Service Times the Special Music Schedule covers. Falls back to every
+// active Sunday service if the setting is missing, so a wiped setting degrades
+// to a slightly-wide schedule rather than an empty one.
+function specialMusicServiceTimeIds(): number[] {
+  const configured = readSettings().specialMusic.serviceTimeIds
+  if (configured.length > 0) return configured
+  return db
+    .select({id: schema.serviceTimes.id})
+    .from(schema.serviceTimes)
+    .where(and(eq(schema.serviceTimes.dayOfWeek, 0), eq(schema.serviceTimes.active, true)))
+    .all()
+    .map((r) => r.id)
+}
+
 function readSettings(): SchedulesSettings {
   const rows = db.select().from(schema.settings).all()
   const map = new Map(rows.map((r) => [r.key, r.value]))
@@ -112,6 +131,7 @@ function readSettings(): SchedulesSettings {
       titlePrefix: map.get('schedules.specialMusic.titlePrefix') ?? 'Special Music Schedule',
       footerBlocks: parseJson<FooterBlock[]>('schedules.specialMusic.footerBlocks', []),
       singerGroupIds: parseJson<number[]>('schedules.specialMusic.singerGroupIds', []),
+      serviceTimeIds: parseJson<number[]>('schedules.specialMusic.serviceTimeIds', []),
     },
     fairBooth: {
       titlePrefix: map.get('schedules.fairBooth.titlePrefix') ?? 'Fair Booth Schedule',
@@ -194,6 +214,8 @@ schedulesRouter.put(
       upsert('schedules.specialMusic.titlePrefix', body.specialMusic.titlePrefix)
     if (body.specialMusic?.footerBlocks !== undefined)
       upsert('schedules.specialMusic.footerBlocks', JSON.stringify(body.specialMusic.footerBlocks))
+    if (body.specialMusic?.serviceTimeIds !== undefined)
+      upsert('schedules.specialMusic.serviceTimeIds', JSON.stringify(body.specialMusic.serviceTimeIds))
     if (body.specialMusic?.singerGroupIds !== undefined)
       upsert('schedules.specialMusic.singerGroupIds', JSON.stringify(body.specialMusic.singerGroupIds))
     if (body.musicSchedule?.titlePrefix !== undefined)
@@ -560,7 +582,7 @@ schedulesRouter.post(
       .where(
         and(
           between(schema.specialMusic.date, source.scopeStart, source.scopeEnd!),
-          inArray(schema.specialMusic.serviceType, ['sunday_am', 'sunday_pm']),
+          inArray(schema.specialMusic.serviceTimeId, specialMusicServiceTimeIds()),
         ),
       )
       .all()
@@ -578,12 +600,19 @@ schedulesRouter.post(
     for (const cell of sourceCells) {
       const newDate = shiftDate(cell.date, deltaDays)
       if (newDate < b.scopeStart || newDate > b.scopeEnd) continue
-      // Skip if a cell already exists at (newDate, service_type) — avoids
+      // Skip if a cell already exists at (newDate, service_time_id) — avoids
       // duplicate rows when the new scope overlaps the source scope.
       const existing = db
         .select({id: schema.specialMusic.id})
         .from(schema.specialMusic)
-        .where(and(eq(schema.specialMusic.date, newDate), eq(schema.specialMusic.serviceType, cell.serviceType)))
+        .where(
+          and(
+            eq(schema.specialMusic.date, newDate),
+            cell.serviceTimeId == null
+              ? isNull(schema.specialMusic.serviceTimeId)
+              : eq(schema.specialMusic.serviceTimeId, cell.serviceTimeId),
+          ),
+        )
         .get()
       if (existing) {
         skippedExisting += 1
@@ -594,7 +623,7 @@ schedulesRouter.post(
         .insert(schema.specialMusic)
         .values({
           date: newDate,
-          serviceType: cell.serviceType,
+          serviceTimeId: cell.serviceTimeId,
           serviceLabel: cell.serviceLabel,
           songTitle: null,
           hymnId: null,
@@ -684,10 +713,10 @@ schedulesRouter.get(
       .where(
         and(
           between(schema.specialMusic.date, schedule.scopeStart, schedule.scopeEnd),
-          inArray(schema.specialMusic.serviceType, ['sunday_am', 'sunday_pm']),
+          inArray(schema.specialMusic.serviceTimeId, specialMusicServiceTimeIds()),
         ),
       )
-      .orderBy(asc(schema.specialMusic.date), asc(schema.specialMusic.serviceType))
+      .orderBy(asc(schema.specialMusic.date), asc(schema.specialMusic.serviceTimeId))
       .all()
 
     // Performers joined to people
@@ -764,7 +793,9 @@ schedulesRouter.get(
       }
     })
 
-    res.json({schedule, cells: decorated})
+    // Advisory only — derived live, never stored, never exported.
+    // See docs/adr/0026.
+    res.json({schedule, cells: decorated, doubleBookings: findForSpecialMusic(ids)})
   }),
 )
 

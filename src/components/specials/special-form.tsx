@@ -7,21 +7,16 @@ import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Textarea} from '@/components/ui/textarea'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
-import {
-  type CreateSpecialBody,
-  SERVICE_TYPE_LABELS,
-  SPECIAL_TYPE_LABELS,
-  type ServiceType,
-  type SpecialType,
-  specialsApi,
-} from '@/lib/specials-api'
+import {useServiceTimes} from '@/hooks/use-service-times'
+import {type CreateSpecialBody, SPECIAL_TYPE_LABELS, type SpecialType, specialsApi} from '@/lib/specials-api'
 import {useQuery} from '@tanstack/react-query'
 import {AlertTriangle, ChevronDown, ChevronRight} from 'lucide-react'
 import {useEffect, useMemo, useState} from 'react'
 
 export interface SpecialFormState {
   date: string
-  serviceType: ServiceType
+  // null = a one-off service named by serviceLabel. See docs/adr/0025.
+  serviceTimeId: number | null
   serviceLabel: string
   songTitle: string
   hymnId: number | null
@@ -37,7 +32,7 @@ export interface SpecialFormState {
 
 export const emptySpecialFormState = (): SpecialFormState => ({
   date: new Date().toISOString().slice(0, 10),
-  serviceType: 'sunday_am',
+  serviceTimeId: null,
   serviceLabel: '',
   songTitle: '',
   hymnId: null,
@@ -68,7 +63,7 @@ function deriveType(linked: number, guest: number): SpecialType {
 export function toCreateBody(state: SpecialFormState): CreateSpecialBody {
   return {
     date: state.date,
-    serviceType: state.serviceType,
+    serviceTimeId: state.serviceTimeId,
     serviceLabel: state.serviceLabel || null,
     songTitle: state.songTitle.trim(),
     hymnId: state.hymnId,
@@ -84,6 +79,7 @@ export function toCreateBody(state: SpecialFormState): CreateSpecialBody {
 }
 
 export function SpecialForm({state, onChange, excludeSpecialId}: SpecialFormProps) {
+  const serviceTimes = useServiceTimes()
   const set = <K extends keyof SpecialFormState>(key: K, value: SpecialFormState[K]) => {
     onChange({...state, [key]: value})
   }
@@ -130,19 +126,24 @@ export function SpecialForm({state, onChange, excludeSpecialId}: SpecialFormProp
         </div>
         <div>
           <Label htmlFor="service-type">Service</Label>
-          <Select value={state.serviceType} onValueChange={(v) => set('serviceType', v as ServiceType)}>
+          <Select
+            value={state.serviceTimeId == null ? 'other' : String(state.serviceTimeId)}
+            onValueChange={(v) => set('serviceTimeId', v === 'other' ? null : Number(v))}
+          >
             <SelectTrigger id="service-type" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(Object.keys(SERVICE_TYPE_LABELS) as ServiceType[]).map((s) => (
-                <SelectItem key={s} value={s}>
-                  {SERVICE_TYPE_LABELS[s]}
+              {serviceTimes.active.map((st) => (
+                <SelectItem key={st.id} value={String(st.id)}>
+                  {st.name}
                 </SelectItem>
               ))}
+              {/* A one-off carries its own label and can never be double booked. */}
+              <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>
-          {state.serviceType === 'other' && (
+          {state.serviceTimeId == null && (
             <Input
               className="mt-2"
               placeholder="Service label (e.g. Christmas Eve)"

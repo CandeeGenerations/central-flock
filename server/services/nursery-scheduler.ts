@@ -1,14 +1,15 @@
-import type {ServiceType} from '../db/schema-nursery.js'
-
+// Services are identified by service_times.id — the app's single service
+// vocabulary. See docs/adr/0025.
 export interface ServiceConfig {
-  serviceType: ServiceType
+  serviceTimeId: number
   label: string
+  dayOfWeek: number
   workerCount: number
   sortOrder: number
 }
 
 export interface WorkerServiceEligibility {
-  serviceType: ServiceType
+  serviceTimeId: number
   maxPerMonth: number | null
 }
 
@@ -22,7 +23,7 @@ export interface WorkerWithEligibility {
 
 export interface ScheduleSlot {
   date: string
-  serviceType: ServiceType
+  serviceTimeId: number
   slot: number
   workerId: number | null
   isCarryover?: boolean
@@ -30,7 +31,7 @@ export interface ScheduleSlot {
 
 export interface PriorMonthAssignment {
   date: string
-  serviceType: ServiceType
+  serviceTimeId: number
   slot: number
   workerId: number | null
 }
@@ -99,22 +100,22 @@ export function computeDatePairs(month: number, year: number): DatePair[] {
 
 export function buildSlots(pairs: DatePair[], serviceConfig: ServiceConfig[]): ScheduleSlot[] {
   const slots: ScheduleSlot[] = []
-  const sundayServices = serviceConfig
-    .filter((s) => s.serviceType !== 'wednesday_evening')
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-  const wednesdayServices = serviceConfig.filter((s) => s.serviceType === 'wednesday_evening')
+  // Sunday vs midweek is now the Service Time's own day_of_week (0=Sun) rather
+  // than a hardcoded enum member. Same partition as before for current data.
+  const sundayServices = serviceConfig.filter((s) => s.dayOfWeek === 0).sort((a, b) => a.sortOrder - b.sortOrder)
+  const wednesdayServices = serviceConfig.filter((s) => s.dayOfWeek !== 0).sort((a, b) => a.sortOrder - b.sortOrder)
 
   for (const pair of pairs) {
     // Sunday services
     for (const svc of sundayServices) {
       for (let s = 1; s <= svc.workerCount; s++) {
-        slots.push({date: pair.sunday, serviceType: svc.serviceType, slot: s, workerId: null})
+        slots.push({date: pair.sunday, serviceTimeId: svc.serviceTimeId, slot: s, workerId: null})
       }
     }
     // Wednesday services
     for (const svc of wednesdayServices) {
       for (let s = 1; s <= svc.workerCount; s++) {
-        slots.push({date: pair.wednesday, serviceType: svc.serviceType, slot: s, workerId: null})
+        slots.push({date: pair.wednesday, serviceTimeId: svc.serviceTimeId, slot: s, workerId: null})
       }
     }
   }
@@ -132,12 +133,12 @@ export function assignWorkers(
 
   // Counters
   const totalAssignments = new Map<number, number>()
-  const serviceAssignments = new Map<number, Map<string, number>>()
+  const serviceAssignments = new Map<number, Map<number, number>>()
   const dayAssignments = new Map<number, Map<string, number>>()
-  // Per-(serviceType:slot) assignment count per worker — long-term slot rotation
+  // Per-(serviceTimeId:slot) assignment count per worker — long-term slot rotation
   const slotPositionAssignments = new Map<number, Map<string, number>>()
   // All assignments per service+date — used to penalize cross-slot repeats from the prior date
-  const assignmentsByServiceDate = new Map<string, Map<string, Set<number>>>() // service → date → worker ids
+  const assignmentsByServiceDate = new Map<number, Map<string, Set<number>>>() // serviceTimeId → date → worker ids
 
   for (const w of activeWorkers) {
     totalAssignments.set(w.id, 0)
@@ -152,7 +153,7 @@ export function assignWorkers(
     // so adjacent native slots still respect the same-day / prev-date rules.
     if (carryoverDates.has(slot.date)) {
       const prior = priorMonthAssignments.find(
-        (a) => a.date === slot.date && a.serviceType === slot.serviceType && a.slot === slot.slot,
+        (a) => a.date === slot.date && a.serviceTimeId === slot.serviceTimeId && a.slot === slot.slot,
       )
       slot.workerId = prior?.workerId ?? null
       slot.isCarryover = true
@@ -162,10 +163,10 @@ export function assignWorkers(
         dayMap.set(slot.date, (dayMap.get(slot.date) || 0) + 1)
       }
       if (slot.workerId !== null) {
-        let dateMap = assignmentsByServiceDate.get(slot.serviceType)
+        let dateMap = assignmentsByServiceDate.get(slot.serviceTimeId)
         if (!dateMap) {
           dateMap = new Map()
-          assignmentsByServiceDate.set(slot.serviceType, dateMap)
+          assignmentsByServiceDate.set(slot.serviceTimeId, dateMap)
         }
         let dateSet = dateMap.get(slot.date)
         if (!dateSet) {
@@ -180,12 +181,14 @@ export function assignWorkers(
     // Workers already assigned to another slot of this same service+date (no double-booking)
     const alreadyAssignedSameServiceDate = new Set(
       slots
-        .filter((s) => s !== slot && s.date === slot.date && s.serviceType === slot.serviceType && s.workerId !== null)
+        .filter(
+          (s) => s !== slot && s.date === slot.date && s.serviceTimeId === slot.serviceTimeId && s.workerId !== null,
+        )
         .map((s) => s.workerId!),
     )
 
     const hasServiceEligibility = (w: WorkerWithEligibility) =>
-      w.services.some((s) => s.serviceType === slot.serviceType)
+      w.services.some((s) => s.serviceTimeId === slot.serviceTimeId)
     const hasDayConflict = (w: WorkerWithEligibility) => {
       if (w.allowMultiplePerDay) return false
       return (dayAssignments.get(w.id)?.get(slot.date) || 0) > 0
@@ -193,9 +196,9 @@ export function assignWorkers(
     const hasDoubleBook = (w: WorkerWithEligibility) => alreadyAssignedSameServiceDate.has(w.id)
     const hitsOverallMax = (w: WorkerWithEligibility) => (totalAssignments.get(w.id) || 0) >= w.maxPerMonth
     const hitsServiceMax = (w: WorkerWithEligibility) => {
-      const svcConfig = w.services.find((s) => s.serviceType === slot.serviceType)
+      const svcConfig = w.services.find((s) => s.serviceTimeId === slot.serviceTimeId)
       if (!svcConfig || svcConfig.maxPerMonth === null) return false
-      return (serviceAssignments.get(w.id)?.get(slot.serviceType) || 0) >= svcConfig.maxPerMonth
+      return (serviceAssignments.get(w.id)?.get(slot.serviceTimeId) || 0) >= svcConfig.maxPerMonth
     }
     // "Oversaturated" = already assigned 2+ services on this date. Near-disqualifier.
     const isOversaturatedToday = (w: WorkerWithEligibility) => (dayAssignments.get(w.id)?.get(slot.date) || 0) >= 2
@@ -224,12 +227,12 @@ export function assignWorkers(
 
     if (eligible.length === 0) continue
 
-    const slotKey = `${slot.serviceType}:${slot.slot}`
+    const slotKey = `${slot.serviceTimeId}:${slot.slot}`
 
     // Find workers assigned to this service on the most recent PRIOR date (not the current date).
     // These workers should be avoided this date to prevent the same person doing the same service
     // two dates in a row (even in different slots).
-    const serviceDateMap = assignmentsByServiceDate.get(slot.serviceType)
+    const serviceDateMap = assignmentsByServiceDate.get(slot.serviceTimeId)
     let prevDateWorkers = new Set<number>()
     let prevSlotWorker: number | undefined
     if (serviceDateMap) {
@@ -239,7 +242,7 @@ export function assignWorkers(
         prevDateWorkers = serviceDateMap.get(lastDate)!
         // The worker in this exact slot on the prior date — stronger penalty
         const prevSlotSameDate = slots.find(
-          (s) => s.date === lastDate && s.serviceType === slot.serviceType && s.slot === slot.slot,
+          (s) => s.date === lastDate && s.serviceTimeId === slot.serviceTimeId && s.slot === slot.slot,
         )
         if (prevSlotSameDate?.workerId) prevSlotWorker = prevSlotSameDate.workerId
       }
@@ -247,7 +250,9 @@ export function assignWorkers(
 
     // Workers already assigned to this (service, date) — used for first-name pairing check
     const siblingSlotWorkers = slots
-      .filter((s) => s !== slot && s.date === slot.date && s.serviceType === slot.serviceType && s.workerId !== null)
+      .filter(
+        (s) => s !== slot && s.date === slot.date && s.serviceTimeId === slot.serviceTimeId && s.workerId !== null,
+      )
       .map((s) => activeWorkers.find((w) => w.id === s.workerId))
       .filter((w): w is WorkerWithEligibility => !!w)
     const getFirstName = (name: string) => name.trim().split(/\s+/)[0]?.toLowerCase() || ''
@@ -296,16 +301,16 @@ export function assignWorkers(
 
     totalAssignments.set(chosen.id, (totalAssignments.get(chosen.id) || 0) + 1)
     const svcMap = serviceAssignments.get(chosen.id)!
-    svcMap.set(slot.serviceType, (svcMap.get(slot.serviceType) || 0) + 1)
+    svcMap.set(slot.serviceTimeId, (svcMap.get(slot.serviceTimeId) || 0) + 1)
     const dayMap = dayAssignments.get(chosen.id)!
     dayMap.set(slot.date, (dayMap.get(slot.date) || 0) + 1)
     const slotMap = slotPositionAssignments.get(chosen.id)!
     slotMap.set(slotKey, (slotMap.get(slotKey) || 0) + 1)
 
-    let dateMap = assignmentsByServiceDate.get(slot.serviceType)
+    let dateMap = assignmentsByServiceDate.get(slot.serviceTimeId)
     if (!dateMap) {
       dateMap = new Map()
-      assignmentsByServiceDate.set(slot.serviceType, dateMap)
+      assignmentsByServiceDate.set(slot.serviceTimeId, dateMap)
     }
     let dateSet = dateMap.get(slot.date)
     if (!dateSet) {

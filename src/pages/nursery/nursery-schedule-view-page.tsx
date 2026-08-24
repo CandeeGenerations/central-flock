@@ -188,6 +188,11 @@ export function NurseryScheduleViewPage() {
   if (!schedule || !serviceConfig) return <div className="p-6 text-muted-foreground">Schedule not found</div>
 
   const isDraft = schedule.status === 'draft'
+  // The conflict is computed regardless of date; the UI just stops nagging
+  // about the past — a finalised August has nothing left to fix.
+  // See docs/adr/0026.
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const upcomingDoubleBookings = schedule.doubleBookings.filter((c) => c.date >= todayIso)
   const pdfRecipients = buildNurseryRecipients(schedule.assignments).map((r) => ({key: r.key, name: r.name}))
   const title = `${settings?.nursery.titlePrefix ?? 'Nursery Schedule'} - ${MONTH_NAMES[schedule.month - 1]} ${schedule.year}`
 
@@ -255,6 +260,7 @@ export function NurseryScheduleViewPage() {
               onCarryoverClick={(a) => a.sourceScheduleId && navigate(`/nursery/${a.sourceScheduleId}`)}
               highlightAssignmentIds={highlightAssignmentIds}
               highlightDates={highlightDates}
+              doubleBookings={upcomingDoubleBookings}
             />
           </SchedulePreviewFrame>
         </CardContent>

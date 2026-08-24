@@ -1,12 +1,14 @@
 import {Badge} from '@/components/ui/badge'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {useServiceTimes} from '@/hooks/use-service-times'
 import {formatDate} from '@/lib/date'
-import {SERVICE_TYPE_LABELS, SPECIAL_STATUS_LABELS, specialsApi} from '@/lib/specials-api'
+import {SPECIAL_STATUS_LABELS, specialsApi} from '@/lib/specials-api'
 import {useQuery} from '@tanstack/react-query'
 import {Music} from 'lucide-react'
 import {Link} from 'react-router-dom'
 
 export function PersonSpecialsCard({personId}: {personId: number}) {
+  const serviceTimes = useServiceTimes()
   const {data} = useQuery({
     queryKey: ['specials-by-person', personId],
     queryFn: () => specialsApi.byPerson(personId),
@@ -31,7 +33,7 @@ export function PersonSpecialsCard({personId}: {personId: number}) {
             <div>
               <div className="font-medium">{s.songTitle}</div>
               <div className="text-xs text-muted-foreground">
-                {formatDate(s.date)} · {SERVICE_TYPE_LABELS[s.serviceType]}
+                {formatDate(s.date)} · {serviceTimes.label(s.serviceTimeId, s.serviceLabel)}
               </div>
             </div>
             <Badge variant="secondary">{SPECIAL_STATUS_LABELS[s.status]}</Badge>

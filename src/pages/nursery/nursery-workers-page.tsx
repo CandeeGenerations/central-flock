@@ -8,11 +8,12 @@ import {SearchInput} from '@/components/ui/search-input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
-import type {NurseryWorker, ServiceType} from '@/lib/nursery-api'
+import type {NurseryWorker} from '@/lib/nursery-api'
 import {
   createNurseryWorker,
   deleteNurseryWorker,
   fetchNurseryWorkers,
+  fetchServiceConfig,
   updateNurseryWorker,
   updateWorkerServices,
 } from '@/lib/nursery-api'
@@ -22,11 +23,18 @@ import {Pencil, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {toast} from 'sonner'
 
-const SERVICE_LABELS: Record<ServiceType, string> = {
-  sunday_school: 'SS',
-  morning: 'AM',
-  evening: 'PM',
-  wednesday_evening: 'Wed',
+// Short badge labels are derived from the Service Time's own name rather than
+// a hardcoded map, so renaming a service renames the badge. See docs/adr/0025.
+function shortServiceLabel(label: string): string {
+  const trimmed = label.trim()
+  if (/sunday school/i.test(trimmed)) return 'SS'
+  if (/^sunday morning/i.test(trimmed)) return 'AM'
+  if (/^sunday evening/i.test(trimmed)) return 'PM'
+  if (/^wednesday/i.test(trimmed)) return 'Wed'
+  return trimmed
+    .split(/\s+/)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('')
 }
 
 const PAGE_SIZE = 25
@@ -41,12 +49,18 @@ export function NurseryWorkersPage() {
   const [page, setPage] = useState(1)
 
   const {data: workers, isLoading} = useQuery({queryKey: nurseryKeys.workers, queryFn: fetchNurseryWorkers})
+  const {data: serviceConfig} = useQuery({queryKey: nurseryKeys.serviceConfig, queryFn: fetchServiceConfig})
+  const serviceLabels = useMemo(() => {
+    const map = new Map<number, string>()
+    serviceConfig?.forEach((c) => map.set(c.serviceTimeId, shortServiceLabel(c.label)))
+    return map
+  }, [serviceConfig])
 
   const filtered = useMemo(() => {
     if (!workers) return []
     if (!debouncedSearch) return workers
     const q = debouncedSearch.toLowerCase()
-    return workers.filter((w) => w.name.toLowerCase().includes(q))
+    return workers.filter((w) => w.displayName.toLowerCase().includes(q))
   }, [workers, debouncedSearch])
 
   const paginated = useMemo(() => {
@@ -67,12 +81,14 @@ export function NurseryWorkersPage() {
   const updateMutation = useMutation({
     mutationFn: async (data: {
       id: number
-      name: string
+      personId: number
+      name: string | null
       maxPerMonth: number
       allowMultiplePerDay: boolean
-      services: {serviceType: ServiceType; maxPerMonth: number | null}[]
+      services: {serviceTimeId: number; maxPerMonth: number | null}[]
     }) => {
       await updateNurseryWorker(data.id, {
+        personId: data.personId,
         name: data.name,
         maxPerMonth: data.maxPerMonth,
         allowMultiplePerDay: data.allowMultiplePerDay,
@@ -145,12 +161,12 @@ export function NurseryWorkersPage() {
             <TableBody>
               {paginated.map((worker) => (
                 <TableRow key={worker.id} className={`hover:bg-muted/50${!worker.isActive ? ' opacity-50' : ''}`}>
-                  <TableCell className="font-medium">{worker.name}</TableCell>
+                  <TableCell className="font-medium">{worker.displayName}</TableCell>
                   <TableCell>
                     <div className="flex gap-1 flex-wrap">
                       {worker.services.map((svc) => (
-                        <Badge key={svc.serviceType} variant="secondary" className="text-xs">
-                          {SERVICE_LABELS[svc.serviceType]}
+                        <Badge key={svc.serviceTimeId} variant="secondary" className="text-xs">
+                          {serviceLabels.get(svc.serviceTimeId) ?? `#${svc.serviceTimeId}`}
                           {svc.maxPerMonth ? ` (${svc.maxPerMonth})` : ''}
                         </Badge>
                       ))}
@@ -204,6 +220,7 @@ export function NurseryWorkersPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         onSave={(data) => createMutation.mutate(data)}
+        serviceConfig={serviceConfig ?? []}
         isPending={createMutation.isPending}
       />
 
@@ -213,6 +230,7 @@ export function NurseryWorkersPage() {
         onOpenChange={(v) => !v && setEditingWorker(null)}
         worker={editingWorker}
         onSave={(data) => editingWorker && updateMutation.mutate({id: editingWorker.id, ...data})}
+        serviceConfig={serviceConfig ?? []}
         isPending={updateMutation.isPending}
       />
 
@@ -220,7 +238,7 @@ export function NurseryWorkersPage() {
         open={!!deleteTarget}
         onOpenChange={(v) => !v && setDeleteTarget(null)}
         title="Delete Worker"
-        description={`Are you sure you want to delete ${deleteTarget?.name}? This will remove them from any future schedules.`}
+        description={`Are you sure you want to delete ${deleteTarget?.displayName}? This will remove them from any future schedules.`}
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}

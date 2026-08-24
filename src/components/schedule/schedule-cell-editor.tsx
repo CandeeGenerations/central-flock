@@ -4,6 +4,7 @@ import {DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {useServiceTimes} from '@/hooks/use-service-times'
 import {fetchGroup, fetchPerson} from '@/lib/api'
 import {formatDate} from '@/lib/date'
 import {type SpecialMusicCell, fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
@@ -16,7 +17,7 @@ import {toast} from 'sonner'
 
 interface Props {
   date: string
-  serviceType: 'sunday_am' | 'sunday_pm'
+  serviceTimeId: number
   cell: SpecialMusicCell | null
   scheduleId: number
   onClose: () => void
@@ -33,9 +34,10 @@ function deriveType(performerCount: number, guestCount: number): SpecialType {
 
 // Renders inside a <Dialog><DialogContent>. Provides its own header + footer
 // for the standard modal layout used elsewhere in the app.
-export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose, onSaved}: Props) {
+export function ScheduleCellEditor({date, serviceTimeId, cell, scheduleId, onClose, onSaved}: Props) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const serviceTimes = useServiceTimes()
   const [performerIds, setPerformerIds] = useState<number[]>(cell?.performers.map((p) => p.personId) ?? [])
   const [guests, setGuests] = useState<string[]>(cell?.guestPerformers ?? [])
   const [overrideLabel, setOverrideLabel] = useState<string>(cell?.serviceLabel ?? '')
@@ -107,7 +109,7 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
         }))
       const bodyWithOverrides = {...body, performerOverrides}
       if (cell) return specialsApi.update(cell.id, bodyWithOverrides)
-      return specialsApi.create({date, serviceType, ...bodyWithOverrides})
+      return specialsApi.create({date, serviceTimeId, ...bodyWithOverrides})
     },
     onSuccess: () => {
       invalidate()
@@ -129,7 +131,7 @@ export function ScheduleCellEditor({date, serviceType, cell, scheduleId, onClose
   })
 
   const hasContent = performerIds.length > 0 || guests.length > 0 || overrideLabel.trim().length > 0
-  const slotLabel = serviceType === 'sunday_am' ? 'Sunday AM' : 'Sunday PM'
+  const slotLabel = serviceTimes.label(serviceTimeId)
 
   return (
     <>

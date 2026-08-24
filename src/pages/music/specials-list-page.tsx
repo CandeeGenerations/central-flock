@@ -7,12 +7,11 @@ import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
+import {useServiceTimes} from '@/hooks/use-service-times'
 import {formatDate} from '@/lib/date'
 import {
-  SERVICE_TYPE_LABELS,
   SPECIAL_STATUS_LABELS,
   SPECIAL_TYPE_LABELS,
-  type ServiceType,
   type Special,
   type SpecialStatus,
   type SpecialType,
@@ -27,10 +26,6 @@ import {Link, useNavigate} from 'react-router-dom'
 const STATUS_OPTIONS: {value: SpecialStatus; label: string}[] = (
   Object.keys(SPECIAL_STATUS_LABELS) as SpecialStatus[]
 ).map((v) => ({value: v, label: SPECIAL_STATUS_LABELS[v]}))
-
-const SERVICE_OPTIONS: {value: ServiceType; label: string}[] = (Object.keys(SERVICE_TYPE_LABELS) as ServiceType[]).map(
-  (v) => ({value: v, label: SERVICE_TYPE_LABELS[v]}),
-)
 
 const TYPE_OPTIONS: {value: SpecialType; label: string}[] = (Object.keys(SPECIAL_TYPE_LABELS) as SpecialType[]).map(
   (v) => ({value: v, label: SPECIAL_TYPE_LABELS[v]}),
@@ -50,18 +45,24 @@ function formatPerformers(s: Special): string {
 
 export function SpecialsListPage() {
   const navigate = useNavigate()
+  const serviceTimes = useServiceTimes()
   const [statuses, setStatuses] = usePersistedState<SpecialStatus[]>('specials.filter.status', [])
-  const [services, setServices] = usePersistedState<ServiceType[]>('specials.filter.service', [])
+  // Filter values are service_times ids now, so the old persisted enum
+  // strings are dropped by the Number() coercion below.
+  const [services, setServices] = usePersistedState<string[]>('specials.filter.service', [])
   const [types, setTypes] = usePersistedState<SpecialType[]>('specials.filter.type', [])
   const [search, setSearch] = usePersistedState('specials.filter.q', '')
   const debouncedSearch = useDebouncedValue(search, 200)
 
+  const serviceTimeIds = services.map(Number).filter(Number.isInteger)
+  const serviceOptions = serviceTimes.active.map((st) => ({value: String(st.id), label: st.name}))
+
   const {data, isLoading} = useQuery({
-    queryKey: ['specials-list', statuses, services, types, debouncedSearch],
+    queryKey: ['specials-list', statuses, serviceTimeIds, types, debouncedSearch],
     queryFn: () =>
       specialsApi.list({
         status: statuses.length > 0 ? statuses : undefined,
-        serviceType: services.length > 0 ? services : undefined,
+        serviceTimeIds: serviceTimeIds.length > 0 ? serviceTimeIds : undefined,
         type: types.length > 0 ? types : undefined,
         q: debouncedSearch || undefined,
       }),
@@ -100,8 +101,8 @@ export function SpecialsListPage() {
           />
           <MultiSelect
             value={services}
-            onValueChange={(v) => setServices(v as ServiceType[])}
-            options={SERVICE_OPTIONS}
+            onValueChange={(v) => setServices(v)}
+            options={serviceOptions}
             placeholder="Service"
           />
           <MultiSelect
@@ -144,8 +145,7 @@ export function SpecialsListPage() {
                 >
                   <TableCell className="whitespace-nowrap">{formatDate(s.date)}</TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {SERVICE_TYPE_LABELS[s.serviceType]}
-                    {s.serviceLabel ? ` · ${s.serviceLabel}` : ''}
+                    {serviceTimes.label(s.serviceTimeId, s.serviceLabel)}
                   </TableCell>
                   <TableCell>
                     <Link to={`/music/specials/${s.id}`} className="hover:underline">

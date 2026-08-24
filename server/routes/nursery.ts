@@ -6,9 +6,9 @@ import os from 'os'
 import path from 'path'
 
 import {db, schema} from '../db/index.js'
-import {serviceTypes} from '../db/schema-nursery.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {sendImageViaUI} from '../services/applescript.js'
+import {workerDisplayName} from '../services/nursery-workers.js'
 
 export const nurseryRouter = Router()
 
@@ -17,13 +17,24 @@ export const nurseryRouter = Router()
 nurseryRouter.get(
   '/workers',
   asyncHandler(async (_req, res) => {
-    const workers = db.select().from(schema.nurseryWorkers).orderBy(schema.nurseryWorkers.name).all()
+    const workers = db
+      .select({
+        worker: schema.nurseryWorkers,
+        firstName: schema.people.firstName,
+        lastName: schema.people.lastName,
+      })
+      .from(schema.nurseryWorkers)
+      .innerJoin(schema.people, eq(schema.people.id, schema.nurseryWorkers.personId))
+      .all()
     const workerServices = db.select().from(schema.nurseryWorkerServices).all()
 
-    const result = workers.map((w) => ({
-      ...w,
-      services: workerServices.filter((ws) => ws.workerId === w.id),
-    }))
+    const result = workers
+      .map(({worker, firstName, lastName}) => ({
+        ...worker,
+        displayName: workerDisplayName(worker.name, firstName, lastName),
+        services: workerServices.filter((ws) => ws.workerId === worker.id),
+      }))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName))
 
     res.json(result)
   }),
@@ -32,16 +43,31 @@ nurseryRouter.get(
 nurseryRouter.post(
   '/workers',
   asyncHandler(async (req, res) => {
-    const {name, maxPerMonth, allowMultiplePerDay, services} = req.body
-    if (!name?.trim()) {
-      res.status(400).json({error: 'Name is required'})
+    const {personId, name, maxPerMonth, allowMultiplePerDay, services} = req.body
+    if (!Number.isInteger(personId)) {
+      res.status(400).json({error: 'personId is required — a Nursery Worker is always a contact'})
+      return
+    }
+    const person = db.select().from(schema.people).where(eq(schema.people.id, personId)).get()
+    if (!person) {
+      res.status(400).json({error: 'Person not found'})
+      return
+    }
+    const existingForPerson = db
+      .select()
+      .from(schema.nurseryWorkers)
+      .where(eq(schema.nurseryWorkers.personId, personId))
+      .get()
+    if (existingForPerson) {
+      res.status(409).json({error: 'That person is already a nursery worker'})
       return
     }
 
     const worker = db
       .insert(schema.nurseryWorkers)
       .values({
-        name: name.trim(),
+        personId,
+        name: name?.trim() ? name.trim() : null,
         maxPerMonth: maxPerMonth ?? 4,
         allowMultiplePerDay: allowMultiplePerDay ?? false,
       })
@@ -51,7 +77,7 @@ nurseryRouter.post(
     if (services && Array.isArray(services)) {
       for (const svc of services) {
         db.insert(schema.nurseryWorkerServices)
-          .values({workerId: worker.id, serviceType: svc.serviceType, maxPerMonth: svc.maxPerMonth ?? null})
+          .values({workerId: worker.id, serviceTimeId: svc.serviceTimeId, maxPerMonth: svc.maxPerMonth ?? null})
           .run()
       }
     }
@@ -62,7 +88,11 @@ nurseryRouter.post(
       .where(eq(schema.nurseryWorkerServices.workerId, worker.id))
       .all()
 
-    res.json({...worker, services: workerServices})
+    res.json({
+      ...worker,
+      displayName: workerDisplayName(worker.name, person.firstName, person.lastName),
+      services: workerServices,
+    })
   }),
 )
 
@@ -70,18 +100,23 @@ nurseryRouter.put(
   '/workers/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
-    const {name, maxPerMonth, allowMultiplePerDay, isActive} = req.body
+    const {personId, name, maxPerMonth, allowMultiplePerDay, isActive} = req.body
 
     const existing = db.select().from(schema.nurseryWorkers).where(eq(schema.nurseryWorkers.id, id)).get()
     if (!existing) {
       res.status(404).json({error: 'Worker not found'})
       return
     }
+    if (personId !== undefined && !Number.isInteger(personId)) {
+      res.status(400).json({error: 'personId must be a contact id'})
+      return
+    }
 
     const updated = db
       .update(schema.nurseryWorkers)
       .set({
-        ...(name !== undefined && {name: name.trim()}),
+        ...(personId !== undefined && {personId}),
+        ...(name !== undefined && {name: name?.trim() ? name.trim() : null}),
         ...(maxPerMonth !== undefined && {maxPerMonth}),
         ...(allowMultiplePerDay !== undefined && {allowMultiplePerDay}),
         ...(isActive !== undefined && {isActive}),
@@ -97,7 +132,13 @@ nurseryRouter.put(
       .where(eq(schema.nurseryWorkerServices.workerId, id))
       .all()
 
-    res.json({...updated, services: workerServices})
+    const person = db.select().from(schema.people).where(eq(schema.people.id, updated.personId)).get()
+
+    res.json({
+      ...updated,
+      displayName: workerDisplayName(updated.name, person?.firstName ?? null, person?.lastName ?? null),
+      services: workerServices,
+    })
   }),
 )
 
@@ -114,7 +155,7 @@ nurseryRouter.put(
   '/workers/:id/services',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id)
-    const {services} = req.body as {services: {serviceType: string; maxPerMonth: number | null}[]}
+    const {services} = req.body as {services: {serviceTimeId: number; maxPerMonth: number | null}[]}
 
     const existing = db.select().from(schema.nurseryWorkers).where(eq(schema.nurseryWorkers.id, id)).get()
     if (!existing) {
@@ -122,15 +163,23 @@ nurseryRouter.put(
       return
     }
 
+    const validServiceTimeIds = new Set(
+      db
+        .select({id: schema.serviceTimes.id})
+        .from(schema.serviceTimes)
+        .all()
+        .map((r) => r.id),
+    )
+
     // Delete all existing service rows for this worker, then re-insert
     db.delete(schema.nurseryWorkerServices).where(eq(schema.nurseryWorkerServices.workerId, id)).run()
 
     for (const svc of services) {
-      if (serviceTypes.includes(svc.serviceType as (typeof serviceTypes)[number])) {
+      if (validServiceTimeIds.has(svc.serviceTimeId)) {
         db.insert(schema.nurseryWorkerServices)
           .values({
             workerId: id,
-            serviceType: svc.serviceType as (typeof serviceTypes)[number],
+            serviceTimeId: svc.serviceTimeId,
             maxPerMonth: svc.maxPerMonth ?? null,
           })
           .run()
@@ -152,19 +201,31 @@ nurseryRouter.put(
 nurseryRouter.get(
   '/service-config',
   asyncHandler(async (_req, res) => {
-    const config = db.select().from(schema.nurseryServiceConfig).orderBy(schema.nurseryServiceConfig.sortOrder).all()
+    const config = db
+      .select({
+        serviceTimeId: schema.nurseryServiceConfig.serviceTimeId,
+        workerCount: schema.nurseryServiceConfig.workerCount,
+        label: schema.serviceTimes.name,
+        dayOfWeek: schema.serviceTimes.dayOfWeek,
+        sortOrder: schema.serviceTimes.sortOrder,
+        active: schema.serviceTimes.active,
+      })
+      .from(schema.nurseryServiceConfig)
+      .innerJoin(schema.serviceTimes, eq(schema.serviceTimes.id, schema.nurseryServiceConfig.serviceTimeId))
+      .orderBy(schema.serviceTimes.sortOrder)
+      .all()
     res.json(config)
   }),
 )
 
 nurseryRouter.put(
-  '/service-config/:type',
+  '/service-config/:serviceTimeId',
   asyncHandler(async (req, res) => {
-    const type = req.params.type
+    const serviceTimeId = Number(req.params.serviceTimeId)
     const {workerCount} = req.body
 
-    if (!serviceTypes.includes(type as (typeof serviceTypes)[number])) {
-      res.status(400).json({error: 'Invalid service type'})
+    if (!Number.isInteger(serviceTimeId)) {
+      res.status(400).json({error: 'Invalid service time id'})
       return
     }
     if (workerCount !== 1 && workerCount !== 2) {
@@ -175,9 +236,14 @@ nurseryRouter.put(
     const updated = db
       .update(schema.nurseryServiceConfig)
       .set({workerCount})
-      .where(eq(schema.nurseryServiceConfig.serviceType, type as (typeof serviceTypes)[number]))
+      .where(eq(schema.nurseryServiceConfig.serviceTimeId, serviceTimeId))
       .returning()
       .get()
+
+    if (!updated) {
+      res.status(404).json({error: 'Service not configured for nursery'})
+      return
+    }
 
     res.json(updated)
   }),

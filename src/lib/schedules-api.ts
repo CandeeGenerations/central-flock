@@ -46,6 +46,8 @@ export interface SchedulesSettings {
     titlePrefix: string
     footerBlocks: FooterBlock[]
     singerGroupIds: number[]
+    // Which Service Times the Special Music Schedule covers. See docs/adr/0025.
+    serviceTimeIds: number[]
   }
   fairBooth: {
     titlePrefix: string
@@ -181,7 +183,8 @@ export interface SpecialMusicCellPerformer {
 export interface SpecialMusicCell {
   id: number
   date: string
-  serviceType: 'sunday_am' | 'sunday_pm' | 'wednesday_pm' | 'other'
+  // null = a one-off service named by serviceLabel. See docs/adr/0025.
+  serviceTimeId: number | null
   serviceLabel: string | null
   songTitle: string | null
   type: 'solo' | 'duet' | 'trio' | 'group' | 'instrumental' | 'other'
@@ -190,8 +193,25 @@ export interface SpecialMusicCell {
   performers: SpecialMusicCellPerformer[]
 }
 
+// A Nursery Worker in the nursery for a service she is also singing in.
+// Advisory only, derived live, never printed. See docs/adr/0026.
+export interface DoubleBooking {
+  personId: number
+  personName: string
+  date: string
+  serviceTimeId: number
+  serviceName: string
+  nurseryAssignmentId: number
+  nurseryWorkerId: number
+  nurserySlot: number
+  specialMusicId: number
+  specialMusicTitle: string | null
+}
+
 export const fetchSpecialMusicCells = (scheduleId: number) =>
-  request<{schedule: Schedule; cells: SpecialMusicCell[]}>(`/schedules/${scheduleId}/cells`)
+  request<{schedule: Schedule; cells: SpecialMusicCell[]; doubleBookings: DoubleBooking[]}>(
+    `/schedules/${scheduleId}/cells`,
+  )
 
 export const schedulesKeys = {
   settings: ['schedules', 'settings'] as const,

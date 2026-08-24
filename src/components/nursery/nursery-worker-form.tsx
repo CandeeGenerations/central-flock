@@ -3,77 +3,72 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import type {NurseryWorker, ServiceType} from '@/lib/nursery-api'
+import {PersonPicker} from '@/components/ui/person-picker'
+import type {NurseryWorker, ServiceConfig} from '@/lib/nursery-api'
 import {useState} from 'react'
-
-const ALL_SERVICES: {type: ServiceType; label: string}[] = [
-  {type: 'sunday_school', label: 'Sunday School Service'},
-  {type: 'morning', label: 'Morning Service'},
-  {type: 'evening', label: 'Evening Service'},
-  {type: 'wednesday_evening', label: 'Wednesday Evening Service'},
-]
 
 interface WorkerFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (data: {
-    name: string
+    personId: number
+    name: string | null
     maxPerMonth: number
     allowMultiplePerDay: boolean
-    services: {serviceType: ServiceType; maxPerMonth: number | null}[]
+    services: {serviceTimeId: number; maxPerMonth: number | null}[]
   }) => void
   worker?: NurseryWorker | null
+  // Eligible services come from the app's Service Times. See docs/adr/0025.
+  serviceConfig: ServiceConfig[]
   isPending?: boolean
 }
 
-export function NurseryWorkerForm({open, onOpenChange, onSave, worker, isPending}: WorkerFormProps) {
+export function NurseryWorkerForm({open, onOpenChange, onSave, worker, serviceConfig, isPending}: WorkerFormProps) {
+  const allServices = serviceConfig.filter((s) => s.active).sort((a, b) => a.sortOrder - b.sortOrder)
+
+  const [personId, setPersonId] = useState<number | null>(worker?.personId ?? null)
   const [name, setName] = useState(worker?.name || '')
   const [maxPerMonth, setMaxPerMonth] = useState(worker?.maxPerMonth ?? 4)
   const [allowMultiplePerDay, setAllowMultiplePerDay] = useState(worker?.allowMultiplePerDay ?? false)
-  const [services, setServices] = useState<Record<ServiceType, {enabled: boolean; maxPerMonth: string}>>(
-    ALL_SERVICES.reduce(
-      (acc, svc) => {
-        const existing = worker?.services.find((s) => s.serviceType === svc.type)
-        acc[svc.type] = {
-          enabled: !!existing,
-          maxPerMonth: existing?.maxPerMonth?.toString() || '',
-        }
-        return acc
-      },
-      {} as Record<ServiceType, {enabled: boolean; maxPerMonth: string}>,
-    ),
+  const [services, setServices] = useState<Record<number, {enabled: boolean; maxPerMonth: string}>>(() =>
+    buildServiceState(allServices, worker),
   )
+
+  function buildServiceState(list: ServiceConfig[], w?: NurseryWorker | null) {
+    return list.reduce<Record<number, {enabled: boolean; maxPerMonth: string}>>((acc, svc) => {
+      const existing = w?.services.find((s) => s.serviceTimeId === svc.serviceTimeId)
+      acc[svc.serviceTimeId] = {enabled: !!existing, maxPerMonth: existing?.maxPerMonth?.toString() || ''}
+      return acc
+    }, {})
+  }
 
   // Reset form when dialog opens with new worker
   function resetForm() {
+    setPersonId(worker?.personId ?? null)
     setName(worker?.name || '')
     setMaxPerMonth(worker?.maxPerMonth ?? 4)
     setAllowMultiplePerDay(worker?.allowMultiplePerDay ?? false)
-    setServices(
-      ALL_SERVICES.reduce(
-        (acc, svc) => {
-          const existing = worker?.services.find((s) => s.serviceType === svc.type)
-          acc[svc.type] = {
-            enabled: !!existing,
-            maxPerMonth: existing?.maxPerMonth?.toString() || '',
-          }
-          return acc
-        },
-        {} as Record<ServiceType, {enabled: boolean; maxPerMonth: string}>,
-      ),
-    )
+    setServices(buildServiceState(allServices, worker))
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim()) return
+    if (personId == null) return
 
-    const enabledServices = ALL_SERVICES.filter((svc) => services[svc.type].enabled).map((svc) => ({
-      serviceType: svc.type,
-      maxPerMonth: services[svc.type].maxPerMonth ? Number(services[svc.type].maxPerMonth) : null,
-    }))
+    const enabledServices = allServices
+      .filter((svc) => services[svc.serviceTimeId]?.enabled)
+      .map((svc) => ({
+        serviceTimeId: svc.serviceTimeId,
+        maxPerMonth: services[svc.serviceTimeId].maxPerMonth ? Number(services[svc.serviceTimeId].maxPerMonth) : null,
+      }))
 
-    onSave({name: name.trim(), maxPerMonth, allowMultiplePerDay, services: enabledServices})
+    onSave({
+      personId,
+      name: name.trim() ? name.trim() : null,
+      maxPerMonth,
+      allowMultiplePerDay,
+      services: enabledServices,
+    })
   }
 
   return (
@@ -90,8 +85,22 @@ export function NurseryWorkerForm({open, onOpenChange, onSave, worker, isPending
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Worker name" />
+            <Label>Contact</Label>
+            <PersonPicker value={personId} onChange={setPersonId} placeholder="Select contact..." />
+            <p className="text-xs text-muted-foreground">
+              A nursery worker is always a contact — that is what lets us catch her being scheduled to sing during a
+              service she is working.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="name">Prints as (optional)</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Leave blank to use the contact's name"
+            />
           </div>
 
           <div className="space-y-2">
@@ -119,44 +128,47 @@ export function NurseryWorkerForm({open, onOpenChange, onSave, worker, isPending
 
           <div className="space-y-3">
             <Label>Eligible Services</Label>
-            {ALL_SERVICES.map((svc) => (
-              <div key={svc.type} className="flex items-center gap-3">
+            {allServices.map((svc) => (
+              <div key={svc.serviceTimeId} className="flex items-center gap-3">
                 <Checkbox
-                  id={`svc-${svc.type}`}
-                  checked={services[svc.type].enabled}
+                  id={`svc-${svc.serviceTimeId}`}
+                  checked={services[svc.serviceTimeId]?.enabled ?? false}
                   onCheckedChange={(c) =>
-                    setServices((prev) => ({...prev, [svc.type]: {...prev[svc.type], enabled: c === true}}))
+                    setServices((prev) => ({
+                      ...prev,
+                      [svc.serviceTimeId]: {...prev[svc.serviceTimeId], enabled: c === true},
+                    }))
                   }
                 />
-                <Label htmlFor={`svc-${svc.type}`} className="text-sm flex-1">
+                <Label htmlFor={`svc-${svc.serviceTimeId}`} className="text-sm flex-1">
                   {svc.label}
                 </Label>
-                {services[svc.type].enabled && (
+                {services[svc.serviceTimeId]?.enabled && (
                   <Input
                     type="number"
                     min={1}
                     max={10}
                     placeholder="No limit"
                     className="w-24 h-8 text-xs"
-                    value={services[svc.type].maxPerMonth}
+                    value={services[svc.serviceTimeId].maxPerMonth}
                     onChange={(e) =>
-                      setServices((prev) => ({...prev, [svc.type]: {...prev[svc.type], maxPerMonth: e.target.value}}))
+                      setServices((prev) => ({
+                        ...prev,
+                        [svc.serviceTimeId]: {...prev[svc.serviceTimeId], maxPerMonth: e.target.value},
+                      }))
                     }
                   />
                 )}
               </div>
             ))}
-            <p className="text-xs text-muted-foreground">
-              Optional per-service limit (leave blank for no per-service limit)
-            </p>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!name.trim() || isPending}>
-              {worker ? 'Save Changes' : 'Add Worker'}
+            <Button type="submit" disabled={isPending || personId == null}>
+              {isPending ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </form>

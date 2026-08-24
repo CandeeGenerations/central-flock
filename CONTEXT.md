@@ -67,6 +67,31 @@ rendered through a template. One person with two **Signups** that merge into one
 Shift Reminder, not two.
 _Avoid_: Notification, Alert.
 
+### Nursery
+
+**Nursery Worker**:
+A **Person** who staffs the nursery, plus the nursery-specific rules that govern how often she can
+be scheduled — her monthly cap, her per-service caps, and whether she may take more than one service
+in a day. Always a contact: the link to a Person is required, which is what lets a nursery
+assignment be compared against a **Special Music** performance for the same service. Carries an
+optional name override for the roster to print (nursery worker "Yuny Mejia" is contact "Juni
+Salgado"); with no override the contact's own name prints.
+_Avoid_: Volunteer, Helper, Worker (bare — the fair booth has its own workers).
+
+**Double Booking**:
+A **Nursery Worker** assigned to the nursery for a service her **Person** is also expected in the
+auditorium for — today, that means a **Special Music** performance on the same date and
+**Service Time**. Asymmetric by design: a **Nursery Assignment** is _exclusive_ (it removes her
+from the service), while singing, preaching, and playing are all _present_ commitments that stack
+freely — a man who preaches and sings a solo in the same service is not double booked, and neither
+is a woman who sings twice. Derived at read time, never stored, because either side can move at any
+moment. Advisory only: it never blocks a save, never blocks marking a schedule final, and never
+appears on a printed sheet — it is a tool for whoever is building the schedule, not a fact about
+the service. A **Special Music** entry with no **Service Time** (a one-off) can never be double
+booked, and neither can a **Guest Performer**, who is a loose name rather than a Person.
+_Avoid_: Conflict (too generic), Overlap (means the nursery's cross-month carryover — see
+docs/adr/0003-nursery-cross-month-overlap.md), Clash, Collision.
+
 ### Workers' Notes
 
 **Workers' Notes Edition**:
@@ -198,9 +223,12 @@ _Avoid_: Number (bare — a **Devotion** has one too), Sermon Number.
 
 **Service Time**:
 An admin-managed, recurring worship-service slot identified by a name, a day-of-week, and a
-time (e.g. "Sunday Evening" / Sunday / 18:30). The configurable list the admin maintains; the
-public entry app groups these by day-of-week under a chosen week, and (week + day-of-week)
-resolves to the concrete date stored on a **Service Record**.
+time (e.g. "Sunday Evening" / Sunday / 18:30). The configurable list the admin maintains, and the
+app's single vocabulary for "which service" — **Service Records**, **Sermons**, **Music Schedules**,
+**Nursery Assignments**, and **Special Music** all key off it rather than off their own service
+enums. Because it is a mutable row and not a frozen enum, a Service Time is _retired_
+(`active = false`) rather than deleted once anything references it; retired Service Times still
+render in past schedules and stop being offered on new ones.
 _Avoid_: Service, Session, Event.
 
 **Service Record**:
@@ -225,9 +253,27 @@ A named person authorized to enter attendance from the public app. A lightweight
 and the basis for attribution — the public link is per-**Recorder** so we know who entered a number.
 _Avoid_: User, Counter, Usher, Contact.
 
+**Tally**:
+An _adjustment_ to a **Service Record**'s **Attendance** or **Streaming** — the ±1 an usher enters
+by tapping a key in the entry app. Carries a change, never a total, which is what lets two devices
+counting the same record both land: tallies from a phone that was offline and a laptop that was not
+add together instead of one overwriting the other. A Tally may not take a count below zero, and it
+carries the moment it was tapped (see docs/adr/0027-attendance-tally-adjustment-vs-correction.md).
+_Avoid_: Tap (the gesture, not the entry), Count (that is the number itself), Increment, Delta.
+
+**Correction**:
+An absolute value written over a **Service Record**'s **Attendance** or **Streaming** — typed into
+the entry app's Type box or edited on the admin dashboard. Unlike a **Tally** it _does_ override
+whatever the number was, deliberately: typing 137 is a statement about the true count, not a
+contribution to it. It settles the number as of the moment it was made: a **Tally** tapped earlier
+but still queued on some device is discarded when it arrives, while one tapped afterwards applies.
+_Avoid_: Edit (that is the log row), Set, Override, Adjustment (that is a **Tally**).
+
 **Record Edit**:
-One entry of an **Attendance**/**Streaming** value against a **Service Record**, capturing which
-**Recorder** entered it and when. Every save appends a **Record Edit** (full change log); the
+One entry against a **Service Record** — either a **Tally** or a **Correction** — capturing which
+**Recorder** made it and when. A Tally stores both its adjustment and the value that adjustment
+produced, so the log reads as a ledger ("+1 → 42") and one device's contribution stays legible; a
+Correction stores only the value. Every save appends a **Record Edit** (full change log); the
 **Service Record** keeps the latest edit's values and recorder for display.
 _Avoid_: Revision, Log entry.
 
@@ -334,6 +380,10 @@ time — never stored.
 - A **Service Record** belongs to exactly one **Service Time** and holds one **Attendance** and one **Streaming** value
 - A **Service Record** has many **Record Edits**; its current value is the latest **Record Edit**
 - A **Record Edit** is attributed to one **Recorder** (or to the admin, for in-app corrections)
+- A **Record Edit** is either a **Tally** (an adjustment) or a **Correction** (an absolute value)
+- **Tallies** against one **Service Record** commute — order of arrival cannot change the total
+- A **Correction** supersedes every **Tally** tapped before it, even one that arrives later;
+  **Tallies** tapped after it apply on top — so a Tally carries the moment it was tapped
 - **Total Attendance** is derived, never entered directly
 - A **Sermon** belongs to exactly one **Service Time** on exactly one date; that pair is unique
 - A **Sermon** has exactly one **Speaker**, who is always a **Person**
@@ -348,6 +398,12 @@ time — never stored.
 - A **Sermon** has at most one **Big Idea**, many **Cited Scriptures**, and optionally one **Series**
 - A **Reflection** may reference only the **Cited Scriptures** of its own **Sermon**
 - A **Social Quote** may be promoted into the **Quote** corpus, citing its **Sermon** as the source
+- A **Nursery Worker** is exactly one **Person**, plus nursery-specific caps and eligibility
+- A **Nursery Assignment** places one **Nursery Worker** in one slot of one **Service Time** on one date
+- A **Double Booking** is derived from one **Nursery Assignment** and one **Special Music** performance
+  sharing a **Person**, a date, and a **Service Time** — never stored
+- **Nursery Assignments**, **Special Music**, **Service Records**, **Sermons**, and **Music Schedules**
+  all name their service by **Service Time**; none of them keeps its own service enum
 
 ## Example dialogue
 
@@ -357,6 +413,13 @@ time — never stored.
 > once. The card is what she experiences, the roster count is what I track."
 > **Dev:** "So if she's Worker until 6 and Unit Leader after, is that still one **Shift**?"
 > **Domain expert:** "No — she's in charge for the second half. That has to be its own line."
+
+> **Dev:** "You typed 137 on the laptop, but your phone still has three taps it never sent. When
+> they finally go through, is it 137 or 140?"
+> **Domain expert:** "137. When I type a number I've just counted the room — that's the number.
+> Those three taps were part of getting to it."
+> **Dev:** "And if you tap once more on the phone after typing 137?"
+> **Domain expert:** "Then it's 138. That one's new."
 
 > **Dev:** "Someone signs up for Saturday on Saturday afternoon. Saturday's **Reminder Run** already
 > went out Friday night — do they get a **Shift Reminder**?"
@@ -374,6 +437,21 @@ time — never stored.
   variable renders a **Shift**. The variable name is baked into the template and is not worth a
   migration; the resolver treats `{{timeSlot}}` as "this person's **Shifts** on the Run's day."
   A new variable should be named for what it holds, not copied from this one.
+- "real time" for attendance meant two different things — the count on a second screen being
+  _current when you look at it_ (what was wanted) versus _pushed the instant it changes_ (what the
+  phrase implies). Resolved as polling while a screen is visible plus a refetch on focus/wake, not
+  streaming: docs/adr/0028-attendance-live-sync-by-polling.md.
 - "Category" (Church Metrics term for a configurable metric with Format/Kind/parent) was
   considered and rejected — for v1 the metrics are the two fixed fields Attendance and Streaming,
   and the configurable entity is the **Service Time** instead.
+- "service type" meant three different things — the nursery's `sunday_school|morning|evening|
+wednesday_evening` enum, special music's `sunday_am|sunday_pm|wednesday_pm|other` enum, and the
+  **Service Time** table that everything newer already used. Resolved: **Service Time** is the only
+  vocabulary; both enums migrate to `service_time_id`. Special music's `other` becomes a null
+  `service_time_id` with a free-text label, matching what **Music Schedule** already does for a
+  one-off service.
+- "Kim Stewart" existed twice with no link between them — as a `nursery_workers` row and as a
+  `people` row — which is what made double booking undetectable. Resolved: a **Nursery Worker** is
+  always a **Person**. Note the two names need not match: worker "Yuny Mejia" is contact "Juni
+  Salgado", which is why the name override exists and why matching on name string was rejected
+  (there are eight Kims in `people`).

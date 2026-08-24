@@ -19,18 +19,22 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 // ── Types ────────────────────────────────────────────────────────────
 
-export type ServiceType = 'sunday_school' | 'morning' | 'evening' | 'wednesday_evening'
-
+// Services are identified by service_times.id — the app's single service
+// vocabulary. See docs/adr/0025.
 export interface WorkerService {
   id: number
   workerId: number
-  serviceType: ServiceType
+  serviceTimeId: number
   maxPerMonth: number | null
 }
 
 export interface NurseryWorker {
   id: number
-  name: string
+  personId: number
+  // Nullable override for what the printed roster shows; `displayName` is the
+  // resolved value the UI should render.
+  name: string | null
+  displayName: string
   maxPerMonth: number
   allowMultiplePerDay: boolean
   isActive: boolean
@@ -40,10 +44,27 @@ export interface NurseryWorker {
 }
 
 export interface ServiceConfig {
-  serviceType: ServiceType
+  serviceTimeId: number
   label: string
+  dayOfWeek: number
   workerCount: number
   sortOrder: number
+  active: boolean
+}
+
+// A Nursery Worker in the nursery for a service she is also singing in.
+// Advisory only, derived live, never printed. See docs/adr/0026.
+export interface DoubleBooking {
+  personId: number
+  personName: string
+  date: string
+  serviceTimeId: number
+  serviceName: string
+  nurseryAssignmentId: number
+  nurseryWorkerId: number
+  nurserySlot: number
+  specialMusicId: number
+  specialMusicTitle: string | null
 }
 
 export interface NurserySchedule {
@@ -59,7 +80,7 @@ export interface NurseryAssignment {
   id: number
   scheduleId: number
   date: string
-  serviceType: ServiceType
+  serviceTimeId: number
   slot: number
   workerId: number | null
   workerName: string | null
@@ -78,8 +99,17 @@ export interface ScheduleOverlapInfo {
   missing: boolean
 }
 
+export interface ScheduleService {
+  id: number
+  label: string
+  dayOfWeek: number
+  sortOrder: number
+}
+
 export interface ScheduleWithAssignments extends NurserySchedule {
   assignments: NurseryAssignment[]
+  services: ScheduleService[]
+  doubleBookings: DoubleBooking[]
   overlap: ScheduleOverlapInfo | null
 }
 
@@ -90,17 +120,24 @@ export function fetchNurseryWorkers(): Promise<NurseryWorker[]> {
 }
 
 export function createNurseryWorker(data: {
-  name: string
+  personId: number
+  name?: string | null
   maxPerMonth?: number
   allowMultiplePerDay?: boolean
-  services?: {serviceType: ServiceType; maxPerMonth?: number | null}[]
+  services?: {serviceTimeId: number; maxPerMonth?: number | null}[]
 }): Promise<NurseryWorker> {
   return request('/nursery/workers', {method: 'POST', body: JSON.stringify(data)})
 }
 
 export function updateNurseryWorker(
   id: number,
-  data: Partial<{name: string; maxPerMonth: number; allowMultiplePerDay: boolean; isActive: boolean}>,
+  data: Partial<{
+    personId: number
+    name: string | null
+    maxPerMonth: number
+    allowMultiplePerDay: boolean
+    isActive: boolean
+  }>,
 ): Promise<NurseryWorker> {
   return request(`/nursery/workers/${id}`, {method: 'PUT', body: JSON.stringify(data)})
 }
@@ -111,7 +148,7 @@ export function deleteNurseryWorker(id: number): Promise<{success: boolean}> {
 
 export function updateWorkerServices(
   id: number,
-  services: {serviceType: ServiceType; maxPerMonth: number | null}[],
+  services: {serviceTimeId: number; maxPerMonth: number | null}[],
 ): Promise<NurseryWorker> {
   return request(`/nursery/workers/${id}/services`, {method: 'PUT', body: JSON.stringify({services})})
 }
@@ -122,8 +159,8 @@ export function fetchServiceConfig(): Promise<ServiceConfig[]> {
   return request('/nursery/service-config')
 }
 
-export function updateServiceConfig(type: ServiceType, workerCount: number): Promise<ServiceConfig> {
-  return request(`/nursery/service-config/${type}`, {method: 'PUT', body: JSON.stringify({workerCount})})
+export function updateServiceConfig(serviceTimeId: number, workerCount: number): Promise<ServiceConfig> {
+  return request(`/nursery/service-config/${serviceTimeId}`, {method: 'PUT', body: JSON.stringify({workerCount})})
 }
 
 // ── Schedules ────────────────────────────────────────────────────────

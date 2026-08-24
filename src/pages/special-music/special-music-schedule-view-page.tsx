@@ -9,6 +9,7 @@ import {Card, CardContent} from '@/components/ui/card'
 import {Dialog, DialogContent} from '@/components/ui/dialog'
 import {PageSpinner} from '@/components/ui/spinner'
 import {describeExportError, useScheduleExport} from '@/hooks/use-schedule-export'
+import {useServiceTimes} from '@/hooks/use-service-times'
 import {
   type Household,
   type SpecialMusicCell,
@@ -26,7 +27,7 @@ import {toast} from 'sonner'
 
 interface OpenCell {
   date: string
-  serviceType: 'sunday_am' | 'sunday_pm'
+  serviceTimeId: number
 }
 
 interface Recipient {
@@ -108,6 +109,7 @@ export function SpecialMusicScheduleViewPage() {
   const scheduleId = Number(id)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const serviceTimes = useServiceTimes()
   const previewRef = useRef<HTMLDivElement>(null)
   const [editMode, setEditMode] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
@@ -212,12 +214,24 @@ export function SpecialMusicScheduleViewPage() {
   if (isLoading) return <PageSpinner />
   if (!data) return <div className="text-muted-foreground p-6">Schedule not found</div>
 
-  const {schedule, cells} = data
+  const {schedule, cells, doubleBookings} = data
+  // Columns come from the configured Service Times, falling back to whatever
+  // the cells themselves reference so an unset setting still renders. See
+  // docs/adr/0025.
+  // Computed regardless of date; the UI stops nagging about the past.
+  // See docs/adr/0026.
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const upcomingDoubleBookings = doubleBookings.filter((c) => c.date >= todayIso)
+  const configuredIds = settings?.specialMusic.serviceTimeIds ?? []
+  const cellIds = [...new Set(cells.map((c) => c.serviceTimeId).filter((v): v is number => v != null))]
+  const previewServices = (configuredIds.length > 0 ? configuredIds : cellIds)
+    .map((id) => ({id, label: serviceTimes.byId.get(id)?.name ?? `Service #${id}`}))
+    .sort((a, b) => (serviceTimes.byId.get(a.id)?.sortOrder ?? 0) - (serviceTimes.byId.get(b.id)?.sortOrder ?? 0))
   const pdfRecipients = buildSpecialMusicRecipients(cells, households ?? []).map((r) => ({key: r.key, name: r.name}))
   const titlePrefix = settings?.specialMusic.titlePrefix ?? 'Special Music Schedule'
   const title = `${titlePrefix} - ${schedule.scopeLabel}`
   const openCellModel: SpecialMusicCell | null = openCell
-    ? (cells.find((c) => c.date === openCell.date && c.serviceType === openCell.serviceType) ?? null)
+    ? (cells.find((c) => c.date === openCell.date && c.serviceTimeId === openCell.serviceTimeId) ?? null)
     : null
 
   return (
@@ -256,9 +270,11 @@ export function SpecialMusicScheduleViewPage() {
               scopeStart={schedule.scopeStart!}
               scopeEnd={schedule.scopeEnd!}
               cells={cells}
+              services={previewServices}
               editMode={schedule.status === 'draft' && editMode}
               exporting={exporting}
-              onCellClick={(date, serviceType) => setOpenCell({date, serviceType})}
+              doubleBookings={upcomingDoubleBookings}
+              onCellClick={(date, serviceTimeId) => setOpenCell({date, serviceTimeId})}
               highlightCellIds={highlightCellIds}
               highlightDates={highlightDates}
             />
@@ -306,7 +322,7 @@ export function SpecialMusicScheduleViewPage() {
           {openCell ? (
             <ScheduleCellEditor
               date={openCell.date}
-              serviceType={openCell.serviceType}
+              serviceTimeId={openCell.serviceTimeId}
               cell={openCellModel}
               scheduleId={scheduleId}
               onClose={() => setOpenCell(null)}

@@ -1,6 +1,8 @@
 import {saveExportedDataUrl, saveExportedFile} from '@/lib/save-exported-file'
-import {toCanvas} from 'html-to-image'
-import {jsPDF} from 'jspdf'
+
+// html-to-image and jspdf are imported dynamically, matching use-schedule-export
+// and fair-booth-exports. A static import here would pull both into the main
+// bundle and make their lazy imports elsewhere inert.
 
 export type CalendarExportFormat = 'pdf' | 'jpg'
 
@@ -37,6 +39,7 @@ export async function generateCalendarExport({element, year, month, format}: Gen
     await document.fonts.ready
   }
 
+  const {toCanvas} = await import('html-to-image')
   const canvas = await toCanvas(element, {
     pixelRatio: 3,
     backgroundColor: '#ffffff',
@@ -51,6 +54,7 @@ export async function generateCalendarExport({element, year, month, format}: Gen
   }
 
   const imgData = canvas.toDataURL('image/png')
+  const {jsPDF} = await import('jspdf')
   const doc = new jsPDF({orientation: 'landscape', unit: 'pt', format: 'letter'})
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()

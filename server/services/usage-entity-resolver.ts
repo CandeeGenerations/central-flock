@@ -136,6 +136,26 @@ const RESOLVERS: Record<string, ResolverDef> = {
       get(db.select({title: schema.quotes.title}).from(schema.quotes).where(eq(schema.quotes.id, id)).get())?.title ??
       null,
   },
+  '/sermons/social': {
+    entityType: 'sermon',
+    typeLabel: 'Sermon',
+    resolveLabel: (id) => {
+      const r = get(
+        db
+          .select({
+            title: schema.sermons.title,
+            sermonDate: schema.sermons.sermonDate,
+            serviceTimeName: schema.serviceTimes.name,
+          })
+          .from(schema.sermons)
+          .innerJoin(schema.serviceTimes, eq(schema.serviceTimes.id, schema.sermons.serviceTimeId))
+          .where(eq(schema.sermons.id, id))
+          .get(),
+      )
+      if (!r) return null
+      return r.title || `${r.serviceTimeName} — ${r.sermonDate}`
+    },
+  },
   '/music/specials': {
     entityType: 'special',
     typeLabel: 'Special',
@@ -174,6 +194,36 @@ const RESOLVERS: Record<string, ResolverDef> = {
     entityType: 'fair_booth_schedule',
     typeLabel: 'Fair Booth',
     resolveLabel: (id) => resolveScheduleLabel(id),
+  },
+  // The route id is the edition, not the schedule envelope — so this resolves
+  // through workers_notes_editions rather than reusing resolveScheduleLabel.
+  '/schedules/sunday-school': {
+    entityType: 'workers_notes_edition',
+    typeLabel: "Workers' Notes",
+    resolveLabel: (id) =>
+      get(
+        db
+          .select({label: schema.schedules.scopeLabel})
+          .from(schema.workersNotesEditions)
+          .innerJoin(schema.schedules, eq(schema.schedules.id, schema.workersNotesEditions.scheduleId))
+          .where(eq(schema.workersNotesEditions.id, id))
+          .get(),
+      )?.label ?? null,
+  },
+  // Same shape as the Workers' Notes entry: the route id is the week, not the
+  // schedule envelope, so it resolves through music_schedules.
+  '/schedules/music': {
+    entityType: 'music_schedule',
+    typeLabel: 'Music Schedule',
+    resolveLabel: (id) =>
+      get(
+        db
+          .select({label: schema.schedules.scopeLabel})
+          .from(schema.musicSchedules)
+          .innerJoin(schema.schedules, eq(schema.schedules.id, schema.musicSchedules.scheduleId))
+          .where(eq(schema.musicSchedules.id, id))
+          .get(),
+      )?.label ?? null,
   },
   '/rsvp': {
     entityType: 'rsvp_list',

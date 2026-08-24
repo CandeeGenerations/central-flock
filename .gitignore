@@ -28,6 +28,8 @@ dist-ssr
 *.db-wal
 *.db-shm
 *.db.pre-*-bak
+*.db.pre-*-bak-wal
+*.db.pre-*-bak-shm
 
 # DB snapshots (taken by scripts/deploy.sh before each migrate)
 /backups/
@@ -43,3 +45,6 @@ dist-ssr
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Deploy output from the post-commit hook
+.deploy.log

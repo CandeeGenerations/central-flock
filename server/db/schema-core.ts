@@ -24,6 +24,9 @@ export const people = sqliteTable('people', {
   // Drives the Fair Booth day-header coverage color. Intentionally person-level
   // (stable across years); see docs/adr/0009-fair-booth-schedule.md.
   isHispanic: integer('is_hispanic', {mode: 'boolean'}).notNull().default(false),
+  // Marks someone who preaches, so the Sermon speaker picker offers only them rather than the
+  // whole contact list. Person-level and stable; a guest evangelist keeps the flag between visits.
+  isPreacher: integer('is_preacher', {mode: 'boolean'}).notNull().default(false),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

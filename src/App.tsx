@@ -42,6 +42,9 @@ import {LoginPage} from '@/pages/login-page'
 import {MessageComposePage} from '@/pages/message-compose-page'
 import {MessageDetailPage} from '@/pages/message-detail-page'
 import {MessageHistoryPage} from '@/pages/message-history-page'
+import {MusicSchedulesListPage} from '@/pages/music-schedule/music-schedules-list-page'
+import {MusicWeekViewPage} from '@/pages/music-schedule/music-week-view-page'
+import {MusicServiceEditorPage} from '@/pages/music-schedule/service-editor-page'
 import {HymnSearchDetailPage} from '@/pages/music/hymn-search-detail-page'
 import {HymnSearchesPage} from '@/pages/music/hymn-searches-page'
 import {HymnsPrepPage} from '@/pages/music/hymns-prep-page'
@@ -55,16 +58,33 @@ import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
 import {RsvpDetailPage} from '@/pages/rsvp/rsvp-detail-page'
 import {RsvpListPage} from '@/pages/rsvp/rsvp-list-page'
-import {SchedulesSettingsPage} from '@/pages/schedules-settings-page'
+import {FairBoothSettingsSection} from '@/pages/schedules-settings/fair-booth-section'
+import {GeneralSettingsSection} from '@/pages/schedules-settings/general-section'
+import {MusicScheduleSettingsSection} from '@/pages/schedules-settings/music-schedule-section'
+import {NurserySettingsSection} from '@/pages/schedules-settings/nursery-section'
+import {SchedulesSettingsLayout} from '@/pages/schedules-settings/schedules-settings-layout'
+import {SpecialMusicSettingsSection} from '@/pages/schedules-settings/special-music-section'
+import {SundaySchoolDefaultsPane} from '@/pages/schedules-settings/sunday-school-defaults'
+import {SundaySchoolLessonsPane} from '@/pages/schedules-settings/sunday-school-lessons'
+import {SundaySchoolSettingsSection} from '@/pages/schedules-settings/sunday-school-section'
+import {SundaySchoolThemesPane} from '@/pages/schedules-settings/sunday-school-themes'
 import {QuoteDetailPage} from '@/pages/sermons/quote-detail-page'
 import {QuoteSearchDetailPage} from '@/pages/sermons/quote-search-detail-page'
 import {QuoteSearchesPage} from '@/pages/sermons/quote-searches-page'
 import {QuotesPage} from '@/pages/sermons/quotes-page'
 import {QuotesResearchPage} from '@/pages/sermons/quotes-research-page'
+import {SermonDetailPage} from '@/pages/sermons/sermon-detail-page'
+import {SermonsPage} from '@/pages/sermons/sermons-page'
 import {VerseStripsPage} from '@/pages/sermons/verse-strips-page'
 import {SettingsPage} from '@/pages/settings-page'
 import {SpecialMusicScheduleViewPage} from '@/pages/special-music/special-music-schedule-view-page'
 import {SpecialMusicSchedulesPage} from '@/pages/special-music/special-music-schedules-page'
+import {WorkersNotesBlocksPage} from '@/pages/sunday-school/workers-notes-blocks-page'
+import {WorkersNotesLessonsPage} from '@/pages/sunday-school/workers-notes-lessons-page'
+import {WorkersNotesListPage} from '@/pages/sunday-school/workers-notes-list-page'
+import {WorkersNotesMonthsPage} from '@/pages/sunday-school/workers-notes-months-page'
+import {WorkersNotesThemePage} from '@/pages/sunday-school/workers-notes-theme-page'
+import {WorkersNotesViewPage} from '@/pages/sunday-school/workers-notes-view-page'
 import {TemplateEditPage} from '@/pages/template-edit-page'
 import {TemplatesPage} from '@/pages/templates-page'
 import {
@@ -471,7 +491,29 @@ function AppLayoutInner({
               <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
               <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
               <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
-              <Route path="/schedules/settings" element={<SchedulesSettingsPage />} />
+              <Route path="/schedules/music" element={<MusicSchedulesListPage />} />
+              <Route path="/schedules/music/:id" element={<MusicWeekViewPage />} />
+              <Route path="/schedules/music/:id/service/:serviceId" element={<MusicServiceEditorPage />} />
+              <Route path="/schedules/sunday-school" element={<WorkersNotesListPage />} />
+              <Route path="/schedules/sunday-school/:id" element={<WorkersNotesViewPage />} />
+              <Route path="/schedules/sunday-school/:id/theme" element={<WorkersNotesThemePage />} />
+              <Route path="/schedules/sunday-school/:id/blocks" element={<WorkersNotesBlocksPage />} />
+              <Route path="/schedules/sunday-school/:id/months" element={<WorkersNotesMonthsPage />} />
+              <Route path="/schedules/sunday-school/:id/lessons" element={<WorkersNotesLessonsPage />} />
+              <Route path="/schedules/settings" element={<SchedulesSettingsLayout />}>
+                <Route index element={<Navigate to="general" replace />} />
+                <Route path="general" element={<GeneralSettingsSection />} />
+                <Route path="nursery" element={<NurserySettingsSection />} />
+                <Route path="special-music" element={<SpecialMusicSettingsSection />} />
+                <Route path="fair-booth" element={<FairBoothSettingsSection />} />
+                <Route path="music" element={<MusicScheduleSettingsSection />} />
+                <Route path="sunday-school" element={<SundaySchoolSettingsSection />}>
+                  <Route index element={<Navigate to="defaults" replace />} />
+                  <Route path="defaults" element={<SundaySchoolDefaultsPane />} />
+                  <Route path="themes" element={<SundaySchoolThemesPane />} />
+                  <Route path="lessons" element={<SundaySchoolLessonsPane />} />
+                </Route>
+              </Route>
               <Route path="/schedules/fair-booth" element={<FairBoothSchedulesPage />} />
               <Route path="/schedules/fair-booth/:id" element={<FairBoothSchedulePage />} />
               <Route path="/schedules/fair-booth/:id/day/:date" element={<FairBoothDayPage />} />
@@ -480,6 +522,8 @@ function AppLayoutInner({
               <Route path="/sermons/research" element={<QuotesResearchPage />} />
               <Route path="/sermons/searches" element={<QuoteSearchesPage />} />
               <Route path="/sermons/searches/:id" element={<QuoteSearchDetailPage />} />
+              <Route path="/sermons/social" element={<SermonsPage />} />
+              <Route path="/sermons/social/:id" element={<SermonDetailPage />} />
               <Route path="/sermons/verse-strips" element={<VerseStripsPage />} />
               <Route path="/music/hymns" element={<HymnsPrepPage />} />
               <Route path="/music/hymns/searches" element={<HymnSearchesPage />} />

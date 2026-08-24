@@ -3,8 +3,10 @@ import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
+import {findForNurserySchedule} from '../services/double-booking.js'
 import type {PriorMonthAssignment, ServiceConfig, WorkerWithEligibility} from '../services/nursery-scheduler.js'
 import {generateSchedule, getBorrowedPairDates} from '../services/nursery-scheduler.js'
+import {workerDisplayName} from '../services/nursery-workers.js'
 
 export const nurserySchedulesRouter = Router()
 
@@ -28,22 +30,47 @@ function scopeLabelFor(month: number, year: number): string {
 }
 
 function loadWorkers(): WorkerWithEligibility[] {
-  const workers = db.select().from(schema.nurseryWorkers).where(eq(schema.nurseryWorkers.isActive, true)).all()
+  const workers = db
+    .select({
+      worker: schema.nurseryWorkers,
+      firstName: schema.people.firstName,
+      lastName: schema.people.lastName,
+    })
+    .from(schema.nurseryWorkers)
+    .innerJoin(schema.people, eq(schema.people.id, schema.nurseryWorkers.personId))
+    .where(eq(schema.nurseryWorkers.isActive, true))
+    .all()
   const allServices = db.select().from(schema.nurseryWorkerServices).all()
 
-  return workers.map((w) => ({
-    id: w.id,
-    name: w.name,
-    maxPerMonth: w.maxPerMonth,
-    allowMultiplePerDay: w.allowMultiplePerDay,
+  return workers.map(({worker, firstName, lastName}) => ({
+    id: worker.id,
+    // The scheduler scores on first name (to avoid pairing two Graces), so it
+    // needs the resolved display name, not the nullable override.
+    name: workerDisplayName(worker.name, firstName, lastName),
+    maxPerMonth: worker.maxPerMonth,
+    allowMultiplePerDay: worker.allowMultiplePerDay,
     services: allServices
-      .filter((s) => s.workerId === w.id)
-      .map((s) => ({serviceType: s.serviceType, maxPerMonth: s.maxPerMonth})),
+      .filter((s) => s.workerId === worker.id)
+      .map((s) => ({serviceTimeId: s.serviceTimeId, maxPerMonth: s.maxPerMonth})),
   }))
 }
 
+// Only active Service Times seed new schedules; a retired one still renders in
+// the schedules that already reference it. See docs/adr/0025.
 function loadServiceConfig(): ServiceConfig[] {
-  return db.select().from(schema.nurseryServiceConfig).orderBy(schema.nurseryServiceConfig.sortOrder).all()
+  return db
+    .select({
+      serviceTimeId: schema.nurseryServiceConfig.serviceTimeId,
+      workerCount: schema.nurseryServiceConfig.workerCount,
+      label: schema.serviceTimes.name,
+      dayOfWeek: schema.serviceTimes.dayOfWeek,
+      sortOrder: schema.serviceTimes.sortOrder,
+    })
+    .from(schema.nurseryServiceConfig)
+    .innerJoin(schema.serviceTimes, eq(schema.serviceTimes.id, schema.nurseryServiceConfig.serviceTimeId))
+    .where(eq(schema.serviceTimes.active, true))
+    .orderBy(schema.serviceTimes.sortOrder)
+    .all()
 }
 
 // Returns the prior month's "canonical" schedule for overlap lookup:
@@ -97,7 +124,7 @@ function loadPriorMonthOverlapAssignments(
   return {
     borrow,
     priorSchedule: {id: priorSchedule.id, status: priorSchedule.status},
-    assignments: rows.map((r) => ({date: r.date, serviceType: r.serviceType, slot: r.slot, workerId: r.workerId})),
+    assignments: rows.map((r) => ({date: r.date, serviceTimeId: r.serviceTimeId, slot: r.slot, workerId: r.workerId})),
   }
 }
 
@@ -115,8 +142,23 @@ function loadScheduleWithAssignments(scheduleId: number) {
     .where(eq(schema.nurseryAssignments.scheduleId, scheduleId))
     .all()
 
-  const workers = db.select().from(schema.nurseryWorkers).all()
-  const workerMap = new Map(workers.map((w) => [w.id, w]))
+  const workers = db
+    .select({
+      worker: schema.nurseryWorkers,
+      firstName: schema.people.firstName,
+      lastName: schema.people.lastName,
+    })
+    .from(schema.nurseryWorkers)
+    .innerJoin(schema.people, eq(schema.people.id, schema.nurseryWorkers.personId))
+    .all()
+  const workerMap = new Map(
+    workers.map(({worker, firstName, lastName}) => [
+      worker.id,
+      {...worker, displayName: workerDisplayName(worker.name, firstName, lastName)},
+    ]),
+  )
+
+  const services = db.select().from(schema.serviceTimes).orderBy(schema.serviceTimes.sortOrder).all()
 
   const overlap = loadPriorMonthOverlapAssignments(schedule.month, schedule.year)
   const carryoverDates = new Set(overlap?.borrow.dates ?? [])
@@ -141,7 +183,7 @@ function loadScheduleWithAssignments(scheduleId: number) {
 
   const enrichedNative = nativeAssignments.map((a) => ({
     ...a,
-    workerName: a.workerId ? workerMap.get(a.workerId)?.name || null : null,
+    workerName: a.workerId ? workerMap.get(a.workerId)?.displayName || null : null,
     isCarryover: false as const,
     sourceScheduleId: null as number | null,
     sourceMonth: null as number | null,
@@ -150,7 +192,7 @@ function loadScheduleWithAssignments(scheduleId: number) {
 
   const enrichedCarryover = priorRows.map((a) => ({
     ...a,
-    workerName: a.workerId ? workerMap.get(a.workerId)?.name || null : null,
+    workerName: a.workerId ? workerMap.get(a.workerId)?.displayName || null : null,
     isCarryover: true as const,
     sourceScheduleId: overlap!.priorSchedule!.id,
     sourceMonth: overlap!.borrow.priorMonth,
@@ -159,6 +201,15 @@ function loadScheduleWithAssignments(scheduleId: number) {
 
   return {
     ...schedule,
+    services: services.map((st) => ({
+      id: st.id,
+      label: st.name,
+      dayOfWeek: st.dayOfWeek,
+      sortOrder: st.sortOrder,
+    })),
+    // Advisory only — computed live, never stored, and never exported.
+    // See docs/adr/0026.
+    doubleBookings: findForNurserySchedule(scheduleId),
     assignments: [...enrichedNative, ...enrichedCarryover],
     overlap: overlap
       ? {
@@ -234,7 +285,7 @@ nurserySchedulesRouter.post(
         .values({
           scheduleId: schedule.id,
           date: slot.date,
-          serviceType: slot.serviceType,
+          serviceTimeId: slot.serviceTimeId,
           slot: slot.slot,
           workerId: slot.workerId,
         })
@@ -327,8 +378,20 @@ nurserySchedulesRouter.patch(
       .returning()
       .get()
 
-    const workerName = workerId
-      ? db.select().from(schema.nurseryWorkers).where(eq(schema.nurseryWorkers.id, workerId)).get()?.name || null
+    const workerRow = workerId
+      ? db
+          .select({
+            worker: schema.nurseryWorkers,
+            firstName: schema.people.firstName,
+            lastName: schema.people.lastName,
+          })
+          .from(schema.nurseryWorkers)
+          .innerJoin(schema.people, eq(schema.people.id, schema.nurseryWorkers.personId))
+          .where(eq(schema.nurseryWorkers.id, workerId))
+          .get()
+      : null
+    const workerName = workerRow
+      ? workerDisplayName(workerRow.worker.name, workerRow.firstName, workerRow.lastName)
       : null
 
     res.json({...updated, workerName})

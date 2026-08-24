@@ -30,18 +30,21 @@ import {homeRouter} from './routes/home.js'
 import {hymnsRouter} from './routes/hymns.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter, processSendJob} from './routes/messages.js'
+import {musicSchedulesRouter} from './routes/music-schedules.js'
 import {nurserySchedulesRouter} from './routes/nursery-schedules.js'
 import {nurseryRouter} from './routes/nursery.js'
 import {peopleRouter} from './routes/people.js'
 import {quotesRouter} from './routes/quotes.js'
 import {rsvpRouter} from './routes/rsvp.js'
 import {schedulesRouter} from './routes/schedules.js'
+import {sermonsRouter} from './routes/sermons.js'
 import {settingsRouter} from './routes/settings.js'
 import {specialsRouter} from './routes/specials.js'
 import {statsRouter} from './routes/stats.js'
 import {templatesRouter} from './routes/templates.js'
 import {usageRouter} from './routes/usage.js'
 import {webhooksRouter} from './routes/webhooks.js'
+import {workersNotesRouter} from './routes/workers-notes.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
 import {startFairBoothReminderScheduler} from './services/fair-booth-reminders.js'
@@ -81,11 +84,14 @@ app.use('/api/home', homeRouter)
 app.use('/api/devotions', devotionsRouter)
 app.use('/api/gwendolyn-devotions', gwendolynDevotionsRouter)
 app.use('/api/schedules/fair-booth', fairBoothRouter)
+app.use('/api/schedules/music', musicSchedulesRouter)
+app.use('/api/schedules/workers-notes', workersNotesRouter)
 app.use('/api/schedules', schedulesRouter)
 app.use('/api/nursery/schedules', nurserySchedulesRouter)
 app.use('/api/nursery', nurseryRouter)
 app.use('/api/quotes', quotesRouter)
 app.use('/api/hymns', hymnsRouter)
+app.use('/api/sermons', sermonsRouter)
 app.use('/api/rsvp', rsvpRouter)
 app.use('/api/attendance', attendanceRouter)
 app.use('/api/settings', settingsRouter)

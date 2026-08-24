@@ -1,8 +1,6 @@
 import {SearchableSelect} from '@/components/ui/searchable-select'
-import type {NurseryAssignment, NurseryWorker, ServiceConfig, ServiceType} from '@/lib/nursery-api'
+import type {DoubleBooking, NurseryAssignment, NurseryWorker, ServiceConfig} from '@/lib/nursery-api'
 import {useMemo} from 'react'
-
-const SERVICE_ORDER: ServiceType[] = ['sunday_school', 'morning', 'evening', 'wednesday_evening']
 
 interface SchedulePreviewProps {
   assignments: NurseryAssignment[]
@@ -18,13 +16,43 @@ interface SchedulePreviewProps {
   // dates = the date column on the matching rows.
   highlightAssignmentIds?: Set<number>
   highlightDates?: Set<string>
+  // Advisory Double Bookings for this schedule. Suppressed when `exporting`.
+  doubleBookings?: DoubleBooking[]
+}
+
+// Advisory Double Booking marker. Never rendered when `exporting` — the
+// printed sheet goes to the nursery wall. See docs/adr/0026.
+function DoubleBookedBadge({conflict}: {conflict: DoubleBooking}) {
+  return (
+    <a
+      href={`/music/specials/${conflict.specialMusicId}`}
+      title={`${conflict.personName} is also singing at ${conflict.serviceName} on ${conflict.date}${
+        conflict.specialMusicTitle ? ` — ${conflict.specialMusicTitle}` : ''
+      }`}
+      style={{
+        marginLeft: 6,
+        fontSize: 10,
+        fontWeight: 600,
+        color: '#92400e',
+        backgroundColor: '#fef3c7',
+        border: '1px solid #fbbf24',
+        borderRadius: 4,
+        padding: '1px 5px',
+        cursor: 'pointer',
+        verticalAlign: 'middle',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      also singing
+    </a>
+  )
 }
 
 interface DateGroup {
   date: string
   displayDate: string
   services: {
-    serviceType: ServiceType
+    serviceTimeId: number
     label: string
     workerCount: number
     slots: NurseryAssignment[]
@@ -68,30 +96,39 @@ export function NurserySchedulePreview({
   onCarryoverClick,
   highlightAssignmentIds,
   highlightDates,
+  doubleBookings,
 }: SchedulePreviewProps) {
   const configMap = useMemo(() => {
-    const map = new Map<ServiceType, ServiceConfig>()
-    serviceConfig.forEach((c) => map.set(c.serviceType, c))
+    const map = new Map<number, ServiceConfig>()
+    serviceConfig.forEach((c) => map.set(c.serviceTimeId, c))
     return map
   }, [serviceConfig])
+
+  // A Double Booking is advisory and never exported — keyed by assignment id so
+  // a cell can look itself up. See docs/adr/0026.
+  const conflictByAssignment = useMemo(() => {
+    const map = new Map<number, DoubleBooking>()
+    if (!exporting) doubleBookings?.forEach((c) => map.set(c.nurseryAssignmentId, c))
+    return map
+  }, [doubleBookings, exporting])
 
   const dateGroups: DateGroup[] = useMemo(() => {
     const dates = [...new Set(assignments.map((a) => a.date))].sort()
     return dates.map((date) => {
       const dateAssignments = assignments.filter((a) => a.date === date)
-      const serviceTypes = [...new Set(dateAssignments.map((a) => a.serviceType))]
-      serviceTypes.sort((a, b) => SERVICE_ORDER.indexOf(a) - SERVICE_ORDER.indexOf(b))
+      const serviceTimeIds = [...new Set(dateAssignments.map((a) => a.serviceTimeId))]
+      serviceTimeIds.sort((a, b) => (configMap.get(a)?.sortOrder ?? 0) - (configMap.get(b)?.sortOrder ?? 0))
 
       return {
         date,
         displayDate: formatDisplayDate(date),
-        services: serviceTypes.map((st) => {
-          const config = configMap.get(st)
+        services: serviceTimeIds.map((stId) => {
+          const config = configMap.get(stId)
           return {
-            serviceType: st,
-            label: config?.label || st,
+            serviceTimeId: stId,
+            label: config?.label || `Service #${stId}`,
             workerCount: config?.workerCount || 1,
-            slots: dateAssignments.filter((a) => a.serviceType === st).sort((a, b) => a.slot - b.slot),
+            slots: dateAssignments.filter((a) => a.serviceTimeId === stId).sort((a, b) => a.slot - b.slot),
           }
         }),
       }
@@ -102,7 +139,7 @@ export function NurserySchedulePreview({
     if (!workers) return []
     return [
       {value: '', label: '- Unassigned -'},
-      ...workers.filter((w) => w.isActive).map((w) => ({value: String(w.id), label: w.name})),
+      ...workers.filter((w) => w.isActive).map((w) => ({value: String(w.id), label: w.displayName})),
     ]
   }, [workers])
 
@@ -156,7 +193,7 @@ export function NurserySchedulePreview({
             const totalRows = group.services.length
             const dateHighlighted = highlightDates?.has(group.date) ?? false
             return group.services.map((svc, svcIdx) => (
-              <tr key={`${group.date}-${svc.serviceType}`}>
+              <tr key={`${group.date}-${svc.serviceTimeId}`}>
                 {svcIdx === 0 && (
                   <td
                     className="px-3 py-2 text-sm font-medium align-middle"
@@ -204,6 +241,7 @@ export function NurserySchedulePreview({
                     )
                   }
                   const isCarryover = slotAssignment?.isCarryover ?? false
+                  const conflict = slotAssignment ? conflictByAssignment.get(slotAssignment.id) : undefined
                   if (editMode && slotAssignment && onAssignmentChange && !isCarryover) {
                     return (
                       <td key={slotNum} className="px-1 py-1 text-sm" style={cellStyle}>
@@ -214,6 +252,7 @@ export function NurserySchedulePreview({
                           placeholder="Select worker"
                           className="w-full text-xs h-7 border-0 px-2 !bg-transparent"
                         />
+                        {conflict ? <DoubleBookedBadge conflict={conflict} /> : null}
                       </td>
                     )
                   }
@@ -227,6 +266,7 @@ export function NurserySchedulePreview({
                       }}
                     >
                       <span>{slotAssignment?.workerName || (slotAssignment?.workerId ? 'Unknown' : 'Unassigned')}</span>
+                      {conflict ? <DoubleBookedBadge conflict={conflict} /> : null}
                       {isCarryover && !exporting && slotAssignment ? (
                         <button
                           type="button"

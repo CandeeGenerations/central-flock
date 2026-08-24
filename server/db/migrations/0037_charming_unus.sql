@@ -1,0 +1,1 @@
+ALTER TABLE `people` ADD `is_preacher` integer DEFAULT false NOT NULL;

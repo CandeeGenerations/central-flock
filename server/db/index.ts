@@ -39,15 +39,6 @@ sqlite.exec(`
   END;
 `)
 
-// Seed nursery service config defaults (idempotent)
-sqlite.exec(`
-  INSERT OR IGNORE INTO nursery_service_config (service_type, label, worker_count, sort_order) VALUES
-    ('sunday_school', 'Sunday School Service', 1, 1),
-    ('morning', 'Morning Service', 2, 2),
-    ('evening', 'Evening Service', 1, 3),
-    ('wednesday_evening', 'Wednesday Evening Service', 2, 4)
-`)
-
 // Seed the 4 recurring service times on a fresh DB (idempotent: only when empty,
 // so admin edits/retirements are never clobbered). day_of_week: 0=Sun..6=Sat.
 {
@@ -62,6 +53,16 @@ sqlite.exec(`
     ins.run('Wednesday 7:30pm', 3, '19:30', 4)
   }
 }
+
+// Nursery service config is keyed by service_time_id (docs/adr/0025), so it is
+// seeded after service_times and derived from them: every service gets a row,
+// two workers for the Sunday 11:00 service and one everywhere else. INSERT OR
+// IGNORE, so an admin's worker-count edit is never clobbered.
+sqlite.exec(`
+  INSERT OR IGNORE INTO nursery_service_config (service_time_id, worker_count)
+  SELECT id, CASE WHEN day_of_week = 0 AND time = '11:00' THEN 2 ELSE 1 END
+  FROM service_times
+`)
 
 // Seed per-schedule-type settings defaults (idempotent). See ADR 0006.
 {

@@ -152,7 +152,16 @@ peopleRouter.get(
 peopleRouter.get(
   '/',
   asyncHandler(async (req, res) => {
-    const {search, status, groupId, page = '1', limit = '50', sort = 'createdAt', sortDir = 'desc'} = req.query
+    const {
+      search,
+      status,
+      groupId,
+      isPreacher,
+      page = '1',
+      limit = '50',
+      sort = 'createdAt',
+      sortDir = 'desc',
+    } = req.query
     const offset = (Number(page) - 1) * Number(limit)
 
     const conditions = []
@@ -179,6 +188,10 @@ peopleRouter.get(
         .from(schema.peopleGroups)
         .where(eq(schema.peopleGroups.groupId, Number(groupId)))
       conditions.push(inArray(schema.people.id, memberIds))
+    }
+
+    if (isPreacher === '1' || isPreacher === 'true') {
+      conditions.push(eq(schema.people.isPreacher, true))
     }
 
     const where = conditions.length > 0 ? and(...conditions) : undefined
@@ -397,6 +410,7 @@ peopleRouter.put(
       anniversaryYear,
       displayFirstNameOnly,
       isHispanic,
+      isPreacher: isPreacherBody,
     } = req.body
 
     if (birthMonth !== undefined || birthDay !== undefined) {
@@ -432,6 +446,7 @@ peopleRouter.put(
         anniversaryYear: anniversaryYear !== undefined ? (anniversaryYear ?? null) : undefined,
         displayFirstNameOnly: typeof displayFirstNameOnly === 'boolean' ? displayFirstNameOnly : undefined,
         isHispanic: typeof isHispanic === 'boolean' ? isHispanic : undefined,
+        isPreacher: typeof isPreacherBody === 'boolean' ? isPreacherBody : undefined,
         updatedAt: sql`datetime('now')`,
       })
       .where(eq(schema.people.id, Number(req.params.id)))

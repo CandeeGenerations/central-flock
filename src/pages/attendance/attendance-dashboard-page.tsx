@@ -396,6 +396,11 @@ function HistoryDialog({record, onClose}: {record: ServiceRecordRow | null; onCl
                   <span className="text-muted-foreground"> · {e.createdAt}</span>
                 </div>
                 <div className="text-muted-foreground tabular-nums">
+                  {e.kind === 'tally' && e.adjustment !== null && (
+                    <span className="mr-2 font-medium text-foreground">
+                      {e.adjustment > 0 ? `+${e.adjustment}` : e.adjustment} →
+                    </span>
+                  )}
                   A {e.attendance ?? '—'} · S {e.streaming ?? '—'}
                 </div>
               </div>

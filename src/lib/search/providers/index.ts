@@ -9,12 +9,14 @@ import {groupsProvider} from './groups'
 import {gwendolynDevotionsProvider} from './gwendolyn-devotions'
 import {hymnsProvider} from './hymns'
 import {messagesProvider} from './messages'
+import {musicSchedulesProvider} from './music-schedules'
 import {nurserySchedulesProvider} from './nursery-schedules'
 import {peopleProvider} from './people'
 import {quotesProvider} from './quotes'
 import {recentsProvider} from './recents'
 import {recordersProvider} from './recorders'
 import {rsvpProvider} from './rsvp'
+import {sermonsProvider} from './sermons'
 import {serviceTimesProvider} from './service-times'
 import {specialMusicSchedulesProvider} from './special-music-schedules'
 import {specialsProvider} from './specials'
@@ -32,12 +34,14 @@ export const providers: SearchProvider[] = [
   fairBoothSchedulesProvider as SearchProvider,
   messagesProvider as SearchProvider,
   quotesProvider as SearchProvider,
+  sermonsProvider as SearchProvider,
   templatesProvider as SearchProvider,
   hymnsProvider as SearchProvider,
   draftsProvider as SearchProvider,
   gwendolynDevotionsProvider as SearchProvider,
   nurserySchedulesProvider as SearchProvider,
   specialMusicSchedulesProvider as SearchProvider,
+  musicSchedulesProvider as SearchProvider,
   calendarProvider as SearchProvider,
   rsvpProvider as SearchProvider,
   serviceTimesProvider as SearchProvider,

@@ -1,7 +1,7 @@
 import {sql} from 'drizzle-orm'
 import {integer, sqliteTable, text} from 'drizzle-orm/sqlite-core'
 
-export const scheduleTypes = ['nursery', 'special_music', 'fair_booth'] as const
+export const scheduleTypes = ['nursery', 'special_music', 'fair_booth', 'workers_notes', 'music_schedule'] as const
 export type ScheduleType = (typeof scheduleTypes)[number]
 
 export const scopeKinds = ['monthly', 'date_range'] as const
@@ -18,7 +18,7 @@ export const schedules = sqliteTable('schedules', {
   // monthly scope (nursery)
   month: integer('month'),
   year: integer('year'),
-  // date_range scope (special_music, future sunday_school)
+  // date_range scope (special_music, workers_notes)
   scopeStart: text('scope_start'),
   scopeEnd: text('scope_end'),
   // displayed in the title after the type's titlePrefix setting

@@ -17,15 +17,26 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export type ServiceType = 'sunday_am' | 'sunday_pm' | 'wednesday_pm' | 'other'
 export type SpecialType = 'solo' | 'duet' | 'trio' | 'group' | 'instrumental' | 'other'
 export type SpecialStatus = 'will_perform' | 'needs_review' | 'performed'
 
-export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
-  sunday_am: 'Sunday AM',
-  sunday_pm: 'Sunday PM',
-  wednesday_pm: 'Wednesday PM',
-  other: 'Other',
+// A Special Music performance names its service by service_times.id — the app's
+// single service vocabulary. null = a one-off carrying its own serviceLabel,
+// which can never be double booked. See docs/adr/0025.
+
+// A Nursery Worker in the nursery for a service she is also singing in.
+// Advisory only, derived live, never printed. See docs/adr/0026.
+export interface DoubleBooking {
+  personId: number
+  personName: string
+  date: string
+  serviceTimeId: number
+  serviceName: string
+  nurseryAssignmentId: number
+  nurseryWorkerId: number
+  nurserySlot: number
+  specialMusicId: number
+  specialMusicTitle: string | null
 }
 
 export const SPECIAL_TYPE_LABELS: Record<SpecialType, string> = {
@@ -62,7 +73,7 @@ export interface Hymn {
 export interface Special {
   id: number
   date: string
-  serviceType: ServiceType
+  serviceTimeId: number | null
   serviceLabel: string | null
   // Nullable when this row represents a scheduled-but-unsung Special Music
   // schedule cell (no song chosen yet).
@@ -84,11 +95,12 @@ export interface Special {
 
 export interface SpecialDetail extends Special {
   hymn: Hymn | null
+  doubleBookings: DoubleBooking[]
 }
 
 export interface CreateSpecialBody {
   date: string
-  serviceType: ServiceType
+  serviceTimeId: number | null
   serviceLabel?: string | null
   songTitle?: string | null
   hymnId?: number | null
@@ -123,7 +135,7 @@ export interface RepeatWarnings {
 
 export interface SpecialsListFilter {
   status?: SpecialStatus[]
-  serviceType?: ServiceType[]
+  serviceTimeIds?: number[]
   type?: SpecialType[]
   q?: string
 }
@@ -132,7 +144,7 @@ export const specialsApi = {
   list(filter: SpecialsListFilter = {}): Promise<Special[]> {
     const params = new URLSearchParams()
     if (filter.status?.length) params.set('status', filter.status.join(','))
-    if (filter.serviceType?.length) params.set('serviceType', filter.serviceType.join(','))
+    if (filter.serviceTimeIds?.length) params.set('serviceTimeId', filter.serviceTimeIds.join(','))
     if (filter.type?.length) params.set('type', filter.type.join(','))
     if (filter.q) params.set('q', filter.q)
     const qs = params.toString()

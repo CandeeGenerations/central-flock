@@ -25,6 +25,15 @@ export interface FooterBlock {
   bold?: boolean
 }
 
+// Page-1 bullet list of a Workers' Notes Edition. The three placeholder kinds
+// carry no text — they render from the edition's own Term, Yearly Theme, and
+// Mottos, so they cannot go stale when copied forward.
+export interface WorkersNotesBlockSeed {
+  kind: 'note' | 'spacer' | 'next_term_forms' | 'growth_plan' | 'month_themes'
+  text: string
+  bold?: boolean
+}
+
 export interface SchedulesSettings {
   logoPath: string | null
   // Squarer mark for image cards; falls back to logoPath when unset.
@@ -37,6 +46,8 @@ export interface SchedulesSettings {
     titlePrefix: string
     footerBlocks: FooterBlock[]
     singerGroupIds: number[]
+    // Which Service Times the Special Music Schedule covers. See docs/adr/0025.
+    serviceTimeIds: number[]
   }
   fairBooth: {
     titlePrefix: string
@@ -49,6 +60,21 @@ export interface SchedulesSettings {
     // Changing it re-times every Run still pending.
     reminderSendTime: string
   }
+  musicSchedule: {
+    titlePrefix: string
+    // Two printed headings per Service Time, keyed by service_time_id.
+    serviceHeadings: Record<string, {music: string; booth: string}>
+    footerBlocks: FooterBlock[]
+    footerImagePath: string | null
+    footerPlacement: 'last' | 'every' | 'never'
+  }
+  workersNotes: {
+    churchName: string
+    // Page 1 heads with the shared logo instead of the church-name line.
+    useLogoHeader: boolean
+    // Seeds a first edition's bullets only; later editions copy forward.
+    defaultBlocks: WorkersNotesBlockSeed[]
+  }
 }
 
 export const fetchSchedulesSettings = () => request<SchedulesSettings>('/schedules/settings')
@@ -58,6 +84,8 @@ export const updateSchedulesSettings = (
     nursery: Partial<SchedulesSettings['nursery']>
     specialMusic: Partial<SchedulesSettings['specialMusic']>
     fairBooth: Partial<SchedulesSettings['fairBooth']>
+    musicSchedule: Partial<SchedulesSettings['musicSchedule']>
+    workersNotes: Partial<SchedulesSettings['workersNotes']>
   }>,
 ) => request<SchedulesSettings>('/schedules/settings', {method: 'PUT', body: JSON.stringify(body)})
 
@@ -155,7 +183,8 @@ export interface SpecialMusicCellPerformer {
 export interface SpecialMusicCell {
   id: number
   date: string
-  serviceType: 'sunday_am' | 'sunday_pm' | 'wednesday_pm' | 'other'
+  // null = a one-off service named by serviceLabel. See docs/adr/0025.
+  serviceTimeId: number | null
   serviceLabel: string | null
   songTitle: string | null
   type: 'solo' | 'duet' | 'trio' | 'group' | 'instrumental' | 'other'
@@ -164,8 +193,25 @@ export interface SpecialMusicCell {
   performers: SpecialMusicCellPerformer[]
 }
 
+// A Nursery Worker in the nursery for a service she is also singing in.
+// Advisory only, derived live, never printed. See docs/adr/0026.
+export interface DoubleBooking {
+  personId: number
+  personName: string
+  date: string
+  serviceTimeId: number
+  serviceName: string
+  nurseryAssignmentId: number
+  nurseryWorkerId: number
+  nurserySlot: number
+  specialMusicId: number
+  specialMusicTitle: string | null
+}
+
 export const fetchSpecialMusicCells = (scheduleId: number) =>
-  request<{schedule: Schedule; cells: SpecialMusicCell[]}>(`/schedules/${scheduleId}/cells`)
+  request<{schedule: Schedule; cells: SpecialMusicCell[]; doubleBookings: DoubleBooking[]}>(
+    `/schedules/${scheduleId}/cells`,
+  )
 
 export const schedulesKeys = {
   settings: ['schedules', 'settings'] as const,

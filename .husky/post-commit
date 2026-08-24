@@ -20,5 +20,29 @@ if [[ -f "$REPO_ROOT/.env.deploy" ]]; then
   source "$REPO_ROOT/.env.deploy"
 fi
 
-echo "post-commit: on main → running deploy"
-"$REPO_ROOT/scripts/deploy.sh"
+# The full deploy is a few hundred lines of build output. Keep all of it in a
+# log file and echo only the step markers, so a commit doesn't bury the terminal
+# (or an agent's context) in font asset tables. On failure, dump the tail —
+# that's where the error is, since the script exits at the first one.
+# DEPLOY_VERBOSE=1 streams everything to the terminal instead.
+LOG="$REPO_ROOT/.deploy.log"
+
+echo "post-commit: on main → running deploy (full log: .deploy.log)"
+
+if [[ -n "${DEPLOY_VERBOSE:-}" ]]; then
+  "$REPO_ROOT/scripts/deploy.sh"
+  exit $?
+fi
+
+if "$REPO_ROOT/scripts/deploy.sh" >"$LOG" 2>&1; then
+  grep -E '^(==>|    (WARN|ERROR|Verified|Sentry))' "$LOG" || true
+  exit 0
+fi
+
+STATUS=$?
+echo "post-commit: DEPLOY FAILED (exit $STATUS) — last 40 lines:"
+echo "─────────────────────────────────────────────"
+tail -40 "$LOG"
+echo "─────────────────────────────────────────────"
+echo "post-commit: full log at .deploy.log"
+exit $STATUS

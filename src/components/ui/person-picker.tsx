@@ -11,6 +11,8 @@ interface PersonPickerProps {
   onChange: (id: number | null) => void
   placeholder?: string
   className?: string
+  // Narrow the list to people flagged as preachers (Sermon speaker picker).
+  preachersOnly?: boolean
 }
 
 function formatPerson(p: {firstName: string | null; lastName: string | null; phoneDisplay: string | null}) {
@@ -18,7 +20,13 @@ function formatPerson(p: {firstName: string | null; lastName: string | null; pho
   return p.phoneDisplay ? `${name} — ${p.phoneDisplay}` : name
 }
 
-export function PersonPicker({value, onChange, placeholder = 'Select person...', className}: PersonPickerProps) {
+export function PersonPicker({
+  value,
+  onChange,
+  placeholder = 'Select person...',
+  className,
+  preachersOnly = false,
+}: PersonPickerProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 200)
@@ -31,8 +39,13 @@ export function PersonPicker({value, onChange, placeholder = 'Select person...',
   })
 
   const {data: results} = useQuery({
-    queryKey: ['people-search', debouncedSearch],
-    queryFn: () => fetchPeople({search: debouncedSearch || undefined, limit: 20}),
+    queryKey: ['people-search', debouncedSearch, preachersOnly],
+    queryFn: () =>
+      fetchPeople({
+        search: debouncedSearch || undefined,
+        limit: 20,
+        isPreacher: preachersOnly ? '1' : undefined,
+      }),
     enabled: open,
   })
 

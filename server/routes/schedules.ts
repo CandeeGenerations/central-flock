@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node'
-import {and, asc, between, desc, eq, inArray, lt, sql} from 'drizzle-orm'
+import {and, asc, between, desc, eq, inArray, isNull, lt, sql} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'fs'
 import os from 'os'
@@ -9,6 +9,7 @@ import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {uploadPath, uploadUrl} from '../lib/uploads.js'
 import {sendImageViaUI} from '../services/applescript.js'
+import {findForSpecialMusic} from '../services/double-booking.js'
 import {
   DEFAULT_REMINDER_SEND_TIME,
   REMINDER_SEND_TIME_KEY,
@@ -25,6 +26,15 @@ const LOGOS_DIR = uploadPath('schedule-logos')
 
 export interface FooterBlock {
   kind: 'quote' | 'note' | 'spacer'
+  text: string
+  bold?: boolean
+}
+
+// Page-1 bullet list of a Workers' Notes Edition. The three placeholder kinds
+// carry no text — they render from the edition's own Term, Yearly Theme, and
+// Mottos, so they cannot go stale when copied forward.
+export interface WorkersNotesBlockSeed {
+  kind: 'note' | 'spacer' | 'next_term_forms' | 'growth_plan' | 'month_themes'
   text: string
   bold?: boolean
 }
@@ -47,6 +57,10 @@ interface SchedulesSettings {
     titlePrefix: string
     footerBlocks: FooterBlock[]
     singerGroupIds: number[]
+    // Which Service Times the Special Music Schedule covers — was a hardcoded
+    // ['sunday_am','sunday_pm'] before service times became the vocabulary.
+    // Seeded by migration 0042. See docs/adr/0025.
+    serviceTimeIds: number[]
   }
   fairBooth: {
     titlePrefix: string
@@ -58,6 +72,40 @@ interface SchedulesSettings {
     // Local HH:MM a Reminder Run fires, the evening before the day it covers.
     reminderSendTime: string
   }
+  musicSchedule: {
+    titlePrefix: string
+    // Two printed headings per Service Time — the Music Sheet says "MORNING
+    // SERVICE" where the Sound Booth Sheet says "SUNDAY MORNING". Keyed by
+    // service_time_id. See CONTEXT.md → Music Sheet / Sound Booth Sheet.
+    serviceHeadings: Record<string, {music: string; booth: string}>
+    footerBlocks: FooterBlock[]
+    // The music-note graphic under the footer quote.
+    footerImagePath: string | null
+    footerPlacement: 'last' | 'every' | 'never'
+  }
+  workersNotes: {
+    churchName: string
+    // When true, page 1 heads with the shared schedules logo instead of the
+    // church-name line. The logo carries the church identity itself.
+    useLogoHeader: boolean
+    // Seeds the Notes Blocks of a first edition only; later editions copy
+    // forward from their predecessor instead. See ADR 0006 amendment.
+    defaultBlocks: WorkersNotesBlockSeed[]
+  }
+}
+
+// Which Service Times the Special Music Schedule covers. Falls back to every
+// active Sunday service if the setting is missing, so a wiped setting degrades
+// to a slightly-wide schedule rather than an empty one.
+function specialMusicServiceTimeIds(): number[] {
+  const configured = readSettings().specialMusic.serviceTimeIds
+  if (configured.length > 0) return configured
+  return db
+    .select({id: schema.serviceTimes.id})
+    .from(schema.serviceTimes)
+    .where(and(eq(schema.serviceTimes.dayOfWeek, 0), eq(schema.serviceTimes.active, true)))
+    .all()
+    .map((r) => r.id)
 }
 
 function readSettings(): SchedulesSettings {
@@ -83,6 +131,7 @@ function readSettings(): SchedulesSettings {
       titlePrefix: map.get('schedules.specialMusic.titlePrefix') ?? 'Special Music Schedule',
       footerBlocks: parseJson<FooterBlock[]>('schedules.specialMusic.footerBlocks', []),
       singerGroupIds: parseJson<number[]>('schedules.specialMusic.singerGroupIds', []),
+      serviceTimeIds: parseJson<number[]>('schedules.specialMusic.serviceTimeIds', []),
     },
     fairBooth: {
       titlePrefix: map.get('schedules.fairBooth.titlePrefix') ?? 'Fair Booth Schedule',
@@ -110,6 +159,27 @@ function readSettings(): SchedulesSettings {
       personalShiftsIntro: map.get('schedules.fairBooth.personalShiftsIntro') ?? DEFAULT_PERSONAL_SHIFTS_INTRO,
       reminderSendTime: map.get(REMINDER_SEND_TIME_KEY) ?? DEFAULT_REMINDER_SEND_TIME,
     },
+    musicSchedule: {
+      titlePrefix: map.get('schedules.musicSchedule.titlePrefix') ?? 'Music Schedule',
+      serviceHeadings: parseJson<Record<string, {music: string; booth: string}>>(
+        'schedules.musicSchedule.serviceHeadings',
+        {},
+      ),
+      footerBlocks: parseJson<FooterBlock[]>('schedules.musicSchedule.footerBlocks', []),
+      footerImagePath: map.get('schedules.musicSchedule.footerImagePath') ?? null,
+      footerPlacement:
+        (map.get('schedules.musicSchedule.footerPlacement') as 'last' | 'every' | 'never' | undefined) ?? 'last',
+    },
+    workersNotes: {
+      churchName: map.get('schedules.workersNotes.churchName') ?? 'Central Baptist Church',
+      useLogoHeader: map.get('schedules.workersNotes.useLogoHeader') === 'true',
+      defaultBlocks: parseJson<WorkersNotesBlockSeed[]>('schedules.workersNotes.defaultBlocks', [
+        {kind: 'note', text: ''},
+        {kind: 'next_term_forms', text: ''},
+        {kind: 'growth_plan', text: ''},
+        {kind: 'month_themes', text: ''},
+      ]),
+    },
   }
 }
 
@@ -134,6 +204,8 @@ schedulesRouter.put(
       nursery: Partial<SchedulesSettings['nursery']>
       specialMusic: Partial<SchedulesSettings['specialMusic']>
       fairBooth: Partial<SchedulesSettings['fairBooth']>
+      musicSchedule: Partial<SchedulesSettings['musicSchedule']>
+      workersNotes: Partial<SchedulesSettings['workersNotes']>
     }>
     if (body.nursery?.titlePrefix !== undefined) upsert('schedules.nursery.titlePrefix', body.nursery.titlePrefix)
     if (body.nursery?.footerBlocks !== undefined)
@@ -142,8 +214,20 @@ schedulesRouter.put(
       upsert('schedules.specialMusic.titlePrefix', body.specialMusic.titlePrefix)
     if (body.specialMusic?.footerBlocks !== undefined)
       upsert('schedules.specialMusic.footerBlocks', JSON.stringify(body.specialMusic.footerBlocks))
+    if (body.specialMusic?.serviceTimeIds !== undefined)
+      upsert('schedules.specialMusic.serviceTimeIds', JSON.stringify(body.specialMusic.serviceTimeIds))
     if (body.specialMusic?.singerGroupIds !== undefined)
       upsert('schedules.specialMusic.singerGroupIds', JSON.stringify(body.specialMusic.singerGroupIds))
+    if (body.musicSchedule?.titlePrefix !== undefined)
+      upsert('schedules.musicSchedule.titlePrefix', body.musicSchedule.titlePrefix)
+    if (body.musicSchedule?.serviceHeadings !== undefined)
+      upsert('schedules.musicSchedule.serviceHeadings', JSON.stringify(body.musicSchedule.serviceHeadings))
+    if (body.musicSchedule?.footerBlocks !== undefined)
+      upsert('schedules.musicSchedule.footerBlocks', JSON.stringify(body.musicSchedule.footerBlocks))
+    if (body.musicSchedule?.footerImagePath !== undefined)
+      upsert('schedules.musicSchedule.footerImagePath', body.musicSchedule.footerImagePath ?? '')
+    if (body.musicSchedule?.footerPlacement !== undefined)
+      upsert('schedules.musicSchedule.footerPlacement', body.musicSchedule.footerPlacement)
     if (body.fairBooth?.titlePrefix !== undefined) upsert('schedules.fairBooth.titlePrefix', body.fairBooth.titlePrefix)
     if (body.fairBooth?.rosterGroupIds !== undefined)
       upsert('schedules.fairBooth.rosterGroupIds', JSON.stringify(body.fairBooth.rosterGroupIds))
@@ -175,6 +259,12 @@ schedulesRouter.put(
           .run()
       }
     }
+    if (body.workersNotes?.churchName !== undefined)
+      upsert('schedules.workersNotes.churchName', body.workersNotes.churchName)
+    if (body.workersNotes?.useLogoHeader !== undefined)
+      upsert('schedules.workersNotes.useLogoHeader', String(body.workersNotes.useLogoHeader))
+    if (body.workersNotes?.defaultBlocks !== undefined)
+      upsert('schedules.workersNotes.defaultBlocks', JSON.stringify(body.workersNotes.defaultBlocks))
     res.json(readSettings())
   }),
 )
@@ -338,7 +428,7 @@ schedulesRouter.get(
   asyncHandler(async (req, res) => {
     const type = typeof req.query.type === 'string' ? req.query.type : undefined
     const where =
-      type === 'nursery' || type === 'special_music' || type === 'fair_booth'
+      type === 'nursery' || type === 'special_music' || type === 'fair_booth' || type === 'workers_notes'
         ? eq(schema.schedules.scheduleType, type)
         : undefined
     const rows = db
@@ -492,7 +582,7 @@ schedulesRouter.post(
       .where(
         and(
           between(schema.specialMusic.date, source.scopeStart, source.scopeEnd!),
-          inArray(schema.specialMusic.serviceType, ['sunday_am', 'sunday_pm']),
+          inArray(schema.specialMusic.serviceTimeId, specialMusicServiceTimeIds()),
         ),
       )
       .all()
@@ -510,12 +600,19 @@ schedulesRouter.post(
     for (const cell of sourceCells) {
       const newDate = shiftDate(cell.date, deltaDays)
       if (newDate < b.scopeStart || newDate > b.scopeEnd) continue
-      // Skip if a cell already exists at (newDate, service_type) — avoids
+      // Skip if a cell already exists at (newDate, service_time_id) — avoids
       // duplicate rows when the new scope overlaps the source scope.
       const existing = db
         .select({id: schema.specialMusic.id})
         .from(schema.specialMusic)
-        .where(and(eq(schema.specialMusic.date, newDate), eq(schema.specialMusic.serviceType, cell.serviceType)))
+        .where(
+          and(
+            eq(schema.specialMusic.date, newDate),
+            cell.serviceTimeId == null
+              ? isNull(schema.specialMusic.serviceTimeId)
+              : eq(schema.specialMusic.serviceTimeId, cell.serviceTimeId),
+          ),
+        )
         .get()
       if (existing) {
         skippedExisting += 1
@@ -526,7 +623,7 @@ schedulesRouter.post(
         .insert(schema.specialMusic)
         .values({
           date: newDate,
-          serviceType: cell.serviceType,
+          serviceTimeId: cell.serviceTimeId,
           serviceLabel: cell.serviceLabel,
           songTitle: null,
           hymnId: null,
@@ -616,10 +713,10 @@ schedulesRouter.get(
       .where(
         and(
           between(schema.specialMusic.date, schedule.scopeStart, schedule.scopeEnd),
-          inArray(schema.specialMusic.serviceType, ['sunday_am', 'sunday_pm']),
+          inArray(schema.specialMusic.serviceTimeId, specialMusicServiceTimeIds()),
         ),
       )
-      .orderBy(asc(schema.specialMusic.date), asc(schema.specialMusic.serviceType))
+      .orderBy(asc(schema.specialMusic.date), asc(schema.specialMusic.serviceTimeId))
       .all()
 
     // Performers joined to people
@@ -696,7 +793,9 @@ schedulesRouter.get(
       }
     })
 
-    res.json({schedule, cells: decorated})
+    // Advisory only — derived live, never stored, never exported.
+    // See docs/adr/0026.
+    res.json({schedule, cells: decorated, doubleBookings: findForSpecialMusic(ids)})
   }),
 )
 

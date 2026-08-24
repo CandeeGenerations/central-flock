@@ -1,15 +1,17 @@
 import {sql} from 'drizzle-orm'
 import {integer, primaryKey, sqliteTable, text, unique} from 'drizzle-orm/sqlite-core'
 
+import {serviceTimes} from './schema-attendance.js'
 import {people} from './schema-core.js'
 import {hymns} from './schema-hymns.js'
 
 export const specialMusic = sqliteTable('special_music', {
   id: integer('id').primaryKey({autoIncrement: true}),
   date: text('date').notNull(), // 'YYYY-MM-DD'
-  serviceType: text('service_type', {
-    enum: ['sunday_am', 'sunday_pm', 'wednesday_pm', 'other'],
-  }).notNull(),
+  // Nullable: a one-off service (revival night) carries null + its own
+  // serviceLabel, the same shape music_schedule_services uses. A null can never
+  // be part of a Double Booking. See docs/adr/0025.
+  serviceTimeId: integer('service_time_id').references(() => serviceTimes.id, {onDelete: 'restrict'}),
   serviceLabel: text('service_label'),
   // Nullable so Special Music schedule cells can exist as "scheduled, not yet
   // sung" placeholders without a song chosen. See ADR 0006.

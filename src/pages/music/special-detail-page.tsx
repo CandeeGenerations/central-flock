@@ -5,9 +5,9 @@ import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {PageSpinner} from '@/components/ui/spinner'
+import {useServiceTimes} from '@/hooks/use-service-times'
 import {formatDate} from '@/lib/date'
 import {
-  SERVICE_TYPE_LABELS,
   SPECIAL_STATUS_LABELS,
   SPECIAL_TYPE_LABELS,
   type SpecialDetail,
@@ -20,7 +20,7 @@ import {
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Check, FileText, Trash2, Upload} from 'lucide-react'
 import {useRef, useState} from 'react'
-import {useNavigate, useParams} from 'react-router-dom'
+import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 const STATUS_STYLE: Record<SpecialStatus, string> = {
@@ -32,7 +32,7 @@ const STATUS_STYLE: Record<SpecialStatus, string> = {
 function detailToFormState(d: SpecialDetail): SpecialFormState {
   return {
     date: d.date,
-    serviceType: d.serviceType,
+    serviceTimeId: d.serviceTimeId,
     serviceLabel: d.serviceLabel ?? '',
     songTitle: d.songTitle ?? '',
     hymnId: d.hymnId,
@@ -61,6 +61,7 @@ interface SpecialEditorProps {
 function SpecialEditor({data}: SpecialEditorProps) {
   const id = data.id
   const navigate = useNavigate()
+  const serviceTimes = useServiceTimes()
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -147,6 +148,10 @@ function SpecialEditor({data}: SpecialEditorProps) {
     reader.readAsDataURL(f)
   }
 
+  // Computed regardless of date; the UI stops nagging about the past.
+  // See docs/adr/0026.
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const upcomingDoubleBookings = data.doubleBookings.filter((c) => c.date >= todayIso)
   const embed = youtubeEmbedUrl(data.youtubeUrl)
   const isPdf = data.sheetMusicPath?.toLowerCase().endsWith('.pdf')
 
@@ -157,9 +162,26 @@ function SpecialEditor({data}: SpecialEditorProps) {
           <div>
             <CardTitle className="text-xl">{data.songTitle}</CardTitle>
             <div className="text-sm text-muted-foreground mt-1">
-              {formatDate(data.date)} · {SERVICE_TYPE_LABELS[data.serviceType]}
-              {data.serviceLabel ? ` · ${data.serviceLabel}` : ''} · {SPECIAL_TYPE_LABELS[data.type]}
+              {formatDate(data.date)} · {serviceTimes.label(data.serviceTimeId, data.serviceLabel)} ·{' '}
+              {SPECIAL_TYPE_LABELS[data.type]}
             </div>
+            {/* Advisory only — never blocks, never printed. See docs/adr/0026. */}
+            {upcomingDoubleBookings.length > 0 && (
+              <div className="mt-2 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm">
+                <div className="font-medium text-amber-900 dark:text-amber-200">Double booked</div>
+                <ul className="mt-1 space-y-0.5 text-amber-900/90 dark:text-amber-200/90">
+                  {upcomingDoubleBookings.map((c) => (
+                    <li key={c.nurseryAssignmentId}>
+                      <span className="font-medium">{c.personName}</span> is also working the nursery for{' '}
+                      {c.serviceName} on {formatDate(c.date)}.{' '}
+                      <Link to="/nursery" className="underline">
+                        Nursery schedule
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {(data.performers.length > 0 || parseGuestPerformers(data.guestPerformers).length > 0) && (
               <div className="text-sm mt-2 flex flex-wrap gap-1">
                 {data.performers.map((p) => (

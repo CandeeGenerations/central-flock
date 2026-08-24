@@ -6,12 +6,12 @@ import path from 'path'
 import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {uploadPath, uploadUrl, urlToDiskPath} from '../lib/uploads.js'
+import {findForSpecialMusic} from '../services/double-booking.js'
 import {computeRepeatWarnings} from '../services/specials-repeat.js'
 import {extractFromYoutube} from '../services/youtube-extract.js'
 
 export const specialsRouter = Router()
 
-type ServiceType = 'sunday_am' | 'sunday_pm' | 'wednesday_pm' | 'other'
 type SpecialType = 'solo' | 'duet' | 'trio' | 'group' | 'instrumental' | 'other'
 type SpecialStatus = 'will_perform' | 'needs_review' | 'performed'
 
@@ -85,13 +85,13 @@ specialsRouter.get(
   '/',
   asyncHandler(async (req, res) => {
     const status = parseList(req.query.status)
-    const serviceType = parseList(req.query.serviceType)
+    const serviceTimeIds = parseList(req.query.serviceTimeId).map(Number).filter(Number.isInteger)
     const type = parseList(req.query.type)
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''
 
     const whereClauses = [
       status.length > 0 ? inArray(schema.specialMusic.status, status as SpecialStatus[]) : undefined,
-      serviceType.length > 0 ? inArray(schema.specialMusic.serviceType, serviceType as ServiceType[]) : undefined,
+      serviceTimeIds.length > 0 ? inArray(schema.specialMusic.serviceTimeId, serviceTimeIds) : undefined,
       type.length > 0 ? inArray(schema.specialMusic.type, type as SpecialType[]) : undefined,
       q ? like(schema.specialMusic.songTitle, `%${q}%`) : undefined,
     ].filter(Boolean)
@@ -139,9 +139,7 @@ specialsRouter.get(
             and(
               inArray(schema.specialMusic.id, missing),
               status.length > 0 ? inArray(schema.specialMusic.status, status as SpecialStatus[]) : undefined,
-              serviceType.length > 0
-                ? inArray(schema.specialMusic.serviceType, serviceType as ServiceType[])
-                : undefined,
+              serviceTimeIds.length > 0 ? inArray(schema.specialMusic.serviceTimeId, serviceTimeIds) : undefined,
               type.length > 0 ? inArray(schema.specialMusic.type, type as SpecialType[]) : undefined,
             ),
           )
@@ -169,13 +167,15 @@ specialsRouter.get(
     if (row.hymnId != null) {
       hymn = db.select().from(schema.hymns).where(eq(schema.hymns.id, row.hymnId)).get() ?? null
     }
-    res.json({...withPerf, hymn})
+    // Advisory only — derived live, never stored. See docs/adr/0026.
+    res.json({...withPerf, hymn, doubleBookings: findForSpecialMusic([row.id])})
   }),
 )
 
 type CreateBody = {
   date: string
-  serviceType: ServiceType
+  // null = a one-off service carrying its own serviceLabel. See docs/adr/0025.
+  serviceTimeId: number | null
   serviceLabel?: string | null
   // Nullable: Special Music schedule cells can be created as
   // scheduled-but-unsung placeholders (no song yet). See ADR 0006.
@@ -195,8 +195,9 @@ function validateCreate(body: unknown): CreateBody | string {
   if (!body || typeof body !== 'object') return 'Body required'
   const b = body as Record<string, unknown>
   if (typeof b.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return 'date must be YYYY-MM-DD'
-  if (typeof b.serviceType !== 'string') return 'serviceType required'
-  if (!['sunday_am', 'sunday_pm', 'wednesday_pm', 'other'].includes(b.serviceType)) return 'invalid serviceType'
+  if (b.serviceTimeId !== null && !Number.isInteger(b.serviceTimeId)) return 'serviceTimeId must be an id or null'
+  if (b.serviceTimeId === null && !(typeof b.serviceLabel === 'string' && b.serviceLabel.trim()))
+    return 'a one-off service needs a serviceLabel'
   if (b.songTitle !== undefined && b.songTitle !== null && typeof b.songTitle !== 'string')
     return 'songTitle must be a string or null'
   if (typeof b.type !== 'string') return 'type required'
@@ -219,7 +220,7 @@ specialsRouter.post(
       .insert(schema.specialMusic)
       .values({
         date: parsed.date,
-        serviceType: parsed.serviceType,
+        serviceTimeId: parsed.serviceTimeId,
         serviceLabel: parsed.serviceLabel ?? null,
         songTitle: parsed.songTitle?.trim() ? parsed.songTitle.trim() : null,
         hymnId: parsed.hymnId ?? null,
@@ -292,7 +293,7 @@ specialsRouter.patch(
       // If the new date is in the future, force will_perform regardless of prior status.
       if (b.date > todayIso()) updates.status = 'will_perform'
     }
-    if (typeof b.serviceType === 'string') updates.serviceType = b.serviceType as ServiceType
+    if ('serviceTimeId' in b) updates.serviceTimeId = (b.serviceTimeId as number | null) ?? null
     if ('serviceLabel' in b) updates.serviceLabel = (b.serviceLabel as string | null) ?? null
     if ('songTitle' in b) updates.songTitle = (b.songTitle as string | null) ?? null
     if ('hymnId' in b) updates.hymnId = (b.hymnId as number | null) ?? null

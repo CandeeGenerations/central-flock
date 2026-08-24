@@ -18,7 +18,7 @@ import {
   specialsApi,
 } from '@/lib/specials-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Check, FileText, Trash2, Upload} from 'lucide-react'
+import {AlertTriangle, Check, FileText, Trash2, Upload} from 'lucide-react'
 import {useRef, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -168,7 +168,10 @@ function SpecialEditor({data}: SpecialEditorProps) {
             {/* Advisory only — never blocks, never printed. See docs/adr/0026. */}
             {upcomingDoubleBookings.length > 0 && (
               <div className="mt-2 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm">
-                <div className="font-medium text-amber-900 dark:text-amber-200">Double booked</div>
+                <div className="flex items-center gap-1.5 font-medium text-amber-900 dark:text-amber-200">
+                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+                  Double booked
+                </div>
                 <ul className="mt-1 space-y-0.5 text-amber-900/90 dark:text-amber-200/90">
                   {upcomingDoubleBookings.map((c) => (
                     <li key={c.nurseryAssignmentId}>

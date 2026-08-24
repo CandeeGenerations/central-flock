@@ -1,5 +1,6 @@
 import {SearchableSelect} from '@/components/ui/searchable-select'
 import type {DoubleBooking, NurseryAssignment, NurseryWorker, ServiceConfig} from '@/lib/nursery-api'
+import {AlertTriangle} from 'lucide-react'
 import {useMemo} from 'react'
 
 interface SchedulePreviewProps {
@@ -31,6 +32,9 @@ function DoubleBookedBadge({conflict}: {conflict: DoubleBooking}) {
       }`}
       style={{
         marginLeft: 6,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 3,
         fontSize: 10,
         fontWeight: 600,
         color: '#92400e',
@@ -43,6 +47,7 @@ function DoubleBookedBadge({conflict}: {conflict: DoubleBooking}) {
         whiteSpace: 'nowrap',
       }}
     >
+      <AlertTriangle style={{width: 11, height: 11, flexShrink: 0}} aria-hidden />
       also singing
     </a>
   )

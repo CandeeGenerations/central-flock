@@ -87,7 +87,8 @@ freely — a man who preaches and sings a solo in the same service is not double
 is a woman who sings twice. Derived at read time, never stored, because either side can move at any
 moment. Advisory only: it never blocks a save, never blocks marking a schedule final, and never
 appears on a printed sheet — it is a tool for whoever is building the schedule, not a fact about
-the service. A **Special Music** entry with no **Service Time** (a one-off) can never be double
+the service. Only Double Bookings dated today or later are surfaced — a past date has
+nothing left to fix. A **Special Music** entry with no **Service Time** (a one-off) can never be double
 booked, and neither can a **Guest Performer**, who is a loose name rather than a Person.
 _Avoid_: Conflict (too generic), Overlap (means the nursery's cross-month carryover — see
 docs/adr/0003-nursery-cross-month-overlap.md), Clash, Collision.

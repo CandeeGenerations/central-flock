@@ -41,6 +41,16 @@ cries wolf gets ignored within a month, which would cost more than the feature i
 the only exclusive source today; a future exclusive source (a sound booth roster, a bus route) joins
 the check, while a future present source does not.
 
+## Only today-forward conflicts are shown
+
+A conflict on a date that has passed has nothing left to fix, so the UI filters to today and
+later. The check itself is date-blind — the filter is presentational, applied per surface.
+
+The known cost, accepted deliberately: conflicts are rare, so most of the time nothing renders and
+a working check looks identical to a dead one. We briefly showed every conflict on a schedule
+regardless of date to prove the check fires end to end, confirmed it, and reverted. If the check
+ever needs re-verifying, widen the filter temporarily rather than assuming silence means broken.
+
 ## Scope
 
 Nursery and Special Music only. No general commitment-registry abstraction was built for a third

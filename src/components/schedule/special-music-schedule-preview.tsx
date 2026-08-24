@@ -1,5 +1,5 @@
 import type {DoubleBooking, SpecialMusicCell} from '@/lib/schedules-api'
-import {Plus} from 'lucide-react'
+import {AlertTriangle, Plus} from 'lucide-react'
 
 // One printed column. Which Service Times the schedule covers is configurable
 // rather than a hardcoded AM/PM pair. See docs/adr/0025.
@@ -219,6 +219,9 @@ export function SpecialMusicSchedulePreview({
                           title={`${c.personName} is also working the nursery for ${c.serviceName} on ${c.date}`}
                           style={{
                             marginLeft: 6,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
                             fontSize: 10,
                             fontWeight: 600,
                             color: '#92400e',
@@ -226,9 +229,11 @@ export function SpecialMusicSchedulePreview({
                             border: '1px solid #fbbf24',
                             borderRadius: 4,
                             padding: '1px 5px',
+                            verticalAlign: 'middle',
                             whiteSpace: 'nowrap',
                           }}
                         >
+                          <AlertTriangle style={{width: 11, height: 11, flexShrink: 0}} aria-hidden />
                           {c.personName.split(/\s+/)[0]} in nursery
                         </span>
                       ))}

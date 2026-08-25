@@ -79,3 +79,36 @@ reflowed, so what is on screen is what prints and the ADR 0005 hit zones stay al
   the repo has adopted.
 - **A third page is not generated automatically.** If a Term ever genuinely does not fit, the fix
   is editorial. Revisit only if it happens in practice.
+
+## Applied to — Nursery Schedule and Special Music Schedule
+
+The **Nursery Schedule** and **Special Music Schedule** now print from this same fixed page box.
+Three things about that extension are worth recording here rather than in a second ADR, because
+they qualify what the Context section above argues.
+
+**The wall-chart carve-out no longer holds.** The Context section reasons that fit-to-page "is
+correct for a schedule grid, where the node's height varies with how many volunteers signed up and
+the document is a wall chart read at arm's length" — which describes the Nursery Schedule exactly.
+That reasoning assumed fit-to-page was buying those grids something. Measured, it was not: at an
+800px capture width both sheets are _width_-limited in every realistic month, so the fit step
+pinned them at ~9.7pt body type regardless of row count. Fit-to-page was not trading legibility
+for flexibility on these two documents; it was giving up control of the type scale for nothing.
+Under the fixed box they print at **12pt**, roughly 24% larger, with the worst case (a five-Sunday
+nursery month, 21 rows) still clearing the page by ~30px.
+
+**These two sheets set their own margins — 0.4in on all four sides**, not the 0.6in/0.5in the
+Workers' Notes uses. That is not a preference; `useScheduleExport` already placed their images at
+10mm margins, so adopting the default would have _narrowed_ the live area from 195.9mm to 185.4mm
+and cost a full point of body type. Precedent is `BOOTH_PAGE_PADDING_X_PX` — a sheet sets its
+margins from how it is read.
+
+**Content still overflows into a warning, not a shrink and not a second page.** Row count cannot
+realistically trip it; the type scale was sized against the hard ceiling. The unbounded input is
+the **Footer Block** list, which is admin-typed free text stored per schedule type and takes about
+a quarter of the page today, so the warning names it and links to the settings field that fixes it.
+Page-boundary flow was rejected: a nursery wall chart that becomes two sheets defeats its purpose,
+and the per-recipient pack would double in length.
+
+**Fair booth is deliberately not migrated.** The `CAPTURE_WIDTH = 900` comment quoted in the
+Context section above therefore stays live and correct _for fair booth_ — do not delete it on the
+strength of this note. If fair booth is ever migrated, that is when it goes.

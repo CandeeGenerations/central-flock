@@ -93,6 +93,45 @@ booked, and neither can a **Guest Performer**, who is a loose name rather than a
 _Avoid_: Conflict (too generic), Overlap (means the nursery's cross-month carryover — see
 docs/adr/0003-nursery-cross-month-overlap.md), Clash, Collision.
 
+### Nursery & Special Music Printing
+
+**Nursery Schedule**:
+One month's printed nursery roster — a **Nursery Worker** in every slot of every **Service Time**
+the month holds, one page, posted on the nursery wall and texted to the workers. Names both the
+`schedules` row (`schedule_type='nursery'`) and the sheet it prints; unlike a **Music Schedule**,
+one schedule is exactly one page, so there is no separate sheet term.
+_Avoid_: Nursery Sheet, Nursery Roster, Nursery Calendar.
+
+**Special Music Schedule**:
+One quarter's printed special-music roster — who sings or plays at each **Service Time** on each
+Sunday in the quarter, one page, handed to the musicians. As with a **Nursery Schedule**, the term
+names both the `schedules` row and the sheet.
+_Avoid_: Special Music Sheet, Music Schedule (that is the week's service planning — a different
+feature entirely).
+
+**Footer Block**:
+One item in the ordered list printed below the table on a **Nursery Schedule** or **Special Music
+Schedule** — kind `quote` (centred, serif italic, the scripture), `note` (a bulleted paragraph with
+the same `*bold*` / `__italic__` / `_underline_` markup a **Notes Block** uses), or `spacer`.
+Stored in **schedules settings per schedule type, never on the schedule**, so editing the Proverbs
+22:6 quote changes how every past **Nursery Schedule** re-exports — the opposite of a **Notes
+Block**, which belongs to its edition and copies forward. The only unbounded input on either sheet,
+and so the usual cause when one overflows its page.
+_Avoid_: Notes Block (that belongs to a **Workers' Notes Edition**), Footer Text, Boilerplate.
+
+**Master Copy**:
+A page of a **Nursery Schedule** or **Special Music Schedule** printed with nothing highlighted —
+the version that goes on the wall. An export produces however many were asked for, ahead of the
+**Recipient Copies**.
+_Avoid_: Blank copy, Clean copy, Unhighlighted page.
+
+**Recipient Copy**:
+A page of the same schedule with one person's — or one household's — cells and dates highlighted,
+so they can find themselves at a glance. Households **merge into a single Recipient Copy**: Carissa
+and Tyler Candee get one sheet between them, not two. A **Guest Performer**, who is a loose name
+rather than a **Person**, still earns their own.
+_Avoid_: Highlighted page, Personal copy, Individual schedule.
+
 ### Workers' Notes
 
 **Workers' Notes Edition**:
@@ -407,6 +446,13 @@ time — never stored.
   sharing a **Person**, a date, and a **Service Time** — never stored
 - **Nursery Assignments**, **Special Music**, **Service Records**, **Sermons**, and **Music Schedules**
   all name their service by **Service Time**; none of them keeps its own service enum
+- A **Nursery Schedule** covers one month, a **Special Music Schedule** one quarter; each prints as
+  exactly one page
+- **Footer Blocks** belong to a schedule _type_ in settings, not to a schedule — every
+  **Nursery Schedule** ever exported prints the current ones
+- One export produces zero or more **Master Copies** followed by one **Recipient Copy** per selected
+  person, household, or **Guest Performer**
+- The members of one household share a single **Recipient Copy**
 
 ## Example dialogue
 
@@ -453,6 +499,10 @@ wednesday_evening` enum, special music's `sunday_am|sunday_pm|wednesday_pm|other
   vocabulary; both enums migrate to `service_time_id`. Special music's `other` becomes a null
   `service_time_id` with a free-text label, matching what **Music Schedule** already does for a
   one-off service.
+- "Footer Block" was cited under **Notes Block** as a term to avoid but was never defined —
+  resolved: it is the quote/note/spacer list under the table on a **Nursery Schedule** or
+  **Special Music Schedule**, and unlike a **Notes Block** it lives in settings per schedule type
+  rather than on the edition.
 - "Kim Stewart" existed twice with no link between them — as a `nursery_workers` row and as a
   `people` row — which is what made double booking undetectable. Resolved: a **Nursery Worker** is
   always a **Person**. Note the two names need not match: worker "Yuny Mejia" is contact "Juni

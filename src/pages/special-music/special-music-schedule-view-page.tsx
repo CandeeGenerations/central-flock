@@ -261,7 +261,7 @@ export function SpecialMusicScheduleViewPage() {
       />
 
       <Card>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
           <SchedulePreviewFrame
             pageRef={pageRef}
             title={title}

@@ -1,4 +1,5 @@
 import {NurserySchedulePreview} from '@/components/nursery/nursery-schedule-preview'
+import type {ZoomMode} from '@/components/print/scaled-page'
 import {ExportSchedulePdfDialog} from '@/components/schedule/export-schedule-pdf-dialog'
 import {ScheduleActionsToolbar} from '@/components/schedule/schedule-actions-toolbar'
 import {SchedulePreviewFrame} from '@/components/schedule/schedule-preview-frame'
@@ -67,7 +68,8 @@ export function NurseryScheduleViewPage() {
   const {id} = useParams<{id: string}>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const previewRef = useRef<HTMLDivElement>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const [zoom, setZoom] = useState<ZoomMode>('fit')
   const [editMode, setEditMode] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [pdfOpen, setPdfOpen] = useState(false)
@@ -75,7 +77,7 @@ export function NurseryScheduleViewPage() {
   const [highlightDates, setHighlightDates] = useState<Set<string>>(new Set())
   const [recipientSubtitle, setRecipientSubtitle] = useState<string>('')
 
-  const {exporting, setExporting, generateImage, exportAs, exportMultiPagePdf} = useScheduleExport(previewRef)
+  const {exporting, generateImage, exportJpg, exportPackPdf, whileExporting} = useScheduleExport(pageRef)
 
   const {data: schedule, isLoading} = useQuery({
     queryKey: nurseryKeys.schedule(Number(id)),
@@ -131,7 +133,7 @@ export function NurseryScheduleViewPage() {
       const wasEditing = editMode
       try {
         if (wasEditing) setEditMode(false)
-        await exportAs('jpg', {filename})
+        await exportJpg(filename)
         toast.success('Exported as JPG')
       } catch (error) {
         console.error('Export error:', error)
@@ -164,7 +166,7 @@ export function NurseryScheduleViewPage() {
     const wasEditing = editMode
     try {
       if (wasEditing) setEditMode(false)
-      await exportMultiPagePdf(pages, {
+      await exportPackPdf(pages, {
         filename,
         prepare: (p) => {
           setHighlightAssignmentIds(p.assignmentIds)
@@ -215,6 +217,8 @@ export function NurseryScheduleViewPage() {
         onReopen={() => reopenMutation.mutate()}
         onExport={handleExport}
         onSend={() => setSendOpen(true)}
+        zoom={zoom}
+        onZoomChange={setZoom}
         finalizing={finalizeMutation.isPending}
         reopening={reopenMutation.isPending}
       />
@@ -242,25 +246,29 @@ export function NurseryScheduleViewPage() {
       <Card>
         <CardContent className="overflow-x-auto">
           <SchedulePreviewFrame
-            ref={previewRef}
+            pageRef={pageRef}
             title={title}
             logoPath={settings?.logoPath}
             footerBlocks={settings?.nursery.footerBlocks}
             subtitle={recipientSubtitle}
             exporting={exporting}
+            zoom={zoom}
+            settingsPath="/schedules/settings/nursery"
           >
-            <NurserySchedulePreview
-              assignments={schedule.assignments}
-              serviceConfig={serviceConfig}
-              editMode={isDraft && editMode}
-              workers={workers}
-              onAssignmentChange={handleAssignmentChange}
-              exporting={exporting}
-              onCarryoverClick={(a) => a.sourceScheduleId && navigate(`/nursery/${a.sourceScheduleId}`)}
-              highlightAssignmentIds={highlightAssignmentIds}
-              highlightDates={highlightDates}
-              doubleBookings={upcomingDoubleBookings}
-            />
+            {(forExport) => (
+              <NurserySchedulePreview
+                assignments={schedule.assignments}
+                serviceConfig={serviceConfig}
+                editMode={isDraft && editMode && !forExport}
+                workers={workers}
+                onAssignmentChange={handleAssignmentChange}
+                exporting={forExport}
+                onCarryoverClick={(a) => a.sourceScheduleId && navigate(`/nursery/${a.sourceScheduleId}`)}
+                highlightAssignmentIds={highlightAssignmentIds}
+                highlightDates={highlightDates}
+                doubleBookings={upcomingDoubleBookings}
+              />
+            )}
           </SchedulePreviewFrame>
         </CardContent>
       </Card>
@@ -279,12 +287,9 @@ export function NurseryScheduleViewPage() {
         getImage={async () => {
           const wasEditing = editMode
           if (wasEditing) setEditMode(false)
-          setExporting(true)
-          await new Promise((r) => setTimeout(r, 100))
           try {
-            return await generateImage()
+            return await whileExporting(generateImage)
           } finally {
-            setExporting(false)
             if (wasEditing) setEditMode(true)
           }
         }}

@@ -1,174 +1,62 @@
-import {saveExportedDataUrl, saveExportedFile} from '@/lib/save-exported-file'
-import {useCallback, useState} from 'react'
+import {captureFixedPageJpeg, exportFixedPagePackPdf} from '@/lib/fixed-page-pdf'
+import {saveExportedDataUrl} from '@/lib/save-exported-file'
+import {type RefObject, useCallback, useState} from 'react'
 
-interface ExportOptions {
-  filename: string
-}
-
-// Shared image-generation + export helpers for any printable Schedule
-// (nursery, special music, future sunday school). The preview is captured
-// at a fixed 800px width so JPG/PDF output is consistent regardless of the
-// viewport that's editing it.
-export function useScheduleExport(previewRef: React.RefObject<HTMLDivElement | null>) {
+/**
+ * Export helpers for the Nursery Schedule and the Special Music Schedule, both
+ * of which print from the fixed 816x1056 page box (ADR 0021). There is no
+ * fit-to-page step anywhere here: the node is already Letter-proportioned, so
+ * the image maps 1:1 onto the sheet.
+ *
+ * `exporting` is the flag the body components read to drop edit chrome — a
+ * `SearchableSelect`, a "+ Add", a Double Booking badge — before capture, which
+ * is the ADR 0005 rule that no edit affordance reaches the PDF.
+ */
+export function useScheduleExport(pageRef: RefObject<HTMLDivElement | null>) {
   const [exporting, setExporting] = useState(false)
 
-  const generateImage = useCallback(async (): Promise<string> => {
-    if (!previewRef.current) throw new Error('Preview not ready')
-    await document.fonts.ready
-    const clone = previewRef.current.cloneNode(true) as HTMLElement
-    // Pre-resolve <img> srcs to data URLs so html-to-image doesn't have to
-    // fetch them itself — its internal fetch silently swallows failures and
-    // rejects with a DOM Event we can't surface as a useful message.
-    await inlineImagesAsDataUrls(clone)
-    const container = document.createElement('div')
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;background:#fff;'
-    container.appendChild(clone)
-    document.body.appendChild(container)
+  /** Hold `exporting` true across the whole run, giving React a beat to drop
+   *  edit chrome and re-render the page node before anything is captured. */
+  const whileExporting = useCallback(async <T>(fn: () => Promise<T>): Promise<T> => {
+    setExporting(true)
     try {
-      const {toJpeg} = await import('html-to-image')
-      return await toJpeg(clone, {
-        quality: 0.95,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
-        cacheBust: false,
-        skipFonts: true,
-        width: 800,
-        height: clone.scrollHeight,
-      })
+      await new Promise((r) => setTimeout(r, 120))
+      return await fn()
     } finally {
-      document.body.removeChild(container)
+      setExporting(false)
     }
-  }, [previewRef])
+  }, [])
 
-  const exportAs = useCallback(
-    async (format: 'pdf' | 'jpg', opts: ExportOptions) => {
-      setExporting(true)
-      try {
-        await new Promise((r) => setTimeout(r, 100))
-        const dataUrl = await generateImage()
-        if (format === 'jpg') {
-          await saveExportedDataUrl(dataUrl, `${opts.filename}.jpg`)
-        } else {
-          const {jsPDF} = await import('jspdf')
-          const img = new Image()
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve()
-            img.onerror = reject
-            img.src = dataUrl
-          })
-          // US Letter, 10mm margins, preserve aspect ratio
-          const pageWidth = 215.9
-          const pageHeight = 279.4
-          const margin = 10
-          const maxWidth = pageWidth - margin * 2
-          const maxHeight = pageHeight - margin * 2
-          const imgRatio = img.width / img.height
-          const pageRatio = maxWidth / maxHeight
-          let renderWidth: number
-          let renderHeight: number
-          if (imgRatio > pageRatio) {
-            renderWidth = maxWidth
-            renderHeight = maxWidth / imgRatio
-          } else {
-            renderHeight = maxHeight
-            renderWidth = maxHeight * imgRatio
-          }
-          const x = (pageWidth - renderWidth) / 2
-          const y = (pageHeight - renderHeight) / 2
-          const pdf = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'letter'})
-          pdf.addImage(dataUrl, 'JPEG', x, y, renderWidth, renderHeight)
-          await saveExportedFile(pdf.output('blob'), `${opts.filename}.pdf`, 'application/pdf')
-        }
-      } finally {
-        setExporting(false)
-      }
+  /** The page as a JPEG data URL at ~192 DPI — the JPG download and the
+   *  Messages attachment. */
+  const generateImage = useCallback(async (): Promise<string> => {
+    if (!pageRef.current) throw new Error('Preview not ready')
+    return captureFixedPageJpeg(pageRef.current)
+  }, [pageRef])
+
+  const exportJpg = useCallback(
+    async (filename: string) => {
+      const dataUrl = await whileExporting(generateImage)
+      await saveExportedDataUrl(dataUrl, `${filename}.jpg`)
     },
-    [generateImage],
+    [generateImage, whileExporting],
   )
 
-  // Multi-page PDF: one page per "page descriptor". Caller passes an array
-  // and a `prepare(page)` callback that mutates React state to highlight or
-  // re-scope the preview for that page. The hook waits a tick for React to
-  // flush, captures the image, appends to a single jsPDF, and saves.
-  //
-  // Used for the per-recipient print pack: one page per scheduled
-  // person/group with their cells + dates highlighted.
-  const exportMultiPagePdf = useCallback(
-    async <T>(pages: T[], opts: {filename: string; prepare: (page: T) => void}) => {
-      if (pages.length === 0) return
-      setExporting(true)
-      try {
-        const {jsPDF} = await import('jspdf')
-        const pdf = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'letter'})
-        const pageWidth = 215.9
-        const pageHeight = 279.4
-        const margin = 10
-        const maxWidth = pageWidth - margin * 2
-        const maxHeight = pageHeight - margin * 2
-        for (let i = 0; i < pages.length; i++) {
-          opts.prepare(pages[i])
-          // Let React flush state + paint before we capture.
-          await new Promise((r) => setTimeout(r, 120))
-          const dataUrl = await generateImage()
-          const img = new Image()
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve()
-            img.onerror = reject
-            img.src = dataUrl
-          })
-          const imgRatio = img.width / img.height
-          const pageRatio = maxWidth / maxHeight
-          let renderWidth: number
-          let renderHeight: number
-          if (imgRatio > pageRatio) {
-            renderWidth = maxWidth
-            renderHeight = maxWidth / imgRatio
-          } else {
-            renderHeight = maxHeight
-            renderWidth = maxHeight * imgRatio
-          }
-          const x = (pageWidth - renderWidth) / 2
-          const y = (pageHeight - renderHeight) / 2
-          if (i > 0) pdf.addPage()
-          pdf.addImage(dataUrl, 'JPEG', x, y, renderWidth, renderHeight)
-        }
-        await saveExportedFile(pdf.output('blob'), `${opts.filename}.pdf`, 'application/pdf')
-      } finally {
-        setExporting(false)
-      }
-    },
-    [generateImage],
+  /** The Master Copy / Recipient Copy pack: one page per descriptor, `prepare`
+   *  re-highlighting the single live node between captures. */
+  const exportPackPdf = useCallback(
+    async <T>(pages: T[], opts: {filename: string; prepare: (page: T) => void}) =>
+      whileExporting(() =>
+        exportFixedPagePackPdf(pages, {
+          filename: opts.filename,
+          node: () => pageRef.current,
+          prepare: opts.prepare,
+        }),
+      ),
+    [pageRef, whileExporting],
   )
 
-  return {exporting, generateImage, exportAs, exportMultiPagePdf, setExporting}
-}
-
-async function inlineImagesAsDataUrls(root: HTMLElement) {
-  const imgs = Array.from(root.querySelectorAll('img'))
-  await Promise.all(
-    imgs.map(async (img) => {
-      if (!img.src || img.src.startsWith('data:')) return
-      try {
-        const res = await fetch(img.src, {credentials: 'include'})
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const blob = await res.blob()
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(String(reader.result))
-          reader.onerror = () => reject(new Error('FileReader failed'))
-          reader.readAsDataURL(blob)
-        })
-        img.removeAttribute('crossorigin')
-        img.src = dataUrl
-      } catch (err) {
-        const wrapped = new Error(
-          `Failed to load image ${img.src}: ${err instanceof Error ? err.message : String(err)}`,
-        )
-        ;(wrapped as Error & {cause?: unknown}).cause = err
-        throw wrapped
-      }
-    }),
-  )
+  return {exporting, generateImage, exportJpg, exportPackPdf, whileExporting}
 }
 
 export function describeExportError(error: unknown): string {

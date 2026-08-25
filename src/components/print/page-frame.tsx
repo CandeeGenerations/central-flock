@@ -19,31 +19,34 @@ export const CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - PAGE_PADDING_Y_PX * 2
  * the export path can mount it directly and no edit chrome can reach the PDF
  * (the ADR 0005 rule). Interaction lives in a wrapper.
  *
- * Shared by the Workers' Notes and the Music Schedule; it belongs to neither.
+ * Shared by the Workers' Notes, the Music Schedule, and the Nursery / Special
+ * Music Schedules; it belongs to none of them. `paddingX`/`paddingY` are
+ * per-sheet: margins come from how a sheet is read, not from one house style.
  */
-export const PrintPage = forwardRef<HTMLDivElement, {children: ReactNode; className?: string; paddingX?: number}>(
-  function PrintPage({children, className, paddingX = PAGE_PADDING_X_PX}, ref) {
-    return (
-      <div
-        ref={ref}
-        className={className}
-        style={{
-          width: PAGE_WIDTH_PX,
-          height: PAGE_HEIGHT_PX,
-          padding: `${PAGE_PADDING_Y_PX}px ${paddingX}px`,
-          boxSizing: 'border-box',
-          backgroundColor: '#ffffff',
-          color: '#000000',
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          overflow: 'hidden',
-          position: 'relative',
-        }}
-      >
-        {children}
-      </div>
-    )
-  },
-)
+export const PrintPage = forwardRef<
+  HTMLDivElement,
+  {children: ReactNode; className?: string; paddingX?: number; paddingY?: number}
+>(function PrintPage({children, className, paddingX = PAGE_PADDING_X_PX, paddingY = PAGE_PADDING_Y_PX}, ref) {
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        width: PAGE_WIDTH_PX,
+        height: PAGE_HEIGHT_PX,
+        padding: `${paddingY}px ${paddingX}px`,
+        boxSizing: 'border-box',
+        backgroundColor: '#ffffff',
+        color: '#000000',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+    >
+      {children}
+    </div>
+  )
+})
 
 /** The boxed headings — a hairline rule around a centred bold line. */
 export function TitleBox({children, fontSize = 14}: {children: ReactNode; fontSize?: number}) {

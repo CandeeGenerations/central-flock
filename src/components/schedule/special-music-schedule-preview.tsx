@@ -1,3 +1,13 @@
+import {
+  SCHEDULE_CELL_PAD,
+  SCHEDULE_CONTENT_WIDTH_PX,
+  SCHEDULE_DATE_COL_PX,
+  SCHEDULE_HEADER_FILL,
+  SCHEDULE_HIGHLIGHT,
+  SCHEDULE_RULE,
+  SCHEDULE_TYPE,
+  SPECIAL_MUSIC_MIN_ROW_PX,
+} from '@/components/print/schedule-scale'
 import type {DoubleBooking, SpecialMusicCell} from '@/lib/schedules-api'
 import {AlertTriangle, Plus} from 'lucide-react'
 
@@ -128,31 +138,40 @@ export function SpecialMusicSchedulePreview({
       conflictsByCell.set(c.specialMusicId, list)
     }
   }
-  const HIGHLIGHT = '#fde68a' // amber-200; readable against black text in print
+  // Label column fixed (it only ever holds "Sep 30"); the service columns split
+  // whatever is left, so adding a third Service Time yields tighter columns
+  // rather than a table that runs off the page box.
+  const serviceColPx = Math.floor((SCHEDULE_CONTENT_WIDTH_PX - SCHEDULE_DATE_COL_PX) / Math.max(1, services.length))
 
-  const cellWidth = '290px'
+  const headCell = {
+    padding: SCHEDULE_CELL_PAD,
+    textAlign: 'left' as const,
+    fontSize: `${SCHEDULE_TYPE.tableHeader}pt`,
+    fontWeight: 700,
+    borderBottom: SCHEDULE_RULE,
+    backgroundColor: SCHEDULE_HEADER_FILL,
+  }
+  const bodyCell = {
+    padding: SCHEDULE_CELL_PAD,
+    fontSize: `${SCHEDULE_TYPE.body}pt`,
+    lineHeight: 1.2,
+    verticalAlign: 'middle' as const,
+  }
+
   return (
-    <div className="overflow-hidden rounded-lg" style={{border: '1.5px solid #000'}}>
-      <table className="w-full border-collapse">
+    <div className="overflow-hidden rounded-lg" style={{border: SCHEDULE_RULE}}>
+      <table style={{width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed'}}>
+        <colgroup>
+          <col style={{width: SCHEDULE_DATE_COL_PX}} />
+          {services.map((svc) => (
+            <col key={svc.id} style={{width: serviceColPx}} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
-            <th
-              className="px-3 py-2 text-left text-sm font-bold"
-              style={{width: '90px', borderBottom: '1.5px solid #000', backgroundColor: '#f3f4f6'}}
-            >
-              DATE
-            </th>
+            <th style={headCell}>DATE</th>
             {services.map((svc) => (
-              <th
-                key={svc.id}
-                className="px-3 py-2 text-left text-sm font-bold"
-                style={{
-                  width: cellWidth,
-                  borderBottom: '1.5px solid #000',
-                  borderLeft: '1.5px solid #000',
-                  backgroundColor: '#f3f4f6',
-                }}
-              >
+              <th key={svc.id} style={{...headCell, borderLeft: SCHEDULE_RULE}}>
                 {svc.label.toUpperCase()}
               </th>
             ))}
@@ -160,16 +179,18 @@ export function SpecialMusicSchedulePreview({
         </thead>
         <tbody>
           {sundays.map((d, rowIdx) => {
-            const rowBorder = rowIdx > 0 ? ('1.5px solid #000' as const) : undefined
+            const rowBorder = rowIdx > 0 ? SCHEDULE_RULE : undefined
             const dateHighlighted = highlightDates?.has(d) ?? false
             return (
-              <tr key={d} style={{height: 52}}>
+              // Natural height plus a floor, not the old hardcoded 52px pin —
+              // that number competed with the type scale. See ADR 0021.
+              <tr key={d} style={{height: SPECIAL_MUSIC_MIN_ROW_PX}}>
                 <td
-                  className="px-3 py-2 text-sm font-medium"
                   style={{
+                    ...bodyCell,
+                    fontWeight: 500,
                     borderTop: rowBorder,
-                    backgroundColor: dateHighlighted ? HIGHLIGHT : '#f3f4f6',
-                    verticalAlign: 'middle',
+                    backgroundColor: dateHighlighted ? SCHEDULE_HIGHLIGHT : SCHEDULE_HEADER_FILL,
                   }}
                 >
                   {formatDate(d)}
@@ -181,19 +202,14 @@ export function SpecialMusicSchedulePreview({
                   const clickable = editMode && !exporting && onCellClick
                   const cellHighlighted = cell && highlightCellIds?.has(cell.id)
                   const baseStyle = {
-                    borderLeft: '1.5px solid #000' as const,
+                    ...bodyCell,
+                    borderLeft: SCHEDULE_RULE,
                     borderTop: rowBorder,
-                    verticalAlign: 'middle' as const,
-                    ...(cellHighlighted ? {backgroundColor: HIGHLIGHT} : {}),
+                    ...(cellHighlighted ? {backgroundColor: SCHEDULE_HIGHLIGHT} : {}),
                   }
                   if (!cell) {
                     return (
-                      <td
-                        key={slot}
-                        className="px-3 py-2 text-sm"
-                        style={baseStyle}
-                        onClick={clickable ? () => onCellClick(d, slot) : undefined}
-                      >
+                      <td key={slot} style={baseStyle} onClick={clickable ? () => onCellClick(d, slot) : undefined}>
                         {clickable && !exporting ? (
                           <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
                             <Plus className="h-3 w-3" /> Add
@@ -207,7 +223,6 @@ export function SpecialMusicSchedulePreview({
                   return (
                     <td
                       key={slot}
-                      className="px-3 py-2 text-sm"
                       style={{...baseStyle, ...(clickable ? {cursor: 'pointer'} : {})}}
                       onClick={clickable ? () => onCellClick(d, slot) : undefined}
                     >

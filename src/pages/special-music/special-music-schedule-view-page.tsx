@@ -1,3 +1,4 @@
+import type {ZoomMode} from '@/components/print/scaled-page'
 import {ExportSchedulePdfDialog} from '@/components/schedule/export-schedule-pdf-dialog'
 import {ScheduleActionsToolbar} from '@/components/schedule/schedule-actions-toolbar'
 import {ScheduleCellEditor} from '@/components/schedule/schedule-cell-editor'
@@ -110,7 +111,8 @@ export function SpecialMusicScheduleViewPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const serviceTimes = useServiceTimes()
-  const previewRef = useRef<HTMLDivElement>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const [zoom, setZoom] = useState<ZoomMode>('fit')
   const [editMode, setEditMode] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [pdfOpen, setPdfOpen] = useState(false)
@@ -119,7 +121,7 @@ export function SpecialMusicScheduleViewPage() {
   const [highlightDates, setHighlightDates] = useState<Set<string>>(new Set())
   const [recipientSubtitle, setRecipientSubtitle] = useState<string>('')
 
-  const {exporting, setExporting, generateImage, exportAs, exportMultiPagePdf} = useScheduleExport(previewRef)
+  const {exporting, generateImage, exportJpg, exportPackPdf, whileExporting} = useScheduleExport(pageRef)
 
   const {data, isLoading} = useQuery({
     queryKey: schedulesKeys.cells(scheduleId),
@@ -157,7 +159,7 @@ export function SpecialMusicScheduleViewPage() {
       const wasEditing = editMode
       try {
         if (wasEditing) setEditMode(false)
-        await exportAs('jpg', {filename})
+        await exportJpg(filename)
         toast.success('Exported as JPG')
       } catch (e) {
         console.error('Export error:', e)
@@ -191,7 +193,7 @@ export function SpecialMusicScheduleViewPage() {
     const wasEditing = editMode
     try {
       if (wasEditing) setEditMode(false)
-      await exportMultiPagePdf(pages, {
+      await exportPackPdf(pages, {
         filename,
         prepare: (p) => {
           setHighlightCellIds(p.cellIds)
@@ -252,6 +254,8 @@ export function SpecialMusicScheduleViewPage() {
         onReopen={() => reopenMutation.mutate()}
         onExport={handleExport}
         onSend={() => setSendOpen(true)}
+        zoom={zoom}
+        onZoomChange={setZoom}
         finalizing={finalizeMutation.isPending}
         reopening={reopenMutation.isPending}
       />
@@ -259,25 +263,29 @@ export function SpecialMusicScheduleViewPage() {
       <Card>
         <CardContent className="overflow-x-auto">
           <SchedulePreviewFrame
-            ref={previewRef}
+            pageRef={pageRef}
             title={title}
             logoPath={settings?.logoPath}
             footerBlocks={settings?.specialMusic.footerBlocks}
             subtitle={recipientSubtitle}
             exporting={exporting}
+            zoom={zoom}
+            settingsPath="/schedules/settings/special-music"
           >
-            <SpecialMusicSchedulePreview
-              scopeStart={schedule.scopeStart!}
-              scopeEnd={schedule.scopeEnd!}
-              cells={cells}
-              services={previewServices}
-              editMode={schedule.status === 'draft' && editMode}
-              exporting={exporting}
-              doubleBookings={upcomingDoubleBookings}
-              onCellClick={(date, serviceTimeId) => setOpenCell({date, serviceTimeId})}
-              highlightCellIds={highlightCellIds}
-              highlightDates={highlightDates}
-            />
+            {(forExport) => (
+              <SpecialMusicSchedulePreview
+                scopeStart={schedule.scopeStart!}
+                scopeEnd={schedule.scopeEnd!}
+                cells={cells}
+                services={previewServices}
+                editMode={schedule.status === 'draft' && editMode && !forExport}
+                exporting={forExport}
+                doubleBookings={upcomingDoubleBookings}
+                onCellClick={(date, serviceTimeId) => setOpenCell({date, serviceTimeId})}
+                highlightCellIds={highlightCellIds}
+                highlightDates={highlightDates}
+              />
+            )}
           </SchedulePreviewFrame>
         </CardContent>
       </Card>
@@ -296,12 +304,9 @@ export function SpecialMusicScheduleViewPage() {
         getImage={async () => {
           const wasEditing = editMode
           if (wasEditing) setEditMode(false)
-          setExporting(true)
-          await new Promise((r) => setTimeout(r, 100))
           try {
-            return await generateImage()
+            return await whileExporting(generateImage)
           } finally {
-            setExporting(false)
             if (wasEditing) setEditMode(true)
           }
         }}

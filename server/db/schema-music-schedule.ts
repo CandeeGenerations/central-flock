@@ -48,6 +48,9 @@ export const musicSchedules = sqliteTable(
       .notNull()
       .references(() => schedules.id, {onDelete: 'cascade'}),
     weekStart: text('week_start').notNull(), // the Sunday, 'YYYY-MM-DD'
+    // A free note about the week as a whole — "Tyler running services". Shown
+    // and searchable on the week list; never printed.
+    note: text('note').notNull().default(''),
     createdAt: text('created_at')
       .default(sql`(datetime('now'))`)
       .notNull(),
@@ -115,7 +118,10 @@ export const musicScheduleLines = sqliteTable(
     align: text('align', {enum: musicLineAligns}), // merged rows; null = default
     bold: integer('bold', {mode: 'boolean'}), // null = role default
     italic: integer('italic', {mode: 'boolean'}).notNull().default(false),
+    // One highlight per sheet: the same line is often exceptional to the
+    // musicians but routine to the sound team, or the other way round.
     highlight: integer('highlight', {mode: 'boolean'}).notNull().default(false),
+    boothHighlight: integer('booth_highlight', {mode: 'boolean'}).notNull().default(false),
     // Keep the song when copying the week forward. On by default for `theme`.
     sticky: integer('sticky', {mode: 'boolean'}).notNull().default(false),
     booth: text('booth', {enum: musicBoothModes}).notNull().default('auto'),

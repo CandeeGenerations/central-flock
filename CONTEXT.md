@@ -149,7 +149,8 @@ _Avoid_: Theme (that is the **Yearly Theme**), Slogan.
 
 **Notes Block**:
 One item in the ordered list that makes up the bullet section of page 1. Kind `note` is free text
-(with `_underscore_` underlining) and copies forward verbatim into the next edition; kinds
+(with `*bold*`, `__italic__` and `_underline_` inline markup) and copies forward verbatim into the
+next edition; kinds
 `next_term_forms`, `growth_plan`, and `month_themes` are placeholders that render from the
 edition's own **Term**, its **Yearly Theme**, and its **Mottos** respectively, so they can never
 go stale when copied forward. `spacer` is a blank gap.
@@ -182,8 +183,9 @@ or "Motto:" left and the value right. A _merged_ row spans the full width, left-
 **Music Sheet** ("Prayer, Announcements") or centred on the **Sound Booth Sheet** ("Motto, Verse,
 Theme Song"). Split-vs-merged and the left cell's text both default from the **Line Role** and are
 both overridable, which is what makes a one-off row like "NO CHOIR | Cong. B #324 …" possible.
-Carries whole-line bold/italic/highlight toggles, `_underscore_` inline underlining (the same
-markup as a **Notes Block**), and an optional song suffix — `(x2)`, `(Invitation)`, `(Optional)` —
+Carries a whole-line highlight toggle, `*bold*` / `__italic__` / `_underline_` inline markup (the
+same markup as a **Notes Block**) — emphasis is per-word, never per-line — and an optional song
+suffix — `(x2)`, `(Invitation)`, `(Optional)` —
 kept as its own field so it prints unbolded beside a bold title. The unit that gets reordered, and
 the unit the **Sound Booth Sheet** lifts.
 _Avoid_: Item, Element, Row (bare).

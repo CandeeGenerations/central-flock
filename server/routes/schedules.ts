@@ -20,6 +20,16 @@ export const schedulesRouter = Router()
 
 const LOGOS_DIR = uploadPath('schedule-logos')
 
+// Every image the printed schedules can carry lands in the same folder; the
+// slot decides which setting points at it. The Music Schedule's footer
+// graphic is one of these — it prints under the verse on the Musicians sheet.
+const LOGO_SLOTS = {
+  print: {key: 'schedulesLogoPath', prefix: 'logo'},
+  compact: {key: 'schedulesCompactLogoPath', prefix: 'logo-compact'},
+  music_footer: {key: 'schedules.musicSchedule.footerImagePath', prefix: 'music-footer'},
+} as const
+type LogoSlot = keyof typeof LOGO_SLOTS
+
 // ── Settings ────────────────────────────────────────────────────────────
 // Cross-cutting settings for every Schedule type (logo) plus per-type
 // defaults (titlePrefix, footerBlocks, singerGroupIds for special music).
@@ -272,21 +282,20 @@ schedulesRouter.put(
 schedulesRouter.post(
   '/settings/logo',
   asyncHandler(async (req, res) => {
-    const {imageData, slot} = req.body as {imageData: string; slot?: 'print' | 'compact'}
+    const {imageData, slot} = req.body as {imageData: string; slot?: LogoSlot}
     if (!imageData) {
       res.status(400).json({error: 'Image data is required'})
       return
     }
-    if (slot !== undefined && slot !== 'print' && slot !== 'compact') {
-      res.status(400).json({error: "slot must be 'print' or 'compact'"})
+    if (slot !== undefined && !(slot in LOGO_SLOTS)) {
+      res.status(400).json({error: `slot must be one of ${Object.keys(LOGO_SLOTS).join(', ')}`})
       return
     }
 
     if (!fs.existsSync(LOGOS_DIR)) fs.mkdirSync(LOGOS_DIR, {recursive: true})
 
-    const isCompact = slot === 'compact'
-    const settingsKey = isCompact ? 'schedulesCompactLogoPath' : 'schedulesLogoPath'
-    const filename = `${isCompact ? 'logo-compact' : 'logo'}-${Date.now()}.png`
+    const {key: settingsKey, prefix} = LOGO_SLOTS[slot ?? 'print']
+    const filename = `${prefix}-${Date.now()}.png`
     const filePath = path.join(LOGOS_DIR, filename)
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '')
     fs.writeFileSync(filePath, Buffer.from(base64, 'base64'))

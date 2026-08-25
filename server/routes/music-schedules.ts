@@ -1,4 +1,4 @@
-import {and, asc, eq, like, or, sql} from 'drizzle-orm'
+import {and, asc, desc, eq, like, or, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {
@@ -14,6 +14,7 @@ import {
   weekBounds,
   weekLabel,
   weekStartFor,
+  weekWarnings,
   yearOf,
 } from '../../src/lib/music-schedule-core.js'
 import {db, schema} from '../db/index.js'
@@ -126,6 +127,7 @@ function linesFor(serviceId: number): OrderLine[] {
       bold: line.bold,
       italic: line.italic,
       highlight: line.highlight,
+      boothHighlight: line.boothHighlight,
       sticky: line.sticky,
       booth: line.booth,
       boothLabel: line.boothLabel,
@@ -216,7 +218,8 @@ musicSchedulesRouter.get(
       .select({week: schema.musicSchedules, schedule: schema.schedules})
       .from(schema.musicSchedules)
       .innerJoin(schema.schedules, eq(schema.schedules.id, schema.musicSchedules.scheduleId))
-      .orderBy(asc(schema.musicSchedules.weekStart))
+      // Newest week first — the one being planned is the one you want at the top.
+      .orderBy(desc(schema.musicSchedules.weekStart))
       .all()
       .filter((r) => !Number.isFinite(year) || yearOf(r.week.weekStart) === year)
 
@@ -227,12 +230,19 @@ musicSchedulesRouter.get(
           .map((s) => s.episodeNumber)
           .filter((n): n is number => n != null)
           .sort((a, b) => a - b)
+        // The same function the week view uses, so the list can never disagree
+        // with what you find when you open the week.
+        const warningCount = weekWarnings(
+          services.map((s) => ({...s, lines: linesFor(s.id), boothLines: boothLinesFor(s.id)})),
+        ).length
         return {
           id: week.id,
           weekStart: week.weekStart,
           label: weekLabel(week.weekStart),
           status: schedule.status,
           scopeLabel: schedule.scopeLabel,
+          note: week.note,
+          warningCount,
           serviceCount: services.filter((s) => s.meeting).length,
           episodeFirst: episodes[0] ?? null,
           episodeLast: episodes[episodes.length - 1] ?? null,
@@ -395,10 +405,145 @@ musicSchedulesRouter.post(
   }),
 )
 
+/* -------------------------------------------------------------- copy week */
+
+/**
+ * Duplicate a week onto another Sunday, verbatim. Where POST / builds the next
+ * week from the last one and deliberately clears what is specific to it (songs,
+ * highlights, titles), a copy keeps everything and only moves the dates — it is
+ * for "this week runs like that one", not for starting the next week.
+ *
+ * Episode Numbers are the exception: they are published identifiers and are
+ * reassigned for the new dates rather than duplicated (ADR 0024).
+ */
+musicSchedulesRouter.post(
+  '/:id/copy',
+  asyncHandler(async (req, res) => {
+    const sourceId = Number(req.params.id)
+    const source = weekWithSchedule(sourceId)
+    if (!source) {
+      res.status(404).json({error: 'Week not found'})
+      return
+    }
+    const raw = String((req.body as {weekStart?: string}).weekStart ?? '')
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      res.status(400).json({error: 'weekStart (YYYY-MM-DD) is required'})
+      return
+    }
+    const weekStart = weekStartFor(raw)
+    if (weekStart === source.week.weekStart) {
+      res.status(409).json({error: 'That is the week being copied'})
+      return
+    }
+    const clash = db.select().from(schema.musicSchedules).where(eq(schema.musicSchedules.weekStart, weekStart)).get()
+    if (clash) {
+      res.status(409).json({error: 'A week already exists for that Sunday', weekId: clash.id})
+      return
+    }
+
+    const {scopeStart, scopeEnd} = weekBounds(weekStart)
+    const schedule = db
+      .insert(schema.schedules)
+      .values({
+        scheduleType: 'music_schedule',
+        scopeKind: 'date_range',
+        scopeStart,
+        scopeEnd,
+        scopeLabel: weekLabel(weekStart),
+      })
+      .returning()
+      .get()
+
+    const week = db
+      .insert(schema.musicSchedules)
+      .values({scheduleId: schedule.id, weekStart, note: source.week.note})
+      .returning()
+      .get()
+
+    const created: {id: number; date: string; meeting: boolean; uploaded: boolean}[] = []
+
+    servicesFor(sourceId).forEach((src, i) => {
+      // The service keeps its weekday; only the week moves.
+      const date = serviceDateFor(weekStart, dayOfWeek(src.date))
+      const service = db
+        .insert(schema.musicScheduleServices)
+        .values({
+          musicScheduleId: week.id,
+          serviceTimeId: src.serviceTimeId,
+          name: src.name,
+          musicHeading: src.musicHeading,
+          boothHeading: src.boothHeading,
+          date,
+          time: src.time,
+          meeting: src.meeting,
+          uploaded: src.uploaded,
+          title: src.title,
+          titleNote: src.titleNote,
+          titleHighlight: src.titleHighlight,
+          scripture: src.scripture,
+          scriptureNote: src.scriptureNote,
+          scriptureHighlight: src.scriptureHighlight,
+          sortOrder: i,
+        })
+        .returning()
+        .get()
+      created.push({id: service.id, date, meeting: service.meeting, uploaded: service.uploaded})
+
+      insertLines(
+        service.id,
+        linesFor(src.id).map((l) => ({
+          kind: l.kind,
+          role: l.role,
+          text: l.text,
+          suffix: l.suffix,
+          leftText: l.leftText,
+          merged: l.merged,
+          align: l.align,
+          bold: l.bold,
+          italic: l.italic,
+          highlight: l.highlight,
+          boothHighlight: l.boothHighlight,
+          booth: l.booth,
+          boothLabel: l.boothLabel,
+          boothNote: l.boothNote,
+          sticky: l.sticky,
+          hymnId: l.hymnId,
+          freeSongTitle: l.freeSongTitle,
+        })),
+      )
+
+      boothLinesFor(src.id).forEach((bl, idx) =>
+        db
+          .insert(schema.musicScheduleBoothLines)
+          .values({
+            serviceId: service.id,
+            slot: bl.slot,
+            text: bl.text,
+            highlight: bl.highlight,
+            draftedFrom: bl.draftedFrom,
+            sortOrder: idx,
+          })
+          .run(),
+      )
+    })
+
+    const numbers = assignEpisodeNumbers(created, highestEpisodeByYear(week.id))
+    for (const [id, n] of Object.entries(numbers)) {
+      db.update(schema.musicScheduleServices)
+        .set({episodeNumber: n})
+        .where(eq(schema.musicScheduleServices.id, Number(id)))
+        .run()
+    }
+
+    res.status(201).json({id: week.id, weekStart, status: schedule.status})
+  }),
+)
+
 interface LineInput extends LineTemplate {
   hymnId?: number | null
   freeSongTitle?: string | null
   highlight?: boolean
+  boothHighlight?: boolean
 }
 
 function insertLines(serviceId: number, lines: LineInput[]) {
@@ -420,6 +565,7 @@ function insertLines(serviceId: number, lines: LineInput[]) {
         bold: l.bold ?? null,
         italic: Boolean(l.italic),
         highlight: Boolean(l.highlight),
+        boothHighlight: Boolean(l.boothHighlight),
         sticky: l.sticky ?? ROLE_DEFAULTS[role].sticky,
         booth: BOOTH_MODES.has(String(l.booth)) ? (l.booth as BoothMode) : 'auto',
         boothLabel: String(l.boothLabel ?? ''),
@@ -454,13 +600,24 @@ musicSchedulesRouter.get(
         .where(eq(schema.serviceTimes.id, s.serviceTimeId ?? -1))
         .get()
       const configured = s.serviceTimeId != null ? headings[String(s.serviceTimeId)] : undefined
+      const nameDefault = time?.name ?? ''
       return {
         ...s,
         time: s.time ?? time?.time ?? null,
         dayOfWeek: dayOfWeek(s.date),
-        name: s.name || time?.name || '',
-        musicHeading: s.musicHeading || configured?.music || s.name || time?.name || '',
-        boothHeading: s.boothHeading || configured?.booth || s.name || time?.name || '',
+        name: s.name || nameDefault,
+        musicHeading: s.musicHeading || configured?.music || s.name || nameDefault,
+        boothHeading: s.boothHeading || configured?.booth || s.name || nameDefault,
+        // What is actually stored on the row, and what it would fall back to.
+        // The editor needs both so it can show an override as an override.
+        nameOverride: s.name,
+        timeOverride: s.time,
+        musicHeadingOverride: s.musicHeading,
+        boothHeadingOverride: s.boothHeading,
+        nameDefault,
+        timeDefault: time?.time ?? null,
+        musicHeadingDefault: configured?.music || nameDefault,
+        boothHeadingDefault: configured?.booth || nameDefault,
         lines,
         boothLines: booth.map((bl) => ({...bl, stale: boothLineStale(bl, lines)})),
       }
@@ -470,6 +627,7 @@ musicSchedulesRouter.get(
       id: week.id,
       weekStart: week.weekStart,
       label: weekLabel(week.weekStart),
+      note: week.note,
       status: schedule.status,
       scopeLabel: schedule.scopeLabel,
       updatedAt: week.updatedAt,
@@ -492,16 +650,24 @@ musicSchedulesRouter.patch(
       res.status(404).json({error: 'Week not found'})
       return
     }
-    const status = (req.body as {status?: string}).status
-    if (status !== 'draft' && status !== 'final') {
+    const b = req.body as {status?: string; note?: string}
+    if (b.status !== undefined && b.status !== 'draft' && b.status !== 'final') {
       res.status(400).json({error: "status must be 'draft' or 'final'"})
       return
     }
-    db.update(schema.schedules)
-      .set({status, updatedAt: new Date().toISOString()})
-      .where(eq(schema.schedules.id, found.schedule.id))
-      .run()
-    res.json({id, status})
+    if (b.status !== undefined) {
+      db.update(schema.schedules)
+        .set({status: b.status, updatedAt: new Date().toISOString()})
+        .where(eq(schema.schedules.id, found.schedule.id))
+        .run()
+    }
+    if (b.note !== undefined) {
+      db.update(schema.musicSchedules)
+        .set({note: String(b.note), updatedAt: new Date().toISOString()})
+        .where(eq(schema.musicSchedules.id, id))
+        .run()
+    }
+    res.json({id, status: b.status ?? found.schedule.status, note: b.note ?? found.week.note})
   }),
 )
 
@@ -585,6 +751,10 @@ musicSchedulesRouter.patch(
     for (const k of ['meeting', 'uploaded', 'titleHighlight', 'scriptureHighlight'] as const)
       if (b[k] !== undefined) patch[k] = Boolean(b[k])
     if (b.time !== undefined) patch.time = b.time ? String(b.time) : null
+    if (b.serviceTimeId !== undefined) {
+      const n = Number(b.serviceTimeId)
+      patch.serviceTimeId = Number.isInteger(n) && n > 0 ? n : null
+    }
     if (b.date !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(String(b.date))) patch.date = String(b.date)
     if (b.episodeNumber !== undefined) {
       const n = Number(b.episodeNumber)

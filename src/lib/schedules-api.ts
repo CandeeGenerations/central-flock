@@ -89,7 +89,9 @@ export const updateSchedulesSettings = (
   }>,
 ) => request<SchedulesSettings>('/schedules/settings', {method: 'PUT', body: JSON.stringify(body)})
 
-export const uploadSchedulesLogo = (imageData: string, slot: 'print' | 'compact' = 'print') =>
+export type LogoSlot = 'print' | 'compact' | 'music_footer'
+
+export const uploadSchedulesLogo = (imageData: string, slot: LogoSlot = 'print') =>
   request<{logoPath: string}>('/schedules/settings/logo', {
     method: 'POST',
     body: JSON.stringify({imageData, slot}),

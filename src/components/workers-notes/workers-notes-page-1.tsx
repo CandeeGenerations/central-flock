@@ -1,5 +1,5 @@
 import {PrintPage, TitleBox} from '@/components/print/page-frame'
-import {renderWithUnderlines} from '@/lib/render-underlines'
+import {renderInline} from '@/lib/render-inline-markup'
 import type {WorkersNotesBlock, WorkersNotesMonth, YearlyTheme} from '@/lib/workers-notes-api'
 import {MONTH_NAMES, type WorkersNotesTerm, nextTerm, termLabel, termThroughLabel} from '@/lib/workers-notes-core'
 import {type ReactNode, forwardRef} from 'react'
@@ -119,7 +119,7 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
           case 'note':
             return (
               <Bullet key={i} bold={block.bold} region="blocks">
-                {renderWithUnderlines(block.text)}
+                {renderInline(block.text)}
               </Bullet>
             )
           case 'next_term_forms':
@@ -131,7 +131,7 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
           case 'growth_plan':
             return (
               <Bullet key={i} region="theme">
-                Our growth plan for the year {year} will be: {renderWithUnderlines(theme?.growthPlan ?? '')}
+                Our growth plan for the year {year} will be: {renderInline(theme?.growthPlan ?? '')}
               </Bullet>
             )
           case 'month_themes':

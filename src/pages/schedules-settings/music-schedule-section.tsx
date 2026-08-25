@@ -5,9 +5,11 @@ import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {fetchServiceTimes} from '@/lib/attendance-api'
-import {fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
-import {useQuery, useQueryClient} from '@tanstack/react-query'
-import {useEffect, useState} from 'react'
+import {fetchSchedulesSettings, schedulesKeys, uploadSchedulesLogo} from '@/lib/schedules-api'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {ImagePlus, Trash2} from 'lucide-react'
+import {useEffect, useRef, useState} from 'react'
+import {toast} from 'sonner'
 
 import {TypeDefaultsCard, saveType} from './shared'
 
@@ -21,6 +23,16 @@ export function MusicScheduleSettingsSection() {
   const queryClient = useQueryClient()
   const {data: settings} = useQuery({queryKey: schedulesKeys.settings, queryFn: fetchSchedulesSettings})
   const {data: times} = useQuery({queryKey: ['service-times'], queryFn: () => fetchServiceTimes()})
+
+  const graphicInputRef = useRef<HTMLInputElement>(null)
+  const uploadGraphic = useMutation({
+    mutationFn: (imageData: string) => uploadSchedulesLogo(imageData, 'music_footer'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: schedulesKeys.settings})
+      toast.success('Footer graphic uploaded')
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to upload graphic'),
+  })
 
   const [headings, setHeadings] = useState<Record<string, {music: string; booth: string}>>({})
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -116,13 +128,50 @@ export function MusicScheduleSettingsSection() {
                   <SelectItem value="never">Never</SelectItem>
                 </SelectContent>
               </Select>
-              <Input
-                className="h-9"
-                placeholder="/uploads/… graphic path"
-                defaultValue={settings.musicSchedule.footerImagePath ?? ''}
-                onBlur={(e) => saveType(queryClient, {musicSchedule: {footerImagePath: e.target.value.trim() || null}})}
-              />
             </div>
+
+            {/* Prints under the verse, centred, at the foot of the sheet. */}
+            {settings.musicSchedule.footerImagePath ? (
+              <div className="flex items-center gap-3 rounded-lg border bg-white p-3">
+                <img
+                  src={settings.musicSchedule.footerImagePath}
+                  alt="Footer graphic"
+                  className="max-h-16 object-contain"
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto"
+                  onClick={() => saveType(queryClient, {musicSchedule: {footerImagePath: null}})}
+                >
+                  <Trash2 className="mr-1 h-3 w-3" />
+                  Remove
+                </Button>
+              </div>
+            ) : null}
+            <input
+              ref={graphicInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                const reader = new FileReader()
+                reader.onload = () => uploadGraphic.mutate(reader.result as string)
+                reader.readAsDataURL(file)
+                e.target.value = ''
+              }}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={uploadGraphic.isPending}
+              onClick={() => graphicInputRef.current?.click()}
+            >
+              <ImagePlus className="mr-2 h-4 w-4" />
+              {settings.musicSchedule.footerImagePath ? 'Replace graphic' : 'Upload graphic'}
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -1,4 +1,5 @@
 import type {MusicFooterBlock} from '@/lib/music-schedule-api'
+import {renderInline} from '@/lib/render-inline-markup'
 
 import {TYPE} from './type-scale'
 
@@ -25,7 +26,7 @@ export function SheetFooter({blocks, imagePath}: {blocks: MusicFooterBlock[]; im
             }}
           >
             {b.text.split('\n').map((line, j) => (
-              <div key={j}>{line}</div>
+              <div key={j}>{renderInline(line)}</div>
             ))}
           </div>
         ),
@@ -35,7 +36,7 @@ export function SheetFooter({blocks, imagePath}: {blocks: MusicFooterBlock[]; im
           src={imagePath}
           alt=""
           crossOrigin="anonymous"
-          style={{maxHeight: 60, margin: '10px auto 0', display: 'block', objectFit: 'contain'}}
+          style={{maxHeight: 60, margin: '30px auto 0', display: 'block', objectFit: 'contain'}}
         />
       ) : null}
     </div>

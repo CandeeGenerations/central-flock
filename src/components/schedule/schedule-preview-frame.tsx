@@ -1,4 +1,4 @@
-import {renderWithUnderlines} from '@/lib/render-underlines'
+import {renderInline} from '@/lib/render-inline-markup'
 import type {FooterBlock} from '@/lib/schedules-api'
 import {type ReactNode, forwardRef} from 'react'
 
@@ -85,7 +85,7 @@ export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFr
                     whiteSpace: 'pre-wrap',
                   }}
                 >
-                  {renderWithUnderlines(b.text)}
+                  {renderInline(b.text)}
                 </div>
               )
             return (
@@ -105,7 +105,7 @@ export const SchedulePreviewFrame = forwardRef<HTMLDivElement, SchedulePreviewFr
                 <span aria-hidden style={{textAlign: 'center'}}>
                   ▪
                 </span>
-                <span style={{whiteSpace: 'pre-wrap'}}>{renderWithUnderlines(b.text)}</span>
+                <span style={{whiteSpace: 'pre-wrap'}}>{renderInline(b.text)}</span>
               </div>
             )
           })}

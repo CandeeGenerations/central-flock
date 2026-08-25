@@ -304,7 +304,10 @@ export interface OrderLine {
   align: MusicLineAlign | null
   bold: boolean | null
   italic: boolean
+  /** Highlight on the Music Sheet. */
   highlight: boolean
+  /** Highlight on the Sound Booth Sheet — set independently. */
+  boothHighlight: boolean
   sticky: boolean
   booth: MusicBoothMode
   boothLabel: string
@@ -506,7 +509,7 @@ export function draftBoothLine(slot: MusicBoothSlot, lines: OrderLine[]): {text:
       const detail = [lineRef(theme), stripOuterParens(theme.suffix)].filter(Boolean).join(', ')
       parts.push(detail ? `Theme Song (${detail})` : 'Theme Song')
     }
-    const highlight = [motto, verse, theme].some((l) => l?.highlight)
+    const highlight = [motto, verse, theme].some((l) => l?.boothHighlight)
     return {text: parts.join(', '), highlight}
   }
 
@@ -515,7 +518,7 @@ export function draftBoothLine(slot: MusicBoothSlot, lines: OrderLine[]): {text:
   const idx = lines.indexOf(sel)
   const lead = [...lines.slice(0, idx)].reverse().find((l) => l.role === 'plain' && l.text.trim())
   const leadText = lead?.text.trim() || 'Prayer, Announcements'
-  return {text: `${leadText}, _${sel.text.trim()}_`, highlight: sel.highlight}
+  return {text: `${leadText}, _${sel.text.trim()}_`, highlight: sel.boothHighlight}
 }
 
 /** True when a stored condensed line no longer matches a fresh draft. */
@@ -626,7 +629,7 @@ export function resolveBoothRows(service: ServiceInfo, lines: OrderLine[], booth
     // service with no choir line reads "Cong. Opener (No Choir)". See ADR 0022.
     let label = line.boothLabel || d.boothLabel
     let note = line.boothNote || d.boothNote
-    let highlight = line.highlight
+    let highlight = line.boothHighlight
     if (!firstSongDone) {
       firstSongDone = true
       if (line.role === 'congregational' && !hasChoir && !line.boothLabel) {

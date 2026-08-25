@@ -243,8 +243,8 @@ export function ThemeForm({
         <div className="space-y-1.5">
           <Label className="text-sm font-medium">Growth plan</Label>
           <p className="text-muted-foreground text-xs">
-            Prints after &quot;Our growth plan for the year {theme.year} will be:&quot;. Wrap a word in _underscores_ to
-            underline it.
+            Prints after &quot;Our growth plan for the year {theme.year} will be:&quot;. Inline markup: *bold*,
+            __italic__, _underline_.
           </p>
           <Textarea rows={4} value={fields.growthPlan} onChange={(e) => set('growthPlan', e.target.value)} />
         </div>

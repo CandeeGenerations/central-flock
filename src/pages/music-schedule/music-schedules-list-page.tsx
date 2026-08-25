@@ -7,10 +7,11 @@ import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip'
 import {createMusicWeek, fetchMusicWeekYears, fetchMusicWeeks, musicScheduleKeys} from '@/lib/music-schedule-api'
 import {addDays, toIso, weekLabel, weekStartFor} from '@/lib/music-schedule-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ListMusic, Plus} from 'lucide-react'
+import {AlertTriangle, ListMusic, Plus} from 'lucide-react'
 import {useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -60,6 +61,7 @@ export function MusicSchedulesListPage() {
     (w) =>
       !q ||
       w.label.toLowerCase().includes(q) ||
+      w.note.toLowerCase().includes(q) ||
       w.weekStart.includes(q) ||
       `${w.episodeFirst ?? ''} ${w.episodeLast ?? ''}`.includes(q),
   )
@@ -89,7 +91,11 @@ export function MusicSchedulesListPage() {
         <CardContent className="space-y-3 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="min-w-48 flex-1">
-              <SearchInput value={search} onChange={setSearch} placeholder="Search by date or episode number..." />
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search by date, note or episode number..."
+              />
             </div>
             <Select value={year} onValueChange={setYear}>
               <SelectTrigger className="w-32">
@@ -115,6 +121,7 @@ export function MusicSchedulesListPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Week of</TableHead>
+                  <TableHead>Note</TableHead>
                   <TableHead className="hidden sm:table-cell">Services</TableHead>
                   <TableHead className="w-28">Episodes</TableHead>
                   <TableHead className="w-24">Status</TableHead>
@@ -127,7 +134,23 @@ export function MusicSchedulesListPage() {
                     className="hover:bg-muted/50 cursor-pointer"
                     onClick={() => navigate(`/schedules/music/${w.id}`)}
                   >
-                    <TableCell className="font-medium">{w.label.replace('Week of ', '')}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="flex items-center gap-1.5">
+                        {w.label.replace('Week of ', '')}
+                        {w.warningCount ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {w.warningCount} thing{w.warningCount === 1 ? '' : 's'} to look at — open the week to see
+                              them
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground max-w-64 truncate">{w.note || '—'}</TableCell>
                     <TableCell className="text-muted-foreground hidden sm:table-cell">
                       {w.serviceCount} service{w.serviceCount === 1 ? '' : 's'}
                     </TableCell>

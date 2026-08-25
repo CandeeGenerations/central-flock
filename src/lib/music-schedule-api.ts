@@ -31,6 +31,10 @@ export interface MusicWeekSummary {
   id: number
   weekStart: string
   label: string
+  /** Free working note about the week — searchable, never printed. */
+  note: string
+  /** Readiness warnings for the week, from the same check the week view runs. */
+  warningCount: number
   status: 'draft' | 'final'
   scopeLabel: string
   serviceCount: number
@@ -58,6 +62,16 @@ export interface MusicService {
   scriptureNote: string
   scriptureHighlight: boolean
   sortOrder: number
+  /** What is stored on the row — blank means "use the Service Time's value". */
+  nameOverride: string
+  timeOverride: string | null
+  musicHeadingOverride: string
+  boothHeadingOverride: string
+  /** What a blank override falls back to, so the editor can show it as a hint. */
+  nameDefault: string
+  timeDefault: string | null
+  musicHeadingDefault: string
+  boothHeadingDefault: string
   lines: OrderLine[]
   boothLines: (BoothLine & {stale: boolean})[]
 }
@@ -72,6 +86,7 @@ export interface MusicWeek {
   id: number
   weekStart: string
   label: string
+  note: string
   status: 'draft' | 'final'
   scopeLabel: string
   updatedAt: string
@@ -93,6 +108,7 @@ export interface LineInput {
   bold: boolean | null
   italic: boolean
   highlight: boolean
+  boothHighlight: boolean
   sticky: boolean
   booth: OrderLine['booth']
   boothLabel: string
@@ -116,8 +132,12 @@ export const fetchMusicWeek = (id: number) => request<MusicWeek>(`/${id}`)
 export const createMusicWeek = (weekStart: string) =>
   request<{id: number; weekStart: string}>('/', {method: 'POST', body: JSON.stringify({weekStart})})
 
-export const updateMusicWeek = (id: number, body: {status: 'draft' | 'final'}) =>
-  request<{id: number; status: string}>(`/${id}`, {method: 'PATCH', body: JSON.stringify(body)})
+export const updateMusicWeek = (id: number, body: {status?: 'draft' | 'final'; note?: string}) =>
+  request<{id: number; status: string; note: string}>(`/${id}`, {method: 'PATCH', body: JSON.stringify(body)})
+
+/** Duplicate a week onto another Sunday, contents and all. */
+export const copyMusicWeek = (id: number, weekStart: string) =>
+  request<{id: number; weekStart: string}>(`/${id}/copy`, {method: 'POST', body: JSON.stringify({weekStart})})
 
 export const deleteMusicWeek = (id: number) => request<void>(`/${id}`, {method: 'DELETE'})
 

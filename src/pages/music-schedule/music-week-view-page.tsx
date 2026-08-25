@@ -1,20 +1,27 @@
 import {BoothServiceBlock, MusicServiceBlock} from '@/components/music-schedule/service-block'
 import {Sheet, type SheetBlock} from '@/components/music-schedule/sheet'
 import {SheetFooter} from '@/components/music-schedule/sheet-footer'
+import {BOOTH_PAGE_PADDING_X_PX} from '@/components/music-schedule/type-scale'
 import type {ZoomMode} from '@/components/print/scaled-page'
 import {Button} from '@/components/ui/button'
+import {Card, CardContent} from '@/components/ui/card'
+import {DatePicker} from '@/components/ui/date-time-picker'
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
 import {PageSpinner} from '@/components/ui/spinner'
 import {exportFixedPagePdf} from '@/lib/fixed-page-pdf'
 import {
   type MusicService,
+  copyMusicWeek,
   deleteMusicWeek,
   fetchMusicWeek,
   musicScheduleKeys,
   updateMusicWeek,
 } from '@/lib/music-schedule-api'
-import {weekWarnings} from '@/lib/music-schedule-core'
+import {addDays, weekLabel, weekStartFor, weekWarnings} from '@/lib/music-schedule-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertTriangle, ArrowLeft, Download, Lock, LockOpen, Trash2} from 'lucide-react'
+import {AlertTriangle, ArrowLeft, Copy, Download, Lock, LockOpen, Trash2} from 'lucide-react'
 import {type ReactElement, useMemo, useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -35,6 +42,8 @@ export function MusicWeekViewPage() {
   const [editMode, setEditMode] = useState(true)
   const [exporting, setExporting] = useState<'booth' | 'music' | null>(null)
   const [overflow, setOverflow] = useState<Record<string, number>>({})
+  const [copyOpen, setCopyOpen] = useState(false)
+  const [copyWeek, setCopyWeek] = useState('')
 
   const boothRefs = useRef<HTMLDivElement[]>([])
   const sundayRefs = useRef<HTMLDivElement[]>([])
@@ -47,9 +56,19 @@ export function MusicWeekViewPage() {
   })
 
   const patch = useMutation({
-    mutationFn: (body: {status: 'draft' | 'final'}) => updateMusicWeek(weekId, body),
+    mutationFn: (body: {status?: 'draft' | 'final'; note?: string}) => updateMusicWeek(weekId, body),
     onSuccess: () => queryClient.invalidateQueries({queryKey: musicScheduleKeys.all}),
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to update'),
+  })
+
+  const copy = useMutation({
+    mutationFn: (weekStart: string) => copyMusicWeek(weekId, weekStart),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({queryKey: musicScheduleKeys.all})
+      setCopyOpen(false)
+      navigate(`/schedules/music/${created.id}`)
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to copy'),
   })
 
   const remove = useMutation({
@@ -142,6 +161,17 @@ export function MusicWeekViewPage() {
             <Download className="mr-1 h-4 w-4" />
             {exporting === 'music' ? 'Exporting…' : 'Musicians'}
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setCopyWeek(addDays(week.weekStart, 7))
+              setCopyOpen(true)
+            }}
+          >
+            <Copy className="mr-1 h-4 w-4" />
+            Copy
+          </Button>
           <Button size="sm" variant={editMode ? 'default' : 'outline'} onClick={() => setEditMode((v) => !v)}>
             {editMode ? 'Editing' : 'Edit'}
           </Button>
@@ -173,6 +203,23 @@ export function MusicWeekViewPage() {
           </Button>
         </div>
       </div>
+
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <div>
+            <Label>Note</Label>
+            <Input
+              key={week.id}
+              defaultValue={week.note}
+              placeholder="e.g. Tyler running services"
+              onBlur={(e) => (e.target.value !== week.note ? patch.mutate({note: e.target.value}) : undefined)}
+            />
+            <p className="text-muted-foreground mt-1 text-xs">
+              Shown and searchable on the week list. Never printed on either sheet.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {warnings.length || overflowList.length ? (
         <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">
@@ -210,6 +257,34 @@ export function MusicWeekViewPage() {
         </p>
       ) : null}
 
+      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Copy {week.label}</DialogTitle>
+            <DialogDescription>
+              Copies every service, line, song, highlight and Sound Booth line as it stands, moved onto the new
+              week&rsquo;s dates. Episode numbers are reassigned for the new dates rather than duplicated.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Sunday</Label>
+            <DatePicker value={copyWeek} onChange={(v) => setCopyWeek(weekStartFor(v || week.weekStart))} />
+            <p className="text-muted-foreground text-xs">
+              Any date picks its Sunday. Will cover {weekLabel(copyWeek || week.weekStart).toLowerCase()} through the
+              Wednesday after it.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCopyOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={copy.isPending || !copyWeek} onClick={() => copy.mutate(copyWeek)}>
+              Copy week
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-6 2xl:grid-cols-2">
         <section className="space-y-3">
           <h3 className="text-muted-foreground text-sm font-medium">Sound Booth</h3>
@@ -217,6 +292,7 @@ export function MusicWeekViewPage() {
             title="SERVICE SCHEDULE"
             subtitle="Sound Booth"
             zoom={zoom}
+            paddingX={BOOTH_PAGE_PADDING_X_PX}
             blocks={blocksFor(meeting, (s, i) => (
               <BoothServiceBlock service={s} showRule={i < meeting.length - 1} />
             ))}

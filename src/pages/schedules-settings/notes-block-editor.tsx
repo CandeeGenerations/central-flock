@@ -98,7 +98,7 @@ export function NotesBlockEditor({
                 rows={4}
                 value={b.text}
                 onChange={(e) => update(i, {text: e.target.value})}
-                placeholder="Bullet text. Wrap a word in _underscores_ to underline it."
+                placeholder="Bullet text. Inline markup: *bold*, __italic__, _underline_."
               />
               <div className="flex items-center gap-2">
                 <Checkbox

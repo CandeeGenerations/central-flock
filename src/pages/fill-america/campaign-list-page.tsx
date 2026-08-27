@@ -1,6 +1,7 @@
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
+import {DateRangePicker} from '@/components/ui/date-range-picker'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
@@ -44,6 +45,27 @@ function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+/**
+ * Per-column shading, as the spreadsheet this replaces does it: each column is
+ * scaled independently between its own smallest and largest value, so a column
+ * of thousands and a column of dozens are both readable. Zero gets no fill at
+ * all, which is what makes an empty campaign obvious at a glance.
+ *
+ * The tint is a fixed green at varying alpha rather than a palette of solid
+ * colours, so it composes over whichever surface the active theme paints and
+ * never fights the foreground text.
+ */
+function heatScale(values: number[]) {
+  const present = values.filter((v) => v > 0)
+  const min = Math.min(...present)
+  const max = Math.max(...present)
+  return (v: number): React.CSSProperties | undefined => {
+    if (!present.length || v <= 0) return undefined
+    const t = max === min ? 1 : (v - min) / (max - min)
+    return {backgroundColor: `color-mix(in oklab, var(--primary) ${8 + t * 30}%, transparent)`}
+  }
+}
+
 export function FillAmericaCampaignListPage() {
   const navigate = useNavigate()
   const [manualOpen, setManualOpen] = useState(false)
@@ -72,6 +94,13 @@ export function FillAmericaCampaignListPage() {
     (c) => !q || c.title.toLowerCase().includes(q) || SEASON_LABELS[c.season].toLowerCase().includes(q),
   )
 
+  // Scaled across every campaign, not just the filtered ones, so searching does
+  // not silently rescale the colours under you.
+  const all = campaigns ?? []
+  const heatParticipants = heatScale(all.map((c) => c.uniqueParticipants))
+  const heatTracts = heatScale(all.map((c) => c.tracts))
+  const heatHangers = heatScale(all.map((c) => c.doorHangers))
+
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div className="mb-6 flex items-center gap-3">
@@ -83,10 +112,9 @@ export function FillAmericaCampaignListPage() {
         </Button>
       </div>
 
-      <SearchInput value={search} onChange={setSearch} placeholder="Search campaigns…" containerClassName="max-w-sm" />
-
       <Card size="sm">
-        <CardContent className="p-0">
+        <CardContent className="space-y-3 p-4">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search campaigns…" />
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -117,9 +145,15 @@ export function FillAmericaCampaignListPage() {
                     </TableCell>
                     <TableCell className="text-center tabular-nums">{c.weekCount}</TableCell>
                     <TableCell className="text-center tabular-nums">{c.householdCount}</TableCell>
-                    <TableCell className="text-right tabular-nums">{c.uniqueParticipants.toLocaleString()}</TableCell>
-                    <TableCell className="text-right tabular-nums">{c.tracts.toLocaleString()}</TableCell>
-                    <TableCell className="text-right tabular-nums">{c.doorHangers.toLocaleString()}</TableCell>
+                    <TableCell className="text-right tabular-nums" style={heatParticipants(c.uniqueParticipants)}>
+                      {c.uniqueParticipants.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums" style={heatTracts(c.tracts)}>
+                      {c.tracts.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums" style={heatHangers(c.doorHangers)}>
+                      {c.doorHangers.toLocaleString()}
+                    </TableCell>
                   </TableRow>
                 ))}
                 {filtered.length === 0 && (
@@ -167,14 +201,10 @@ function NewCampaignDialog({
   const weeks = valid ? campaignWeekDates(startDate, endDate) : []
   const derivedTitle = valid ? defaultTitle(startDate, endDate) : ''
 
-  function changeStart(next: string) {
-    setStartDate(next)
-    // Keep the campaign the same length when the start moves.
-    if (next && endDate >= startDate) {
-      const span = campaignWeekDates(startDate, endDate).length
-      setEndDate(addDaysIso(next, 7 * (span - 1)))
-    }
-    if (!seasonTouched && next) setSeason(defaultSeason(next))
+  function changeRange(nextStart: string, nextEnd: string) {
+    setStartDate(nextStart)
+    setEndDate(nextEnd)
+    if (!seasonTouched && nextStart) setSeason(defaultSeason(nextStart))
   }
 
   const create = useMutation({
@@ -203,15 +233,16 @@ function NewCampaignDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="fa-start">Start</Label>
-              <Input id="fa-start" type="date" value={startDate} onChange={(e) => changeStart(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="fa-end">End</Label>
-              <Input id="fa-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            </div>
+          <div className="space-y-1.5">
+            <Label>Dates</Label>
+            {/* No presets: none of the standing ranges ("Year to date", "Last 30
+                days") describes a campaign, which is a specific fortnight. */}
+            <DateRangePicker
+              value={{from: startDate, to: endDate}}
+              onChange={(r) => changeRange(r.from, r.to)}
+              presets={[]}
+              className="w-full"
+            />
           </div>
 
           <p className="text-muted-foreground text-sm">

@@ -4,7 +4,7 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {
@@ -21,7 +21,7 @@ import {
 import {SEASON_LABELS, weekLabel} from '@/lib/fill-america-core'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Megaphone, Plus, Trash2} from 'lucide-react'
+import {ArrowLeft, Eraser, Megaphone, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -185,18 +185,32 @@ function RosterCard({
   onRemove: (householdId: number) => void
 }) {
   const [adding, setAdding] = useState(false)
+  const [clearing, setClearing] = useState(false)
+
+  // Rosters are copied forward from the previous campaign, so a fresh campaign
+  // starts full of households that may never report. "Empty" is the strict
+  // sense the participant rule uses: not one week with tracts above zero.
+  const empties = roster.filter((r) => !r.tracts.some((t) => t !== null && t > 0))
 
   const weekTotals = weeks.map((w) => w.tracts)
   const goalTotal = totals.goal
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle>Roster</CardTitle>
-        <Button size="sm" onClick={() => setAdding(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add household
-        </Button>
+        <div className="flex items-center gap-2">
+          {empties.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setClearing(true)}>
+              <Eraser className="mr-2 h-4 w-4" />
+              Clear {empties.length} empty
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setAdding(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add household
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -292,6 +306,38 @@ function RosterCard({
         </p>
       </CardContent>
 
+      <Dialog open={clearing} onOpenChange={(v) => !v && setClearing(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear {empties.length} empty households?</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            Removes households that reported no tracts in any week of this campaign. It only affects this
+            campaign&rsquo;s roster — the households themselves, and every other campaign they are on, are untouched.
+            Add any of them back at any time.
+          </p>
+          <div className="max-h-48 overflow-y-auto rounded-md border p-3 text-sm">
+            {empties.map((r) => (
+              <div key={r.id}>{r.householdName}</div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearing(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                empties.forEach((r) => onRemove(r.householdId))
+                setClearing(false)
+              }}
+            >
+              Clear {empties.length}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AddHouseholdDialog
         open={adding}
         campaignId={campaignId}
@@ -349,18 +395,12 @@ function AddHouseholdDialog({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Existing household</Label>
-            <Select value={picked} onValueChange={setPicked}>
-              <SelectTrigger>
-                <SelectValue placeholder={available.length ? 'Choose…' : 'All households are already on'} />
-              </SelectTrigger>
-              <SelectContent>
-                {available.map((h) => (
-                  <SelectItem key={h.id} value={String(h.id)}>
-                    {h.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={picked}
+              onValueChange={setPicked}
+              options={available.map((h) => ({value: String(h.id), label: h.name}))}
+              placeholder={available.length ? 'Search households…' : 'All households are already on'}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="fa-new-household">Or create a new one</Label>

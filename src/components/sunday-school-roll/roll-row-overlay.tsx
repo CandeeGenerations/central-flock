@@ -105,13 +105,17 @@ export function RollRowOverlay({
               if (b.row > 0) onFocusRow(b.row - 1)
             }
           }}
-          className="pointer-events-auto absolute border-0 bg-transparent outline-none focus:bg-blue-50"
+          // Opaque, not transparent: it sits directly on the cell's own text,
+          // and a see-through input renders the same name twice a hair apart.
+          className="pointer-events-auto absolute border-0 bg-white outline-none focus:bg-blue-50"
           style={{
-            top: b.top,
-            left: b.left,
-            width: b.width,
-            height: b.height,
-            padding: '0 6px',
+            // Inset by the cell's 1px rule, so an opaque input covers the text
+            // underneath without painting over the grid lines.
+            top: b.top + 1,
+            left: b.left + 1,
+            width: Math.max(0, b.width - 2),
+            height: Math.max(0, b.height - 2),
+            padding: '0 5px',
             // Matches the cell it covers, so typing looks like the print.
             fontSize: '11pt',
             fontFamily: 'Arial, Helvetica, sans-serif',

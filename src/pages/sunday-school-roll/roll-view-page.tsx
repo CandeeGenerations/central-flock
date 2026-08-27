@@ -2,6 +2,7 @@ import {ScaledPage, type ZoomMode} from '@/components/print/scaled-page'
 import {RollRowOverlay} from '@/components/sunday-school-roll/roll-row-overlay'
 import {RollSheetPage} from '@/components/sunday-school-roll/roll-sheet-page'
 import {Button} from '@/components/ui/button'
+import {Card, CardContent} from '@/components/ui/card'
 import {Input} from '@/components/ui/input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {UnsavedChangesDialog} from '@/components/unsaved-changes-dialog'
@@ -157,7 +158,7 @@ export function RollViewPage() {
   const overflowing = drafts.filter((s) => sheetPageCount(s.scholars) > 1)
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="space-y-6 p-4 md:p-8">
       <UnsavedChangesDialog blocker={blocker} onSave={() => save.mutateAsync(drafts)} what="your edits to this roll" />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -246,7 +247,7 @@ export function RollViewPage() {
       </div>
 
       {/* Sheet index — jump between the sheets without scrolling five pages. */}
-      <div className="bg-background/95 sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b py-2 text-sm">
+      <div className="bg-background/95 sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b py-3 text-sm backdrop-blur">
         {drafts.map((s, i) => (
           <a
             key={i}
@@ -291,10 +292,10 @@ export function RollViewPage() {
         </div>
       )}
 
-      <div className="space-y-8">
+      <div className="mx-auto max-w-[1400px] space-y-8">
         {drafts.map((sheet, sheetIndex) => (
-          <section key={sheetIndex} id={`roll-sheet-${sheetIndex}`} className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
+          <Card key={sheetIndex} id={`roll-sheet-${sheetIndex}`} className="scroll-mt-20 gap-0 overflow-hidden py-0">
+            <div className="flex flex-wrap items-center gap-2 border-b px-6 py-4">
               <Input
                 value={sheet.label}
                 disabled={locked}
@@ -343,28 +344,32 @@ export function RollViewPage() {
               )}
             </div>
 
-            {Array.from({length: sheetPageCount(sheet.scholars)}, (_, page) => {
-              const flatIndex = printedPages.findIndex((p) => p.sheetIndex === sheetIndex && p.page === page)
-              return (
-                <RollPage
-                  key={page}
-                  registerPage={registerPage(flatIndex)}
-                  titlePrefix={titlePrefix}
-                  year={roll.year}
-                  quarter={quarter}
-                  sheet={sheet}
-                  page={page}
-                  dates={dates}
-                  logoPath={settings.logoPath}
-                  zoom={zoom}
-                  locked={locked}
-                  focusRow={focus?.sheet === sheetIndex ? focus.row : null}
-                  onFocusRow={(row) => setFocus(row == null ? null : {sheet: sheetIndex, row})}
-                  onRowChange={(row, value) => patchSheet(sheetIndex, {scholars: withRow(sheet.scholars, row, value)})}
-                />
-              )
-            })}
-          </section>
+            <CardContent className="space-y-6 p-6 md:p-8">
+              {Array.from({length: sheetPageCount(sheet.scholars)}, (_, page) => {
+                const flatIndex = printedPages.findIndex((p) => p.sheetIndex === sheetIndex && p.page === page)
+                return (
+                  <RollPage
+                    key={page}
+                    registerPage={registerPage(flatIndex)}
+                    titlePrefix={titlePrefix}
+                    year={roll.year}
+                    quarter={quarter}
+                    sheet={sheet}
+                    page={page}
+                    dates={dates}
+                    logoPath={settings.logoPath}
+                    zoom={zoom}
+                    locked={locked}
+                    focusRow={focus?.sheet === sheetIndex ? focus.row : null}
+                    onFocusRow={(row) => setFocus(row == null ? null : {sheet: sheetIndex, row})}
+                    onRowChange={(row, value) =>
+                      patchSheet(sheetIndex, {scholars: withRow(sheet.scholars, row, value)})
+                    }
+                  />
+                )
+              })}
+            </CardContent>
+          </Card>
         ))}
       </div>
     </div>
@@ -406,7 +411,7 @@ function RollPage({
 
   return (
     <ScaledPage zoom={zoom} orientation="landscape">
-      <div className="relative shadow-sm">
+      <div className="relative">
         <RollSheetPage
           ref={(node) => {
             localRef.current = node

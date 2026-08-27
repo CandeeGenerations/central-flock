@@ -3,6 +3,7 @@ import type {ActionsBuildContext, SearchItem} from '@/lib/search/registry'
 import {
   BookOpen,
   CheckSquare,
+  ClipboardList,
   FileText,
   FolderPlus,
   LayoutDashboard,
@@ -138,6 +139,17 @@ export function buildCreateActions(): SearchItem[] {
       keywords: ['new', 'rsvp', 'event', 'attendance'],
       action: ({navigate, close}) => {
         navigate('/rsvp?new=1')
+        close()
+      },
+    },
+    {
+      id: 'create-sunday-school-roll',
+      label: 'New Sunday School Roll',
+      group: 'Create',
+      icon: ClipboardList,
+      keywords: ['new', 'sunday school', 'roll', 'attendance', 'quarter'],
+      action: ({navigate, close}) => {
+        navigate('/schedules/sunday-school-rolls?new=1')
         close()
       },
     },

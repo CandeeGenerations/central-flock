@@ -20,7 +20,9 @@ import {sermonsProvider} from './sermons'
 import {serviceTimesProvider} from './service-times'
 import {specialMusicSchedulesProvider} from './special-music-schedules'
 import {specialsProvider} from './specials'
+import {sundaySchoolRollsProvider} from './sunday-school-rolls'
 import {templatesProvider} from './templates'
+import {workersNotesProvider} from './workers-notes'
 
 // Recents always loads (it shows on the empty palette). The entity providers
 // populate the searchable index; their results only surface once you type
@@ -47,4 +49,6 @@ export const providers: SearchProvider[] = [
   serviceTimesProvider as SearchProvider,
   recordersProvider as SearchProvider,
   specialsProvider as SearchProvider,
+  sundaySchoolRollsProvider as SearchProvider,
+  workersNotesProvider as SearchProvider,
 ]

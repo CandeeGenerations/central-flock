@@ -66,6 +66,7 @@ import {SchedulesSettingsLayout} from '@/pages/schedules-settings/schedules-sett
 import {SpecialMusicSettingsSection} from '@/pages/schedules-settings/special-music-section'
 import {SundaySchoolDefaultsPane} from '@/pages/schedules-settings/sunday-school-defaults'
 import {SundaySchoolLessonsPane} from '@/pages/schedules-settings/sunday-school-lessons'
+import {SundaySchoolRollSettingsSection} from '@/pages/schedules-settings/sunday-school-roll-section'
 import {SundaySchoolSettingsSection} from '@/pages/schedules-settings/sunday-school-section'
 import {SundaySchoolThemesPane} from '@/pages/schedules-settings/sunday-school-themes'
 import {QuoteDetailPage} from '@/pages/sermons/quote-detail-page'
@@ -79,6 +80,8 @@ import {VerseStripsPage} from '@/pages/sermons/verse-strips-page'
 import {SettingsPage} from '@/pages/settings-page'
 import {SpecialMusicScheduleViewPage} from '@/pages/special-music/special-music-schedule-view-page'
 import {SpecialMusicSchedulesPage} from '@/pages/special-music/special-music-schedules-page'
+import {RollListPage} from '@/pages/sunday-school-roll/roll-list-page'
+import {RollViewPage} from '@/pages/sunday-school-roll/roll-view-page'
 import {WorkersNotesBlocksPage} from '@/pages/sunday-school/workers-notes-blocks-page'
 import {WorkersNotesLessonsPage} from '@/pages/sunday-school/workers-notes-lessons-page'
 import {WorkersNotesListPage} from '@/pages/sunday-school/workers-notes-list-page'
@@ -504,6 +507,8 @@ function AppLayoutInner({
               <Route path="/schedules/music" element={<MusicSchedulesListPage />} />
               <Route path="/schedules/music/:id" element={<MusicWeekViewPage />} />
               <Route path="/schedules/music/:id/service/:serviceId" element={<MusicServiceEditorPage />} />
+              <Route path="/schedules/sunday-school-rolls" element={<RollListPage />} />
+              <Route path="/schedules/sunday-school-rolls/:id" element={<RollViewPage />} />
               <Route path="/schedules/sunday-school" element={<WorkersNotesListPage />} />
               <Route path="/schedules/sunday-school/:id" element={<WorkersNotesViewPage />} />
               <Route path="/schedules/sunday-school/:id/theme" element={<WorkersNotesThemePage />} />
@@ -517,6 +522,7 @@ function AppLayoutInner({
                 <Route path="special-music" element={<SpecialMusicSettingsSection />} />
                 <Route path="fair-booth" element={<FairBoothSettingsSection />} />
                 <Route path="music" element={<MusicScheduleSettingsSection />} />
+                <Route path="sunday-school-roll" element={<SundaySchoolRollSettingsSection />} />
                 <Route path="sunday-school" element={<SundaySchoolSettingsSection />}>
                   <Route index element={<Navigate to="defaults" replace />} />
                   <Route path="defaults" element={<SundaySchoolDefaultsPane />} />

@@ -68,6 +68,12 @@ export interface SchedulesSettings {
     footerImagePath: string | null
     footerPlacement: 'last' | 'every' | 'never'
   }
+  sundaySchoolRoll: {
+    // Leads the printed title: "Attendance 2026 - 3rd Quarter (July -
+    // September) | 3 yrs - Kindergarten". The printed word stays "Attendance"
+    // even though the code calls this a Roll — see ADR 0029.
+    titlePrefix: string
+  }
   workersNotes: {
     churchName: string
     // Page 1 heads with the shared logo instead of the church-name line.
@@ -85,6 +91,7 @@ export const updateSchedulesSettings = (
     specialMusic: Partial<SchedulesSettings['specialMusic']>
     fairBooth: Partial<SchedulesSettings['fairBooth']>
     musicSchedule: Partial<SchedulesSettings['musicSchedule']>
+    sundaySchoolRoll: Partial<SchedulesSettings['sundaySchoolRoll']>
     workersNotes: Partial<SchedulesSettings['workersNotes']>
   }>,
 ) => request<SchedulesSettings>('/schedules/settings', {method: 'PUT', body: JSON.stringify(body)})

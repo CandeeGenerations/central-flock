@@ -156,6 +156,48 @@ edition's own **Term**, its **Yearly Theme**, and its **Mottos** respectively, s
 go stale when copied forward. `spacer` is a blank gap.
 _Avoid_: Footer Block (that is the nursery/special-music footer), Bullet, Paragraph.
 
+### Sunday School Roll
+
+**Sunday School Roll**:
+One quarter's blank attendance grids for the whole Sunday School — one **Roll Sheet** per
+**Class**, all sharing one derived list of Sundays. A print-only artifact: it leaves the app as
+paper, teachers mark it by hand, and nothing is ever captured back. Lives in the shared
+`schedules` envelope as `schedule_type='sunday_school_roll'`
+(see docs/adr/0006-multi-type-schedule-envelope.md).
+_Avoid_: Attendance (that is the usher-entered in-person count — a number, captured digitally,
+a different feature entirely), Attendance Sheet, Sunday School Schedule.
+
+**Roll Sheet**:
+One printed landscape page of a **Sunday School Roll** — one **Class**, its **Scholars** down the
+left, the Roll's Sundays across the top, ruled to the bottom margin. Five of them per Roll,
+exported as one PDF so the whole quarter is a single printing action.
+_Avoid_: Roll (that is all five together), Page, Tab.
+
+**Class**:
+What one **Roll Sheet** is for — "3 yrs – Kindergarten", "1st-5th girls", "6th-12th boys". Not
+purely an age band: four of the five split by grade _and_ gender. Deliberately **not** a
+configured entity — it is a free-text label on the Roll Sheet, propagated to the next quarter by
+copy-forward rather than by a settings list, so there is nothing to maintain between quarters.
+_Avoid_: Age Group (two of the five are grade+gender), Department, Grade.
+
+**Scholar**:
+One name in the left column of a **Roll Sheet**. Free text, never a **Person** — Sunday School
+children are minors and are deliberately kept out of Contacts. Not a row of its own: the whole
+roster is one newline-separated field on the Roll Sheet, so line index _is_ row index and a blank
+line prints as a deliberate blank row. Owned by the Roll Sheet, not by a **Class**, so the roster
+is a snapshot of that quarter: a scholar who ages out simply is not copied forward, and last
+quarter's Roll still prints them where they were.
+_Avoid_: Student, Pupil, Child, Person (that is a contact), Member.
+
+**Quarter**:
+One of the four calendar quarters a **Sunday School Roll** covers — Jan–Mar, Apr–Jun, Jul–Sep,
+Oct–Dec. A genuine quarter, unlike the Workers' Notes **Term**, which is a four-month third of the
+year; the two sit side by side in the Sunday School area and must not be conflated. The Roll's
+date columns are derived from (year, quarter) at render time and never stored — every Sunday in
+the quarter gets a column, including one where Sunday School does not meet, which the teacher
+strikes through on paper.
+_Avoid_: Term (that is the Workers' Notes third), Period, Session.
+
 ### Music Schedule
 
 **Music Schedule**:

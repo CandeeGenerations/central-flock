@@ -225,6 +225,20 @@ const RESOLVERS: Record<string, ResolverDef> = {
           .get(),
       )?.label ?? null,
   },
+  // Same shape again: the route id is the roll, not the schedule envelope.
+  '/schedules/sunday-school-rolls': {
+    entityType: 'sunday_school_roll',
+    typeLabel: 'Sunday School Roll',
+    resolveLabel: (id) =>
+      get(
+        db
+          .select({label: schema.schedules.scopeLabel})
+          .from(schema.sundaySchoolRolls)
+          .innerJoin(schema.schedules, eq(schema.schedules.id, schema.sundaySchoolRolls.scheduleId))
+          .where(eq(schema.sundaySchoolRolls.id, id))
+          .get(),
+      )?.label ?? null,
+  },
   '/rsvp': {
     entityType: 'rsvp_list',
     typeLabel: 'RSVP List',

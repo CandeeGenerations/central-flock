@@ -41,6 +41,7 @@ import {sermonsRouter} from './routes/sermons.js'
 import {settingsRouter} from './routes/settings.js'
 import {specialsRouter} from './routes/specials.js'
 import {statsRouter} from './routes/stats.js'
+import {sundaySchoolRollsRouter} from './routes/sunday-school-rolls.js'
 import {templatesRouter} from './routes/templates.js'
 import {usageRouter} from './routes/usage.js'
 import {webhooksRouter} from './routes/webhooks.js'
@@ -86,6 +87,7 @@ app.use('/api/gwendolyn-devotions', gwendolynDevotionsRouter)
 app.use('/api/schedules/fair-booth', fairBoothRouter)
 app.use('/api/schedules/music', musicSchedulesRouter)
 app.use('/api/schedules/workers-notes', workersNotesRouter)
+app.use('/api/schedules/sunday-school-rolls', sundaySchoolRollsRouter)
 app.use('/api/schedules', schedulesRouter)
 app.use('/api/nursery/schedules', nurserySchedulesRouter)
 app.use('/api/nursery', nurseryRouter)

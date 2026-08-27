@@ -79,3 +79,18 @@ reflowed, so what is on screen is what prints and the ADR 0005 hit zones stay al
   the repo has adopted.
 - **A third page is not generated automatically.** If a Term ever genuinely does not fit, the fix
   is editorial. Revisit only if it happens in practice.
+
+## Amendment — the box has two sizes (Sunday School Roll)
+
+The **Sunday School Roll** prints landscape, so `PrintPage`, `ScaledPage` and `exportFixedPagePdf`
+take an `orientation` that defaults to `'portrait'` — Workers' Notes and Music Schedule are
+unchanged. Landscape is the same box with the two dimensions swapped (1056×816, the same 58/48
+padding) and the same 1:1 mapping to the sheet, so a `pt` in the CSS is still a real point on
+paper in both. `pageWidthPx()` / `pageHeightPx()` / `contentWidthPx()` / `contentHeightPx()` are
+the accessors; the bare `PAGE_WIDTH_PX` / `PAGE_HEIGHT_PX` constants stay, and stay portrait.
+
+Two consequences of the pattern read differently landscape. A Roll's rows are a fixed count sized
+to fill the box rather than content that might overflow it, so the overflow-warning machinery is
+replaced by a page count: a roster longer than the grid spills onto a second sheet and the Roll
+page says so before you print. And fit-to-width on a phone is kinder here than it is portrait —
+the grid is rules and blank cells, so there is nothing small to read.

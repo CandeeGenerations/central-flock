@@ -23,6 +23,7 @@ import {contactsRouter} from './routes/contacts.js'
 import {cleanupOrphanedScanImages, devotionsRouter} from './routes/devotions.js'
 import {draftsRouter} from './routes/drafts.js'
 import {fairBoothRouter} from './routes/fair-booth.js'
+import {fillAmericaRouter} from './routes/fill-america.js'
 import {globalVariablesRouter} from './routes/global-variables.js'
 import {groupsRouter} from './routes/groups.js'
 import {gwendolynDevotionsRouter} from './routes/gwendolyn-devotions.js'
@@ -98,6 +99,7 @@ app.use('/api/sermons', sermonsRouter)
 app.use('/api/rsvp', rsvpRouter)
 app.use('/api/attendance', attendanceRouter)
 app.use('/api/sunday-school-stats', sundaySchoolStatsRouter)
+app.use('/api/fill-america', fillAmericaRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/specials', specialsRouter)
 app.use('/api/usage', usageRouter)

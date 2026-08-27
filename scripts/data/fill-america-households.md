@@ -1,6 +1,6 @@
 # Fill America — household merge map (review sheet)
 
-Generated from `Fill America Stats.xlsx`. **Edit [fill-america-merge-map.json](./fill-america-merge-map.json)** —
+Generated from `Fill America Stats.xlsx`. **Edit [fill-america-households.json](./fill-america-households.json)** —
 this table is a read-only view for deciding. 114 spreadsheet labels → **61 Households**.
 
 Groups with more than one label are merges; move a label between groups, or give it its own group,

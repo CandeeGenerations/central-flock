@@ -177,14 +177,14 @@ reviewed merge map at `scripts/data/fill-america-households.json`.
 **114 distinct roster labels** across 18 campaigns resolve to **61 Households**. The mapping is a
 reviewed artifact, not an algorithm:
 
-- [`plans/fill-america-merge-map.json`](./fill-america-merge-map.json) — the editable source of
+- [`scripts/data/fill-america-households.json`](../scripts/data/fill-america-households.json) — the editable source of
   truth, `{"<Household>": ["<label>", …]}`. Move a label between groups, or give it its own group,
   to change an association. Every label must appear exactly once; the script asserts this.
-- [`plans/fill-america-merge-map.md`](./fill-america-merge-map.md) — a generated read-only view of
+- [`scripts/data/fill-america-households.md`](../scripts/data/fill-america-households.md) — a generated read-only view of
   the same data with campaign counts, tract totals and first/last campaign per label, for making
   those decisions.
 
-Move both to `scripts/data/` when implementing. 22 groups merge more than one label; 39 labels
+22 groups merge more than one label; 39 labels
 stand alone. Associations reviewed and confirmed:
 
 - `Preacher`, `Pastor Brad Weniger`, `Gwendolyn Weniger` → **Wenigers**; `Max Weniger` and

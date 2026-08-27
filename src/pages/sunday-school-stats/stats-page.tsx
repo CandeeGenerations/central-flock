@@ -16,6 +16,7 @@ import {
   fetchGrid,
   fetchSsSeries,
   fetchSsSummary,
+  fetchYears,
   saveCount,
 } from '@/lib/sunday-school-stats-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
@@ -294,6 +295,8 @@ function QuarterGrid() {
       qc.invalidateQueries({queryKey: ['sundaySchoolGrid']})
       qc.invalidateQueries({queryKey: ['sundaySchoolSeries']})
       qc.invalidateQueries({queryKey: ['sundaySchoolSummary']})
+      // A count typed into a year that had none makes it a data year.
+      qc.invalidateQueries({queryKey: ['sundaySchoolYears']})
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Save failed'),
   })
@@ -306,10 +309,16 @@ function QuarterGrid() {
 
   const departments = useMemo(() => grid?.departments ?? [], [grid])
   const weeks = useMemo(() => grid?.weeks ?? [], [grid])
+  // Years come from the data (plus this year and next), not a rolling window off
+  // today — a fixed window offers empty years below the first record and drops
+  // real ones off the bottom as time passes.
+  const {data: yearOptions} = useQuery({queryKey: queryKeys.sundaySchoolYears, queryFn: fetchYears})
   const years = useMemo(() => {
-    const now = new Date().getFullYear()
-    return Array.from({length: 8}, (_, i) => now + 1 - i)
-  }, [])
+    const list = yearOptions ?? []
+    // Keep the selected year listed even if it has no data yet, so the Select
+    // never renders a value it has no option for.
+    return list.includes(year) ? list : [...list, year].sort((a, b) => b - a)
+  }, [yearOptions, year])
 
   // Diff compares against the previous Sunday THAT HAS DATA, not the previous
   // row — a blank week must not read as a crash to zero and back. Built with an

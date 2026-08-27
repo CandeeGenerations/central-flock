@@ -164,6 +164,31 @@ sundaySchoolStatsRouter.delete(
   }),
 )
 
+// --- Years ------------------------------------------------------------------
+
+// Which years the year picker offers: every year that actually has counts,
+// plus this year and next so a new quarter can be started before it has data.
+// Derived rather than a rolling window off the current year, which would both
+// offer empty years below the first record and drop real ones off the bottom
+// as time passes.
+sundaySchoolStatsRouter.get(
+  '/years',
+  asyncHandler(async (_req, res) => {
+    const rows = db
+      .select({year: sql<string>`substr(${schema.sundaySchoolDepartmentCounts.weekOf}, 1, 4)`})
+      .from(schema.sundaySchoolDepartmentCounts)
+      .groupBy(sql`substr(${schema.sundaySchoolDepartmentCounts.weekOf}, 1, 4)`)
+      .all()
+    const now = new Date().getUTCFullYear()
+    const years = new Set<number>([now, now + 1])
+    for (const r of rows) {
+      const y = Number(r.year)
+      if (Number.isInteger(y)) years.add(y)
+    }
+    res.json([...years].sort((a, b) => b - a))
+  }),
+)
+
 // --- Quarter grid -----------------------------------------------------------
 
 // Every Sunday in the quarter crossed with every department, blanks included.

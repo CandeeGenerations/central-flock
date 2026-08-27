@@ -58,6 +58,7 @@ export const queryKeys = {
   attendanceConfig: ['attendanceConfig'] as const,
   attendanceRecordHistory: (recordId: number) => ['attendanceRecordHistory', recordId] as const,
   sundaySchoolDepartments: (includeInactive: boolean) => ['sundaySchoolDepartments', includeInactive] as const,
+  sundaySchoolYears: ['sundaySchoolYears'] as const,
   sundaySchoolGrid: (year: number, quarter: number) => ['sundaySchoolGrid', year, quarter] as const,
   sundaySchoolSeries: (metric: string, departmentId: string, from?: string, to?: string) =>
     ['sundaySchoolSeries', metric, departmentId, from ?? '', to ?? ''] as const,

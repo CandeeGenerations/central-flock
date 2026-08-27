@@ -82,6 +82,10 @@ export const deleteDepartment = (id: number) => request<{ok: true}>(`/department
 export const reorderDepartments = (ids: number[]) =>
   request<{ok: true}>('/departments/reorder', {method: 'POST', body: JSON.stringify({ids})})
 
+// --- Years ---
+/** Years with data, plus this year and next. Newest first. */
+export const fetchYears = () => request<number[]>('/years')
+
 // --- Grid ---
 export const fetchGrid = (year: number, quarter: number) =>
   request<GridResponse>(`/grid?year=${year}&quarter=${quarter}`)

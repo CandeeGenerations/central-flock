@@ -1,5 +1,5 @@
 import {cn} from '@/lib/utils'
-import {Clock, Contact, Settings} from 'lucide-react'
+import {Clock, Contact, GraduationCap, Settings} from 'lucide-react'
 import {NavLink, Outlet} from 'react-router-dom'
 
 // Mirrors Schedule Settings: a left rail of routed sections, so each pane is a
@@ -8,6 +8,7 @@ import {NavLink, Outlet} from 'react-router-dom'
 const SECTIONS = [
   {to: 'times', label: 'Service Times', icon: Clock},
   {to: 'recorders', label: 'Recorders', icon: Contact},
+  {to: 'departments', label: 'Departments', icon: GraduationCap},
 ]
 
 export function AttendanceSettingsLayout() {
@@ -15,7 +16,7 @@ export function AttendanceSettingsLayout() {
     <div className="space-y-4 p-4 md:p-6">
       <div className="mb-6 flex items-center gap-3">
         <Settings className="h-6 w-6" />
-        <h2 className="text-2xl font-bold">Attendance Settings</h2>
+        <h2 className="text-2xl font-bold">Ministry Stats Settings</h2>
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">

@@ -84,6 +84,8 @@ import {SpecialMusicScheduleViewPage} from '@/pages/special-music/special-music-
 import {SpecialMusicSchedulesPage} from '@/pages/special-music/special-music-schedules-page'
 import {RollListPage} from '@/pages/sunday-school-roll/roll-list-page'
 import {RollViewPage} from '@/pages/sunday-school-roll/roll-view-page'
+import {SundaySchoolDepartmentsSection} from '@/pages/sunday-school-stats/departments-section'
+import {SundaySchoolStatsPage} from '@/pages/sunday-school-stats/stats-page'
 import {WorkersNotesBlocksPage} from '@/pages/sunday-school/workers-notes-blocks-page'
 import {WorkersNotesLessonsPage} from '@/pages/sunday-school/workers-notes-lessons-page'
 import {WorkersNotesListPage} from '@/pages/sunday-school/workers-notes-list-page'
@@ -564,7 +566,9 @@ function AppLayoutInner({
                 <Route index element={<Navigate to="times" replace />} />
                 <Route path="times" element={<ServiceTimesSection />} />
                 <Route path="recorders" element={<RecordersSection />} />
+                <Route path="departments" element={<SundaySchoolDepartmentsSection />} />
               </Route>
+              <Route path="/sunday-school/stats" element={<SundaySchoolStatsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </main>

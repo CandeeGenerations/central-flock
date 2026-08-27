@@ -116,7 +116,9 @@ function main() {
 
   console.log('\nQuarter  Sundays  With data  Total scholars')
   for (const s of summary) {
-    console.log(`   Q${s.quarter}     ${String(s.sundays).padStart(4)}     ${String(s.withData).padStart(4)}      ${String(s.total).padStart(6)}`)
+    console.log(
+      `   Q${s.quarter}     ${String(s.sundays).padStart(4)}     ${String(s.withData).padStart(4)}      ${String(s.total).padStart(6)}`,
+    )
   }
   const weeks = new Set(pending.map((c) => c.weekOf)).size
   const grand = summary.reduce((a, s) => a + s.total, 0)

@@ -118,10 +118,13 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: 'attendance',
-    label: 'Attendance',
+    // Group id deliberately unchanged: route_visits frecency history keys off
+    // it, and /attendance keeps its path for the same reason. See ADR 0012.
+    label: 'Ministry Stats',
     icon: BarChart3,
     children: [
       {to: '/attendance', label: 'Main Services', icon: Church, end: true},
+      {to: '/sunday-school/stats', label: 'Sunday School', icon: GraduationCap},
       {
         to: '/attendance/settings',
         label: 'Settings',

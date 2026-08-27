@@ -55,7 +55,13 @@ sundaySchoolStatsRouter.get(
         name: schema.sundaySchoolDepartments.name,
         active: schema.sundaySchoolDepartments.active,
         sortOrder: schema.sundaySchoolDepartments.sortOrder,
-        countCount: sql<number>`(select count(*) from ${schema.sundaySchoolDepartmentCounts} where ${schema.sundaySchoolDepartmentCounts.departmentId} = ${schema.sundaySchoolDepartments.id})`,
+        // Written out rather than interpolated: drizzle's sql template renders a
+        // column as a bare `"id"`, which inside a subquery binds to the INNER
+        // table and silently counts the wrong thing.
+        countCount: sql<number>`(
+          select count(*) from sunday_school_department_counts c
+          where c.department_id = sunday_school_departments.id
+        )`,
       })
       .from(schema.sundaySchoolDepartments)
       .all()

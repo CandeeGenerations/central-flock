@@ -45,13 +45,18 @@ fillAmericaRouter.get(
         name: schema.fillAmericaHouseholds.name,
         active: schema.fillAmericaHouseholds.active,
         sortOrder: schema.fillAmericaHouseholds.sortOrder,
-        campaignCount: sql<number>`(select count(*) from ${schema.fillAmericaRosterEntries} where ${schema.fillAmericaRosterEntries.householdId} = ${schema.fillAmericaHouseholds.id})`,
+        // Written out rather than interpolated: drizzle's sql template renders a
+        // column as a bare `"id"`, which inside these subqueries is ambiguous
+        // across the joined tables (and silently wrong where it is not).
+        campaignCount: sql<number>`(
+          select count(*) from fill_america_roster_entries re
+          where re.household_id = fill_america_households.id
+        )`,
         totalTracts: sql<number>`(
-          select coalesce(sum(${schema.fillAmericaTractReports.tracts}), 0)
-          from ${schema.fillAmericaTractReports}
-          join ${schema.fillAmericaRosterEntries}
-            on ${schema.fillAmericaRosterEntries.id} = ${schema.fillAmericaTractReports.rosterEntryId}
-          where ${schema.fillAmericaRosterEntries.householdId} = ${schema.fillAmericaHouseholds.id}
+          select coalesce(sum(tr.tracts), 0)
+          from fill_america_tract_reports tr
+          join fill_america_roster_entries re on re.id = tr.roster_entry_id
+          where re.household_id = fill_america_households.id
         )`,
       })
       .from(schema.fillAmericaHouseholds)

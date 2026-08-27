@@ -83,7 +83,7 @@ export function FillAmericaCampaignListPage() {
         </Button>
       </div>
 
-      <SearchInput value={search} onChange={setSearch} placeholder="Search campaigns…" className="max-w-sm" />
+      <SearchInput value={search} onChange={setSearch} placeholder="Search campaigns…" containerClassName="max-w-sm" />
 
       <Card size="sm">
         <CardContent className="p-0">

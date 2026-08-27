@@ -5,6 +5,7 @@ import {devotionPassagesProvider} from './devotion-passages'
 import {devotionsProvider} from './devotions'
 import {draftsProvider} from './drafts'
 import {fairBoothSchedulesProvider} from './fair-booth-schedules'
+import {fillAmericaCampaignsProvider} from './fill-america-campaigns'
 import {groupsProvider} from './groups'
 import {gwendolynDevotionsProvider} from './gwendolyn-devotions'
 import {hymnsProvider} from './hymns'
@@ -34,6 +35,7 @@ export const providers: SearchProvider[] = [
   devotionsProvider as SearchProvider,
   devotionPassagesProvider as SearchProvider,
   fairBoothSchedulesProvider as SearchProvider,
+  fillAmericaCampaignsProvider as SearchProvider,
   messagesProvider as SearchProvider,
   quotesProvider as SearchProvider,
   sermonsProvider as SearchProvider,

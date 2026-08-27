@@ -63,4 +63,7 @@ export const queryKeys = {
   sundaySchoolSeries: (metric: string, departmentId: string, from?: string, to?: string) =>
     ['sundaySchoolSeries', metric, departmentId, from ?? '', to ?? ''] as const,
   sundaySchoolSummary: (departmentId: string) => ['sundaySchoolSummary', departmentId] as const,
+  fillAmericaHouseholds: (includeInactive: boolean) => ['fillAmericaHouseholds', includeInactive] as const,
+  fillAmericaCampaigns: ['fillAmericaCampaigns'] as const,
+  fillAmericaCampaign: (id: string | number) => ['fillAmericaCampaign', String(id)] as const,
 }

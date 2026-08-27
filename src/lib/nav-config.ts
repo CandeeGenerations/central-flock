@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   List,
   ListMusic,
+  Megaphone,
   MessageCircle,
   MessageSquare,
   Music,
@@ -125,6 +126,7 @@ export const navGroups: NavGroup[] = [
     children: [
       {to: '/attendance', label: 'Main Services', icon: Church, end: true},
       {to: '/sunday-school/stats', label: 'Sunday School', icon: GraduationCap},
+      {to: '/fill-america', label: 'Fill America', icon: Megaphone},
       {
         to: '/attendance/settings',
         label: 'Settings',

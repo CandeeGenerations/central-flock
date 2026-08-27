@@ -35,6 +35,9 @@ import {GwendolynNewPage} from '@/pages/devotions/gwendolyn-new-page'
 import {FairBoothDayPage} from '@/pages/fair-booth/fair-booth-day-page'
 import {FairBoothSchedulePage} from '@/pages/fair-booth/fair-booth-schedule-page'
 import {FairBoothSchedulesPage} from '@/pages/fair-booth/fair-booth-schedules-page'
+import {FillAmericaCampaignListPage} from '@/pages/fill-america/campaign-list-page'
+import {FillAmericaCampaignViewPage} from '@/pages/fill-america/campaign-view-page'
+import {FillAmericaHouseholdsSection} from '@/pages/fill-america/households-section'
 import {GroupDetailPage} from '@/pages/group-detail-page'
 import {GroupsPage} from '@/pages/groups-page'
 import {HomePage} from '@/pages/home-page'
@@ -567,8 +570,11 @@ function AppLayoutInner({
                 <Route path="times" element={<ServiceTimesSection />} />
                 <Route path="recorders" element={<RecordersSection />} />
                 <Route path="departments" element={<SundaySchoolDepartmentsSection />} />
+                <Route path="households" element={<FillAmericaHouseholdsSection />} />
               </Route>
               <Route path="/sunday-school/stats" element={<SundaySchoolStatsPage />} />
+              <Route path="/fill-america" element={<FillAmericaCampaignListPage />} />
+              <Route path="/fill-america/:id" element={<FillAmericaCampaignViewPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </main>

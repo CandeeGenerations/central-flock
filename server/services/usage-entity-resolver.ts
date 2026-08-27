@@ -61,6 +61,18 @@ const RESOLVERS: Record<string, ResolverDef> = {
       return `${r.first ?? ''} ${r.last ?? ''}`.trim() || `#${id}`
     },
   },
+  '/fill-america': {
+    entityType: 'fill-america-campaign',
+    typeLabel: 'Fill America Campaign',
+    resolveLabel: (id) =>
+      get(
+        db
+          .select({title: schema.fillAmericaCampaigns.title})
+          .from(schema.fillAmericaCampaigns)
+          .where(eq(schema.fillAmericaCampaigns.id, id))
+          .get(),
+      )?.title ?? null,
+  },
   '/groups': {
     entityType: 'group',
     typeLabel: 'Group',

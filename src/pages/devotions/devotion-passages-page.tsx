@@ -1,4 +1,5 @@
 import {AIProgress} from '@/components/ai-progress'
+import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
@@ -10,9 +11,16 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/c
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {useProgressOperation} from '@/hooks/use-sse'
-import {type PoolPassage, fetchPool, generatePoolPassages, setPoolPassageRecorded} from '@/lib/devotion-api'
+import {
+  type PoolPassage,
+  clearUnusedPoolPassages,
+  fetchPool,
+  generatePoolPassages,
+  setPoolPassageRecorded,
+} from '@/lib/devotion-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowDown, ArrowUp, Check, ChevronsUpDown, Loader2, Sparkles, X} from 'lucide-react'
+import {ArrowDown, ArrowUp, Check, ChevronsUpDown, Loader2, Sparkles, Trash2, X} from 'lucide-react'
+import type React from 'react'
 import {useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -35,6 +43,7 @@ export function DevotionPassagesPage() {
   const [devoSort, setDevoSort] = usePersistedState<'none' | 'asc' | 'desc'>('passages.sort.devo', 'none')
   const [page, setPage] = useState(1)
   const [generateOpen, setGenerateOpen] = useState(false)
+  const [clearOpen, setClearOpen] = useState(false)
 
   const usedParam = filter === 'available' ? 'false' : filter === 'used' ? 'true' : undefined
 
@@ -71,6 +80,14 @@ export function DevotionPassagesPage() {
     }
   }
 
+  // Enter anywhere in the dialog's fields submits, so a topic can be typed and
+  // fired without reaching for the button.
+  const handleGenerateKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter' || genState.isRunning) return
+    e.preventDefault()
+    void handleGenerate()
+  }
+
   // Optional sort by assigned devotion number; unassigned always sink to the bottom.
   const sortedPassages =
     devoSort === 'none'
@@ -94,6 +111,19 @@ export function DevotionPassagesPage() {
     setPage(1)
   }
 
+  // Flushes the un-recorded end of the pool so generation starts from a clean
+  // slate. Recorded and used passages are never touched.
+  const clearUnusedMutation = useMutation({
+    mutationFn: clearUnusedPoolPassages,
+    onSuccess: ({deleted}) => {
+      queryClient.invalidateQueries({queryKey: ['passages-pool']})
+      setClearOpen(false)
+      setPage(1)
+      toast.success(deleted === 1 ? 'Cleared 1 passage' : `Cleared ${deleted} passages`)
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to clear passages'),
+  })
+
   const handleFilterChange = (mode: FilterMode) => {
     setFilter(mode)
     setPage(1)
@@ -112,11 +142,28 @@ export function DevotionPassagesPage() {
           <h2 className="text-2xl font-bold">Passages</h2>
           <Badge variant="secondary">{availableCount} available</Badge>
         </div>
-        <Button size="sm" onClick={() => setGenerateOpen(true)}>
-          <Sparkles className="h-4 w-4 mr-1.5" />
-          Generate
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setClearOpen(true)}>
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Clear Unused
+          </Button>
+          <Button size="sm" onClick={() => setGenerateOpen(true)}>
+            <Sparkles className="h-4 w-4 mr-1.5" />
+            Generate
+          </Button>
+        </div>
       </div>
+
+      <ConfirmDialog
+        open={clearOpen}
+        onOpenChange={setClearOpen}
+        title="Clear Unused Passages"
+        description="Deletes every available passage that has not been recorded yet. Recorded passages and any already used on a devotion are kept."
+        confirmLabel="Clear"
+        variant="destructive"
+        onConfirm={() => clearUnusedMutation.mutate()}
+        loading={clearUnusedMutation.isPending}
+      />
 
       <Dialog open={generateOpen} onOpenChange={(open) => !genState.isRunning && setGenerateOpen(open)}>
         <DialogContent showCloseButton={!genState.isRunning}>
@@ -132,6 +179,7 @@ export function DevotionPassagesPage() {
                 max={20}
                 value={count}
                 onChange={(e) => setCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))}
+                onKeyDown={handleGenerateKeyDown}
                 className="w-28"
                 disabled={genState.isRunning}
               />
@@ -142,6 +190,7 @@ export function DevotionPassagesPage() {
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
+                onKeyDown={handleGenerateKeyDown}
                 placeholder="e.g. freedom, independence (July 4th)"
                 disabled={genState.isRunning}
               />

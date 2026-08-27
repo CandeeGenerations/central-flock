@@ -99,22 +99,39 @@ function buildUserMessage(extraRefs: string[], extraTitles: string[], topic?: st
   return msg
 }
 
-function parseResponse(text: string): GeneratedPassage {
-  const titleMatch = text.match(/<title>([\s\S]*?)<\/title>/)
-  const verseMatch = text.match(/<verse>([\s\S]*?)<\/verse>/)
-  const pointsMatch = text.match(/<points>([\s\S]*?)<\/points>/)
-
-  if (!titleMatch || !verseMatch || !pointsMatch) {
-    throw new Error('Failed to parse AI response — missing required XML tags')
+// The model occasionally drifts from the asked-for tags — renaming <points> to
+// <talking_points>, wrapping the block in a code fence, or dropping a closing
+// tag. None of those change the content, so accept them rather than discarding
+// an otherwise good passage.
+function extractTag(text: string, names: string[]): string | null {
+  for (const name of names) {
+    const closed = new RegExp(`<\\s*${name}\\s*[^>]*>([\\s\\S]*?)<\\s*/\\s*${name}\\s*>`, 'i')
+    const m = text.match(closed)
+    if (m?.[1].trim()) return m[1].trim()
   }
+  // No closing tag — truncated output, or the model just dropped it. Take up to
+  // the next tag so an unclosed <title> can't swallow the rest of the reply.
+  for (const name of names) {
+    const unclosed = new RegExp(`<\\s*${name}\\s*[^>]*>([\\s\\S]*?)(?:<|$)`, 'i')
+    const m = text.match(unclosed)
+    if (m?.[1].trim()) return m[1].trim()
+  }
+  return null
+}
 
-  const rawRef = verseMatch[1].trim()
-  const bibleReference = normalizeReference(rawRef)
+function parseResponse(text: string): GeneratedPassage | null {
+  const cleaned = text.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '')
+
+  const title = extractTag(cleaned, ['title'])
+  const verse = extractTag(cleaned, ['verse', 'reference', 'bible_reference', 'bibleReference'])
+  const points = extractTag(cleaned, ['points', 'talking_points', 'talkingPoints'])
+
+  if (!title || !verse || !points) return null
 
   return {
-    title: titleMatch[1].trim(),
-    bibleReference,
-    talkingPoints: pointsMatch[1].trim(),
+    title,
+    bibleReference: normalizeReference(verse),
+    talkingPoints: points,
     notes: null,
   }
 }
@@ -139,6 +156,13 @@ function normalizeReference(ref: string): string {
 
   return parts.join('; ')
 }
+
+// A reply that misses a tag is a one-off formatting slip, not a permanent
+// failure — asking again almost always fixes it.
+const MAX_PARSE_ATTEMPTS = 3
+const RETRY_NUDGE =
+  '\n\nIMPORTANT: your previous reply could not be parsed. Reply with ONLY the three tags ' +
+  '<title></title>, <verse></verse> and <points></points> — no preamble, no code fences, no other tags.'
 
 export type ProgressCallback = (step: string, message: string, progress: number) => void
 
@@ -167,26 +191,48 @@ export async function generateDevotionPassage(
 
     const userMessage = buildUserMessage(freshRefs, freshTitles, topic)
 
-    const response = await client.messages.create({
-      model,
-      max_tokens: 4096,
-      ...effortConfig(model, 'medium'),
-      system: SYSTEM_PROMPT,
-      messages: [{role: 'user', content: userMessage}],
-    })
+    let passage: GeneratedPassage | null = null
+    let lastText = ''
+    let lastStop: string | null = null
 
-    const textBlock = response.content.find((b) => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') {
-      throw new Error('No text response from Claude')
+    for (let attempt = 1; attempt <= MAX_PARSE_ATTEMPTS && !passage; attempt++) {
+      const response = await client.messages.create({
+        model,
+        max_tokens: 4096,
+        ...effortConfig(model, 'medium'),
+        system: SYSTEM_PROMPT,
+        messages: [{role: 'user', content: attempt === 1 ? userMessage : `${userMessage}${RETRY_NUDGE}`}],
+      })
+
+      const textBlock = response.content.find((b) => b.type === 'text')
+      lastText = textBlock?.type === 'text' ? textBlock.text : ''
+      lastStop = response.stop_reason
+
+      onProgress?.(
+        'parsing',
+        `Processing response${count > 1 ? ` ${i + 1}/${count}` : ''}\u2026`,
+        80 + Math.round((i / count) * 15),
+      )
+
+      passage = parseResponse(lastText)
+
+      // Log what actually came back — the old error said only "missing tags",
+      // which left no way to tell a truncation from a reworded tag.
+      if (!passage) {
+        console.warn(
+          `[devotion-generation] unparseable reply (attempt ${attempt}/${MAX_PARSE_ATTEMPTS}, ` +
+            `stop_reason=${lastStop}): ${JSON.stringify(lastText.slice(0, 300))}`,
+        )
+      }
     }
 
-    onProgress?.(
-      'parsing',
-      `Processing response${count > 1 ? ` ${i + 1}/${count}` : ''}\u2026`,
-      80 + Math.round((i / count) * 15),
-    )
+    if (!passage) {
+      throw new Error(
+        `The AI reply could not be parsed after ${MAX_PARSE_ATTEMPTS} attempts ` +
+          `(stop_reason=${lastStop}). Reply began: ${lastText.slice(0, 200) || '(empty)'}`,
+      )
+    }
 
-    const passage = parseResponse(textBlock.text)
     if (topic && topic.trim()) passage.notes = `Topic: ${topic.trim()}`
     results.push(passage)
     freshRefs.push(passage.bibleReference)

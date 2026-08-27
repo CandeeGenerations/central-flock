@@ -198,6 +198,42 @@ the quarter gets a column, including one where Sunday School does not meet, whic
 strikes through on paper.
 _Avoid_: Term (that is the Workers' Notes third), Period, Session.
 
+### Sunday School Stats
+
+**Sunday School Department**:
+The age band a **Department Count** is recorded against — "2-5yrs", "1st-5th", "6th-12th". A short,
+configured, admin-maintained list that is deliberately _not_ the Roll's **Class**: the Roll has five
+free-text Classes split by grade _and_ gender, while a Department is three age bands with gender as
+a pair of columns inside each. The two lists overlap without agreeing (the Roll's
+"3 yrs - Kindergarten" is the Department "2-5yrs"), and that is fine — they answer different
+questions and have different lifecycles. A Department is configured rather than copy-forward
+precisely because a chart has to hold its series identity across years, where a Roll Sheet's label
+is a per-quarter snapshot that may be retyped at will.
+_Avoid_: Class (that is the free-text label on a **Roll Sheet**), Group, Age Group, Grade.
+
+**Department Count**:
+The girls and boys counted in one **Sunday School Department** on one Sunday — the cell of the
+stats grid, and the only thing this feature stores. Keyed by (Sunday, Department), upserted on
+write. Both numbers are nullable, and blank is not zero: a blank means nobody recorded it, a zero
+means the class met and no one came.
+_Avoid_: Attendance (that is the usher-entered in-person count on a **Service Record** — a different
+capture, a different number, and never shown beside this one), Class Count, Tally (that is the
+attendance app's ±1), Enrollment.
+
+**Sunday School Stats**:
+The whole feature — the weekly grid of **Department Counts** and the charts over them. Data capture
+only: it produces no paper, has no draft/final status, and lives outside the `schedules` envelope,
+so there is nothing to create before a number can be typed. Deliberately holds no relationship to
+the **Sunday School** **Service Time**, whose **Service Records** count the whole room including
+adults and teachers; the two numbers are never displayed together and never reconciled.
+_Avoid_: Sunday School Roll (that is the print-only quarterly form), Sunday School Attendance.
+
+**Diff**:
+The week-over-week change in a **Department**'s total, and in the Sunday's grand total — the column
+the Sunday School director actually reads down. Derived at render time against the previous Sunday
+that has data, never stored.
+_Avoid_: Delta, Trend, Change (bare).
+
 ### Music Schedule
 
 **Music Schedule**:
@@ -321,6 +357,78 @@ produced, so the log reads as a ledger ("+1 → 42") and one device's contributi
 Correction stores only the value. Every save appends a **Record Edit** (full change log); the
 **Service Record** keeps the latest edit's values and recorder for display.
 _Avoid_: Revision, Log entry.
+
+### Fill America
+
+**Campaign**:
+One bounded church-wide tract-and-door-hanger push, identified by a start date and an end date —
+"Jun 20 - Jul 4, 2026". Roughly four a year since 2022. Its **Campaign Weeks** are derived from the
+range (start, start+7, … through end), never stored as a count, so a four-week campaign needs no
+schema change even though every campaign so far has been three weeks. The title is generated from
+the dates and stays editable.
+_Avoid_: Event (the spreadsheet's word, but this app already uses Event for calendar entries),
+Blitz, Push, Reminder Run (that is the fair booth's queued send, whose glossary entry avoids the
+word "Campaign" precisely because it belongs here).
+
+**Season**:
+Which of the four recurring slots in the year a **Campaign** occupies — Spring (Mar/Apr), Summer
+(Jun/Jul), Fall (Aug/Sep), Winter (Dec). The axis every comparison is made along, because the
+season dominates the result: Fall campaigns average 2,101 tracts and 38 **Unique Participants**
+against Spring's 1,497 and Winter's 25, so a December campaign held up against the August one
+before it shows a decline that is purely calendar. Stored on the Campaign and defaulted from the
+start month rather than derived at read time, so an off-month campaign can be filed correctly
+instead of silently mis-bucketed.
+_Avoid_: Quarter (that is the Sunday School's calendar quarter), Term, Cycle, Round.
+
+**Household**:
+The durable participant unit — "Candees", "Harrisons", "Neil Tellier", "Unknown". A configured list
+reused by every **Campaign**, which is what lets a family's giving be totalled across four years.
+Deliberately **not** linked to a **Person**: the roster is kept by family rather than by individual,
+half the entries have no single contact behind them, and a contact link would drift from the family
+headcount every time someone is added to Contacts. A single adult is a Household of one.
+_Avoid_: Person (that is a contact), Family (a household of one is not a family), Participant (that
+is the counted human, not the row), Team.
+
+**Roster Entry**:
+One **Household**'s participation in one **Campaign** — its **Size** for that campaign and its
+optional **Goal**. Copied forward from the previous Campaign when a new one is created, then edited:
+a household that sat one out is removed, a new one is added. The unit the campaign grid renders as
+a row.
+_Avoid_: Signup (that is the fair booth's), Membership, Enrollment.
+
+**Size**:
+How many people a **Household** contributed to one **Campaign** — the "x 5" that used to live inside
+the spreadsheet's row label. Stored per **Roster Entry**, not on the Household, because families
+grow: the Sells were 3 in 2024 and 4 in 2025, and a 2024 report must still say 3. A Household with
+no explicit size counts as 1.
+_Avoid_: Headcount, Members, Count.
+
+**Campaign Week**:
+One week of a **Campaign**, dated start + 7×(n−1). Holds exactly one typed number — **Door
+Hangers** — and derives the rest.
+_Avoid_: Week (bare), Date, Session.
+
+**Tract Report**:
+The number of tracts one **Household** distributed in one **Campaign Week** — the cell of the
+roster grid, and the only per-household figure captured. Blank means nothing was reported; the
+**Campaign Week**'s tract total is the sum of that week's Tract Reports, never typed.
+_Avoid_: Tracts (bare — that is the derived weekly total), Distribution, Entry.
+
+**Door Hangers**:
+Door hangers distributed in one **Campaign Week**. Typed at the week level and deliberately never
+attributed to a **Household**, unlike a **Tract Report** — the spreadsheet never tracked who hung
+them and nobody has asked to.
+_Avoid_: Hangers, Flyers.
+
+**Unique Participants**:
+How many distinct people took part — derived, never stored, at every level. For a **Campaign**, the
+sum of **Size** over every **Roster Entry** with a **Tract Report** greater than zero in any week.
+For a **Campaign Week**, the same sum restricted to households appearing for the _first time_ that
+campaign, so the three weekly figures add up to the campaign figure without double-counting a
+family that goes out all three weeks. A household that went out but reported no tracts is invisible
+to this count — accepted, because the roster is the only evidence there is.
+_Avoid_: Turnout (implies people-weeks), Attendance (that is the usher-entered service count),
+Volunteers, Participants (bare).
 
 ### Social Media
 

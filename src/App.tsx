@@ -108,7 +108,17 @@ import {
   Sun,
 } from 'lucide-react'
 import {useState} from 'react'
-import {BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate} from 'react-router-dom'
+import {
+  Link,
+  NavLink,
+  Navigate,
+  Route,
+  RouterProvider,
+  Routes,
+  createBrowserRouter,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom'
 
 import {Sentry} from './lib/sentry'
 
@@ -553,13 +563,17 @@ function AppLayoutInner({
   )
 }
 
+// One splat route rendering the whole shell: the <Routes> inside AppLayout
+// still does the real matching, so no route moves. What this buys is the data
+// router — useBlocker only exists on one, and the unsaved-changes guard
+// (use-unsaved-changes.ts) needs it to hold a page that has pending edits.
+const router = createBrowserRouter([{path: '*', element: <AuthGate />}])
+
 function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <AuthGate />
-        </BrowserRouter>
+        <RouterProvider router={router} />
       </QueryClientProvider>
     </ThemeProvider>
   )

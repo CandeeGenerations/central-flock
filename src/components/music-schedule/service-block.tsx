@@ -161,6 +161,12 @@ export function BoothServiceBlock({service, showRule = true}: {service: MusicSer
   )
 }
 
+/**
+ * The booth sheet is read at a glance across a dark room, so a long song title
+ * clips to one line rather than wrapping and pushing the block out of shape.
+ */
+const TRUNCATE: CSSProperties = {whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}
+
 function BoothCells({row}: {row: BoothRow}) {
   const isSong = row.kind === 'song'
   const inlineNote = row.kind === 'title' || row.kind === 'scripture'
@@ -177,10 +183,12 @@ function BoothCells({row}: {row: BoothRow}) {
         </div>
         {row.note && !inlineNote ? <div>{renderInline(row.note)}</div> : null}
       </div>
-      <div style={rowStyle({bold: isSong, italic: false, highlight: false})}>
-        <div>{renderInline(row.value)}</div>
+      {/* minWidth 0: a grid item's automatic minimum is its content, so without
+          this the cell grows past the 1fr track and the ellipsis never fires. */}
+      <div style={{...rowStyle({bold: isSong, italic: false, highlight: false}), minWidth: 0}}>
+        <div style={TRUNCATE}>{renderInline(row.value)}</div>
         {row.valueSecond ? (
-          <div>
+          <div style={TRUNCATE}>
             {renderInline(row.valueSecond)}
             {row.suffix ? <span style={{fontWeight: 400}}> {renderInline(row.suffix)}</span> : null}
           </div>

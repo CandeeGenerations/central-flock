@@ -55,8 +55,18 @@ export function buildNavigationActions(): SearchItem[] {
     nav('/settings', 'Settings', Settings),
     // Schedule Settings sections are routed panes off a left rail, so they are
     // not sidebar entries and need naming here explicitly.
+    nav('/attendance/settings/times', 'Attendance Settings Service Times', Settings, ['service times', 'attendance']),
+    nav('/attendance/settings/recorders', 'Attendance Settings Recorders', Settings, [
+      'recorders',
+      'attendance',
+      'public link',
+    ]),
     nav('/schedules/settings/general', 'Schedule Settings General', Settings, ['logo', 'compact logo']),
-    nav('/schedules/settings/nursery', 'Schedule Settings Nursery', Settings, ['nursery', 'worker counts']),
+    nav('/schedules/settings/nursery/defaults', 'Schedule Settings Nursery Defaults', Settings, [
+      'nursery',
+      'worker counts',
+    ]),
+    nav('/schedules/settings/nursery/workers', 'Nursery Workers', Settings, ['nursery', 'roster', 'workers']),
     nav('/schedules/settings/special-music', 'Schedule Settings Special Music', Settings, ['singers', 'households']),
     nav('/schedules/settings/fair-booth', 'Schedule Settings Fair Booth', Settings, ['roster', 'reminders']),
     nav('/schedules/settings/music', 'Schedule Settings Music Schedule', Settings, [

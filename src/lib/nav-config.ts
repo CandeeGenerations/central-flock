@@ -7,6 +7,7 @@ import {
   Calendar,
   CalendarDays,
   CheckSquare,
+  Church,
   ClipboardList,
   Clock,
   Contact,
@@ -103,12 +104,16 @@ export const navGroups: NavGroup[] = [
     children: [
       {to: '/special-music', label: 'Special Music', icon: Music, end: true},
       {to: '/nursery', label: 'Nursery', icon: Baby, end: true},
-      {to: '/nursery/workers', label: 'Nursery Workers', icon: Users},
       {to: '/schedules/fair-booth', label: 'Fair Booth', icon: Tent},
       {to: '/schedules/music', label: 'Music Schedule', icon: ListMusic},
       {to: '/schedules/sunday-school', label: 'Workers’ Notes', icon: GraduationCap},
       {to: '/schedules/sunday-school-rolls', label: 'Sunday School Roll', icon: ClipboardList},
-      {to: '/schedules/settings', label: 'Settings', icon: Settings, matchPaths: ['/nursery/settings']},
+      {
+        to: '/schedules/settings',
+        label: 'Settings',
+        icon: Settings,
+        matchPaths: ['/nursery/settings', '/nursery/workers'],
+      },
     ],
   },
   {
@@ -116,9 +121,13 @@ export const navGroups: NavGroup[] = [
     label: 'Attendance',
     icon: BarChart3,
     children: [
-      {to: '/attendance', label: 'Dashboard', icon: LayoutDashboard, end: true},
-      {to: '/attendance/times', label: 'Service Times', icon: Clock},
-      {to: '/attendance/recorders', label: 'Recorders', icon: Contact},
+      {to: '/attendance', label: 'Main Services', icon: Church, end: true},
+      {
+        to: '/attendance/settings',
+        label: 'Settings',
+        icon: Settings,
+        matchPaths: ['/attendance/times', '/attendance/recorders'],
+      },
     ],
   },
   {

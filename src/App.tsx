@@ -12,9 +12,10 @@ import {checkAuthStatus, logout} from '@/lib/api'
 import {findActiveGroup, isChildActive, navGroups} from '@/lib/nav-config'
 import {ThemeProvider, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
+import {AttendanceSettingsLayout} from '@/pages/attendance-settings/attendance-settings-layout'
+import {RecordersSection} from '@/pages/attendance-settings/recorders-section'
+import {ServiceTimesSection} from '@/pages/attendance-settings/service-times-section'
 import {AttendanceDashboardPage} from '@/pages/attendance/attendance-dashboard-page'
-import {RecordersPage} from '@/pages/attendance/recorders-page'
-import {ServiceTimesPage} from '@/pages/attendance/service-times-page'
 import {CalendarPage} from '@/pages/calendar-page'
 import {CalendarPrintPage} from '@/pages/calendar-print-page'
 import {ContactsImportPage} from '@/pages/contacts-import-page'
@@ -53,7 +54,6 @@ import {SpecialNewPage} from '@/pages/music/special-new-page'
 import {SpecialsListPage} from '@/pages/music/specials-list-page'
 import {NurseryScheduleViewPage} from '@/pages/nursery/nursery-schedule-view-page'
 import {NurserySchedulesPage} from '@/pages/nursery/nursery-schedules-page'
-import {NurseryWorkersPage} from '@/pages/nursery/nursery-workers-page'
 import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
 import {RsvpDetailPage} from '@/pages/rsvp/rsvp-detail-page'
@@ -61,7 +61,9 @@ import {RsvpListPage} from '@/pages/rsvp/rsvp-list-page'
 import {FairBoothSettingsSection} from '@/pages/schedules-settings/fair-booth-section'
 import {GeneralSettingsSection} from '@/pages/schedules-settings/general-section'
 import {MusicScheduleSettingsSection} from '@/pages/schedules-settings/music-schedule-section'
+import {NurseryDefaultsPane} from '@/pages/schedules-settings/nursery-defaults'
 import {NurserySettingsSection} from '@/pages/schedules-settings/nursery-section'
+import {NurseryWorkersPane} from '@/pages/schedules-settings/nursery-workers'
 import {SchedulesSettingsLayout} from '@/pages/schedules-settings/schedules-settings-layout'
 import {SpecialMusicSettingsSection} from '@/pages/schedules-settings/special-music-section'
 import {SundaySchoolDefaultsPane} from '@/pages/schedules-settings/sunday-school-defaults'
@@ -499,7 +501,7 @@ function AppLayoutInner({
               <Route path="/devotions/new" element={<DevotionDetailPage />} />
               <Route path="/devotions/:id" element={<DevotionDetailPage />} />
               <Route path="/nursery" element={<NurserySchedulesPage />} />
-              <Route path="/nursery/workers" element={<NurseryWorkersPage />} />
+              <Route path="/nursery/workers" element={<Navigate to="/schedules/settings/nursery/workers" replace />} />
               <Route path="/nursery/settings" element={<Navigate to="/schedules/settings" replace />} />
               <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
               <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
@@ -518,7 +520,11 @@ function AppLayoutInner({
               <Route path="/schedules/settings" element={<SchedulesSettingsLayout />}>
                 <Route index element={<Navigate to="general" replace />} />
                 <Route path="general" element={<GeneralSettingsSection />} />
-                <Route path="nursery" element={<NurserySettingsSection />} />
+                <Route path="nursery" element={<NurserySettingsSection />}>
+                  <Route index element={<Navigate to="defaults" replace />} />
+                  <Route path="defaults" element={<NurseryDefaultsPane />} />
+                  <Route path="workers" element={<NurseryWorkersPane />} />
+                </Route>
                 <Route path="special-music" element={<SpecialMusicSettingsSection />} />
                 <Route path="fair-booth" element={<FairBoothSettingsSection />} />
                 <Route path="music" element={<MusicScheduleSettingsSection />} />
@@ -552,8 +558,13 @@ function AppLayoutInner({
               <Route path="/rsvp" element={<RsvpListPage />} />
               <Route path="/rsvp/:id" element={<RsvpDetailPage />} />
               <Route path="/attendance" element={<AttendanceDashboardPage />} />
-              <Route path="/attendance/times" element={<ServiceTimesPage />} />
-              <Route path="/attendance/recorders" element={<RecordersPage />} />
+              <Route path="/attendance/times" element={<Navigate to="/attendance/settings/times" replace />} />
+              <Route path="/attendance/recorders" element={<Navigate to="/attendance/settings/recorders" replace />} />
+              <Route path="/attendance/settings" element={<AttendanceSettingsLayout />}>
+                <Route index element={<Navigate to="times" replace />} />
+                <Route path="times" element={<ServiceTimesSection />} />
+                <Route path="recorders" element={<RecordersSection />} />
+              </Route>
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </main>

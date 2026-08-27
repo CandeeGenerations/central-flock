@@ -20,7 +20,7 @@ import {Copy, Link2, Pencil, Plus, RefreshCw, Trash2} from 'lucide-react'
 import {useState} from 'react'
 import {toast} from 'sonner'
 
-export function RecordersPage() {
+export function RecordersSection() {
   const qc = useQueryClient()
   const {data: recorders, isLoading} = useQuery({queryKey: queryKeys.attendanceRecorders, queryFn: fetchRecorders})
   const {data: config} = useQuery({queryKey: queryKeys.attendanceConfig, queryFn: fetchAttendanceConfig})
@@ -86,11 +86,11 @@ export function RecordersPage() {
   const list = recorders ?? []
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Recorders</h2>
+        <p className="text-muted-foreground text-sm">Who can submit a count, each with their own public link.</p>
         <Button onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Add Recorder
         </Button>
       </div>

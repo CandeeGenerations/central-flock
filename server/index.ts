@@ -42,6 +42,7 @@ import {settingsRouter} from './routes/settings.js'
 import {specialsRouter} from './routes/specials.js'
 import {statsRouter} from './routes/stats.js'
 import {sundaySchoolRollsRouter} from './routes/sunday-school-rolls.js'
+import {sundaySchoolStatsRouter} from './routes/sunday-school-stats.js'
 import {templatesRouter} from './routes/templates.js'
 import {usageRouter} from './routes/usage.js'
 import {webhooksRouter} from './routes/webhooks.js'
@@ -96,6 +97,7 @@ app.use('/api/hymns', hymnsRouter)
 app.use('/api/sermons', sermonsRouter)
 app.use('/api/rsvp', rsvpRouter)
 app.use('/api/attendance', attendanceRouter)
+app.use('/api/sunday-school-stats', sundaySchoolStatsRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/specials', specialsRouter)
 app.use('/api/usage', usageRouter)

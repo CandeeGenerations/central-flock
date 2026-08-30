@@ -5,6 +5,7 @@ import {DateRangePicker} from '@/components/ui/date-range-picker'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
@@ -26,6 +27,9 @@ import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 import {FillAmericaDashboard} from './campaign-dashboard'
+
+// Four campaigns a year, so a page holds roughly two and a half years.
+const CAMPAIGNS_PAGE_SIZE = 10
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
@@ -72,7 +76,15 @@ export function FillAmericaCampaignListPage() {
   const navigate = useNavigate()
   const [manualOpen, setManualOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [params, setParams] = useSearchParams()
+
+  // Narrowing the search can leave the table on a page that no longer exists.
+  const [lastSearch, setLastSearch] = useState(search)
+  if (lastSearch !== search) {
+    setLastSearch(search)
+    setPage(1)
+  }
 
   // The command palette's "New Campaign" lands here with ?new=1. Derived rather
   // than pushed into state by an effect, so arriving with the param opens the
@@ -102,6 +114,8 @@ export function FillAmericaCampaignListPage() {
   const heatParticipants = heatScale(all.map((c) => c.uniqueParticipants))
   const heatTracts = heatScale(all.map((c) => c.tracts))
   const heatHangers = heatScale(all.map((c) => c.doorHangers))
+
+  const rows = filtered.slice((page - 1) * CAMPAIGNS_PAGE_SIZE, page * CAMPAIGNS_PAGE_SIZE)
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -135,7 +149,7 @@ export function FillAmericaCampaignListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((c) => (
+                {rows.map((c) => (
                   <TableRow
                     key={c.id}
                     className="cursor-pointer"
@@ -181,6 +195,15 @@ export function FillAmericaCampaignListPage() {
               </TableBody>
             </Table>
           </div>
+          {filtered.length > 0 && (
+            <Pagination
+              page={page}
+              pageSize={CAMPAIGNS_PAGE_SIZE}
+              total={filtered.length}
+              onPageChange={setPage}
+              noun="campaigns"
+            />
+          )}
         </CardContent>
       </Card>
 

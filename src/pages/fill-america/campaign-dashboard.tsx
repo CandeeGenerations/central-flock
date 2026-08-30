@@ -38,7 +38,7 @@ export function FillAmericaDashboard() {
   const [householdId, setHouseholdId] = useState('all')
   const [season, setSeason] = useState('all')
   const [range, setRange] = useState<DateRange>(allTime)
-  const [yoy, setYoy] = useState(true)
+  const [yoy, setYoy] = useState(false)
   const {from, to} = range
 
   // Active only. A retired family's four years of tracts stay on every board

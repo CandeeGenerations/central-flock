@@ -5,7 +5,7 @@ import {DateRangePicker} from '@/components/ui/date-range-picker'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import {Pagination} from '@/components/ui/pagination'
+import {type PageSize, Pagination, resolvePageSize} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
@@ -28,8 +28,9 @@ import {toast} from 'sonner'
 
 import {FillAmericaDashboard} from './campaign-dashboard'
 
-// Four campaigns a year, so a page holds roughly two and a half years.
-const CAMPAIGNS_PAGE_SIZE = 10
+// Four campaigns a year, so the default page holds roughly two and a half
+// years. "All" is there because eighteen campaigns is still a scannable list.
+const CAMPAIGNS_PAGE_SIZES: PageSize[] = [10, 25, 50, 'all']
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
@@ -77,6 +78,7 @@ export function FillAmericaCampaignListPage() {
   const [manualOpen, setManualOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [size, setSize] = useState<PageSize>(10)
   const [params, setParams] = useSearchParams()
 
   // Narrowing the search can leave the table on a page that no longer exists.
@@ -115,7 +117,8 @@ export function FillAmericaCampaignListPage() {
   const heatTracts = heatScale(all.map((c) => c.tracts))
   const heatHangers = heatScale(all.map((c) => c.doorHangers))
 
-  const rows = filtered.slice((page - 1) * CAMPAIGNS_PAGE_SIZE, page * CAMPAIGNS_PAGE_SIZE)
+  const pageSize = resolvePageSize(size, filtered.length)
+  const rows = filtered.slice((page - 1) * pageSize, page * pageSize)
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -198,10 +201,16 @@ export function FillAmericaCampaignListPage() {
           {filtered.length > 0 && (
             <Pagination
               page={page}
-              pageSize={CAMPAIGNS_PAGE_SIZE}
+              pageSize={pageSize}
               total={filtered.length}
               onPageChange={setPage}
               noun="campaigns"
+              size={size}
+              sizeOptions={CAMPAIGNS_PAGE_SIZES}
+              onSizeChange={(next) => {
+                setSize(next)
+                setPage(1)
+              }}
             />
           )}
         </CardContent>

@@ -923,6 +923,11 @@ fillAmericaRouter.get(
 // single campaigns. Both count a campaign as participated in only where tracts
 // above zero were reported, which is the same test the Unique Participants rule
 // uses — a roster row copied forward and never filled in is not participation.
+//
+// Retired households are left off both boards. Their tracts still count towards
+// every campaign total, /series and /summary, and their rows stay on the
+// campaign pages where the numbers were typed — retiring takes a family off the
+// dashboard, it does not erase what they did.
 fillAmericaRouter.get(
   '/leaderboard',
   asyncHandler(async (req, res) => {
@@ -933,11 +938,11 @@ fillAmericaRouter.get(
     const from = dateParam(req.query.from)
     const to = dateParam(req.query.to)
 
-    const conds = []
+    const conds = [eq(schema.fillAmericaHouseholds.active, true)]
     if (season) conds.push(eq(schema.fillAmericaCampaigns.season, season))
     if (from) conds.push(gte(schema.fillAmericaCampaigns.startDate, from))
     if (to) conds.push(lte(schema.fillAmericaCampaigns.startDate, to))
-    const where = conds.length ? and(...conds) : undefined
+    const where = and(...conds)
 
     // Table names are written out: drizzle renders a column inside an sql
     // template as a bare `"tracts"`, which across these joins is ambiguous.
@@ -982,7 +987,6 @@ fillAmericaRouter.get(
       .select({
         householdId: schema.fillAmericaHouseholds.id,
         householdName: schema.fillAmericaHouseholds.name,
-        householdActive: schema.fillAmericaHouseholds.active,
         tracts: tractSum,
         campaigns: sql<number>`count(distinct case when fill_america_tract_reports.tracts > 0
           then fill_america_roster_entries.campaign_id end)`,

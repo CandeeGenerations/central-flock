@@ -322,7 +322,7 @@ function MostFaithfulCard({season, from, to}: BoardFilter) {
             </TableHeader>
             <TableBody>
               {rows.map((r, i) => (
-                <TableRow key={r.householdId} className={r.householdActive ? '' : 'opacity-60'}>
+                <TableRow key={r.householdId}>
                   <TableCell className="text-muted-foreground tabular-nums">{i + 1}</TableCell>
                   <TableCell className="font-medium">{r.householdName}</TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">{r.tracts.toLocaleString()}</TableCell>
@@ -344,7 +344,8 @@ function MostFaithfulCard({season, from, to}: BoardFilter) {
         </div>
         <p className="text-muted-foreground mt-3 text-xs">
           Campaigns counts the ones where the household actually reported tracts, so a roster row copied forward and
-          never filled in does not count as taking part.
+          never filled in does not count as taking part. Retired households are left off &mdash; their tracts still
+          count towards every campaign total above, and their rows stay on the campaign pages.
         </p>
       </CardContent>
     </Card>
@@ -400,8 +401,9 @@ function TopEffortsCard({season, from, to}: BoardFilter) {
           </Table>
         </div>
         <p className="text-muted-foreground mt-3 text-xs">
-          One household&rsquo;s whole campaign, not a single week. This board reads every campaign, including the oldest
-          one the hand-kept spreadsheet never covered, so it will not match that sheet&rsquo;s Top 10 exactly.
+          One household&rsquo;s whole campaign, not a single week. Retired households are left off. This board reads
+          every campaign, including the oldest one the hand-kept spreadsheet never covered, so it will not match that
+          sheet&rsquo;s Top 10 exactly.
         </p>
       </CardContent>
     </Card>

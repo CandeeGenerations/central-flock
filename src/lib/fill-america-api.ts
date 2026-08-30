@@ -185,10 +185,10 @@ export interface FaSummary {
   metrics: Record<FaMetric, {latest: number | null; year: FaAgg; allTime: FaAgg}>
 }
 
+/** Retired households are left off both boards; see the route's comment. */
 export interface HouseholdBoardRow {
   householdId: number
   householdName: string
-  householdActive: boolean
   tracts: number
   campaigns: number
   avg: number

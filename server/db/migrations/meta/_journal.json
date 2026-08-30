@@ -365,6 +365,13 @@
       "when": 1788054715518,
       "tag": "0051_fill_america_door_hanger_goal",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "6",
+      "when": 1788099481413,
+      "tag": "0052_attendance_edit_idempotency",
+      "breakpoints": true
     }
   ]
 }

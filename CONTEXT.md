@@ -355,7 +355,10 @@ One entry against a **Service Record** — either a **Tally** or a **Correction*
 **Recorder** made it and when. A Tally stores both its adjustment and the value that adjustment
 produced, so the log reads as a ledger ("+1 → 42") and one device's contribution stays legible; a
 Correction stores only the value. Every save appends a **Record Edit** (full change log); the
-**Service Record** keeps the latest edit's values and recorder for display.
+**Service Record** keeps the latest edit's values and recorder for display. An edit made in the
+entry app also carries the id that app minted for it, and an id already in the log is a re-send of
+a write that landed rather than a second one — which is what keeps a dropped response from counting
+twice (see docs/adr/0034-attendance-writes-are-idempotent-by-client-id.md).
 _Avoid_: Revision, Log entry.
 
 ### Fill America

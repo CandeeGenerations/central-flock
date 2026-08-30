@@ -1,7 +1,7 @@
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {cn} from '@/lib/utils'
-import {CheckIcon, ChevronDownIcon} from 'lucide-react'
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {CheckIcon, ChevronDownIcon, PlusIcon} from 'lucide-react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
 interface SearchableSelectProps {
   value: string
@@ -10,6 +10,8 @@ interface SearchableSelectProps {
   placeholder?: string
   className?: string
   searchable?: boolean
+  /** Offer an "Add …" row for a search term that matches no option, so the caller can extend the list. */
+  creatable?: boolean
 }
 
 export function SearchableSelect({
@@ -19,6 +21,7 @@ export function SearchableSelect({
   placeholder,
   className,
   searchable = true,
+  creatable = false,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -29,7 +32,17 @@ export function SearchableSelect({
 
   const filtered = search ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase())) : options
 
-  const selectedLabel = options.find((o) => o.value === value)?.label
+  // A creatable select can hold a value that is not in the list yet — the "Add …" row puts it there.
+  const trimmedSearch = search.trim()
+  const showCreate =
+    creatable && trimmedSearch.length > 0 && !options.some((o) => o.label.toLowerCase() === trimmedSearch.toLowerCase())
+  const items = useMemo<{value: string; label: string; create?: boolean}[]>(
+    () => (showCreate ? [...filtered, {value: trimmedSearch, label: trimmedSearch, create: true}] : filtered),
+    [filtered, showCreate, trimmedSearch],
+  )
+
+  const matched = options.find((o) => o.value === value)
+  const selectedLabel = matched ? matched.label : creatable && value ? value : undefined
 
   // Lock page scroll while popover is open so mobile touch doesn't scroll the body behind
   useEffect(() => {
@@ -47,7 +60,6 @@ export function SearchableSelect({
     if (nextOpen) {
       setSearch('')
       setHighlightIndex(-1)
-      requestAnimationFrame(() => inputRef.current?.focus())
     }
   }, [])
 
@@ -67,21 +79,23 @@ export function SearchableSelect({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!filtered.length) return
+      if (!items.length) return
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setHighlightIndex((i) => (i < filtered.length - 1 ? i + 1 : 0))
+        setHighlightIndex((i) => (i < items.length - 1 ? i + 1 : 0))
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setHighlightIndex((i) => (i > 0 ? i - 1 : filtered.length - 1))
+        setHighlightIndex((i) => (i > 0 ? i - 1 : items.length - 1))
       } else if (e.key === 'Enter') {
         e.preventDefault()
-        if (highlightIndex >= 0 && highlightIndex < filtered.length) {
-          select(filtered[highlightIndex].value)
+        if (highlightIndex >= 0 && highlightIndex < items.length) {
+          select(items[highlightIndex].value)
+        } else if (showCreate) {
+          select(trimmedSearch)
         }
       }
     },
-    [filtered, highlightIndex, select],
+    [items, highlightIndex, select, showCreate, trimmedSearch],
   )
 
   return (
@@ -106,7 +120,12 @@ export function SearchableSelect({
         align="start"
         usePortal={false}
         className="w-(--radix-popover-trigger-width) gap-0 overflow-hidden p-0 relative bg-popover/70 before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150"
-        onOpenAutoFocus={(e) => e.preventDefault()}
+        onOpenAutoFocus={(e) => {
+          // Radix would focus the content wrapper; send focus to the search box instead so typing
+          // works immediately and mobile raises the keyboard.
+          e.preventDefault()
+          inputRef.current?.focus()
+        }}
       >
         {searchable && (
           <div className="px-2 pt-2 pb-1">
@@ -121,12 +140,12 @@ export function SearchableSelect({
           </div>
         )}
         <div ref={listRef} className="max-h-60 overflow-y-auto overscroll-contain p-1.5">
-          {filtered.length === 0 ? (
+          {items.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">No results</p>
           ) : (
-            filtered.map((option, i) => (
+            items.map((option, i) => (
               <button
-                key={option.value}
+                key={option.create ? `__create__${option.value}` : option.value}
                 type="button"
                 ref={i === highlightIndex ? (el) => el?.scrollIntoView({block: 'nearest'}) : undefined}
                 className={cn(
@@ -135,8 +154,17 @@ export function SearchableSelect({
                 )}
                 onClick={() => select(option.value)}
               >
-                {option.label}
-                {option.value === value && (
+                {option.create ? (
+                  <span className="flex items-center gap-2 text-left">
+                    <PlusIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span>
+                      Add <span className="font-semibold">{option.label}</span>
+                    </span>
+                  </span>
+                ) : (
+                  option.label
+                )}
+                {!option.create && option.value === value && (
                   <span className="absolute right-2 flex size-3.5 items-center justify-center">
                     <CheckIcon className="size-4" />
                   </span>

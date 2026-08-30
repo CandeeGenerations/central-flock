@@ -41,9 +41,12 @@ export function FillAmericaDashboard() {
   const [yoy, setYoy] = useState(true)
   const {from, to} = range
 
+  // Active only. A retired family's four years of tracts stay on every board
+  // and in every campaign's roster — this filter just stops offering them as
+  // something to chart, which is the list that goes stale.
   const {data: households} = useQuery({
-    queryKey: queryKeys.fillAmericaHouseholds(true),
-    queryFn: () => fetchHouseholds(true),
+    queryKey: queryKeys.fillAmericaHouseholds(false),
+    queryFn: () => fetchHouseholds(false),
   })
 
   const {data: series} = useQuery({
@@ -118,10 +121,7 @@ export function FillAmericaDashboard() {
               onValueChange={changeHousehold}
               options={[
                 {value: 'all', label: 'All combined'},
-                ...(households ?? []).map((h) => ({
-                  value: String(h.id),
-                  label: h.active ? h.name : `${h.name} (retired)`,
-                })),
+                ...(households ?? []).map((h) => ({value: String(h.id), label: h.name})),
               ]}
               className="w-52"
             />

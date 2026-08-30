@@ -124,7 +124,7 @@ export function FillAmericaCampaignListPage() {
                   <TableHead className="text-center">Weeks</TableHead>
                   <TableHead className="text-center">Households</TableHead>
                   <TableHead className="text-right">Participants</TableHead>
-                  <TableHead className="text-right">Goal</TableHead>
+                  <TableHead className="text-right">Packet Goal</TableHead>
                   <TableHead className="text-right">Tracts</TableHead>
                   <TableHead className="text-right">Door Hangers</TableHead>
                 </TableRow>
@@ -150,7 +150,7 @@ export function FillAmericaCampaignListPage() {
                       {c.uniqueParticipants.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-right tabular-nums">
-                      {c.goal ? c.goal.toLocaleString() : '—'}
+                      {c.packetGoal ? c.packetGoal.toLocaleString() : '—'}
                     </TableCell>
                     <TableCell className="text-right tabular-nums" style={heatTracts(c.tracts)}>
                       {c.tracts.toLocaleString()}
@@ -219,7 +219,7 @@ function NewCampaignDialog({
         endDate,
         season,
         title: titleTouched && title.trim() ? title.trim() : undefined,
-        goal: goal.trim() === '' ? null : Number(goal),
+        packetGoal: goal.trim() === '' ? null : Number(goal),
       }),
     onSuccess: (row) => {
       qc.invalidateQueries({queryKey: queryKeys.fillAmericaCampaigns})
@@ -285,7 +285,7 @@ function NewCampaignDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="fa-goal">Goal (tracts)</Label>
+            <Label htmlFor="fa-goal">Packet goal</Label>
             <Input
               id="fa-goal"
               inputMode="numeric"

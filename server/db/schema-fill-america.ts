@@ -37,10 +37,11 @@ export const fillAmericaCampaigns = sqliteTable('fill_america_campaigns', {
   startDate: text('start_date').notNull().unique(),
   endDate: text('end_date').notNull(),
   season: text('season', {enum: fillAmericaSeasons}).notNull(),
-  // The campaign's own target, in tracts. Independent of the per-Roster-Entry
-  // goals, which sum to their own total — this is what the church set out to
-  // do, not what the roster added up to when everyone was asked.
-  goal: integer('goal'),
+  // The campaign's target, counted in PACKETS — not tracts, and not the sum of
+  // the per-Roster-Entry goals. Deliberately its own column and its own noun:
+  // three different numbers on this feature could all be called "goal", and
+  // conflating them is how a target silently starts measuring the wrong unit.
+  packetGoal: integer('packet_goal'),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

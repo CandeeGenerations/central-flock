@@ -34,8 +34,8 @@ export interface CampaignSummary {
   startDate: string
   endDate: string
   season: Season
-  /** The campaign's own target, in tracts. Not the sum of roster goals. */
-  goal: number | null
+  /** The campaign's target, counted in packets. Not tracts, not the roster sum. */
+  packetGoal: number | null
   weekCount: number
   householdCount: number
   /** Derived, never stored. See ADR 0032. */
@@ -69,7 +69,7 @@ export interface RosterEntry {
 }
 
 export interface CampaignDetail {
-  campaign: {id: number; title: string; startDate: string; endDate: string; season: Season; goal: number | null}
+  campaign: {id: number; title: string; startDate: string; endDate: string; season: Season; packetGoal: number | null}
   weeks: CampaignWeek[]
   roster: RosterEntry[]
   totals: {uniqueParticipants: number; tracts: number; doorHangers: number; rosterGoal: number}
@@ -100,12 +100,12 @@ export const createCampaign = (data: {
   endDate: string
   season?: Season
   title?: string
-  goal?: number | null
+  packetGoal?: number | null
 }) => request<CampaignSummary>('/campaigns', {method: 'POST', body: JSON.stringify(data)})
 
 export const updateCampaign = (
   id: number,
-  data: Partial<{startDate: string; endDate: string; season: Season; title: string; goal: number | null}>,
+  data: Partial<{startDate: string; endDate: string; season: Season; title: string; packetGoal: number | null}>,
 ) => request<CampaignSummary>(`/campaigns/${id}`, {method: 'PATCH', body: JSON.stringify(data)})
 
 export const deleteCampaign = (id: number) => request<{ok: true}>(`/campaigns/${id}`, {method: 'DELETE'})

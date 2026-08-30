@@ -68,8 +68,8 @@ export function FillAmericaCampaignViewPage() {
     onSuccess: invalidate,
     onError,
   })
-  const goal = useMutation({
-    mutationFn: (v: number | null) => updateCampaign(Number(id), {goal: v}),
+  const packetGoal = useMutation({
+    mutationFn: (v: number | null) => updateCampaign(Number(id), {packetGoal: v}),
     onSuccess: invalidate,
     onError,
   })
@@ -95,21 +95,18 @@ export function FillAmericaCampaignViewPage() {
         <h2 className="text-2xl font-bold">{campaign.title}</h2>
         <Badge variant="secondary">{SEASON_LABELS[campaign.season]}</Badge>
         <div className="ml-auto flex items-center gap-2">
-          <Label htmlFor="fa-campaign-goal" className="text-muted-foreground text-sm">
-            Goal
+          <Label htmlFor="fa-packet-goal" className="text-muted-foreground text-sm">
+            Packet goal
           </Label>
+          {/* No progress bar: packets are not tracts, and nothing on this page
+              records packets handed out, so there is no actual to measure the
+              target against yet. */}
           <NumberCell
-            value={campaign.goal}
+            value={campaign.packetGoal}
             className="w-24"
-            onCommit={(v) => goal.mutate(v)}
-            inputId="fa-campaign-goal"
+            onCommit={(v) => packetGoal.mutate(v)}
+            inputId="fa-packet-goal"
           />
-          {campaign.goal ? (
-            <span className="text-muted-foreground text-sm tabular-nums">
-              {Math.round((totals.tracts / campaign.goal) * 100)}% &middot; {totals.tracts.toLocaleString()} of{' '}
-              {campaign.goal.toLocaleString()}
-            </span>
-          ) : null}
         </div>
       </div>
 

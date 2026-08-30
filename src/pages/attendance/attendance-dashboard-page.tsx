@@ -18,6 +18,7 @@ import {
   fetchSummary,
   updateRecord,
 } from '@/lib/attendance-api'
+import {linreg} from '@/lib/chart-math'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Church, History, Pencil, TrendingDown, TrendingUp} from 'lucide-react'
@@ -62,26 +63,6 @@ function toWeekly(points: {date: string; value: number}[]): {week: string; value
 function shiftYear(iso: string, years: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   return `${y + years}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-}
-
-// Least-squares slope/intercept over y indexed 0..n-1.
-function linreg(y: number[]): {slope: number; intercept: number} {
-  const n = y.length
-  if (n < 2) return {slope: 0, intercept: y[0] ?? 0}
-  let sx = 0,
-    sy = 0,
-    sxy = 0,
-    sxx = 0
-  for (let i = 0; i < n; i++) {
-    sx += i
-    sy += y[i]
-    sxy += i * y[i]
-    sxx += i * i
-  }
-  const denom = n * sxx - sx * sx
-  const slope = denom === 0 ? 0 : (n * sxy - sx * sy) / denom
-  const intercept = (sy - slope * sx) / n
-  return {slope, intercept}
 }
 
 export function AttendanceDashboardPage() {

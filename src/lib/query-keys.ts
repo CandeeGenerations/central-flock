@@ -66,4 +66,9 @@ export const queryKeys = {
   fillAmericaHouseholds: (includeInactive: boolean) => ['fillAmericaHouseholds', includeInactive] as const,
   fillAmericaCampaigns: ['fillAmericaCampaigns'] as const,
   fillAmericaCampaign: (id: string | number) => ['fillAmericaCampaign', String(id)] as const,
+  fillAmericaSeries: (metric: string, householdId: string, season: string, from?: string, to?: string) =>
+    ['fillAmericaSeries', metric, householdId, season, from ?? '', to ?? ''] as const,
+  fillAmericaSummary: (householdId: string) => ['fillAmericaSummary', householdId] as const,
+  fillAmericaLeaderboard: (scope: string, season: string, from?: string, to?: string) =>
+    ['fillAmericaLeaderboard', scope, season, from ?? '', to ?? ''] as const,
 }

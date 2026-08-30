@@ -141,3 +141,48 @@ export function weeklyTracts(entries: RosterLike[], weekCount: number): number[]
 export function entryTotal(entry: RosterLike): number {
   return entry.tracts.reduce<number>((a, t) => a + (t ?? 0), 0)
 }
+
+// --- Seasonal comparison ----------------------------------------------------
+
+/**
+ * How many whole months separate two ISO dates, ignoring the day. Campaigns
+ * move around inside their month — `Sep 3` one year, `Aug 29` the next — so a
+ * day-accurate difference would put a real pair either side of 12.
+ */
+function monthsBetween(earlier: string, later: string): number {
+  const [ey, em] = earlier.split('-').map(Number)
+  const [ly, lm] = later.split('-').map(Number)
+  return (ly - ey) * 12 + (lm - em)
+}
+
+/**
+ * For each campaign, the index of the one in the same Season roughly a year
+ * earlier, or -1 where there is none.
+ *
+ * The comparison line on the dashboard is deliberately NOT the previous
+ * campaign: Fall runs ~40% ahead of Spring on tracts and 50% ahead of Winter on
+ * people, so a December campaign held against the August one before it shows a
+ * decline that is purely calendar. 10-14 months is wide enough for a campaign
+ * that slid a month and narrow enough to never reach two years back.
+ *
+ * Points must be ascending by `startDate`, which is the order `/series` returns.
+ */
+export function seasonalPredecessors(points: {startDate: string; season: Season}[]): number[] {
+  return points.map((p, i) => {
+    for (let j = i - 1; j >= 0; j--) {
+      if (points[j].season !== p.season) continue
+      const gap = monthsBetween(points[j].startDate, p.startDate)
+      // Ascending order means the gap only grows as j falls; past 14 there is
+      // nothing left to find.
+      if (gap > 14) return -1
+      if (gap >= 10) return j
+    }
+    return -1
+  })
+}
+
+/** "Dec 25", "Mar 26" — one campaign's tick on the dashboard's x-axis. */
+export function campaignShortLabel(startDate: string): string {
+  const [y, m] = startDate.split('-').map(Number)
+  return `${MONTH_ABBR[m - 1]} ${String(y).slice(2)}`
+}

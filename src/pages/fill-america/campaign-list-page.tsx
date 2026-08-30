@@ -25,6 +25,8 @@ import {useState} from 'react'
 import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
+import {FillAmericaDashboard} from './campaign-dashboard'
+
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
 function todayIso(): string {
@@ -111,6 +113,8 @@ export function FillAmericaCampaignListPage() {
           New Campaign
         </Button>
       </div>
+
+      <FillAmericaDashboard />
 
       <Card size="sm">
         <CardContent className="space-y-3 p-4">

@@ -1,4 +1,4 @@
-import {and, asc, desc, eq, sql} from 'drizzle-orm'
+import {and, asc, desc, eq, gte, lte, sql} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {
@@ -716,5 +716,299 @@ fillAmericaRouter.put(
       .returning()
       .get()
     res.json(row)
+  }),
+)
+
+// --- Dashboard: series, summary, leaderboards -------------------------------
+
+// Fill America has nothing continuous to plot: eighteen three-week campaigns
+// over four years, separated by two-to-three-month gaps. So the x-axis is the
+// Campaign, not the date, and every endpoint below returns one row per
+// campaign rather than one per week.
+
+type Metric = 'tracts' | 'doorHangers' | 'uniqueParticipants'
+
+const METRICS: Metric[] = ['tracts', 'doorHangers', 'uniqueParticipants']
+
+const isMetric = (v: unknown): v is Metric => METRICS.includes(v as Metric)
+
+/** `householdId` query param -> a numeric id, or null for "all combined". */
+function householdFilter(raw: unknown): number | null {
+  const s = String(raw ?? 'all')
+  if (s === 'all') return null
+  const id = Number(s)
+  return Number.isInteger(id) ? id : null
+}
+
+const dateParam = (raw: unknown): string | null => (typeof raw === 'string' && DATE_RE.test(raw) ? raw : null)
+
+/** `season` query param -> a Season, or null for "all". */
+const seasonFilter = (raw: unknown): Season | null => (isSeason(raw) ? raw : null)
+
+interface CampaignPoint {
+  campaignId: number
+  title: string
+  startDate: string
+  season: Season
+  tracts: number
+  // Both null when a single Household is selected. Door Hangers are recorded on
+  // the Campaign Week and never attributed to a family, and Unique Participants
+  // is a whole-campaign headcount — reporting either under a household filter
+  // would hand back the entire church's number as if it were one family's.
+  doorHangers: number | null
+  uniqueParticipants: number | null
+}
+
+/**
+ * Every campaign as one point, ascending by start date. Tracts and Unique
+ * Participants are derived from the roster on every read, per ADR 0032 — there
+ * is no column for either.
+ */
+function campaignPoints(householdId: number | null): CampaignPoint[] {
+  const campaigns = db
+    .select()
+    .from(schema.fillAmericaCampaigns)
+    .orderBy(asc(schema.fillAmericaCampaigns.startDate))
+    .all()
+
+  // Every roster entry in the database with its tracts laid out by week number,
+  // in one pass — eighteen campaigns is not worth eighteen round trips.
+  const rows = db
+    .select({
+      campaignId: schema.fillAmericaRosterEntries.campaignId,
+      entryId: schema.fillAmericaRosterEntries.id,
+      size: schema.fillAmericaRosterEntries.size,
+      weekNo: schema.fillAmericaCampaignWeeks.weekNo,
+      tracts: schema.fillAmericaTractReports.tracts,
+    })
+    .from(schema.fillAmericaRosterEntries)
+    .leftJoin(
+      schema.fillAmericaTractReports,
+      eq(schema.fillAmericaTractReports.rosterEntryId, schema.fillAmericaRosterEntries.id),
+    )
+    .leftJoin(
+      schema.fillAmericaCampaignWeeks,
+      eq(schema.fillAmericaCampaignWeeks.id, schema.fillAmericaTractReports.weekId),
+    )
+    .where(householdId === null ? undefined : eq(schema.fillAmericaRosterEntries.householdId, householdId))
+    .all()
+
+  const byCampaign = new Map<number, Map<number, RosterLike>>()
+  for (const r of rows) {
+    let entries = byCampaign.get(r.campaignId)
+    if (!entries) byCampaign.set(r.campaignId, (entries = new Map()))
+    let entry = entries.get(r.entryId)
+    if (!entry) entries.set(r.entryId, (entry = {size: r.size, tracts: []}))
+    // A left join with no report leaves weekNo null: nothing to place, and the
+    // hole it leaves reads as "not reported", which is exactly what it is.
+    if (r.weekNo !== null) entry.tracts[r.weekNo - 1] = r.tracts
+  }
+
+  const hangers = new Map<number, number>()
+  for (const h of db
+    .select({
+      campaignId: schema.fillAmericaCampaignWeeks.campaignId,
+      total: sql<number>`coalesce(sum(fill_america_campaign_weeks.door_hangers), 0)`,
+    })
+    .from(schema.fillAmericaCampaignWeeks)
+    .groupBy(schema.fillAmericaCampaignWeeks.campaignId)
+    .all()) {
+    hangers.set(h.campaignId, h.total)
+  }
+
+  return campaigns.map((c) => {
+    const entries = [...(byCampaign.get(c.id)?.values() ?? [])]
+    return {
+      campaignId: c.id,
+      title: c.title,
+      startDate: c.startDate,
+      season: c.season,
+      tracts: entries.reduce((a, e) => a + entryTotal(e), 0),
+      doorHangers: householdId === null ? (hangers.get(c.id) ?? 0) : null,
+      uniqueParticipants: householdId === null ? campaignUniqueParticipants(entries) : null,
+    }
+  })
+}
+
+/** The Season and start-date window every dashboard endpoint shares. */
+function inWindow(
+  p: {startDate: string; season: Season},
+  season: Season | null,
+  from: string | null,
+  to: string | null,
+) {
+  if (season && p.season !== season) return false
+  if (from && p.startDate < from) return false
+  if (to && p.startDate > to) return false
+  return true
+}
+
+fillAmericaRouter.get(
+  '/series',
+  asyncHandler(async (req, res) => {
+    const metric: Metric = isMetric(req.query.metric) ? req.query.metric : 'tracts'
+    const householdParam = String(req.query.householdId ?? 'all')
+    const seasonParam = String(req.query.season ?? 'all')
+    const season = seasonFilter(req.query.season)
+    const from = dateParam(req.query.from)
+    const to = dateParam(req.query.to)
+
+    const points = campaignPoints(householdFilter(req.query.householdId))
+      .filter((p) => inWindow(p, season, from, to))
+      .map((p) => ({
+        campaignId: p.campaignId,
+        title: p.title,
+        startDate: p.startDate,
+        season: p.season,
+        value: p[metric],
+      }))
+    res.json({metric, householdId: householdParam, season: seasonParam, points})
+  }),
+)
+
+// --- Summary tiles ----------------------------------------------------------
+
+/**
+ * Totals over a set of campaigns. `campaigns` counts only the ones that
+ * actually recorded something, so a campaign created this morning does not drag
+ * the average down before anybody has reported.
+ */
+function agg(points: CampaignPoint[], metric: Metric) {
+  const values = points.map((p) => p[metric]).filter((v): v is number => v !== null)
+  const withData = values.filter((v) => v > 0)
+  const total = values.reduce((a, b) => a + b, 0)
+  return {
+    total: values.length ? total : null,
+    campaigns: withData.length,
+    avg: withData.length ? Math.round(total / withData.length) : 0,
+  }
+}
+
+fillAmericaRouter.get(
+  '/summary',
+  asyncHandler(async (req, res) => {
+    const householdParam = String(req.query.householdId ?? 'all')
+    const points = campaignPoints(householdFilter(req.query.householdId))
+
+    const year = new Date().getUTCFullYear()
+    const thisYear = points.filter((p) => p.startDate.slice(0, 4) === String(year))
+    // The most recent campaign outright, not the most recent one with data — a
+    // tile called "Latest Campaign" that quietly names an older one is worse
+    // than one reading zero next to today's title.
+    const latest = points.at(-1) ?? null
+
+    const metrics: Record<string, unknown> = {}
+    for (const m of METRICS) {
+      metrics[m] = {
+        latest: latest ? latest[m] : null,
+        year: agg(thisYear, m),
+        allTime: agg(points, m),
+      }
+    }
+
+    res.json({
+      householdId: householdParam,
+      year,
+      latest: latest
+        ? {campaignId: latest.campaignId, title: latest.title, startDate: latest.startDate, season: latest.season}
+        : null,
+      metrics,
+    })
+  }),
+)
+
+// --- Leaderboards -----------------------------------------------------------
+
+// `scope=household` totals a family across every campaign; `scope=effort` ranks
+// single campaigns. Both count a campaign as participated in only where tracts
+// above zero were reported, which is the same test the Unique Participants rule
+// uses — a roster row copied forward and never filled in is not participation.
+fillAmericaRouter.get(
+  '/leaderboard',
+  asyncHandler(async (req, res) => {
+    const scope = req.query.scope === 'effort' ? 'effort' : 'household'
+    const rawLimit = Number(req.query.limit)
+    const limit = Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 10
+    const season = seasonFilter(req.query.season)
+    const from = dateParam(req.query.from)
+    const to = dateParam(req.query.to)
+
+    const conds = []
+    if (season) conds.push(eq(schema.fillAmericaCampaigns.season, season))
+    if (from) conds.push(gte(schema.fillAmericaCampaigns.startDate, from))
+    if (to) conds.push(lte(schema.fillAmericaCampaigns.startDate, to))
+    const where = conds.length ? and(...conds) : undefined
+
+    // Table names are written out: drizzle renders a column inside an sql
+    // template as a bare `"tracts"`, which across these joins is ambiguous.
+    const tractSum = sql<number>`coalesce(sum(fill_america_tract_reports.tracts), 0)`
+
+    if (scope === 'effort') {
+      const rows = db
+        .select({
+          householdId: schema.fillAmericaHouseholds.id,
+          householdName: schema.fillAmericaHouseholds.name,
+          campaignId: schema.fillAmericaCampaigns.id,
+          campaignTitle: schema.fillAmericaCampaigns.title,
+          startDate: schema.fillAmericaCampaigns.startDate,
+          season: schema.fillAmericaCampaigns.season,
+          tracts: tractSum,
+        })
+        .from(schema.fillAmericaRosterEntries)
+        .innerJoin(
+          schema.fillAmericaHouseholds,
+          eq(schema.fillAmericaHouseholds.id, schema.fillAmericaRosterEntries.householdId),
+        )
+        .innerJoin(
+          schema.fillAmericaCampaigns,
+          eq(schema.fillAmericaCampaigns.id, schema.fillAmericaRosterEntries.campaignId),
+        )
+        .innerJoin(
+          schema.fillAmericaTractReports,
+          eq(schema.fillAmericaTractReports.rosterEntryId, schema.fillAmericaRosterEntries.id),
+        )
+        .where(where)
+        .groupBy(schema.fillAmericaRosterEntries.id)
+        .all()
+      const out = rows
+        .filter((r) => r.tracts > 0)
+        .sort((a, b) => b.tracts - a.tracts || a.householdName.localeCompare(b.householdName))
+        .slice(0, limit)
+      res.json({scope, rows: out})
+      return
+    }
+
+    const rows = db
+      .select({
+        householdId: schema.fillAmericaHouseholds.id,
+        householdName: schema.fillAmericaHouseholds.name,
+        householdActive: schema.fillAmericaHouseholds.active,
+        tracts: tractSum,
+        campaigns: sql<number>`count(distinct case when fill_america_tract_reports.tracts > 0
+          then fill_america_roster_entries.campaign_id end)`,
+      })
+      .from(schema.fillAmericaRosterEntries)
+      .innerJoin(
+        schema.fillAmericaHouseholds,
+        eq(schema.fillAmericaHouseholds.id, schema.fillAmericaRosterEntries.householdId),
+      )
+      .innerJoin(
+        schema.fillAmericaCampaigns,
+        eq(schema.fillAmericaCampaigns.id, schema.fillAmericaRosterEntries.campaignId),
+      )
+      .leftJoin(
+        schema.fillAmericaTractReports,
+        eq(schema.fillAmericaTractReports.rosterEntryId, schema.fillAmericaRosterEntries.id),
+      )
+      .where(where)
+      .groupBy(schema.fillAmericaHouseholds.id)
+      .all()
+
+    const out = rows
+      .filter((r) => r.tracts > 0)
+      .sort((a, b) => b.tracts - a.tracts || a.householdName.localeCompare(b.householdName))
+      .slice(0, limit)
+      .map((r) => ({...r, avg: r.campaigns ? Math.round(r.tracts / r.campaigns) : 0}))
+    res.json({scope, rows: out})
   }),
 )

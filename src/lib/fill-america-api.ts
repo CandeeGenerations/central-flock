@@ -143,3 +143,87 @@ export const saveTracts = (campaignId: number, householdId: number, weekNo: numb
     method: 'PUT',
     body: JSON.stringify({householdId, weekNo, tracts}),
   })
+
+// --- Dashboard ---
+
+export type FaMetric = 'tracts' | 'doorHangers' | 'uniqueParticipants'
+
+export const FA_METRIC_LABELS: Record<FaMetric, string> = {
+  tracts: 'Tracts',
+  doorHangers: 'Door Hangers',
+  uniqueParticipants: 'Unique Participants',
+}
+
+export interface SeriesPoint {
+  campaignId: number
+  title: string
+  startDate: string
+  season: Season
+  /** null where the metric is not meaningful for the current filter. */
+  value: number | null
+}
+
+export interface FaSeries {
+  metric: FaMetric
+  householdId: string
+  season: string
+  points: SeriesPoint[]
+}
+
+export interface FaAgg {
+  /** null where the metric is not meaningful for the current filter. */
+  total: number | null
+  /** Campaigns that actually recorded something, so a fresh one drags nothing down. */
+  campaigns: number
+  avg: number
+}
+
+export interface FaSummary {
+  householdId: string
+  year: number
+  latest: {campaignId: number; title: string; startDate: string; season: Season} | null
+  metrics: Record<FaMetric, {latest: number | null; year: FaAgg; allTime: FaAgg}>
+}
+
+export interface HouseholdBoardRow {
+  householdId: number
+  householdName: string
+  householdActive: boolean
+  tracts: number
+  campaigns: number
+  avg: number
+}
+
+export interface EffortBoardRow {
+  householdId: number
+  householdName: string
+  campaignId: number
+  campaignTitle: string
+  startDate: string
+  season: Season
+  tracts: number
+}
+
+interface DashboardFilter {
+  householdId?: string
+  season?: string
+  from?: string
+  to?: string
+}
+
+function query(parts: object): string {
+  const q = new URLSearchParams()
+  for (const [k, v] of Object.entries(parts)) if (v !== undefined && v !== '') q.set(k, String(v))
+  const s = q.toString()
+  return s ? `?${s}` : ''
+}
+
+export const fetchFaSeries = (f: DashboardFilter & {metric: FaMetric}) => request<FaSeries>(`/series${query(f)}`)
+
+export const fetchFaSummary = (householdId: string) => request<FaSummary>(`/summary${query({householdId})}`)
+
+export const fetchHouseholdBoard = (f: DashboardFilter & {limit?: number}) =>
+  request<{scope: 'household'; rows: HouseholdBoardRow[]}>(`/leaderboard${query({...f, scope: 'household'})}`)
+
+export const fetchEffortBoard = (f: DashboardFilter & {limit?: number}) =>
+  request<{scope: 'effort'; rows: EffortBoardRow[]}>(`/leaderboard${query({...f, scope: 'effort'})}`)

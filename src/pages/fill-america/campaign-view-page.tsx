@@ -13,6 +13,7 @@ import {
   changeRosterHousehold,
   createHousehold,
   fetchCampaign,
+  fetchCampaigns,
   fetchHouseholds,
   removeRosterEntry,
   saveDoorHangers,
@@ -20,12 +21,13 @@ import {
   saveTracts,
   updateCampaign,
 } from '@/lib/fill-america-api'
-import {SEASON_LABELS, weekLabel} from '@/lib/fill-america-core'
+import {SEASON_LABELS, seasonalPredecessors, weekLabel} from '@/lib/fill-america-core'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowLeft, Eraser, Megaphone, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link, useParams} from 'react-router-dom'
+import {Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts'
 import {toast} from 'sonner'
 
 export function FillAmericaCampaignViewPage() {
@@ -112,6 +114,10 @@ export function FillAmericaCampaignViewPage() {
           ) : null}
         </div>
       </div>
+
+      <SeasonalComparison campaignId={campaign.id} totals={totals} />
+
+      <WeekChartCard weeks={weeks} />
 
       <WeeksCard
         weeks={weeks}
@@ -526,6 +532,109 @@ function TopEffortsCard({roster, weeks}: {roster: RosterEntry[]; weeks: Campaign
             </TableBody>
           </Table>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * This campaign against the same Season a year earlier — never against the
+ * previous campaign, which is usually a different Season, and Season dominates
+ * the result. Read off the campaign list, which every metric is already derived
+ * on, rather than a second endpoint.
+ */
+function SeasonalComparison({campaignId, totals}: {campaignId: number; totals: CampaignDetail['totals']}) {
+  const {data: campaigns} = useQuery({queryKey: queryKeys.fillAmericaCampaigns, queryFn: fetchCampaigns})
+
+  const previous = useMemo(() => {
+    // The list arrives newest-first; the predecessor rule wants ascending.
+    const asc = [...(campaigns ?? [])].sort((a, b) => a.startDate.localeCompare(b.startDate))
+    const i = asc.findIndex((c) => c.id === campaignId)
+    if (i < 0) return null
+    const j = seasonalPredecessors(asc)[i]
+    return j >= 0 ? asc[j] : null
+  }, [campaigns, campaignId])
+
+  if (!previous) return null
+
+  return (
+    <p className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+      <span>
+        vs <span className="text-foreground font-medium">{previous.title}</span>
+      </span>
+      <Delta label="Tracts" now={totals.tracts} then={previous.tracts} />
+      <Delta label="Door Hangers" now={totals.doorHangers} then={previous.doorHangers} />
+      <Delta label="Participants" now={totals.uniqueParticipants} then={previous.uniqueParticipants} />
+    </p>
+  )
+}
+
+function Delta({label, now, then}: {label: string; now: number; then: number}) {
+  const pct = then > 0 ? Math.round(((now - then) / then) * 100) : null
+  const up = now >= then
+  return (
+    <span className="tabular-nums">
+      {label} <span className="text-foreground font-medium">{now.toLocaleString()}</span> vs {then.toLocaleString()}
+      {pct !== null && (
+        <span className={`ml-1 font-medium ${up ? 'text-green-600' : 'text-red-600'}`}>
+          {pct >= 0 ? '+' : ''}
+          {pct}%
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** Tracts and Door Hangers side by side, one pair per Campaign Week. */
+function WeekChartCard({weeks}: {weeks: CampaignDetail['weeks']}) {
+  const data = weeks.map((w) => ({
+    week: weekLabel(w.weekDate),
+    tracts: w.tracts,
+    doorHangers: w.doorHangers ?? 0,
+  }))
+  // Nothing recorded yet is three empty columns, which says less than no chart.
+  if (!data.some((d) => d.tracts > 0 || d.doorHangers > 0)) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>By week</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={data}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis dataKey="week" tick={{fontSize: 12, fill: 'var(--muted-foreground)'}} tickLine={false} />
+            <YAxis
+              allowDecimals={false}
+              tick={{fontSize: 12, fill: 'var(--muted-foreground)'}}
+              width={45}
+              tickLine={false}
+              axisLine={false}
+            />
+            <Tooltip
+              cursor={{fill: 'var(--muted)', opacity: 0.4}}
+              content={({active, payload, label}) => {
+                if (!active || !payload?.length) return null
+                return (
+                  <div className="bg-card rounded-lg border px-3 py-2 shadow-md">
+                    <p className="mb-1 text-sm font-medium">Week of {label}</p>
+                    {payload.map((e) => (
+                      <p key={e.name} className="text-muted-foreground text-xs">
+                        <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{backgroundColor: e.color}} />
+                        {e.name}:{' '}
+                        <span className="text-foreground font-medium">{Number(e.value).toLocaleString()}</span>
+                      </p>
+                    ))}
+                  </div>
+                )
+              }}
+            />
+            <Legend wrapperStyle={{fontSize: 12}} />
+            <Bar dataKey="tracts" name="Tracts" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="doorHangers" name="Door Hangers" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
       </CardContent>
     </Card>
   )

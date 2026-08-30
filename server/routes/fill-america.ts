@@ -563,6 +563,73 @@ fillAmericaRouter.put(
   }),
 )
 
+// Repoint an existing roster row at a different Household, keeping its size,
+// goal and every Tract Report — those hang off the roster entry, so they follow
+// the row rather than the household. For fixing a row entered against the wrong
+// family without retyping three weeks of numbers.
+fillAmericaRouter.put(
+  '/campaigns/:id/roster/:householdId/household',
+  asyncHandler(async (req, res) => {
+    const campaignId = Number(req.params.id)
+    const fromId = Number(req.params.householdId)
+    const {householdId: toId} = req.body as {householdId?: number}
+    if (!Number.isInteger(campaignId) || !Number.isInteger(fromId) || !Number.isInteger(toId)) {
+      res.status(400).json({error: 'bad id'})
+      return
+    }
+    if (fromId === toId) {
+      res.json({ok: true})
+      return
+    }
+    const entry = db
+      .select()
+      .from(schema.fillAmericaRosterEntries)
+      .where(
+        and(
+          eq(schema.fillAmericaRosterEntries.campaignId, campaignId),
+          eq(schema.fillAmericaRosterEntries.householdId, fromId),
+        ),
+      )
+      .get()
+    if (!entry) {
+      res.status(404).json({error: 'household is not on this campaign roster'})
+      return
+    }
+    const target = db
+      .select()
+      .from(schema.fillAmericaHouseholds)
+      .where(eq(schema.fillAmericaHouseholds.id, toId!))
+      .get()
+    if (!target) {
+      res.status(404).json({error: 'household not found'})
+      return
+    }
+    // One row per household per campaign: merging two rows would have to decide
+    // what happens to two sets of tract reports, which is a different feature.
+    const clash = db
+      .select()
+      .from(schema.fillAmericaRosterEntries)
+      .where(
+        and(
+          eq(schema.fillAmericaRosterEntries.campaignId, campaignId),
+          eq(schema.fillAmericaRosterEntries.householdId, toId!),
+        ),
+      )
+      .get()
+    if (clash) {
+      res.status(409).json({error: `${target.name} is already on this campaign`})
+      return
+    }
+    const row = db
+      .update(schema.fillAmericaRosterEntries)
+      .set({householdId: toId!})
+      .where(eq(schema.fillAmericaRosterEntries.id, entry.id))
+      .returning()
+      .get()
+    res.json(row)
+  }),
+)
+
 fillAmericaRouter.delete(
   '/campaigns/:id/roster/:householdId',
   asyncHandler(async (req, res) => {

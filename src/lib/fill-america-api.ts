@@ -113,6 +113,13 @@ export const saveDoorHangers = (campaignId: number, weekNo: number, doorHangers:
 export const saveRosterEntry = (campaignId: number, householdId: number, data: {size: number; goal: number | null}) =>
   request<RosterEntry>(`/campaigns/${campaignId}/roster/${householdId}`, {method: 'PUT', body: JSON.stringify(data)})
 
+/** Repoint a roster row at another household, keeping its size, goal and tracts. */
+export const changeRosterHousehold = (campaignId: number, fromHouseholdId: number, householdId: number) =>
+  request<RosterEntry>(`/campaigns/${campaignId}/roster/${fromHouseholdId}/household`, {
+    method: 'PUT',
+    body: JSON.stringify({householdId}),
+  })
+
 export const removeRosterEntry = (campaignId: number, householdId: number) =>
   request<{ok: true}>(`/campaigns/${campaignId}/roster/${householdId}`, {method: 'DELETE'})
 

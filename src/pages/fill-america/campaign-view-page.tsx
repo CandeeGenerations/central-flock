@@ -10,6 +10,7 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {
   type CampaignDetail,
   type RosterEntry,
+  changeRosterHousehold,
   createHousehold,
   fetchCampaign,
   fetchHouseholds,
@@ -66,6 +67,12 @@ export function FillAmericaCampaignViewPage() {
     onSuccess: invalidate,
     onError,
   })
+  const repoint = useMutation({
+    mutationFn: (v: {fromHouseholdId: number; householdId: number}) =>
+      changeRosterHousehold(Number(id), v.fromHouseholdId, v.householdId),
+    onSuccess: invalidate,
+    onError,
+  })
 
   if (isLoading || !data) return <PageSpinner />
   const {campaign, weeks, roster, totals} = data
@@ -97,6 +104,7 @@ export function FillAmericaCampaignViewPage() {
         onSaveTracts={(householdId, weekNo, v) => tracts.mutate({householdId, weekNo, tracts: v})}
         onSaveEntry={(householdId, size, goal) => entry.mutate({householdId, size, goal})}
         onRemove={(householdId) => removeEntry.mutate(householdId)}
+        onRepoint={(fromHouseholdId, householdId) => repoint.mutate({fromHouseholdId, householdId})}
       />
 
       <TopEffortsCard roster={roster} weeks={weeks} />
@@ -175,6 +183,7 @@ function RosterCard({
   onSaveTracts,
   onSaveEntry,
   onRemove,
+  onRepoint,
 }: {
   campaignId: number
   weeks: CampaignDetail['weeks']
@@ -183,6 +192,7 @@ function RosterCard({
   onSaveTracts: (householdId: number, weekNo: number, v: number | null) => void
   onSaveEntry: (householdId: number, size: number, goal: number | null) => void
   onRemove: (householdId: number) => void
+  onRepoint: (fromHouseholdId: number, householdId: number) => void
 }) {
   const [adding, setAdding] = useState(false)
   const [clearing, setClearing] = useState(false)
@@ -194,6 +204,18 @@ function RosterCard({
 
   const weekTotals = weeks.map((w) => w.tracts)
   const goalTotal = totals.goal
+
+  // Every active household, minus the ones already on this campaign, plus the
+  // row's own — repointing is a swap, so the current value has to stay listed.
+  const {data: households} = useQuery({
+    queryKey: queryKeys.fillAmericaHouseholds(false),
+    queryFn: () => fetchHouseholds(false),
+  })
+  const onRoster = new Set(roster.map((r) => r.householdId))
+  const householdOptions = (ownId: number, ownName: string, ownActive: boolean) => [
+    {value: String(ownId), label: ownActive ? ownName : `${ownName} (retired)`},
+    ...(households ?? []).filter((h) => !onRoster.has(h.id)).map((h) => ({value: String(h.id), label: h.name})),
+  ]
 
   return (
     <Card>
@@ -232,9 +254,13 @@ function RosterCard({
             <TableBody>
               {roster.map((r) => (
                 <TableRow key={r.id} className={r.householdActive ? '' : 'opacity-60'}>
-                  <TableCell className="font-medium whitespace-nowrap">
-                    {r.householdName}
-                    {r.householdActive ? '' : ' (retired)'}
+                  <TableCell className="p-1">
+                    <SearchableSelect
+                      value={String(r.householdId)}
+                      onValueChange={(v) => onRepoint(r.householdId, Number(v))}
+                      options={householdOptions(r.householdId, r.householdName, r.householdActive)}
+                      className="w-52"
+                    />
                   </TableCell>
                   <TableCell className="p-1">
                     <NumberCell

@@ -124,7 +124,8 @@ export function FillAmericaCampaignListPage() {
                   <TableHead className="text-center">Weeks</TableHead>
                   <TableHead className="text-center">Households</TableHead>
                   <TableHead className="text-right">Participants</TableHead>
-                  <TableHead className="text-right">Packet Goal</TableHead>
+                  <TableHead className="text-right">Hanger Goal</TableHead>
+                  <TableHead className="text-right">Tract Goal</TableHead>
                   <TableHead className="text-right">Tracts</TableHead>
                   <TableHead className="text-right">Door Hangers</TableHead>
                 </TableRow>
@@ -150,7 +151,13 @@ export function FillAmericaCampaignListPage() {
                       {c.uniqueParticipants.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-right tabular-nums">
-                      {c.packetGoal ? c.packetGoal.toLocaleString() : '—'}
+                      {c.doorHangerGoal ? c.doorHangerGoal.toLocaleString() : '—'}
+                    </TableCell>
+                    {/* Muted and unshaded like Hanger Goal: these are targets,
+                        not results, so they stay out of the heatmap that
+                        compares campaigns to each other. */}
+                    <TableCell className="text-muted-foreground text-right tabular-nums">
+                      {c.rosterGoal ? c.rosterGoal.toLocaleString() : '—'}
                     </TableCell>
                     <TableCell className="text-right tabular-nums" style={heatTracts(c.tracts)}>
                       {c.tracts.toLocaleString()}
@@ -162,7 +169,7 @@ export function FillAmericaCampaignListPage() {
                 ))}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
+                    <TableCell colSpan={9} className="text-muted-foreground py-8 text-center">
                       {q ? 'No campaigns match that search.' : 'No campaigns yet. Create one to get started.'}
                     </TableCell>
                   </TableRow>
@@ -219,7 +226,7 @@ function NewCampaignDialog({
         endDate,
         season,
         title: titleTouched && title.trim() ? title.trim() : undefined,
-        packetGoal: goal.trim() === '' ? null : Number(goal),
+        doorHangerGoal: goal.trim() === '' ? null : Number(goal),
       }),
     onSuccess: (row) => {
       qc.invalidateQueries({queryKey: queryKeys.fillAmericaCampaigns})
@@ -285,7 +292,7 @@ function NewCampaignDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="fa-goal">Packet goal</Label>
+            <Label htmlFor="fa-goal">Door hanger goal</Label>
             <Input
               id="fa-goal"
               inputMode="numeric"

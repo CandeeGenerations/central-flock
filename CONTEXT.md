@@ -417,8 +417,16 @@ _Avoid_: Tracts (bare — that is the derived weekly total), Distribution, Entry
 **Door Hangers**:
 Door hangers distributed in one **Campaign Week**. Typed at the week level and deliberately never
 attributed to a **Household**, unlike a **Tract Report** — the spreadsheet never tracked who hung
-them and nobody has asked to.
-_Avoid_: Hangers, Flyers.
+them and nobody has asked to. The church says _packets_ for these; the code says Door Hangers
+throughout, because the spreadsheet's own column does and because a **Campaign** carries a door
+hanger goal that has to sit beside the actual without reading as a second quantity.
+_Avoid_: Packet (the church's spoken word, deliberately not the code's), Hangers, Flyers.
+
+**Door Hanger Goal**:
+A **Campaign**'s target for **Door Hangers**, measured against the door hangers its Campaign Weeks
+record. Distinct from the **Goal** on a **Roster Entry**, which targets tracts: two numbers, two
+units, and they are never added together or shown as one.
+_Avoid_: Goal (bare — the Roster Entry has one), Packet Goal, Target.
 
 **Unique Participants**:
 How many distinct people took part — derived, never stored, at every level. For a **Campaign**, the

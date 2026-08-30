@@ -358,6 +358,13 @@
       "when": 1788054714518,
       "tag": "0050_fill_america_packet_goal",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "6",
+      "when": 1788054715518,
+      "tag": "0051_fill_america_door_hanger_goal",
+      "breakpoints": true
     }
   ]
 }

@@ -335,12 +335,12 @@ function syncWeeks(campaignId: number, startDate: string, endDate: string, tx: T
 fillAmericaRouter.post(
   '/campaigns',
   asyncHandler(async (req, res) => {
-    const {startDate, endDate, season, title, packetGoal} = req.body as {
+    const {startDate, endDate, season, title, doorHangerGoal} = req.body as {
       startDate?: string
       endDate?: string
       season?: string
       title?: string
-      packetGoal?: unknown
+      doorHangerGoal?: unknown
     }
     if (typeof startDate !== 'string' || !DATE_RE.test(startDate)) {
       res.status(400).json({error: 'startDate must be YYYY-MM-DD'})
@@ -368,7 +368,7 @@ fillAmericaRouter.post(
           startDate,
           endDate,
           season: (isSeason(season) ? season : defaultSeason(startDate)) as Season,
-          packetGoal: cleanInt(packetGoal),
+          doorHangerGoal: cleanInt(doorHangerGoal),
         })
         .returning()
         .get()
@@ -417,12 +417,12 @@ fillAmericaRouter.patch(
       res.status(404).json({error: 'not found'})
       return
     }
-    const {startDate, endDate, season, title, packetGoal} = req.body as {
+    const {startDate, endDate, season, title, doorHangerGoal} = req.body as {
       startDate?: string
       endDate?: string
       season?: string
       title?: string
-      packetGoal?: unknown
+      doorHangerGoal?: unknown
     }
     const nextStart = typeof startDate === 'string' ? startDate : campaign.startDate
     const nextEnd = typeof endDate === 'string' ? endDate : campaign.endDate
@@ -458,7 +458,7 @@ fillAmericaRouter.patch(
     const patch: Record<string, unknown> = {updatedAt: sql`(datetime('now'))`}
     if (typeof title === 'string' && title.trim()) patch.title = title.trim()
     if (isSeason(season)) patch.season = season
-    if ('packetGoal' in (req.body as object)) patch.packetGoal = cleanInt(packetGoal)
+    if ('doorHangerGoal' in (req.body as object)) patch.doorHangerGoal = cleanInt(doorHangerGoal)
     patch.startDate = nextStart
     patch.endDate = nextEnd
 

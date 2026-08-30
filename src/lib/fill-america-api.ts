@@ -34,14 +34,15 @@ export interface CampaignSummary {
   startDate: string
   endDate: string
   season: Season
-  /** The campaign's target, counted in packets. Not tracts, not the roster sum. */
-  packetGoal: number | null
+  /** Target for Door Hangers — what the church calls packets. Not the roster sum. */
+  doorHangerGoal: number | null
   weekCount: number
   householdCount: number
   /** Derived, never stored. See ADR 0032. */
   uniqueParticipants: number
   tracts: number
   doorHangers: number
+  /** Every Roster Entry's goal added up — a tract target, a different unit. */
   rosterGoal: number
 }
 
@@ -69,7 +70,14 @@ export interface RosterEntry {
 }
 
 export interface CampaignDetail {
-  campaign: {id: number; title: string; startDate: string; endDate: string; season: Season; packetGoal: number | null}
+  campaign: {
+    id: number
+    title: string
+    startDate: string
+    endDate: string
+    season: Season
+    doorHangerGoal: number | null
+  }
   weeks: CampaignWeek[]
   roster: RosterEntry[]
   totals: {uniqueParticipants: number; tracts: number; doorHangers: number; rosterGoal: number}
@@ -100,12 +108,12 @@ export const createCampaign = (data: {
   endDate: string
   season?: Season
   title?: string
-  packetGoal?: number | null
+  doorHangerGoal?: number | null
 }) => request<CampaignSummary>('/campaigns', {method: 'POST', body: JSON.stringify(data)})
 
 export const updateCampaign = (
   id: number,
-  data: Partial<{startDate: string; endDate: string; season: Season; title: string; packetGoal: number | null}>,
+  data: Partial<{startDate: string; endDate: string; season: Season; title: string; doorHangerGoal: number | null}>,
 ) => request<CampaignSummary>(`/campaigns/${id}`, {method: 'PATCH', body: JSON.stringify(data)})
 
 export const deleteCampaign = (id: number) => request<{ok: true}>(`/campaigns/${id}`, {method: 'DELETE'})

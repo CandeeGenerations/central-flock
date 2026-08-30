@@ -34,13 +34,15 @@ export interface CampaignSummary {
   startDate: string
   endDate: string
   season: Season
+  /** The campaign's own target, in tracts. Not the sum of roster goals. */
+  goal: number | null
   weekCount: number
   householdCount: number
   /** Derived, never stored. See ADR 0032. */
   uniqueParticipants: number
   tracts: number
   doorHangers: number
-  goal: number
+  rosterGoal: number
 }
 
 export interface CampaignWeek {
@@ -67,10 +69,10 @@ export interface RosterEntry {
 }
 
 export interface CampaignDetail {
-  campaign: {id: number; title: string; startDate: string; endDate: string; season: Season}
+  campaign: {id: number; title: string; startDate: string; endDate: string; season: Season; goal: number | null}
   weeks: CampaignWeek[]
   roster: RosterEntry[]
-  totals: {uniqueParticipants: number; tracts: number; doorHangers: number; goal: number}
+  totals: {uniqueParticipants: number; tracts: number; doorHangers: number; rosterGoal: number}
 }
 
 // --- Households ---
@@ -93,12 +95,17 @@ export const fetchCampaigns = () => request<CampaignSummary[]>('/campaigns')
 
 export const fetchCampaign = (id: number | string) => request<CampaignDetail>(`/campaigns/${id}`)
 
-export const createCampaign = (data: {startDate: string; endDate: string; season?: Season; title?: string}) =>
-  request<CampaignSummary>('/campaigns', {method: 'POST', body: JSON.stringify(data)})
+export const createCampaign = (data: {
+  startDate: string
+  endDate: string
+  season?: Season
+  title?: string
+  goal?: number | null
+}) => request<CampaignSummary>('/campaigns', {method: 'POST', body: JSON.stringify(data)})
 
 export const updateCampaign = (
   id: number,
-  data: Partial<{startDate: string; endDate: string; season: Season; title: string}>,
+  data: Partial<{startDate: string; endDate: string; season: Season; title: string; goal: number | null}>,
 ) => request<CampaignSummary>(`/campaigns/${id}`, {method: 'PATCH', body: JSON.stringify(data)})
 
 export const deleteCampaign = (id: number) => request<{ok: true}>(`/campaigns/${id}`, {method: 'DELETE'})

@@ -124,6 +124,7 @@ export function FillAmericaCampaignListPage() {
                   <TableHead className="text-center">Weeks</TableHead>
                   <TableHead className="text-center">Households</TableHead>
                   <TableHead className="text-right">Participants</TableHead>
+                  <TableHead className="text-right">Goal</TableHead>
                   <TableHead className="text-right">Tracts</TableHead>
                   <TableHead className="text-right">Door Hangers</TableHead>
                 </TableRow>
@@ -148,6 +149,9 @@ export function FillAmericaCampaignListPage() {
                     <TableCell className="text-right tabular-nums" style={heatParticipants(c.uniqueParticipants)}>
                       {c.uniqueParticipants.toLocaleString()}
                     </TableCell>
+                    <TableCell className="text-muted-foreground text-right tabular-nums">
+                      {c.goal ? c.goal.toLocaleString() : '—'}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums" style={heatTracts(c.tracts)}>
                       {c.tracts.toLocaleString()}
                     </TableCell>
@@ -158,7 +162,7 @@ export function FillAmericaCampaignListPage() {
                 ))}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-muted-foreground py-8 text-center">
+                    <TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
                       {q ? 'No campaigns match that search.' : 'No campaigns yet. Create one to get started.'}
                     </TableCell>
                   </TableRow>
@@ -196,6 +200,7 @@ function NewCampaignDialog({
   const [title, setTitle] = useState('')
   const [seasonTouched, setSeasonTouched] = useState(false)
   const [titleTouched, setTitleTouched] = useState(false)
+  const [goal, setGoal] = useState('')
 
   const valid = startDate && endDate && endDate >= startDate
   const weeks = valid ? campaignWeekDates(startDate, endDate) : []
@@ -214,6 +219,7 @@ function NewCampaignDialog({
         endDate,
         season,
         title: titleTouched && title.trim() ? title.trim() : undefined,
+        goal: goal.trim() === '' ? null : Number(goal),
       }),
     onSuccess: (row) => {
       qc.invalidateQueries({queryKey: queryKeys.fillAmericaCampaigns})
@@ -276,6 +282,17 @@ function NewCampaignDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="fa-goal">Goal (tracts)</Label>
+            <Input
+              id="fa-goal"
+              inputMode="numeric"
+              value={goal}
+              placeholder="Optional"
+              onChange={(e) => setGoal(e.target.value.replace(/[^\d]/g, ''))}
+            />
           </div>
 
           <div className="space-y-1.5">

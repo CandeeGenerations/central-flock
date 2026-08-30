@@ -37,6 +37,10 @@ export const fillAmericaCampaigns = sqliteTable('fill_america_campaigns', {
   startDate: text('start_date').notNull().unique(),
   endDate: text('end_date').notNull(),
   season: text('season', {enum: fillAmericaSeasons}).notNull(),
+  // The campaign's own target, in tracts. Independent of the per-Roster-Entry
+  // goals, which sum to their own total — this is what the church set out to
+  // do, not what the roster added up to when everyone was asked.
+  goal: integer('goal'),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),

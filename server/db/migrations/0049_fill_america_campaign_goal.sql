@@ -1,0 +1,1 @@
+ALTER TABLE `fill_america_campaigns` ADD `goal` integer;

@@ -344,6 +344,13 @@
       "when": 1787863241022,
       "tag": "0048_fill_america",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1788054713518,
+      "tag": "0049_fill_america_campaign_goal",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,7 @@ import {
   saveDoorHangers,
   saveRosterEntry,
   saveTracts,
+  updateCampaign,
 } from '@/lib/fill-america-api'
 import {SEASON_LABELS, weekLabel} from '@/lib/fill-america-core'
 import {queryKeys} from '@/lib/query-keys'
@@ -67,6 +68,11 @@ export function FillAmericaCampaignViewPage() {
     onSuccess: invalidate,
     onError,
   })
+  const goal = useMutation({
+    mutationFn: (v: number | null) => updateCampaign(Number(id), {goal: v}),
+    onSuccess: invalidate,
+    onError,
+  })
   const repoint = useMutation({
     mutationFn: (v: {fromHouseholdId: number; householdId: number}) =>
       changeRosterHousehold(Number(id), v.fromHouseholdId, v.householdId),
@@ -88,6 +94,23 @@ export function FillAmericaCampaignViewPage() {
         <Megaphone className="h-6 w-6" />
         <h2 className="text-2xl font-bold">{campaign.title}</h2>
         <Badge variant="secondary">{SEASON_LABELS[campaign.season]}</Badge>
+        <div className="ml-auto flex items-center gap-2">
+          <Label htmlFor="fa-campaign-goal" className="text-muted-foreground text-sm">
+            Goal
+          </Label>
+          <NumberCell
+            value={campaign.goal}
+            className="w-24"
+            onCommit={(v) => goal.mutate(v)}
+            inputId="fa-campaign-goal"
+          />
+          {campaign.goal ? (
+            <span className="text-muted-foreground text-sm tabular-nums">
+              {Math.round((totals.tracts / campaign.goal) * 100)}% &middot; {totals.tracts.toLocaleString()} of{' '}
+              {campaign.goal.toLocaleString()}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <WeeksCard
@@ -203,7 +226,7 @@ function RosterCard({
   const empties = roster.filter((r) => !r.tracts.some((t) => t !== null && t > 0))
 
   const weekTotals = weeks.map((w) => w.tracts)
-  const goalTotal = totals.goal
+  const goalTotal = totals.rosterGoal
 
   // Every active household, minus the ones already on this campaign, plus the
   // row's own — repointing is a swap, so the current value has to stay listed.
@@ -516,10 +539,12 @@ function NumberCell({
   value,
   className,
   onCommit,
+  inputId,
 }: {
   value: number | null
   className?: string
   onCommit: (v: number | null) => void
+  inputId?: string
 }) {
   const external = value === null ? '' : String(value)
   const [draft, setDraft] = useState<string | null>(null)
@@ -527,6 +552,7 @@ function NumberCell({
 
   return (
     <Input
+      id={inputId}
       className={`h-8 px-1 text-center tabular-nums ${className ?? ''}`}
       inputMode="numeric"
       value={shown}

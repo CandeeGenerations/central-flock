@@ -2,7 +2,7 @@ import {CollapsibleNavGroup, NavPopoverProvider} from '@/components/collapsible-
 import {CommandPaletteProvider} from '@/components/command-palette-provider'
 import {Sheet, SheetContent, SheetTitle, SheetTrigger} from '@/components/ui/sheet'
 import {Toaster} from '@/components/ui/sonner'
-import {Spinner} from '@/components/ui/spinner'
+import {PageSpinner, Spinner} from '@/components/ui/spinner'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useCommandPalette} from '@/hooks/use-command-palette'
 import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts'
@@ -12,91 +12,16 @@ import {checkAuthStatus, logout} from '@/lib/api'
 import {findActiveGroup, isChildActive, navGroups} from '@/lib/nav-config'
 import {ThemeProvider, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
-import {AttendanceSettingsLayout} from '@/pages/attendance-settings/attendance-settings-layout'
-import {RecordersSection} from '@/pages/attendance-settings/recorders-section'
-import {ServiceTimesSection} from '@/pages/attendance-settings/service-times-section'
-import {AttendanceDashboardPage} from '@/pages/attendance/attendance-dashboard-page'
-import {CalendarPage} from '@/pages/calendar-page'
-import {CalendarPrintPage} from '@/pages/calendar-print-page'
-import {ContactsImportPage} from '@/pages/contacts-import-page'
-import {DashboardPage} from '@/pages/dashboard-page'
-import {DevotionAuditPage} from '@/pages/devotions/devotion-audit-page'
-import {DevotionDetailPage} from '@/pages/devotions/devotion-detail-page'
-import {DevotionListPage} from '@/pages/devotions/devotion-list-page'
-import {DevotionMissingPage} from '@/pages/devotions/devotion-missing-page'
-import {DevotionPassageDetailPage} from '@/pages/devotions/devotion-passage-detail-page'
-import {DevotionPassagesPage} from '@/pages/devotions/devotion-passages-page'
-import {DevotionScanPage} from '@/pages/devotions/devotion-scan-page'
-import {DevotionScripturesPage} from '@/pages/devotions/devotion-scriptures-page'
-import {DevotionStatsPage} from '@/pages/devotions/devotion-stats-page'
-import {GwendolynDetailPage} from '@/pages/devotions/gwendolyn-detail-page'
-import {GwendolynListPage} from '@/pages/devotions/gwendolyn-list-page'
-import {GwendolynNewPage} from '@/pages/devotions/gwendolyn-new-page'
-import {FairBoothDayPage} from '@/pages/fair-booth/fair-booth-day-page'
-import {FairBoothSchedulePage} from '@/pages/fair-booth/fair-booth-schedule-page'
-import {FairBoothSchedulesPage} from '@/pages/fair-booth/fair-booth-schedules-page'
-import {FillAmericaCampaignListPage} from '@/pages/fill-america/campaign-list-page'
-import {FillAmericaCampaignViewPage} from '@/pages/fill-america/campaign-view-page'
-import {FillAmericaHouseholdsSection} from '@/pages/fill-america/households-section'
 import {GroupDetailPage} from '@/pages/group-detail-page'
 import {GroupsPage} from '@/pages/groups-page'
 import {HomePage} from '@/pages/home-page'
-import {ImportPage} from '@/pages/import-page'
 import {LoginPage} from '@/pages/login-page'
 import {MessageComposePage} from '@/pages/message-compose-page'
 import {MessageDetailPage} from '@/pages/message-detail-page'
 import {MessageHistoryPage} from '@/pages/message-history-page'
-import {MusicSchedulesListPage} from '@/pages/music-schedule/music-schedules-list-page'
-import {MusicWeekViewPage} from '@/pages/music-schedule/music-week-view-page'
-import {MusicServiceEditorPage} from '@/pages/music-schedule/service-editor-page'
-import {HymnSearchDetailPage} from '@/pages/music/hymn-search-detail-page'
-import {HymnSearchesPage} from '@/pages/music/hymn-searches-page'
-import {HymnsPrepPage} from '@/pages/music/hymns-prep-page'
-import {SpecialDetailPage} from '@/pages/music/special-detail-page'
-import {SpecialNewPage} from '@/pages/music/special-new-page'
-import {SpecialsListPage} from '@/pages/music/specials-list-page'
-import {NurseryScheduleViewPage} from '@/pages/nursery/nursery-schedule-view-page'
-import {NurserySchedulesPage} from '@/pages/nursery/nursery-schedules-page'
 import {PeoplePage} from '@/pages/people-page'
 import {PersonDetailPage} from '@/pages/person-detail-page'
-import {RsvpDetailPage} from '@/pages/rsvp/rsvp-detail-page'
-import {RsvpListPage} from '@/pages/rsvp/rsvp-list-page'
-import {FairBoothSettingsSection} from '@/pages/schedules-settings/fair-booth-section'
-import {GeneralSettingsSection} from '@/pages/schedules-settings/general-section'
-import {MusicScheduleSettingsSection} from '@/pages/schedules-settings/music-schedule-section'
-import {NurseryDefaultsPane} from '@/pages/schedules-settings/nursery-defaults'
-import {NurserySettingsSection} from '@/pages/schedules-settings/nursery-section'
-import {NurseryWorkersPane} from '@/pages/schedules-settings/nursery-workers'
-import {SchedulesSettingsLayout} from '@/pages/schedules-settings/schedules-settings-layout'
-import {SpecialMusicSettingsSection} from '@/pages/schedules-settings/special-music-section'
-import {SundaySchoolDefaultsPane} from '@/pages/schedules-settings/sunday-school-defaults'
-import {SundaySchoolLessonsPane} from '@/pages/schedules-settings/sunday-school-lessons'
-import {SundaySchoolRollSettingsSection} from '@/pages/schedules-settings/sunday-school-roll-section'
-import {SundaySchoolSettingsSection} from '@/pages/schedules-settings/sunday-school-section'
-import {SundaySchoolThemesPane} from '@/pages/schedules-settings/sunday-school-themes'
-import {QuoteDetailPage} from '@/pages/sermons/quote-detail-page'
-import {QuoteSearchDetailPage} from '@/pages/sermons/quote-search-detail-page'
-import {QuoteSearchesPage} from '@/pages/sermons/quote-searches-page'
-import {QuotesPage} from '@/pages/sermons/quotes-page'
-import {QuotesResearchPage} from '@/pages/sermons/quotes-research-page'
-import {SermonDetailPage} from '@/pages/sermons/sermon-detail-page'
-import {SermonsPage} from '@/pages/sermons/sermons-page'
-import {VerseStripsPage} from '@/pages/sermons/verse-strips-page'
 import {SettingsPage} from '@/pages/settings-page'
-import {SpecialMusicScheduleViewPage} from '@/pages/special-music/special-music-schedule-view-page'
-import {SpecialMusicSchedulesPage} from '@/pages/special-music/special-music-schedules-page'
-import {RollListPage} from '@/pages/sunday-school-roll/roll-list-page'
-import {RollViewPage} from '@/pages/sunday-school-roll/roll-view-page'
-import {SundaySchoolDepartmentsSection} from '@/pages/sunday-school-stats/departments-section'
-import {SundaySchoolStatsPage} from '@/pages/sunday-school-stats/stats-page'
-import {WorkersNotesBlocksPage} from '@/pages/sunday-school/workers-notes-blocks-page'
-import {WorkersNotesLessonsPage} from '@/pages/sunday-school/workers-notes-lessons-page'
-import {WorkersNotesListPage} from '@/pages/sunday-school/workers-notes-list-page'
-import {WorkersNotesMonthsPage} from '@/pages/sunday-school/workers-notes-months-page'
-import {WorkersNotesThemePage} from '@/pages/sunday-school/workers-notes-theme-page'
-import {WorkersNotesViewPage} from '@/pages/sunday-school/workers-notes-view-page'
-import {TemplateEditPage} from '@/pages/template-edit-page'
-import {TemplatesPage} from '@/pages/templates-page'
 import {
   MutationCache,
   QueryCache,
@@ -117,7 +42,7 @@ import {
   Settings,
   Sun,
 } from 'lucide-react'
-import {useState} from 'react'
+import {Suspense, lazy, useState} from 'react'
 import {
   Link,
   NavLink,
@@ -131,6 +56,219 @@ import {
 } from 'react-router-dom'
 
 import {Sentry} from './lib/sentry'
+
+// Hybrid code splitting: the daily core (Home, People, Groups, Messages, Settings) stays in
+// the main chunk so a cold iOS relaunch does not pay a tunnel round trip for it. Everything
+// else — the burst-use sub-apps, and every page that pulls in recharts — is lazy, and is
+// grouped into per-cluster chunks by manualChunks in vite.config.ts.
+// See docs/adr/0036-ios-relaunch-restore-not-prevent.md.
+const AttendanceDashboardPage = lazy(() =>
+  import('@/pages/attendance/attendance-dashboard-page').then((m) => ({default: m.AttendanceDashboardPage})),
+)
+const AttendanceSettingsLayout = lazy(() =>
+  import('@/pages/attendance-settings/attendance-settings-layout').then((m) => ({default: m.AttendanceSettingsLayout})),
+)
+const CalendarPage = lazy(() => import('@/pages/calendar-page').then((m) => ({default: m.CalendarPage})))
+const CalendarPrintPage = lazy(() =>
+  import('@/pages/calendar-print-page').then((m) => ({default: m.CalendarPrintPage})),
+)
+const ContactsImportPage = lazy(() =>
+  import('@/pages/contacts-import-page').then((m) => ({default: m.ContactsImportPage})),
+)
+const DashboardPage = lazy(() => import('@/pages/dashboard-page').then((m) => ({default: m.DashboardPage})))
+const DevotionAuditPage = lazy(() =>
+  import('@/pages/devotions/devotion-audit-page').then((m) => ({default: m.DevotionAuditPage})),
+)
+const DevotionDetailPage = lazy(() =>
+  import('@/pages/devotions/devotion-detail-page').then((m) => ({default: m.DevotionDetailPage})),
+)
+const DevotionListPage = lazy(() =>
+  import('@/pages/devotions/devotion-list-page').then((m) => ({default: m.DevotionListPage})),
+)
+const DevotionMissingPage = lazy(() =>
+  import('@/pages/devotions/devotion-missing-page').then((m) => ({default: m.DevotionMissingPage})),
+)
+const DevotionPassageDetailPage = lazy(() =>
+  import('@/pages/devotions/devotion-passage-detail-page').then((m) => ({default: m.DevotionPassageDetailPage})),
+)
+const DevotionPassagesPage = lazy(() =>
+  import('@/pages/devotions/devotion-passages-page').then((m) => ({default: m.DevotionPassagesPage})),
+)
+const DevotionScanPage = lazy(() =>
+  import('@/pages/devotions/devotion-scan-page').then((m) => ({default: m.DevotionScanPage})),
+)
+const DevotionScripturesPage = lazy(() =>
+  import('@/pages/devotions/devotion-scriptures-page').then((m) => ({default: m.DevotionScripturesPage})),
+)
+const DevotionStatsPage = lazy(() =>
+  import('@/pages/devotions/devotion-stats-page').then((m) => ({default: m.DevotionStatsPage})),
+)
+const FairBoothDayPage = lazy(() =>
+  import('@/pages/fair-booth/fair-booth-day-page').then((m) => ({default: m.FairBoothDayPage})),
+)
+const FairBoothSchedulePage = lazy(() =>
+  import('@/pages/fair-booth/fair-booth-schedule-page').then((m) => ({default: m.FairBoothSchedulePage})),
+)
+const FairBoothSchedulesPage = lazy(() =>
+  import('@/pages/fair-booth/fair-booth-schedules-page').then((m) => ({default: m.FairBoothSchedulesPage})),
+)
+const FairBoothSettingsSection = lazy(() =>
+  import('@/pages/schedules-settings/fair-booth-section').then((m) => ({default: m.FairBoothSettingsSection})),
+)
+const FillAmericaCampaignListPage = lazy(() =>
+  import('@/pages/fill-america/campaign-list-page').then((m) => ({default: m.FillAmericaCampaignListPage})),
+)
+const FillAmericaCampaignViewPage = lazy(() =>
+  import('@/pages/fill-america/campaign-view-page').then((m) => ({default: m.FillAmericaCampaignViewPage})),
+)
+const FillAmericaHouseholdsSection = lazy(() =>
+  import('@/pages/fill-america/households-section').then((m) => ({default: m.FillAmericaHouseholdsSection})),
+)
+const GeneralSettingsSection = lazy(() =>
+  import('@/pages/schedules-settings/general-section').then((m) => ({default: m.GeneralSettingsSection})),
+)
+const GwendolynDetailPage = lazy(() =>
+  import('@/pages/devotions/gwendolyn-detail-page').then((m) => ({default: m.GwendolynDetailPage})),
+)
+const GwendolynListPage = lazy(() =>
+  import('@/pages/devotions/gwendolyn-list-page').then((m) => ({default: m.GwendolynListPage})),
+)
+const GwendolynNewPage = lazy(() =>
+  import('@/pages/devotions/gwendolyn-new-page').then((m) => ({default: m.GwendolynNewPage})),
+)
+const HymnSearchDetailPage = lazy(() =>
+  import('@/pages/music/hymn-search-detail-page').then((m) => ({default: m.HymnSearchDetailPage})),
+)
+const HymnSearchesPage = lazy(() =>
+  import('@/pages/music/hymn-searches-page').then((m) => ({default: m.HymnSearchesPage})),
+)
+const HymnsPrepPage = lazy(() => import('@/pages/music/hymns-prep-page').then((m) => ({default: m.HymnsPrepPage})))
+const ImportPage = lazy(() => import('@/pages/import-page').then((m) => ({default: m.ImportPage})))
+const MusicScheduleSettingsSection = lazy(() =>
+  import('@/pages/schedules-settings/music-schedule-section').then((m) => ({default: m.MusicScheduleSettingsSection})),
+)
+const MusicSchedulesListPage = lazy(() =>
+  import('@/pages/music-schedule/music-schedules-list-page').then((m) => ({default: m.MusicSchedulesListPage})),
+)
+const MusicServiceEditorPage = lazy(() =>
+  import('@/pages/music-schedule/service-editor-page').then((m) => ({default: m.MusicServiceEditorPage})),
+)
+const MusicWeekViewPage = lazy(() =>
+  import('@/pages/music-schedule/music-week-view-page').then((m) => ({default: m.MusicWeekViewPage})),
+)
+const NurseryDefaultsPane = lazy(() =>
+  import('@/pages/schedules-settings/nursery-defaults').then((m) => ({default: m.NurseryDefaultsPane})),
+)
+const NurseryScheduleViewPage = lazy(() =>
+  import('@/pages/nursery/nursery-schedule-view-page').then((m) => ({default: m.NurseryScheduleViewPage})),
+)
+const NurserySchedulesPage = lazy(() =>
+  import('@/pages/nursery/nursery-schedules-page').then((m) => ({default: m.NurserySchedulesPage})),
+)
+const NurserySettingsSection = lazy(() =>
+  import('@/pages/schedules-settings/nursery-section').then((m) => ({default: m.NurserySettingsSection})),
+)
+const NurseryWorkersPane = lazy(() =>
+  import('@/pages/schedules-settings/nursery-workers').then((m) => ({default: m.NurseryWorkersPane})),
+)
+const QuoteDetailPage = lazy(() =>
+  import('@/pages/sermons/quote-detail-page').then((m) => ({default: m.QuoteDetailPage})),
+)
+const QuoteSearchDetailPage = lazy(() =>
+  import('@/pages/sermons/quote-search-detail-page').then((m) => ({default: m.QuoteSearchDetailPage})),
+)
+const QuoteSearchesPage = lazy(() =>
+  import('@/pages/sermons/quote-searches-page').then((m) => ({default: m.QuoteSearchesPage})),
+)
+const QuotesPage = lazy(() => import('@/pages/sermons/quotes-page').then((m) => ({default: m.QuotesPage})))
+const QuotesResearchPage = lazy(() =>
+  import('@/pages/sermons/quotes-research-page').then((m) => ({default: m.QuotesResearchPage})),
+)
+const RecordersSection = lazy(() =>
+  import('@/pages/attendance-settings/recorders-section').then((m) => ({default: m.RecordersSection})),
+)
+const RollListPage = lazy(() =>
+  import('@/pages/sunday-school-roll/roll-list-page').then((m) => ({default: m.RollListPage})),
+)
+const RollViewPage = lazy(() =>
+  import('@/pages/sunday-school-roll/roll-view-page').then((m) => ({default: m.RollViewPage})),
+)
+const RsvpDetailPage = lazy(() => import('@/pages/rsvp/rsvp-detail-page').then((m) => ({default: m.RsvpDetailPage})))
+const RsvpListPage = lazy(() => import('@/pages/rsvp/rsvp-list-page').then((m) => ({default: m.RsvpListPage})))
+const SchedulesSettingsLayout = lazy(() =>
+  import('@/pages/schedules-settings/schedules-settings-layout').then((m) => ({default: m.SchedulesSettingsLayout})),
+)
+const SermonDetailPage = lazy(() =>
+  import('@/pages/sermons/sermon-detail-page').then((m) => ({default: m.SermonDetailPage})),
+)
+const SermonsPage = lazy(() => import('@/pages/sermons/sermons-page').then((m) => ({default: m.SermonsPage})))
+const ServiceTimesSection = lazy(() =>
+  import('@/pages/attendance-settings/service-times-section').then((m) => ({default: m.ServiceTimesSection})),
+)
+const SpecialDetailPage = lazy(() =>
+  import('@/pages/music/special-detail-page').then((m) => ({default: m.SpecialDetailPage})),
+)
+const SpecialMusicScheduleViewPage = lazy(() =>
+  import('@/pages/special-music/special-music-schedule-view-page').then((m) => ({
+    default: m.SpecialMusicScheduleViewPage,
+  })),
+)
+const SpecialMusicSchedulesPage = lazy(() =>
+  import('@/pages/special-music/special-music-schedules-page').then((m) => ({default: m.SpecialMusicSchedulesPage})),
+)
+const SpecialMusicSettingsSection = lazy(() =>
+  import('@/pages/schedules-settings/special-music-section').then((m) => ({default: m.SpecialMusicSettingsSection})),
+)
+const SpecialNewPage = lazy(() => import('@/pages/music/special-new-page').then((m) => ({default: m.SpecialNewPage})))
+const SpecialsListPage = lazy(() =>
+  import('@/pages/music/specials-list-page').then((m) => ({default: m.SpecialsListPage})),
+)
+const SundaySchoolDefaultsPane = lazy(() =>
+  import('@/pages/schedules-settings/sunday-school-defaults').then((m) => ({default: m.SundaySchoolDefaultsPane})),
+)
+const SundaySchoolDepartmentsSection = lazy(() =>
+  import('@/pages/sunday-school-stats/departments-section').then((m) => ({default: m.SundaySchoolDepartmentsSection})),
+)
+const SundaySchoolLessonsPane = lazy(() =>
+  import('@/pages/schedules-settings/sunday-school-lessons').then((m) => ({default: m.SundaySchoolLessonsPane})),
+)
+const SundaySchoolRollSettingsSection = lazy(() =>
+  import('@/pages/schedules-settings/sunday-school-roll-section').then((m) => ({
+    default: m.SundaySchoolRollSettingsSection,
+  })),
+)
+const SundaySchoolSettingsSection = lazy(() =>
+  import('@/pages/schedules-settings/sunday-school-section').then((m) => ({default: m.SundaySchoolSettingsSection})),
+)
+const SundaySchoolStatsPage = lazy(() =>
+  import('@/pages/sunday-school-stats/stats-page').then((m) => ({default: m.SundaySchoolStatsPage})),
+)
+const SundaySchoolThemesPane = lazy(() =>
+  import('@/pages/schedules-settings/sunday-school-themes').then((m) => ({default: m.SundaySchoolThemesPane})),
+)
+const TemplateEditPage = lazy(() => import('@/pages/template-edit-page').then((m) => ({default: m.TemplateEditPage})))
+const TemplatesPage = lazy(() => import('@/pages/templates-page').then((m) => ({default: m.TemplatesPage})))
+const VerseStripsPage = lazy(() =>
+  import('@/pages/sermons/verse-strips-page').then((m) => ({default: m.VerseStripsPage})),
+)
+const WorkersNotesBlocksPage = lazy(() =>
+  import('@/pages/sunday-school/workers-notes-blocks-page').then((m) => ({default: m.WorkersNotesBlocksPage})),
+)
+const WorkersNotesLessonsPage = lazy(() =>
+  import('@/pages/sunday-school/workers-notes-lessons-page').then((m) => ({default: m.WorkersNotesLessonsPage})),
+)
+const WorkersNotesListPage = lazy(() =>
+  import('@/pages/sunday-school/workers-notes-list-page').then((m) => ({default: m.WorkersNotesListPage})),
+)
+const WorkersNotesMonthsPage = lazy(() =>
+  import('@/pages/sunday-school/workers-notes-months-page').then((m) => ({default: m.WorkersNotesMonthsPage})),
+)
+const WorkersNotesThemePage = lazy(() =>
+  import('@/pages/sunday-school/workers-notes-theme-page').then((m) => ({default: m.WorkersNotesThemePage})),
+)
+const WorkersNotesViewPage = lazy(() =>
+  import('@/pages/sunday-school/workers-notes-view-page').then((m) => ({default: m.WorkersNotesViewPage})),
+)
 
 const queryClient = new QueryClient({
   defaultOptions: {queries: {staleTime: 30_000}},
@@ -477,106 +615,114 @@ function AppLayoutInner({
             {/* When adding/removing routes here, keep the Cmd+K command palette in sync:
                 sidebar routes derive from src/lib/nav-config.ts; non-sidebar routes need an
                 explicit entry in src/lib/search/actions.ts. See CLAUDE.md → Key Patterns. */}
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/people" element={<PeoplePage />} />
-              <Route path="/people/:id" element={<PersonDetailPage />} />
-              <Route path="/groups" element={<GroupsPage />} />
-              <Route path="/groups/:id" element={<GroupDetailPage />} />
-              <Route path="/messages" element={<MessageHistoryPage />} />
-              <Route path="/messages/compose" element={<MessageComposePage />} />
-              <Route path="/messages/:id" element={<MessageDetailPage />} />
-              <Route path="/templates" element={<TemplatesPage />} />
-              <Route path="/templates/new" element={<TemplateEditPage />} />
-              <Route path="/templates/:id/edit" element={<TemplateEditPage />} />
-              <Route path="/import" element={<ImportPage />} />
-              <Route path="/import/contacts" element={<ContactsImportPage />} />
-              <Route path="/devotions" element={<DevotionListPage />} />
-              <Route path="/devotions/stats" element={<DevotionStatsPage />} />
-              <Route path="/devotions/scan" element={<DevotionScanPage />} />
-              <Route path="/devotions/scriptures" element={<DevotionScripturesPage />} />
-              <Route path="/devotions/passages" element={<DevotionPassagesPage />} />
-              <Route path="/devotions/passages/:id" element={<DevotionPassageDetailPage />} />
-              <Route path="/devotions/audit" element={<DevotionAuditPage />} />
-              <Route path="/devotions/missing" element={<DevotionMissingPage />} />
-              <Route path="/devotions/gwendolyn" element={<GwendolynListPage />} />
-              <Route path="/devotions/gwendolyn/new" element={<GwendolynNewPage />} />
-              <Route path="/devotions/gwendolyn/:id" element={<GwendolynDetailPage />} />
-              <Route path="/devotions/new" element={<DevotionDetailPage />} />
-              <Route path="/devotions/:id" element={<DevotionDetailPage />} />
-              <Route path="/nursery" element={<NurserySchedulesPage />} />
-              <Route path="/nursery/workers" element={<Navigate to="/schedules/settings/nursery/workers" replace />} />
-              <Route path="/nursery/settings" element={<Navigate to="/schedules/settings" replace />} />
-              <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
-              <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
-              <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
-              <Route path="/schedules/music" element={<MusicSchedulesListPage />} />
-              <Route path="/schedules/music/:id" element={<MusicWeekViewPage />} />
-              <Route path="/schedules/music/:id/service/:serviceId" element={<MusicServiceEditorPage />} />
-              <Route path="/schedules/sunday-school-rolls" element={<RollListPage />} />
-              <Route path="/schedules/sunday-school-rolls/:id" element={<RollViewPage />} />
-              <Route path="/schedules/sunday-school" element={<WorkersNotesListPage />} />
-              <Route path="/schedules/sunday-school/:id" element={<WorkersNotesViewPage />} />
-              <Route path="/schedules/sunday-school/:id/theme" element={<WorkersNotesThemePage />} />
-              <Route path="/schedules/sunday-school/:id/blocks" element={<WorkersNotesBlocksPage />} />
-              <Route path="/schedules/sunday-school/:id/months" element={<WorkersNotesMonthsPage />} />
-              <Route path="/schedules/sunday-school/:id/lessons" element={<WorkersNotesLessonsPage />} />
-              <Route path="/schedules/settings" element={<SchedulesSettingsLayout />}>
-                <Route index element={<Navigate to="general" replace />} />
-                <Route path="general" element={<GeneralSettingsSection />} />
-                <Route path="nursery" element={<NurserySettingsSection />}>
-                  <Route index element={<Navigate to="defaults" replace />} />
-                  <Route path="defaults" element={<NurseryDefaultsPane />} />
-                  <Route path="workers" element={<NurseryWorkersPane />} />
+            <Suspense fallback={<PageSpinner />}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/people" element={<PeoplePage />} />
+                <Route path="/people/:id" element={<PersonDetailPage />} />
+                <Route path="/groups" element={<GroupsPage />} />
+                <Route path="/groups/:id" element={<GroupDetailPage />} />
+                <Route path="/messages" element={<MessageHistoryPage />} />
+                <Route path="/messages/compose" element={<MessageComposePage />} />
+                <Route path="/messages/:id" element={<MessageDetailPage />} />
+                <Route path="/templates" element={<TemplatesPage />} />
+                <Route path="/templates/new" element={<TemplateEditPage />} />
+                <Route path="/templates/:id/edit" element={<TemplateEditPage />} />
+                <Route path="/import" element={<ImportPage />} />
+                <Route path="/import/contacts" element={<ContactsImportPage />} />
+                <Route path="/devotions" element={<DevotionListPage />} />
+                <Route path="/devotions/stats" element={<DevotionStatsPage />} />
+                <Route path="/devotions/scan" element={<DevotionScanPage />} />
+                <Route path="/devotions/scriptures" element={<DevotionScripturesPage />} />
+                <Route path="/devotions/passages" element={<DevotionPassagesPage />} />
+                <Route path="/devotions/passages/:id" element={<DevotionPassageDetailPage />} />
+                <Route path="/devotions/audit" element={<DevotionAuditPage />} />
+                <Route path="/devotions/missing" element={<DevotionMissingPage />} />
+                <Route path="/devotions/gwendolyn" element={<GwendolynListPage />} />
+                <Route path="/devotions/gwendolyn/new" element={<GwendolynNewPage />} />
+                <Route path="/devotions/gwendolyn/:id" element={<GwendolynDetailPage />} />
+                <Route path="/devotions/new" element={<DevotionDetailPage />} />
+                <Route path="/devotions/:id" element={<DevotionDetailPage />} />
+                <Route path="/nursery" element={<NurserySchedulesPage />} />
+                <Route
+                  path="/nursery/workers"
+                  element={<Navigate to="/schedules/settings/nursery/workers" replace />}
+                />
+                <Route path="/nursery/settings" element={<Navigate to="/schedules/settings" replace />} />
+                <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
+                <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
+                <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
+                <Route path="/schedules/music" element={<MusicSchedulesListPage />} />
+                <Route path="/schedules/music/:id" element={<MusicWeekViewPage />} />
+                <Route path="/schedules/music/:id/service/:serviceId" element={<MusicServiceEditorPage />} />
+                <Route path="/schedules/sunday-school-rolls" element={<RollListPage />} />
+                <Route path="/schedules/sunday-school-rolls/:id" element={<RollViewPage />} />
+                <Route path="/schedules/sunday-school" element={<WorkersNotesListPage />} />
+                <Route path="/schedules/sunday-school/:id" element={<WorkersNotesViewPage />} />
+                <Route path="/schedules/sunday-school/:id/theme" element={<WorkersNotesThemePage />} />
+                <Route path="/schedules/sunday-school/:id/blocks" element={<WorkersNotesBlocksPage />} />
+                <Route path="/schedules/sunday-school/:id/months" element={<WorkersNotesMonthsPage />} />
+                <Route path="/schedules/sunday-school/:id/lessons" element={<WorkersNotesLessonsPage />} />
+                <Route path="/schedules/settings" element={<SchedulesSettingsLayout />}>
+                  <Route index element={<Navigate to="general" replace />} />
+                  <Route path="general" element={<GeneralSettingsSection />} />
+                  <Route path="nursery" element={<NurserySettingsSection />}>
+                    <Route index element={<Navigate to="defaults" replace />} />
+                    <Route path="defaults" element={<NurseryDefaultsPane />} />
+                    <Route path="workers" element={<NurseryWorkersPane />} />
+                  </Route>
+                  <Route path="special-music" element={<SpecialMusicSettingsSection />} />
+                  <Route path="fair-booth" element={<FairBoothSettingsSection />} />
+                  <Route path="music" element={<MusicScheduleSettingsSection />} />
+                  <Route path="sunday-school-roll" element={<SundaySchoolRollSettingsSection />} />
+                  <Route path="sunday-school" element={<SundaySchoolSettingsSection />}>
+                    <Route index element={<Navigate to="defaults" replace />} />
+                    <Route path="defaults" element={<SundaySchoolDefaultsPane />} />
+                    <Route path="themes" element={<SundaySchoolThemesPane />} />
+                    <Route path="lessons" element={<SundaySchoolLessonsPane />} />
+                  </Route>
                 </Route>
-                <Route path="special-music" element={<SpecialMusicSettingsSection />} />
-                <Route path="fair-booth" element={<FairBoothSettingsSection />} />
-                <Route path="music" element={<MusicScheduleSettingsSection />} />
-                <Route path="sunday-school-roll" element={<SundaySchoolRollSettingsSection />} />
-                <Route path="sunday-school" element={<SundaySchoolSettingsSection />}>
-                  <Route index element={<Navigate to="defaults" replace />} />
-                  <Route path="defaults" element={<SundaySchoolDefaultsPane />} />
-                  <Route path="themes" element={<SundaySchoolThemesPane />} />
-                  <Route path="lessons" element={<SundaySchoolLessonsPane />} />
+                <Route path="/schedules/fair-booth" element={<FairBoothSchedulesPage />} />
+                <Route path="/schedules/fair-booth/:id" element={<FairBoothSchedulePage />} />
+                <Route path="/schedules/fair-booth/:id/day/:date" element={<FairBoothDayPage />} />
+                <Route path="/sermons/quotes" element={<QuotesPage />} />
+                <Route path="/sermons/quotes/:id" element={<QuoteDetailPage />} />
+                <Route path="/sermons/research" element={<QuotesResearchPage />} />
+                <Route path="/sermons/searches" element={<QuoteSearchesPage />} />
+                <Route path="/sermons/searches/:id" element={<QuoteSearchDetailPage />} />
+                <Route path="/sermons/social" element={<SermonsPage />} />
+                <Route path="/sermons/social/:id" element={<SermonDetailPage />} />
+                <Route path="/sermons/verse-strips" element={<VerseStripsPage />} />
+                <Route path="/music/hymns" element={<HymnsPrepPage />} />
+                <Route path="/music/hymns/searches" element={<HymnSearchesPage />} />
+                <Route path="/music/hymns/searches/:id" element={<HymnSearchDetailPage />} />
+                <Route path="/music/specials" element={<SpecialsListPage />} />
+                <Route path="/music/specials/new" element={<SpecialNewPage />} />
+                <Route path="/music/specials/:id" element={<SpecialDetailPage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/calendar/print" element={<CalendarPrintPage />} />
+                <Route path="/rsvp" element={<RsvpListPage />} />
+                <Route path="/rsvp/:id" element={<RsvpDetailPage />} />
+                <Route path="/attendance" element={<AttendanceDashboardPage />} />
+                <Route path="/attendance/times" element={<Navigate to="/attendance/settings/times" replace />} />
+                <Route
+                  path="/attendance/recorders"
+                  element={<Navigate to="/attendance/settings/recorders" replace />}
+                />
+                <Route path="/attendance/settings" element={<AttendanceSettingsLayout />}>
+                  <Route index element={<Navigate to="times" replace />} />
+                  <Route path="times" element={<ServiceTimesSection />} />
+                  <Route path="recorders" element={<RecordersSection />} />
+                  <Route path="departments" element={<SundaySchoolDepartmentsSection />} />
+                  <Route path="households" element={<FillAmericaHouseholdsSection />} />
                 </Route>
-              </Route>
-              <Route path="/schedules/fair-booth" element={<FairBoothSchedulesPage />} />
-              <Route path="/schedules/fair-booth/:id" element={<FairBoothSchedulePage />} />
-              <Route path="/schedules/fair-booth/:id/day/:date" element={<FairBoothDayPage />} />
-              <Route path="/sermons/quotes" element={<QuotesPage />} />
-              <Route path="/sermons/quotes/:id" element={<QuoteDetailPage />} />
-              <Route path="/sermons/research" element={<QuotesResearchPage />} />
-              <Route path="/sermons/searches" element={<QuoteSearchesPage />} />
-              <Route path="/sermons/searches/:id" element={<QuoteSearchDetailPage />} />
-              <Route path="/sermons/social" element={<SermonsPage />} />
-              <Route path="/sermons/social/:id" element={<SermonDetailPage />} />
-              <Route path="/sermons/verse-strips" element={<VerseStripsPage />} />
-              <Route path="/music/hymns" element={<HymnsPrepPage />} />
-              <Route path="/music/hymns/searches" element={<HymnSearchesPage />} />
-              <Route path="/music/hymns/searches/:id" element={<HymnSearchDetailPage />} />
-              <Route path="/music/specials" element={<SpecialsListPage />} />
-              <Route path="/music/specials/new" element={<SpecialNewPage />} />
-              <Route path="/music/specials/:id" element={<SpecialDetailPage />} />
-              <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/calendar/print" element={<CalendarPrintPage />} />
-              <Route path="/rsvp" element={<RsvpListPage />} />
-              <Route path="/rsvp/:id" element={<RsvpDetailPage />} />
-              <Route path="/attendance" element={<AttendanceDashboardPage />} />
-              <Route path="/attendance/times" element={<Navigate to="/attendance/settings/times" replace />} />
-              <Route path="/attendance/recorders" element={<Navigate to="/attendance/settings/recorders" replace />} />
-              <Route path="/attendance/settings" element={<AttendanceSettingsLayout />}>
-                <Route index element={<Navigate to="times" replace />} />
-                <Route path="times" element={<ServiceTimesSection />} />
-                <Route path="recorders" element={<RecordersSection />} />
-                <Route path="departments" element={<SundaySchoolDepartmentsSection />} />
-                <Route path="households" element={<FillAmericaHouseholdsSection />} />
-              </Route>
-              <Route path="/sunday-school/stats" element={<SundaySchoolStatsPage />} />
-              <Route path="/fill-america" element={<FillAmericaCampaignListPage />} />
-              <Route path="/fill-america/:id" element={<FillAmericaCampaignViewPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-            </Routes>
+                <Route path="/sunday-school/stats" element={<SundaySchoolStatsPage />} />
+                <Route path="/fill-america" element={<FillAmericaCampaignListPage />} />
+                <Route path="/fill-america/:id" element={<FillAmericaCampaignViewPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Routes>
+            </Suspense>
           </main>
         </div>
 

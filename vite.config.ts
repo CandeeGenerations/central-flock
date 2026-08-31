@@ -29,6 +29,26 @@ export default defineConfig({
   build: {
     // Emit source maps for Sentry; 'hidden' means they're produced but not referenced from the bundle.
     sourcemap: 'hidden',
+    rollupOptions: {
+      output: {
+        // Group the lazy pages into one chunk per sub-app rather than one per page, so
+        // opening any devotions page fetches the devotions cluster once instead of a
+        // round trip per navigation within it. There is no service worker (see
+        // docs/adr/0036-ios-relaunch-restore-not-prevent.md), so every chunk boundary is
+        // a real tunnel request the first time it is crossed.
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('recharts') || id.includes('d3-')) return 'charts'
+            return undefined
+          }
+          const match = id.match(/\/src\/pages\/([^/]+)\//)
+          if (!match) return undefined
+          const cluster = match[1]
+          if (cluster === 'schedules-settings' || cluster === 'attendance-settings') return 'settings-panes'
+          return `page-${cluster}`
+        },
+      },
+    },
   },
   resolve: {
     alias: {

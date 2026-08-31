@@ -12,6 +12,7 @@ import {
   logout,
 } from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
+import {dismissUnsent, listUnsent, unsentComposeHref} from '@/lib/unsent-message'
 import {type RecentEntity, fetchRecents} from '@/lib/usage-api'
 import {cn} from '@/lib/utils'
 import {useQuery, useQueryClient} from '@tanstack/react-query'
@@ -36,9 +37,10 @@ import {
   Sparkles,
   Tent,
   Users,
+  X,
 } from 'lucide-react'
 import type {LucideIcon} from 'lucide-react'
-import type {ReactNode} from 'react'
+import {type ReactNode, useState} from 'react'
 import {Link} from 'react-router-dom'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -216,7 +218,24 @@ export function HomePage() {
 // --- Needs attention -------------------------------------------------------
 
 function NeedsAttention({attention}: {attention: HomeAttention}) {
-  const segments: {label: string; to: string}[] = []
+  // A cold icon launch goes to start_url ("/"), not back to the compose page, so an
+  // Unsent Message is surfaced here instead of hijacking where the app opens.
+  // Unlike every other segment this one is client-side — the buffer only exists on
+  // this device. See docs/adr/0036-ios-relaunch-restore-not-prevent.md.
+  const [unsent, setUnsent] = useState(() => listUnsent())
+
+  const segments: {label: string; to: string; onDismiss?: () => void}[] = []
+  if (unsent.length > 0)
+    segments.push({
+      label: unsent.length === 1 ? 'Unsent message' : `${unsent.length} unsent messages`,
+      to: unsentComposeHref(unsent[0].key),
+      // Dismiss hides the notice only. Discarding the text is done on the compose
+      // page, where you can see what you are throwing away.
+      onDismiss: () => {
+        for (const u of unsent) dismissUnsent(u.key)
+        setUnsent([])
+      },
+    })
   if (attention.draftsOlderThan2Days > 0)
     segments.push({
       label: `${attention.draftsOlderThan2Days} draft${attention.draftsOlderThan2Days !== 1 ? 's' : ''}`,
@@ -247,6 +266,16 @@ function NeedsAttention({attention}: {attention: HomeAttention}) {
           <Link to={seg.to} className="rounded px-1 py-0.5 font-medium hover:bg-amber-500/20 transition-colors">
             {seg.label}
           </Link>
+          {seg.onDismiss && (
+            <button
+              type="button"
+              aria-label={`Dismiss ${seg.label}`}
+              onClick={seg.onDismiss}
+              className="rounded p-0.5 text-muted-foreground hover:bg-amber-500/20 hover:text-foreground transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </span>
       ))}
     </div>

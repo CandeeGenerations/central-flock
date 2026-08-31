@@ -5,6 +5,24 @@ used across its features. New feature areas add their terms here as they are des
 
 ## Language
 
+### Messaging
+
+**Draft**:
+A message deliberately parked to finish later. Created only by an explicit *Save Draft*, and owns a
+`drafts` row plus its `draft_groups`. A first-class artifact: it appears in the Drafts tab and its
+count badge, the dashboard Drafts stat, the Home **Needs Attention** strip once it is two days old,
+and the command palette. Deleted automatically when its message sends.
+_Avoid_: Autosave, Unsaved message.
+
+**Unsent Message**:
+The compose form's contents, captured while typing so that a reload cannot lose them. Lives only in
+one device's local storage, keyed to the thing being composed — a new message, a **Draft**, or a
+scheduled message — and appears in none of the **Draft** surfaces. Restores silently when you return
+to the same compose context, and is offered once on the Home **Needs Attention** strip after a cold
+launch. Becomes a **Draft** only if you press *Save Draft*. *Discard* clears it and returns the page to a
+blank new compose, detached from whatever it was editing; the **Draft** behind it is left untouched.
+_Avoid_: Draft, Autosaved draft, Recovery buffer.
+
 ### Devotions
 
 **Devotion Slot**:
@@ -562,6 +580,11 @@ time — never stored.
 - A **Sermon** has at most one **Big Idea**, many **Cited Scriptures**, and optionally one **Series**
 - A **Reflection** may reference only the **Cited Scriptures** of its own **Sermon**
 - A **Social Quote** may be promoted into the **Quote** corpus, citing its **Sermon** as the source
+- A **Draft** is created only by an explicit save; an **Unsent Message** is created only by typing
+- An **Unsent Message** is scoped to one device and one compose context; a **Draft** is server-side
+- An **Unsent Message** captured against a **Draft** holds unsaved edits to it, never a second Draft
+- Sending, explicitly saving, or discarding retires the **Unsent Message** for that context
+- *Discard* detaches compose from its **Draft**; *Delete* destroys the **Draft** — never the same act
 - A **Nursery Worker** is exactly one **Person**, plus nursery-specific caps and eligibility
 - A **Nursery Assignment** places one **Nursery Worker** in one slot of one **Service Time** on one date
 - A **Double Booking** is derived from one **Nursery Assignment** and one **Special Music** performance

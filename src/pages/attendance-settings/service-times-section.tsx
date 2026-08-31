@@ -28,7 +28,7 @@ function formatTime(t: string) {
   return `${h12}:${String(m).padStart(2, '0')}${ampm}`
 }
 
-export function ServiceTimesPage() {
+export function ServiceTimesSection() {
   const qc = useQueryClient()
   const key = queryKeys.serviceTimes(true)
   const {data: times, isLoading} = useQuery({queryKey: key, queryFn: () => fetchServiceTimes(true)})
@@ -86,11 +86,13 @@ export function ServiceTimesPage() {
   const list = times ?? []
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Service Times</h2>
+        <p className="text-muted-foreground text-sm">
+          The services attendance is recorded against, in the order they appear on a recorder&rsquo;s sheet.
+        </p>
         <Button onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Add Service Time
         </Button>
       </div>

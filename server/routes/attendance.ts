@@ -43,7 +43,12 @@ attendanceRouter.get(
         time: schema.serviceTimes.time,
         active: schema.serviceTimes.active,
         sortOrder: schema.serviceTimes.sortOrder,
-        recordCount: sql<number>`(select count(*) from ${schema.serviceRecords} where ${schema.serviceRecords.serviceTimeId} = ${schema.serviceTimes.id})`,
+        // Written out rather than interpolated: drizzle's sql template renders a
+        // column as a bare `"id"`, which inside the subquery binds to
+        // service_records.id and counted nothing.
+        recordCount: sql<number>`(
+          select count(*) from service_records r where r.service_time_id = service_times.id
+        )`,
       })
       .from(schema.serviceTimes)
       .all()
@@ -314,7 +319,9 @@ attendanceRouter.get(
         name: schema.recorders.name,
         token: schema.recorders.token,
         active: schema.recorders.active,
-        editCount: sql<number>`(select count(*) from ${schema.serviceRecordEdits} where ${schema.serviceRecordEdits.recorderId} = ${schema.recorders.id})`,
+        editCount: sql<number>`(
+          select count(*) from service_record_edits e where e.recorder_id = recorders.id
+        )`,
       })
       .from(schema.recorders)
       .orderBy(asc(schema.recorders.name))

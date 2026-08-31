@@ -1,5 +1,5 @@
 import {cn} from '@/lib/utils'
-import {Baby, GraduationCap, ListMusic, Music, Settings, Tent} from 'lucide-react'
+import {Baby, ClipboardList, GraduationCap, ListMusic, Music, Settings, Tent} from 'lucide-react'
 import {NavLink, Outlet} from 'react-router-dom'
 
 // A left rail of routed sections. Each pane is a URL, so sections are
@@ -11,7 +11,8 @@ const SECTIONS = [
   {to: 'special-music', label: 'Special Music', icon: Music},
   {to: 'fair-booth', label: 'Fair Booth', icon: Tent},
   {to: 'music', label: 'Music Schedule', icon: ListMusic},
-  {to: 'sunday-school', label: 'Sunday School', icon: GraduationCap},
+  {to: 'sunday-school', label: 'Workers’ Notes', icon: GraduationCap},
+  {to: 'sunday-school-roll', label: 'Sunday School Roll', icon: ClipboardList},
 ]
 
 export function SchedulesSettingsLayout() {

@@ -32,10 +32,15 @@ const GROUP_ORDER = [
   'Hymns',
   'Schedules',
   'Attendance',
+  'Fill America',
   'Calendar',
 ]
 
 const PREFIX_TO_GROUP: Record<string, string> = {
+  fa: 'Fill America',
+  fill: 'Fill America',
+  campaign: 'Fill America',
+  campaigns: 'Fill America',
   nav: 'Navigation',
   go: 'Navigation',
   new: 'Create',

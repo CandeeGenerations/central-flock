@@ -5,6 +5,7 @@ import {devotionPassagesProvider} from './devotion-passages'
 import {devotionsProvider} from './devotions'
 import {draftsProvider} from './drafts'
 import {fairBoothSchedulesProvider} from './fair-booth-schedules'
+import {fillAmericaCampaignsProvider} from './fill-america-campaigns'
 import {groupsProvider} from './groups'
 import {gwendolynDevotionsProvider} from './gwendolyn-devotions'
 import {hymnsProvider} from './hymns'
@@ -20,7 +21,9 @@ import {sermonsProvider} from './sermons'
 import {serviceTimesProvider} from './service-times'
 import {specialMusicSchedulesProvider} from './special-music-schedules'
 import {specialsProvider} from './specials'
+import {sundaySchoolRollsProvider} from './sunday-school-rolls'
 import {templatesProvider} from './templates'
+import {workersNotesProvider} from './workers-notes'
 
 // Recents always loads (it shows on the empty palette). The entity providers
 // populate the searchable index; their results only surface once you type
@@ -32,6 +35,7 @@ export const providers: SearchProvider[] = [
   devotionsProvider as SearchProvider,
   devotionPassagesProvider as SearchProvider,
   fairBoothSchedulesProvider as SearchProvider,
+  fillAmericaCampaignsProvider as SearchProvider,
   messagesProvider as SearchProvider,
   quotesProvider as SearchProvider,
   sermonsProvider as SearchProvider,
@@ -47,4 +51,6 @@ export const providers: SearchProvider[] = [
   serviceTimesProvider as SearchProvider,
   recordersProvider as SearchProvider,
   specialsProvider as SearchProvider,
+  sundaySchoolRollsProvider as SearchProvider,
+  workersNotesProvider as SearchProvider,
 ]

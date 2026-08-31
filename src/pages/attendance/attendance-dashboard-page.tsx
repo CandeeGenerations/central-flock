@@ -1,9 +1,10 @@
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {DatePicker} from '@/components/ui/date-time-picker'
+import {type DateRange, DateRangePicker} from '@/components/ui/date-range-picker'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Pagination} from '@/components/ui/pagination'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {
@@ -17,58 +18,58 @@ import {
   fetchSummary,
   updateRecord,
 } from '@/lib/attendance-api'
+import {linreg} from '@/lib/chart-math'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {History, Pencil, TrendingDown, TrendingUp} from 'lucide-react'
+import {Church, History, Pencil, TrendingDown, TrendingUp} from 'lucide-react'
 import {useMemo, useState} from 'react'
-import {CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts'
+import {Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts'
 import {toast} from 'sonner'
 
 const METRIC_LABELS: Record<Metric, string> = {attendance: 'Attendance', streaming: 'Streaming', total: 'Total'}
 
-function isoDaysAgo(days: number): string {
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+function todayIso(): string {
   const d = new Date()
-  d.setUTCDate(d.getUTCDate() - days)
-  return d.toISOString().slice(0, 10)
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
+function startOfYearIso(): string {
+  return `${new Date().getFullYear()}-01-01`
+}
+
+// The Sunday that opens the week a date falls in. Bucketing on this is what
+// merges Sunday morning/evening and the following Wednesday into one point.
+function weekStartIso(iso: string): string {
+  const d = new Date(iso + 'T12:00:00')
+  d.setDate(d.getDate() - d.getDay())
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+function formatWeekLabel(iso: string): string {
+  const d = new Date(iso + 'T12:00:00')
+  return d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})
+}
+
+// Sum each week's service records into a single point, ascending by week.
+function toWeekly(points: {date: string; value: number}[]): {week: string; value: number}[] {
+  const byWeek = new Map<string, number>()
+  for (const p of points) {
+    const w = weekStartIso(p.date)
+    byWeek.set(w, (byWeek.get(w) ?? 0) + p.value)
+  }
+  return [...byWeek.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([week, value]) => ({week, value}))
+}
+
 function shiftYear(iso: string, years: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   return `${y + years}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
 
-// Least-squares slope/intercept over y indexed 0..n-1.
-function linreg(y: number[]): {slope: number; intercept: number} {
-  const n = y.length
-  if (n < 2) return {slope: 0, intercept: y[0] ?? 0}
-  let sx = 0,
-    sy = 0,
-    sxy = 0,
-    sxx = 0
-  for (let i = 0; i < n; i++) {
-    sx += i
-    sy += y[i]
-    sxy += i * y[i]
-    sxx += i * i
-  }
-  const denom = n * sxx - sx * sx
-  const slope = denom === 0 ? 0 : (n * sxy - sx * sy) / denom
-  const intercept = (sy - slope * sx) / n
-  return {slope, intercept}
-}
-function movingAvg(y: number[], w: number): (number | null)[] {
-  return y.map((_, i) => {
-    if (i < w - 1) return null
-    let s = 0
-    for (let k = i - w + 1; k <= i; k++) s += y[k]
-    return Math.round((s / w) * 10) / 10
-  })
-}
-
 export function AttendanceDashboardPage() {
   const [metric, setMetric] = useState<Metric>('attendance')
   const [serviceTimeId, setServiceTimeId] = useState<string>('all')
-  const [from, setFrom] = useState(isoDaysAgo(365))
-  const [to, setTo] = useState(isoDaysAgo(0))
+  const [range, setRange] = useState<DateRange>(() => ({from: startOfYearIso(), to: todayIso()}))
+  const {from, to} = range
   const [yoy, setYoy] = useState(false)
 
   const {data: serviceTimes} = useQuery({
@@ -91,16 +92,14 @@ export function AttendanceDashboardPage() {
   })
 
   const {chartData, delta} = useMemo(() => {
-    const pts = series?.points ?? []
+    const pts = toWeekly(series?.points ?? [])
     const y = pts.map((p) => p.value)
     const {slope, intercept} = linreg(y)
-    const ma = movingAvg(y, 4)
-    const prev = prevSeries?.points ?? []
+    const prev = toWeekly(prevSeries?.points ?? [])
     const data = pts.map((p, i) => ({
-      date: p.date,
+      date: formatWeekLabel(p.week),
       value: p.value,
       trend: Math.round((intercept + slope * i) * 10) / 10,
-      ma: ma[i],
       prev: yoy ? (prev[i]?.value ?? null) : null,
     }))
     const fittedStart = intercept
@@ -114,7 +113,10 @@ export function AttendanceDashboardPage() {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-2xl font-bold">Attendance</h2>
+        <div className="flex items-center gap-3">
+          <Church className="h-6 w-6" />
+          <h2 className="text-2xl font-bold">Main Services</h2>
+        </div>
       </div>
 
       {/* Filters */}
@@ -150,13 +152,9 @@ export function AttendanceDashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5 w-44">
-            <Label>From</Label>
-            <DatePicker value={from} onChange={(v) => v && setFrom(v)} />
-          </div>
-          <div className="space-y-1.5 w-44">
-            <Label>To</Label>
-            <DatePicker value={to} onChange={(v) => v && setTo(v)} />
+          <div className="space-y-1.5">
+            <Label>Date Range</Label>
+            <DateRangePicker value={range} onChange={setRange} className="w-60" />
           </div>
           <Button variant={yoy ? 'default' : 'outline'} onClick={() => setYoy((v) => !v)}>
             vs Last Year
@@ -166,9 +164,17 @@ export function AttendanceDashboardPage() {
 
       {/* Tiles */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Tile label="This Month" value={metricSummary?.month.total} sub={`avg ${metricSummary?.month.avg ?? 0}`} />
+        <Tile
+          label="This Month"
+          value={metricSummary?.month.total}
+          sub={`avg ${(metricSummary?.month.avg ?? 0).toLocaleString()}`}
+        />
         <Tile label="This Month · services" value={metricSummary?.month.count} />
-        <Tile label="This Year" value={metricSummary?.year.total} sub={`avg ${metricSummary?.year.avg ?? 0}`} />
+        <Tile
+          label="This Year"
+          value={metricSummary?.year.total}
+          sub={`avg ${(metricSummary?.year.avg ?? 0).toLocaleString()}`}
+        />
         <Tile label="This Year · services" value={metricSummary?.year.count} />
       </div>
 
@@ -176,7 +182,7 @@ export function AttendanceDashboardPage() {
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle>
-            {METRIC_LABELS[metric]} over time
+            {METRIC_LABELS[metric]} by week
             {serviceTimeId !== 'all' && serviceTimes
               ? ` · ${serviceTimes.find((s) => String(s.id) === serviceTimeId)?.name ?? ''}`
               : ' · all combined'}
@@ -196,7 +202,15 @@ export function AttendanceDashboardPage() {
             <p className="text-center text-muted-foreground py-8">No data for this range.</p>
           ) : (
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData}>
+              <ComposedChart data={chartData}>
+                <defs>
+                  {/* Fades the fill to fully transparent so the card surface, in
+                      either theme, shows through the tail of the area. */}
+                  <linearGradient id="attendance-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="date"
@@ -217,7 +231,7 @@ export function AttendanceDashboardPage() {
                     if (!active || !payload?.length) return null
                     return (
                       <div className="rounded-lg border bg-card px-3 py-2 shadow-md">
-                        <p className="text-sm font-medium mb-1">{label}</p>
+                        <p className="text-sm font-medium mb-1">Week of {label}</p>
                         {payload
                           .filter((e) => e.value != null)
                           .map((e) => (
@@ -233,23 +247,15 @@ export function AttendanceDashboardPage() {
                     )
                   }}
                 />
-                <Line
+                <Area
                   type="monotone"
                   dataKey="value"
                   name={METRIC_LABELS[metric]}
                   stroke="var(--primary)"
                   strokeWidth={2}
+                  fill="url(#attendance-area)"
                   dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="ma"
-                  name="4-pt avg"
-                  stroke="var(--muted-foreground)"
-                  strokeWidth={1.5}
-                  strokeDasharray="5 4"
-                  dot={false}
-                  connectNulls
+                  activeDot={{r: 4}}
                 />
                 <Line type="linear" dataKey="trend" name="Trend" stroke="#ef4444" strokeWidth={1.5} dot={false} />
                 {yoy && (
@@ -263,7 +269,7 @@ export function AttendanceDashboardPage() {
                     connectNulls
                   />
                 )}
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
           )}
         </CardContent>
@@ -279,21 +285,31 @@ function Tile({label, value, sub}: {label: string; value: number | undefined; su
     <Card size="sm">
       <CardContent className="py-4">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="text-3xl font-bold">{value ?? '—'}</p>
+        <p className="text-3xl font-bold tabular-nums">{value?.toLocaleString() ?? '—'}</p>
         {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
       </CardContent>
     </Card>
   )
 }
 
+const RECORDS_PAGE_SIZE = 25
+
 function RecordsTable({serviceTimeId, from, to}: {serviceTimeId: number | null; from: string; to: string}) {
   const qc = useQueryClient()
   const {data: records} = useQuery({
     queryKey: queryKeys.attendanceRecords(serviceTimeId, from, to),
-    queryFn: () => fetchRecords({serviceTimeId, from, to, limit: 100}),
+    queryFn: () => fetchRecords({serviceTimeId, from, to, limit: 1000}),
   })
   const [editing, setEditing] = useState<ServiceRecordRow | null>(null)
   const [historyRecord, setHistoryRecord] = useState<ServiceRecordRow | null>(null)
+  const [page, setPage] = useState(1)
+
+  // A range change can leave the table on a page that no longer exists.
+  const [lastRange, setLastRange] = useState(`${serviceTimeId}|${from}|${to}`)
+  if (lastRange !== `${serviceTimeId}|${from}|${to}`) {
+    setLastRange(`${serviceTimeId}|${from}|${to}`)
+    setPage(1)
+  }
 
   const mut = useMutation({
     mutationFn: (data: {id: number; attendance: number | null; streaming: number | null}) =>
@@ -308,7 +324,8 @@ function RecordsTable({serviceTimeId, from, to}: {serviceTimeId: number | null; 
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Update failed'),
   })
 
-  const rows = records ?? []
+  const all = records ?? []
+  const rows = all.slice((page - 1) * RECORDS_PAGE_SIZE, page * RECORDS_PAGE_SIZE)
   return (
     <Card size="sm">
       <CardHeader>
@@ -358,6 +375,9 @@ function RecordsTable({serviceTimeId, from, to}: {serviceTimeId: number | null; 
           </TableBody>
         </Table>
       </div>
+      <CardContent>
+        <Pagination page={page} pageSize={RECORDS_PAGE_SIZE} total={all.length} onPageChange={setPage} noun="records" />
+      </CardContent>
       <EditRecordDialog
         record={editing}
         pending={mut.isPending}

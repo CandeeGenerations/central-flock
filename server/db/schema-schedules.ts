@@ -1,7 +1,14 @@
 import {sql} from 'drizzle-orm'
 import {integer, sqliteTable, text} from 'drizzle-orm/sqlite-core'
 
-export const scheduleTypes = ['nursery', 'special_music', 'fair_booth', 'workers_notes', 'music_schedule'] as const
+export const scheduleTypes = [
+  'nursery',
+  'special_music',
+  'fair_booth',
+  'workers_notes',
+  'music_schedule',
+  'sunday_school_roll',
+] as const
 export type ScheduleType = (typeof scheduleTypes)[number]
 
 export const scopeKinds = ['monthly', 'date_range'] as const

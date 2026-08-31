@@ -177,7 +177,9 @@ function BoothCells({row}: {row: BoothRow}) {
         </div>
         {row.note && !inlineNote ? <div>{renderInline(row.note)}</div> : null}
       </div>
-      <div style={rowStyle({bold: isSong, italic: false, highlight: false})}>
+      {/* minWidth 0: a grid item's automatic minimum is its content, so without
+          this a long unbroken title grows past the 1fr track instead of wrapping. */}
+      <div style={{...rowStyle({bold: isSong, italic: false, highlight: false}), minWidth: 0}}>
         <div>{renderInline(row.value)}</div>
         {row.valueSecond ? (
           <div>

@@ -9,6 +9,8 @@ import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip'
+import {UnsavedChangesDialog} from '@/components/unsaved-changes-dialog'
+import {useUnsavedChanges} from '@/hooks/use-unsaved-changes'
 import {fetchServiceTimes} from '@/lib/attendance-api'
 import {
   type LineInput,
@@ -81,7 +83,12 @@ function emptyLine(kind: OrderLine['kind'], sortOrder: number): Draft {
   }
 }
 
-function toInput(l: Draft): LineInput {
+/** The two fields a booth line saves, for comparing a draft against the server. */
+function toBoothInput(b: {slot: MusicBoothSlot; text: string; highlight: boolean}) {
+  return {slot: b.slot, text: b.text, highlight: b.highlight}
+}
+
+function toInput(l: OrderLine): LineInput {
   return {
     kind: l.kind,
     role: l.role,
@@ -124,11 +131,17 @@ export function MusicServiceEditorPage() {
   const [showOverrides, setShowOverrides] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
 
+  // The server copy the drafts below were seeded from. React Query hands back
+  // the same object while the data is unchanged, so this stays put through a
+  // refetch and only moves when a real save lands.
+  const [seededFrom, setSeededFrom] = useState<MusicService | undefined>(undefined)
+
   // Re-sync the draft when the server copy changes (after a save invalidates
   // and refetches) — the same pattern the settings panes use.
   useEffect(() => {
     if (!service) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSeededFrom(service)
     setLines(service.lines.map((l, i) => ({...l, tempKey: `l-${l.id}-${i}`})))
     setBooth(service.boothLines.map((b) => ({slot: b.slot, text: b.text, highlight: b.highlight, stale: b.stale})))
   }, [service])
@@ -181,6 +194,24 @@ export function MusicServiceEditorPage() {
     onSuccess: () => queryClient.invalidateQueries({queryKey: musicScheduleKeys.detail(weekId)}),
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to rewrite'),
   })
+
+  // The Service Order and the Sound Booth lines live in local state until their
+  // Save button is pressed, so leaving the page drops them. Compare the drafts
+  // against the server copy they were seeded from — only while they HAVE been
+  // seeded from it, else the first render (drafts still empty) reads as edited.
+  const seeded = seededFrom === service
+  const linesDirty =
+    seeded && !!service && JSON.stringify(lines.map(toInput)) !== JSON.stringify(service.lines.map(toInput))
+  const boothDirty =
+    seeded &&
+    !!service &&
+    JSON.stringify(booth.map(toBoothInput)) !== JSON.stringify(service.boothLines.map(toBoothInput))
+  const blocker = useUnsavedChanges(linesDirty || boothDirty)
+
+  const saveEverything = async () => {
+    if (linesDirty) await saveLines.mutateAsync()
+    if (boothDirty) await saveBooth.mutateAsync()
+  }
 
   if (!week || !service) return <PageSpinner />
 
@@ -328,8 +359,14 @@ export function MusicServiceEditorPage() {
             </div>
           </Field>
 
+          {/* Title and Text sit on one row, their notes on the next: Tab follows
+              DOM order, and the pair that gets typed week after week is what it
+              runs through first. Each note still sits under its own field. */}
           <Field label="Title">
             <Input defaultValue={service.title} onBlur={(e) => patchService.mutate({title: e.target.value})} />
+          </Field>
+          <Field label="Text">
+            <Input defaultValue={service.scripture} onBlur={(e) => patchService.mutate({scripture: e.target.value})} />
           </Field>
           <Field label="Title note (prints only when set)">
             <NoteField
@@ -340,9 +377,6 @@ export function MusicServiceEditorPage() {
               onChange={(titleNote) => patchService.mutate({titleNote})}
               onHighlight={(titleHighlight) => patchService.mutate({titleHighlight})}
             />
-          </Field>
-          <Field label="Text">
-            <Input defaultValue={service.scripture} onBlur={(e) => patchService.mutate({scripture: e.target.value})} />
           </Field>
           <Field label="Text note (prints only when set)">
             <NoteField
@@ -491,6 +525,8 @@ export function MusicServiceEditorPage() {
           Preview
         </Button>
       </Tip>
+
+      <UnsavedChangesDialog blocker={blocker} onSave={saveEverything} what="your edits to this service" />
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">

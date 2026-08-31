@@ -23,6 +23,7 @@ import {contactsRouter} from './routes/contacts.js'
 import {cleanupOrphanedScanImages, devotionsRouter} from './routes/devotions.js'
 import {draftsRouter} from './routes/drafts.js'
 import {fairBoothRouter} from './routes/fair-booth.js'
+import {fillAmericaRouter} from './routes/fill-america.js'
 import {globalVariablesRouter} from './routes/global-variables.js'
 import {groupsRouter} from './routes/groups.js'
 import {gwendolynDevotionsRouter} from './routes/gwendolyn-devotions.js'
@@ -41,6 +42,8 @@ import {sermonsRouter} from './routes/sermons.js'
 import {settingsRouter} from './routes/settings.js'
 import {specialsRouter} from './routes/specials.js'
 import {statsRouter} from './routes/stats.js'
+import {sundaySchoolRollsRouter} from './routes/sunday-school-rolls.js'
+import {sundaySchoolStatsRouter} from './routes/sunday-school-stats.js'
 import {templatesRouter} from './routes/templates.js'
 import {usageRouter} from './routes/usage.js'
 import {webhooksRouter} from './routes/webhooks.js'
@@ -86,6 +89,7 @@ app.use('/api/gwendolyn-devotions', gwendolynDevotionsRouter)
 app.use('/api/schedules/fair-booth', fairBoothRouter)
 app.use('/api/schedules/music', musicSchedulesRouter)
 app.use('/api/schedules/workers-notes', workersNotesRouter)
+app.use('/api/schedules/sunday-school-rolls', sundaySchoolRollsRouter)
 app.use('/api/schedules', schedulesRouter)
 app.use('/api/nursery/schedules', nurserySchedulesRouter)
 app.use('/api/nursery', nurseryRouter)
@@ -94,6 +98,8 @@ app.use('/api/hymns', hymnsRouter)
 app.use('/api/sermons', sermonsRouter)
 app.use('/api/rsvp', rsvpRouter)
 app.use('/api/attendance', attendanceRouter)
+app.use('/api/sunday-school-stats', sundaySchoolStatsRouter)
+app.use('/api/fill-america', fillAmericaRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/specials', specialsRouter)
 app.use('/api/usage', usageRouter)

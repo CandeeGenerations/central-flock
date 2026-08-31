@@ -10,6 +10,7 @@ import {Label} from '@/components/ui/label'
 import {Pagination} from '@/components/ui/pagination'
 import {PersonPicker} from '@/components/ui/person-picker'
 import {SearchInput} from '@/components/ui/search-input'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
@@ -17,7 +18,8 @@ import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {useProgressOperation} from '@/hooks/use-sse'
 import {fetchServiceTimes} from '@/lib/attendance-api'
-import {type SermonListItem, createSermon, deleteSermon, listSermons} from '@/lib/sermons-api'
+import {type SermonListItem, createSermon, deleteSermon, listSermonSeries, listSermons} from '@/lib/sermons-api'
+import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {FileText, Plus, Trash2, Upload, X} from 'lucide-react'
 import {useState} from 'react'
@@ -80,6 +82,7 @@ export function SermonsPage() {
   const [series, setSeries] = useState('')
   const [transcript, setTranscript] = useState('')
   const [fileName, setFileName] = useState('')
+  const [dragging, setDragging] = useState(false)
 
   const {data, isLoading} = useQuery({
     queryKey: ['sermons', 'list', debouncedSearch, page],
@@ -87,6 +90,10 @@ export function SermonsPage() {
   })
 
   const {data: serviceTimes} = useQuery({queryKey: ['service-times'], queryFn: () => fetchServiceTimes()})
+
+  // The series list is just the distinct values already on sermons — picking an existing one keeps
+  // the spelling consistent, and the "Add …" row covers the first sermon of a new series.
+  const {data: seriesOptions} = useQuery({queryKey: ['sermons', 'series'], queryFn: () => listSermonSeries()})
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -130,6 +137,10 @@ export function SermonsPage() {
   // dialog. 40 KB of unbroken ASR in a textarea is unreadable and invites accidental edits.
   function handleFile(file: File | undefined) {
     if (!file) return
+    if (file.type && file.type !== 'text/plain' && !file.name.toLowerCase().endsWith('.txt')) {
+      toast.error('Transcripts must be plain .txt files')
+      return
+    }
     const reader = new FileReader()
     reader.onload = () => {
       setTranscript(String(reader.result ?? ''))
@@ -278,12 +289,17 @@ export function SermonsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sermon-series">Series (optional)</Label>
-              <Input
-                id="sermon-series"
+              <Label>Series (optional)</Label>
+              <SearchableSelect
                 value={series}
-                onChange={(e) => setSeries(e.target.value)}
-                placeholder="Jesus is the Way, the Truth, and the Life"
+                onValueChange={setSeries}
+                options={[
+                  {value: '', label: 'No series'},
+                  ...(seriesOptions ?? []).map((name) => ({value: name, label: name})),
+                ]}
+                placeholder="Select or add a series…"
+                creatable
+                className="w-full"
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
@@ -316,10 +332,36 @@ export function SermonsPage() {
                 </Button>
               </div>
             ) : (
-              <label className="flex cursor-pointer flex-col items-center gap-1 rounded-md border border-dashed p-6 text-center hover:bg-muted/50">
+              <label
+                className={cn(
+                  'flex cursor-pointer flex-col items-center gap-1 rounded-md border border-dashed p-6 text-center transition-colors',
+                  dragging ? 'border-primary bg-primary/5' : 'hover:bg-muted/50',
+                )}
+                onDragEnter={(e) => {
+                  e.preventDefault()
+                  setDragging(true)
+                }}
+                onDragOver={(e) => {
+                  // Without preventDefault on dragover the browser refuses the drop entirely.
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'copy'
+                  setDragging(true)
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+                  setDragging(false)
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setDragging(false)
+                  handleFile(e.dataTransfer.files?.[0])
+                }}
+              >
                 <Upload className="h-5 w-5 text-muted-foreground" />
                 <span className="text-sm font-medium">Choose a .txt transcript</span>
-                <span className="text-xs text-muted-foreground">The file's text is saved with the sermon</span>
+                <span className="text-xs text-muted-foreground">
+                  or drop it here — the file's text is saved with the sermon
+                </span>
                 <input
                   type="file"
                   accept=".txt,text/plain"

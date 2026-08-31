@@ -1606,6 +1606,20 @@ devotionsRouter.put(
   }),
 )
 
+// DELETE /api/devotions/pool/unused - Clear every available, not-yet-recorded passage.
+// Must be registered before '/pool/:id' or Express matches 'unused' as the id.
+devotionsRouter.delete(
+  '/pool/unused',
+  asyncHandler(async (_req, res) => {
+    const result = db
+      .delete(schema.generatedPassages)
+      .where(and(eq(schema.generatedPassages.used, false), eq(schema.generatedPassages.recorded, false)))
+      .run()
+
+    res.json({deleted: result.changes})
+  }),
+)
+
 // DELETE /api/devotions/pool/:id - Delete an unused pool passage
 devotionsRouter.delete(
   '/pool/:id',

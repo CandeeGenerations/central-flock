@@ -1,3 +1,4 @@
+import {DeferredChart} from '@/components/deferred-chart'
 import {Button} from '@/components/ui/button'
 import {Calendar} from '@/components/ui/calendar'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -267,35 +268,37 @@ export function DashboardPage() {
             ) : (
               <div className="flex flex-col sm:flex-row items-center gap-6">
                 <div className="shrink-0">
-                  <ResponsiveContainer width={180} height={180}>
-                    <PieChart>
-                      <Pie
-                        data={deliveryData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                        strokeWidth={0}
-                      >
-                        {deliveryData.map((entry) => (
-                          <Cell key={entry.name} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({active, payload}) => {
-                          if (!active || !payload?.length) return null
-                          const d = payload[0].payload
-                          return (
-                            <div className="rounded-lg border bg-card px-3 py-2 shadow-md text-sm">
-                              <span className="font-medium">{d.name}</span>: {d.value} ({d.pct}%)
-                            </div>
-                          )
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <DeferredChart order={0} width={180} height={180}>
+                    <ResponsiveContainer width={180} height={180}>
+                      <PieChart>
+                        <Pie
+                          data={deliveryData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={80}
+                          paddingAngle={2}
+                          dataKey="value"
+                          strokeWidth={0}
+                        >
+                          {deliveryData.map((entry) => (
+                            <Cell key={entry.name} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={({active, payload}) => {
+                            if (!active || !payload?.length) return null
+                            const d = payload[0].payload
+                            return (
+                              <div className="rounded-lg border bg-card px-3 py-2 shadow-md text-sm">
+                                <span className="font-medium">{d.name}</span>: {d.value} ({d.pct}%)
+                              </div>
+                            )
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </DeferredChart>
                 </div>
                 <div className="space-y-3">
                   {deliveryData.map((d) => (
@@ -326,35 +329,37 @@ export function DashboardPage() {
             ) : (
               <div className="flex flex-col sm:flex-row items-center gap-6">
                 <div className="shrink-0">
-                  <ResponsiveContainer width={180} height={180}>
-                    <PieChart>
-                      <Pie
-                        data={peopleData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                        strokeWidth={0}
-                      >
-                        {peopleData.map((entry) => (
-                          <Cell key={entry.name} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({active, payload}) => {
-                          if (!active || !payload?.length) return null
-                          const d = payload[0].payload
-                          return (
-                            <div className="rounded-lg border bg-card px-3 py-2 shadow-md text-sm">
-                              <span className="font-medium">{d.name}</span>: {d.value}
-                            </div>
-                          )
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <DeferredChart order={1} width={180} height={180}>
+                    <ResponsiveContainer width={180} height={180}>
+                      <PieChart>
+                        <Pie
+                          data={peopleData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={80}
+                          paddingAngle={2}
+                          dataKey="value"
+                          strokeWidth={0}
+                        >
+                          {peopleData.map((entry) => (
+                            <Cell key={entry.name} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={({active, payload}) => {
+                            if (!active || !payload?.length) return null
+                            const d = payload[0].payload
+                            return (
+                              <div className="rounded-lg border bg-card px-3 py-2 shadow-md text-sm">
+                                <span className="font-medium">{d.name}</span>: {d.value}
+                              </div>
+                            )
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </DeferredChart>
                 </div>
                 <div className="space-y-3">
                   {peoplePcts.map((d) => (
@@ -435,76 +440,78 @@ export function DashboardPage() {
           {overTimeData.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">No message data for this period.</p>
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={overTimeData}>
-                <defs>
-                  <linearGradient id="sentGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis
-                  dataKey="label"
-                  tick={{fontSize: 11, fill: 'var(--muted-foreground)'}}
-                  axisLine={{stroke: 'var(--border)'}}
-                  tickLine={false}
-                  padding={{left: 10, right: 10}}
-                  interval="preserveStartEnd"
-                />
-                <YAxis
-                  allowDecimals={false}
-                  tick={{fontSize: 12, fill: 'var(--muted-foreground)'}}
-                  axisLine={false}
-                  tickLine={false}
-                  width={35}
-                />
-                <Tooltip
-                  content={({active, payload, label}) => {
-                    if (!active || !payload?.length) return null
-                    return (
-                      <div className="rounded-lg border bg-card px-3 py-2 shadow-md">
-                        <p className="text-sm font-medium mb-1">{label}</p>
-                        {payload.map((entry) => (
-                          <p key={entry.name} className="text-xs text-muted-foreground">
-                            <span
-                              className="inline-block w-2 h-2 rounded-full mr-1.5"
-                              style={{backgroundColor: entry.color}}
-                            />
-                            {entry.name}: <span className="font-medium text-foreground">{entry.value}</span>
-                          </p>
-                        ))}
-                      </div>
-                    )
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="sent"
-                  stroke="var(--primary)"
-                  strokeWidth={2}
-                  fill="url(#sentGradient)"
-                  name="Sent"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="failed"
-                  stroke="var(--destructive)"
-                  strokeWidth={2}
-                  fill="transparent"
-                  name="Failed"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="skipped"
-                  stroke="var(--muted-foreground)"
-                  strokeWidth={2}
-                  fill="transparent"
-                  strokeDasharray="4 4"
-                  name="Skipped"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <DeferredChart order={2} height={250}>
+              <ResponsiveContainer width="100%" height={250}>
+                <AreaChart data={overTimeData}>
+                  <defs>
+                    <linearGradient id="sentGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.2} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{fontSize: 11, fill: 'var(--muted-foreground)'}}
+                    axisLine={{stroke: 'var(--border)'}}
+                    tickLine={false}
+                    padding={{left: 10, right: 10}}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{fontSize: 12, fill: 'var(--muted-foreground)'}}
+                    axisLine={false}
+                    tickLine={false}
+                    width={35}
+                  />
+                  <Tooltip
+                    content={({active, payload, label}) => {
+                      if (!active || !payload?.length) return null
+                      return (
+                        <div className="rounded-lg border bg-card px-3 py-2 shadow-md">
+                          <p className="text-sm font-medium mb-1">{label}</p>
+                          {payload.map((entry) => (
+                            <p key={entry.name} className="text-xs text-muted-foreground">
+                              <span
+                                className="inline-block w-2 h-2 rounded-full mr-1.5"
+                                style={{backgroundColor: entry.color}}
+                              />
+                              {entry.name}: <span className="font-medium text-foreground">{entry.value}</span>
+                            </p>
+                          ))}
+                        </div>
+                      )
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sent"
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    fill="url(#sentGradient)"
+                    name="Sent"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="failed"
+                    stroke="var(--destructive)"
+                    strokeWidth={2}
+                    fill="transparent"
+                    name="Failed"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="skipped"
+                    stroke="var(--muted-foreground)"
+                    strokeWidth={2}
+                    fill="transparent"
+                    strokeDasharray="4 4"
+                    name="Skipped"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </DeferredChart>
           )}
         </CardContent>
       </Card>

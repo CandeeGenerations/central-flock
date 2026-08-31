@@ -5,6 +5,24 @@ used across its features. New feature areas add their terms here as they are des
 
 ## Language
 
+### Messaging
+
+**Draft**:
+A message deliberately parked to finish later. Created only by an explicit _Save Draft_, and owns a
+`drafts` row plus its `draft_groups`. A first-class artifact: it appears in the Drafts tab and its
+count badge, the dashboard Drafts stat, the Home **Needs Attention** strip once it is two days old,
+and the command palette. Deleted automatically when its message sends.
+_Avoid_: Autosave, Unsaved message.
+
+**Unsent Message**:
+The compose form's contents, captured while typing so that a reload cannot lose them. Lives only in
+one device's local storage, keyed to the thing being composed — a new message, a **Draft**, or a
+scheduled message — and appears in none of the **Draft** surfaces. Restores silently when you return
+to the same compose context, and is offered once on the Home **Needs Attention** strip after a cold
+launch. Becomes a **Draft** only if you press _Save Draft_. _Discard_ clears it and returns the page to a
+blank new compose, detached from whatever it was editing; the **Draft** behind it is left untouched.
+_Avoid_: Draft, Autosaved draft, Recovery buffer.
+
 ### Devotions
 
 **Devotion Slot**:
@@ -195,6 +213,84 @@ edition's own **Term**, its **Yearly Theme**, and its **Mottos** respectively, s
 go stale when copied forward. `spacer` is a blank gap.
 _Avoid_: Footer Block (that is the nursery/special-music footer), Bullet, Paragraph.
 
+### Sunday School Roll
+
+**Sunday School Roll**:
+One quarter's blank attendance grids for the whole Sunday School — one **Roll Sheet** per
+**Class**, all sharing one derived list of Sundays. A print-only artifact: it leaves the app as
+paper, teachers mark it by hand, and nothing is ever captured back. Lives in the shared
+`schedules` envelope as `schedule_type='sunday_school_roll'`
+(see docs/adr/0006-multi-type-schedule-envelope.md).
+_Avoid_: Attendance (that is the usher-entered in-person count — a number, captured digitally,
+a different feature entirely), Attendance Sheet, Sunday School Schedule.
+
+**Roll Sheet**:
+One printed landscape page of a **Sunday School Roll** — one **Class**, its **Scholars** down the
+left, the Roll's Sundays across the top, ruled to the bottom margin. Five of them per Roll,
+exported as one PDF so the whole quarter is a single printing action.
+_Avoid_: Roll (that is all five together), Page, Tab.
+
+**Class**:
+What one **Roll Sheet** is for — "3 yrs – Kindergarten", "1st-5th girls", "6th-12th boys". Not
+purely an age band: four of the five split by grade _and_ gender. Deliberately **not** a
+configured entity — it is a free-text label on the Roll Sheet, propagated to the next quarter by
+copy-forward rather than by a settings list, so there is nothing to maintain between quarters.
+_Avoid_: Age Group (two of the five are grade+gender), Department, Grade.
+
+**Scholar**:
+One name in the left column of a **Roll Sheet**. Free text, never a **Person** — Sunday School
+children are minors and are deliberately kept out of Contacts. Not a row of its own: the whole
+roster is one newline-separated field on the Roll Sheet, so line index _is_ row index and a blank
+line prints as a deliberate blank row. Owned by the Roll Sheet, not by a **Class**, so the roster
+is a snapshot of that quarter: a scholar who ages out simply is not copied forward, and last
+quarter's Roll still prints them where they were.
+_Avoid_: Student, Pupil, Child, Person (that is a contact), Member.
+
+**Quarter**:
+One of the four calendar quarters a **Sunday School Roll** covers — Jan–Mar, Apr–Jun, Jul–Sep,
+Oct–Dec. A genuine quarter, unlike the Workers' Notes **Term**, which is a four-month third of the
+year; the two sit side by side in the Sunday School area and must not be conflated. The Roll's
+date columns are derived from (year, quarter) at render time and never stored — every Sunday in
+the quarter gets a column, including one where Sunday School does not meet, which the teacher
+strikes through on paper.
+_Avoid_: Term (that is the Workers' Notes third), Period, Session.
+
+### Sunday School Stats
+
+**Sunday School Department**:
+The age band a **Department Count** is recorded against — "2-5yrs", "1st-5th", "6th-12th". A short,
+configured, admin-maintained list that is deliberately _not_ the Roll's **Class**: the Roll has five
+free-text Classes split by grade _and_ gender, while a Department is three age bands with gender as
+a pair of columns inside each. The two lists overlap without agreeing (the Roll's
+"3 yrs - Kindergarten" is the Department "2-5yrs"), and that is fine — they answer different
+questions and have different lifecycles. A Department is configured rather than copy-forward
+precisely because a chart has to hold its series identity across years, where a Roll Sheet's label
+is a per-quarter snapshot that may be retyped at will.
+_Avoid_: Class (that is the free-text label on a **Roll Sheet**), Group, Age Group, Grade.
+
+**Department Count**:
+The girls and boys counted in one **Sunday School Department** on one Sunday — the cell of the
+stats grid, and the only thing this feature stores. Keyed by (Sunday, Department), upserted on
+write. Both numbers are nullable, and blank is not zero: a blank means nobody recorded it, a zero
+means the class met and no one came.
+_Avoid_: Attendance (that is the usher-entered in-person count on a **Service Record** — a different
+capture, a different number, and never shown beside this one), Class Count, Tally (that is the
+attendance app's ±1), Enrollment.
+
+**Sunday School Stats**:
+The whole feature — the weekly grid of **Department Counts** and the charts over them. Data capture
+only: it produces no paper, has no draft/final status, and lives outside the `schedules` envelope,
+so there is nothing to create before a number can be typed. Deliberately holds no relationship to
+the **Sunday School** **Service Time**, whose **Service Records** count the whole room including
+adults and teachers; the two numbers are never displayed together and never reconciled.
+_Avoid_: Sunday School Roll (that is the print-only quarterly form), Sunday School Attendance.
+
+**Diff**:
+The week-over-week change in a **Department**'s total, and in the Sunday's grand total — the column
+the Sunday School director actually reads down. Derived at render time against the previous Sunday
+that has data, never stored.
+_Avoid_: Delta, Trend, Change (bare).
+
 ### Music Schedule
 
 **Music Schedule**:
@@ -316,8 +412,91 @@ One entry against a **Service Record** — either a **Tally** or a **Correction*
 **Recorder** made it and when. A Tally stores both its adjustment and the value that adjustment
 produced, so the log reads as a ledger ("+1 → 42") and one device's contribution stays legible; a
 Correction stores only the value. Every save appends a **Record Edit** (full change log); the
-**Service Record** keeps the latest edit's values and recorder for display.
+**Service Record** keeps the latest edit's values and recorder for display. An edit made in the
+entry app also carries the id that app minted for it, and an id already in the log is a re-send of
+a write that landed rather than a second one — which is what keeps a dropped response from counting
+twice (see docs/adr/0034-attendance-writes-are-idempotent-by-client-id.md).
 _Avoid_: Revision, Log entry.
+
+### Fill America
+
+**Campaign**:
+One bounded church-wide tract-and-door-hanger push, identified by a start date and an end date —
+"Jun 20 - Jul 4, 2026". Roughly four a year since 2022. Its **Campaign Weeks** are derived from the
+range (start, start+7, … through end), never stored as a count, so a four-week campaign needs no
+schema change even though every campaign so far has been three weeks. The title is generated from
+the dates and stays editable.
+_Avoid_: Event (the spreadsheet's word, but this app already uses Event for calendar entries),
+Blitz, Push, Reminder Run (that is the fair booth's queued send, whose glossary entry avoids the
+word "Campaign" precisely because it belongs here).
+
+**Season**:
+Which of the four recurring slots in the year a **Campaign** occupies — Spring (Mar/Apr), Summer
+(Jun/Jul), Fall (Aug/Sep), Winter (Dec). The axis every comparison is made along, because the
+season dominates the result: Fall campaigns average 2,101 tracts and 38 **Unique Participants**
+against Spring's 1,497 and Winter's 25, so a December campaign held up against the August one
+before it shows a decline that is purely calendar. Stored on the Campaign and defaulted from the
+start month rather than derived at read time, so an off-month campaign can be filed correctly
+instead of silently mis-bucketed.
+_Avoid_: Quarter (that is the Sunday School's calendar quarter), Term, Cycle, Round.
+
+**Household**:
+The durable participant unit — "Candees", "Harrisons", "Neil Tellier", "Unknown". A configured list
+reused by every **Campaign**, which is what lets a family's giving be totalled across four years.
+Deliberately **not** linked to a **Person**: the roster is kept by family rather than by individual,
+half the entries have no single contact behind them, and a contact link would drift from the family
+headcount every time someone is added to Contacts. A single adult is a Household of one.
+_Avoid_: Person (that is a contact), Family (a household of one is not a family), Participant (that
+is the counted human, not the row), Team.
+
+**Roster Entry**:
+One **Household**'s participation in one **Campaign** — its **Size** for that campaign and its
+optional **Goal**. Copied forward from the previous Campaign when a new one is created, then edited:
+a household that sat one out is removed, a new one is added. The unit the campaign grid renders as
+a row.
+_Avoid_: Signup (that is the fair booth's), Membership, Enrollment.
+
+**Size**:
+How many people a **Household** contributed to one **Campaign** — the "x 5" that used to live inside
+the spreadsheet's row label. Stored per **Roster Entry**, not on the Household, because families
+grow: the Sells were 3 in 2024 and 4 in 2025, and a 2024 report must still say 3. A Household with
+no explicit size counts as 1.
+_Avoid_: Headcount, Members, Count.
+
+**Campaign Week**:
+One week of a **Campaign**, dated start + 7×(n−1). Holds exactly one typed number — **Door
+Hangers** — and derives the rest.
+_Avoid_: Week (bare), Date, Session.
+
+**Tract Report**:
+The number of tracts one **Household** distributed in one **Campaign Week** — the cell of the
+roster grid, and the only per-household figure captured. Blank means nothing was reported; the
+**Campaign Week**'s tract total is the sum of that week's Tract Reports, never typed.
+_Avoid_: Tracts (bare — that is the derived weekly total), Distribution, Entry.
+
+**Door Hangers**:
+Door hangers distributed in one **Campaign Week**. Typed at the week level and deliberately never
+attributed to a **Household**, unlike a **Tract Report** — the spreadsheet never tracked who hung
+them and nobody has asked to. The church says _packets_ for these; the code says Door Hangers
+throughout, because the spreadsheet's own column does and because a **Campaign** carries a door
+hanger goal that has to sit beside the actual without reading as a second quantity.
+_Avoid_: Packet (the church's spoken word, deliberately not the code's), Hangers, Flyers.
+
+**Door Hanger Goal**:
+A **Campaign**'s target for **Door Hangers**, measured against the door hangers its Campaign Weeks
+record. Distinct from the **Goal** on a **Roster Entry**, which targets tracts: two numbers, two
+units, and they are never added together or shown as one.
+_Avoid_: Goal (bare — the Roster Entry has one), Packet Goal, Target.
+
+**Unique Participants**:
+How many distinct people took part — derived, never stored, at every level. For a **Campaign**, the
+sum of **Size** over every **Roster Entry** with a **Tract Report** greater than zero in any week.
+For a **Campaign Week**, the same sum restricted to households appearing for the _first time_ that
+campaign, so the three weekly figures add up to the campaign figure without double-counting a
+family that goes out all three weeks. A household that went out but reported no tracts is invisible
+to this count — accepted, because the roster is the only evidence there is.
+_Avoid_: Turnout (implies people-weeks), Attendance (that is the usher-entered service count),
+Volunteers, Participants (bare).
 
 ### Social Media
 
@@ -440,6 +619,11 @@ time — never stored.
 - A **Sermon** has at most one **Big Idea**, many **Cited Scriptures**, and optionally one **Series**
 - A **Reflection** may reference only the **Cited Scriptures** of its own **Sermon**
 - A **Social Quote** may be promoted into the **Quote** corpus, citing its **Sermon** as the source
+- A **Draft** is created only by an explicit save; an **Unsent Message** is created only by typing
+- An **Unsent Message** is scoped to one device and one compose context; a **Draft** is server-side
+- An **Unsent Message** captured against a **Draft** holds unsaved edits to it, never a second Draft
+- Sending, explicitly saving, or discarding retires the **Unsent Message** for that context
+- _Discard_ detaches compose from its **Draft**; _Delete_ destroys the **Draft** — never the same act
 - A **Nursery Worker** is exactly one **Person**, plus nursery-specific caps and eligibility
 - A **Nursery Assignment** places one **Nursery Worker** in one slot of one **Service Time** on one date
 - A **Double Booking** is derived from one **Nursery Assignment** and one **Special Music** performance

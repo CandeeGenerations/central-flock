@@ -4,7 +4,7 @@ import {fetchPeople, fetchPerson} from '@/lib/api'
 import {cn} from '@/lib/utils'
 import {useQuery} from '@tanstack/react-query'
 import {ChevronDownIcon, X} from 'lucide-react'
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {useCallback, useRef, useState} from 'react'
 
 interface PersonPickerProps {
   value: number | null
@@ -48,10 +48,6 @@ export function PersonPicker({
       }),
     enabled: open,
   })
-
-  useEffect(() => {
-    if (open) requestAnimationFrame(() => inputRef.current?.focus())
-  }, [open])
 
   const handleOpenChange = useCallback((next: boolean) => {
     setOpen(next)
@@ -105,7 +101,12 @@ export function PersonPicker({
       <PopoverContent
         align="start"
         className="w-(--radix-popover-trigger-width) gap-0 overflow-hidden p-0 relative bg-popover/70 before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150"
-        onOpenAutoFocus={(e) => e.preventDefault()}
+        onOpenAutoFocus={(e) => {
+          // Radix would focus the content wrapper; send focus to the search box instead so typing
+          // works immediately and mobile raises the keyboard.
+          e.preventDefault()
+          inputRef.current?.focus()
+        }}
       >
         <div className="px-2 pt-2 pb-1">
           <input

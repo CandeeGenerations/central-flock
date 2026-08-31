@@ -57,4 +57,18 @@ export const queryKeys = {
   attendanceRecorders: ['attendanceRecorders'] as const,
   attendanceConfig: ['attendanceConfig'] as const,
   attendanceRecordHistory: (recordId: number) => ['attendanceRecordHistory', recordId] as const,
+  sundaySchoolDepartments: (includeInactive: boolean) => ['sundaySchoolDepartments', includeInactive] as const,
+  sundaySchoolYears: ['sundaySchoolYears'] as const,
+  sundaySchoolGrid: (year: number, quarter: number) => ['sundaySchoolGrid', year, quarter] as const,
+  sundaySchoolSeries: (metric: string, departmentId: string, from?: string, to?: string) =>
+    ['sundaySchoolSeries', metric, departmentId, from ?? '', to ?? ''] as const,
+  sundaySchoolSummary: (departmentId: string) => ['sundaySchoolSummary', departmentId] as const,
+  fillAmericaHouseholds: (includeInactive: boolean) => ['fillAmericaHouseholds', includeInactive] as const,
+  fillAmericaCampaigns: ['fillAmericaCampaigns'] as const,
+  fillAmericaCampaign: (id: string | number) => ['fillAmericaCampaign', String(id)] as const,
+  fillAmericaSeries: (metric: string, householdId: string, season: string, from?: string, to?: string) =>
+    ['fillAmericaSeries', metric, householdId, season, from ?? '', to ?? ''] as const,
+  fillAmericaSummary: (householdId: string) => ['fillAmericaSummary', householdId] as const,
+  fillAmericaLeaderboard: (scope: string, season: string, from?: string, to?: string) =>
+    ['fillAmericaLeaderboard', scope, season, from ?? '', to ?? ''] as const,
 }

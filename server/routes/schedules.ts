@@ -93,6 +93,12 @@ interface SchedulesSettings {
     footerImagePath: string | null
     footerPlacement: 'last' | 'every' | 'never'
   }
+  sundaySchoolRoll: {
+    // Leads the printed title on every Roll Sheet. Stays the word "Attendance"
+    // even though the code calls this a Roll: the printed word is what the
+    // teachers read, the code word is what a developer reads. See ADR 0029.
+    titlePrefix: string
+  }
   workersNotes: {
     churchName: string
     // When true, page 1 heads with the shared schedules logo instead of the
@@ -180,6 +186,9 @@ function readSettings(): SchedulesSettings {
       footerPlacement:
         (map.get('schedules.musicSchedule.footerPlacement') as 'last' | 'every' | 'never' | undefined) ?? 'last',
     },
+    sundaySchoolRoll: {
+      titlePrefix: map.get('schedules.sundaySchoolRoll.titlePrefix') ?? 'Attendance',
+    },
     workersNotes: {
       churchName: map.get('schedules.workersNotes.churchName') ?? 'Central Baptist Church',
       useLogoHeader: map.get('schedules.workersNotes.useLogoHeader') === 'true',
@@ -215,6 +224,7 @@ schedulesRouter.put(
       specialMusic: Partial<SchedulesSettings['specialMusic']>
       fairBooth: Partial<SchedulesSettings['fairBooth']>
       musicSchedule: Partial<SchedulesSettings['musicSchedule']>
+      sundaySchoolRoll: Partial<SchedulesSettings['sundaySchoolRoll']>
       workersNotes: Partial<SchedulesSettings['workersNotes']>
     }>
     if (body.nursery?.titlePrefix !== undefined) upsert('schedules.nursery.titlePrefix', body.nursery.titlePrefix)
@@ -269,6 +279,8 @@ schedulesRouter.put(
           .run()
       }
     }
+    if (body.sundaySchoolRoll?.titlePrefix !== undefined)
+      upsert('schedules.sundaySchoolRoll.titlePrefix', body.sundaySchoolRoll.titlePrefix)
     if (body.workersNotes?.churchName !== undefined)
       upsert('schedules.workersNotes.churchName', body.workersNotes.churchName)
     if (body.workersNotes?.useLogoHeader !== undefined)

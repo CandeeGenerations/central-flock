@@ -386,6 +386,10 @@ export function deletePoolPassage(id: number) {
   return request<{success: boolean}>(`/devotions/pool/${id}`, {method: 'DELETE'})
 }
 
+export function clearUnusedPoolPassages() {
+  return request<{deleted: number}>('/devotions/pool/unused', {method: 'DELETE'})
+}
+
 export function setPoolPassageRecorded(id: number, recorded: boolean) {
   return request<PoolPassage>(`/devotions/pool/${id}`, {
     method: 'PUT',

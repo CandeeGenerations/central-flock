@@ -7,7 +7,7 @@ import {type HymnOption, musicScheduleKeys, searchMusicHymns} from '@/lib/music-
 import {type HymnBook, hymnRef, toTitleCase} from '@/lib/music-schedule-core'
 import {useQuery} from '@tanstack/react-query'
 import {Music} from 'lucide-react'
-import {useState} from 'react'
+import {useRef, useState} from 'react'
 
 export interface SongValue {
   hymnId: number | null
@@ -27,6 +27,7 @@ export interface SongValue {
  */
 export function SongButton({value, onChange}: {value: SongValue; onChange: (next: Partial<SongValue>) => void}) {
   const [open, setOpen] = useState(false)
+  const numberRef = useRef<HTMLInputElement>(null)
   const [book, setBook] = useState<HymnBook>(value.hymnBook ?? 'burgundy')
   const [number, setNumber] = useState(value.hymnNumber != null ? String(value.hymnNumber) : '')
   const [search, setSearch] = useState('')
@@ -63,7 +64,18 @@ export function SongButton({value, onChange}: {value: SongValue; onChange: (next
           <span className="truncate">{shown || <span className="text-muted-foreground">Pick a song…</span>}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 space-y-3" align="start">
+      <PopoverContent
+        className="w-80 space-y-3"
+        align="start"
+        // Book + number is the fast path, so opening lands on the number rather
+        // than on the book Select that Radix would focus first. Selected, not
+        // just focused: the next keystroke replaces the number already there.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault()
+          numberRef.current?.focus()
+          numberRef.current?.select()
+        }}
+      >
         <div className="space-y-1.5">
           <Label className="text-xs">Book and number</Label>
           <div className="flex items-center gap-1">
@@ -77,6 +89,7 @@ export function SongButton({value, onChange}: {value: SongValue; onChange: (next
               </SelectContent>
             </Select>
             <Input
+              ref={numberRef}
               className="h-8 w-20 text-xs"
               placeholder="#"
               value={number}

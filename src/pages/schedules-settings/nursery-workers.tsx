@@ -39,7 +39,7 @@ function shortServiceLabel(label: string): string {
 
 const PAGE_SIZE = 25
 
-export function NurseryWorkersPage() {
+export function NurseryWorkersPane() {
   const queryClient = useQueryClient()
   const [formOpen, setFormOpen] = useState(false)
   const [editingWorker, setEditingWorker] = useState<NurseryWorker | null>(null)
@@ -124,11 +124,13 @@ export function NurseryWorkersPage() {
   if (isLoading) return <PageSpinner />
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Nursery Workers</h2>
+        <p className="text-muted-foreground text-sm">
+          Who can be scheduled, which services they cover, and how often they come up.
+        </p>
         <Button onClick={() => setFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Add Worker
         </Button>
       </div>

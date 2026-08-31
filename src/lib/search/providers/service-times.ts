@@ -18,9 +18,9 @@ export const serviceTimesProvider: SearchProvider<ServiceTime> = {
       group: 'Attendance',
       icon: Clock,
       keywords: [st.name, 'service time', 'attendance', DAY_NAMES[st.dayOfWeek]],
-      navPath: '/attendance/times',
+      navPath: '/attendance/settings/times',
       action: ({navigate, close}) => {
-        navigate('/attendance/times')
+        navigate('/attendance/settings/times')
         close()
       },
     })),

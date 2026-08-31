@@ -38,6 +38,43 @@ function coerceCount(v: unknown): number | null | undefined {
   return v
 }
 
+// The entry app mints an id per edit and re-sends it until it hears back, because a wifi handover
+// drops responses as readily as requests and the two are indistinguishable from a phone (ADR-0034).
+// An id we have already logged is therefore a repeat of a write that landed, not a second count.
+function editIdOf(v: unknown): string | null {
+  if (typeof v !== 'string') return null
+  const id = v.trim()
+  return id.length > 0 && id.length <= 200 ? id : null
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+function alreadyApplied(tx: Tx, editId: string | null): boolean {
+  if (!editId) return false
+  return Boolean(
+    tx
+      .select({id: schema.serviceRecordEdits.id})
+      .from(schema.serviceRecordEdits)
+      .where(eq(schema.serviceRecordEdits.clientEditId, editId))
+      .get(),
+  )
+}
+
+// What the record holds right now — the answer to a repeat, since the edit itself is long since
+// folded in and the caller wants the truth, not an echo of its own request.
+function currentValues(
+  tx: Tx,
+  serviceTimeId: number,
+  date: string,
+): {attendance: number | null; streaming: number | null} {
+  const row = tx
+    .select({attendance: schema.serviceRecords.attendance, streaming: schema.serviceRecords.streaming})
+    .from(schema.serviceRecords)
+    .where(and(eq(schema.serviceRecords.serviceTimeId, serviceTimeId), eq(schema.serviceRecords.serviceDate, date)))
+    .get()
+  return {attendance: row?.attendance ?? null, streaming: row?.streaming ?? null}
+}
+
 function loadRecorder(token: string) {
   return db
     .select({id: schema.recorders.id, name: schema.recorders.name, active: schema.recorders.active})
@@ -171,7 +208,9 @@ attendanceWebhookRouter.post(
       field?: unknown
       adjustment?: unknown
       tappedAt?: unknown
+      editId?: unknown
     }
+    const editId = editIdOf(body.editId)
     const serviceTimeId = Number(body.serviceTimeId)
     const date = String(body.date ?? '')
     if (!Number.isInteger(serviceTimeId) || !DATE_RE.test(date)) {
@@ -197,7 +236,7 @@ attendanceWebhookRouter.post(
     }
     // A Tally adjusts one field; a Correction replaces both. See ADR-0027.
     if (body.adjustment !== undefined || body.field !== undefined) {
-      applyTally(res, {recorderId: rec.id, recorderName: rec.name}, serviceTimeId, date, body)
+      applyTally(res, {recorderId: rec.id, recorderName: rec.name}, serviceTimeId, date, body, editId)
       return
     }
 
@@ -214,7 +253,11 @@ attendanceWebhookRouter.post(
       return
     }
 
-    db.transaction((tx) => {
+    const result = db.transaction((tx) => {
+      // A repeat of a Correction is more than a wasted write: replaying it would undo every Tally
+      // another device has landed since it was first applied.
+      if (alreadyApplied(tx, editId)) return {duplicate: true, ...currentValues(tx, serviceTimeId, date)}
+
       const record = tx
         .insert(schema.serviceRecords)
         .values({
@@ -247,11 +290,13 @@ attendanceWebhookRouter.post(
           kind: 'correction',
           attendance: att,
           streaming: strm,
+          clientEditId: editId,
         })
         .run()
+      return {duplicate: false, attendance: att, streaming: strm}
     })
 
-    res.json({serviceTimeId, date, attendance: att, streaming: strm, saved: true})
+    res.json({serviceTimeId, date, ...result, saved: true})
   }),
 )
 
@@ -268,6 +313,7 @@ function applyTally(
   serviceTimeId: number,
   date: string,
   body: {field?: unknown; adjustment?: unknown; tappedAt?: unknown},
+  editId: string | null,
 ): void {
   const field = body.field
   if (field !== 'attendance' && field !== 'streaming') {
@@ -291,6 +337,11 @@ function applyTally(
   }
 
   const result = db.transaction((tx) => {
+    // The same ±1 arriving twice is one tap that was answered twice, or not at all the first time.
+    if (alreadyApplied(tx, editId)) {
+      return {applied: false, duplicate: true, ...currentValues(tx, serviceTimeId, date)}
+    }
+
     const existing = tx
       .select({
         id: schema.serviceRecords.id,
@@ -316,7 +367,7 @@ function applyTally(
         .get()
       // Tapped before the count was last declared: the declaration already accounts for it.
       if (lastCorrection && tappedAt <= lastCorrection.createdAt) {
-        return {applied: false, attendance: existing.attendance, streaming: existing.streaming}
+        return {applied: false, duplicate: false, attendance: existing.attendance, streaming: existing.streaming}
       }
     }
 
@@ -359,10 +410,11 @@ function applyTally(
         kind: 'tally',
         adjustment,
         ...values,
+        clientEditId: editId,
       })
       .run()
 
-    return {applied: true, ...values}
+    return {applied: true, duplicate: false, ...values}
   })
 
   res.json({serviceTimeId, date, ...result, saved: true})

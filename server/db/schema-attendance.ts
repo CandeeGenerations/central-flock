@@ -66,21 +66,32 @@ export const serviceRecords = sqliteTable(
 // kind splits the two ways a count changes (ADR-0027): a 'tally' carries its ±1 in `adjustment`
 // plus the value that adjustment produced, a 'correction' carries only the value it wrote.
 // Pre-existing rows are corrections — snapshots are all the old endpoint could write.
-export const serviceRecordEdits = sqliteTable('service_record_edits', {
-  id: integer('id').primaryKey({autoIncrement: true}),
-  serviceRecordId: integer('service_record_id')
-    .notNull()
-    .references(() => serviceRecords.id, {onDelete: 'cascade'}),
-  recorderId: integer('recorder_id').references(() => recorders.id, {onDelete: 'set null'}),
-  recorderName: text('recorder_name').notNull(),
-  kind: text('kind', {enum: ['tally', 'correction']})
-    .notNull()
-    .default('correction'),
-  /** Signed change for a tally; null for a correction. */
-  adjustment: integer('adjustment'),
-  attendance: integer('attendance'),
-  streaming: integer('streaming'),
-  createdAt: text('created_at')
-    .default(sql`(datetime('now'))`)
-    .notNull(),
-})
+//
+// client_edit_id is the entry app's idempotency key (ADR-0034): the unique index is what makes a
+// re-sent Tally a lookup instead of a second +1, which is the whole defence against a dropped
+// response counting twice. Null for admin edits and for everything written before that app grew
+// keys — SQLite treats NULLs as distinct, so they do not collide.
+export const serviceRecordEdits = sqliteTable(
+  'service_record_edits',
+  {
+    id: integer('id').primaryKey({autoIncrement: true}),
+    serviceRecordId: integer('service_record_id')
+      .notNull()
+      .references(() => serviceRecords.id, {onDelete: 'cascade'}),
+    recorderId: integer('recorder_id').references(() => recorders.id, {onDelete: 'set null'}),
+    recorderName: text('recorder_name').notNull(),
+    kind: text('kind', {enum: ['tally', 'correction']})
+      .notNull()
+      .default('correction'),
+    /** Signed change for a tally; null for a correction. */
+    adjustment: integer('adjustment'),
+    attendance: integer('attendance'),
+    streaming: integer('streaming'),
+    /** Client-minted id for this edit. Null = not written by the entry app. */
+    clientEditId: text('client_edit_id'),
+    createdAt: text('created_at')
+      .default(sql`(datetime('now'))`)
+      .notNull(),
+  },
+  (t) => [uniqueIndex('service_record_edits_client_edit_id_uniq').on(t.clientEditId)],
+)

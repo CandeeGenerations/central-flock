@@ -18,9 +18,9 @@ export const recordersProvider: SearchProvider<Recorder> = {
       group: 'Attendance',
       icon: Contact,
       keywords: [r.name, 'recorder', 'attendance', 'token'],
-      navPath: '/attendance/recorders',
+      navPath: '/attendance/settings/recorders',
       action: ({navigate, close}) => {
-        navigate('/attendance/recorders')
+        navigate('/attendance/settings/recorders')
         close()
       },
     })),

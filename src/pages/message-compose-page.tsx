@@ -16,6 +16,7 @@ import {Separator} from '@/components/ui/separator'
 import {Textarea} from '@/components/ui/textarea'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {useSetToggle} from '@/hooks/use-set-toggle'
+import {useUnsentAutosave} from '@/hooks/use-unsent-message'
 import {
   createDraft,
   deleteDrafts,
@@ -36,10 +37,24 @@ import {formatFullName, renderTemplate} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {addRsvpEntries, checkMissingRsvpEntries, fetchRsvpListContext} from '@/lib/rsvp-api'
 import type {RsvpListContext} from '@/lib/rsvp-api'
+import {clearUnsent, readUnsent, unsentKey} from '@/lib/unsent-message'
 import {cn} from '@/lib/utils'
 import {useMutation, useQueries, useQuery, useQueryClient} from '@tanstack/react-query'
 import {format} from 'date-fns'
-import {CalendarIcon, ChevronDown, ChevronRight, Globe, Save, Send, Trash2, Type, Users, X, Zap} from 'lucide-react'
+import {
+  CalendarIcon,
+  ChevronDown,
+  ChevronRight,
+  Globe,
+  RotateCcw,
+  Save,
+  Send,
+  Trash2,
+  Type,
+  Users,
+  X,
+  Zap,
+} from 'lucide-react'
 import {type ReactNode, useCallback, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -80,6 +95,16 @@ function getDateFormatOptions(date: Date) {
     label: format(date, fmt) + (suffix ?? ''),
     format: fmt,
   }))
+}
+
+function parseIdList(raw: string | null): number[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
 }
 
 export function MessageComposePage() {
@@ -582,6 +607,153 @@ export function MessageComposePage() {
     })
   }
 
+  const getDraftFormData = () => {
+    let templateState: string | null = null
+    if (selectedTemplateId && selectedTemplateId !== 'none') {
+      const dateIsoValues: Record<string, string> = {}
+      for (const [key, date] of Object.entries(dateValues)) {
+        if (date) dateIsoValues[key] = date.toISOString()
+      }
+      templateState = JSON.stringify({
+        templateId: Number(selectedTemplateId),
+        customVarValues,
+        dateValues: dateIsoValues,
+        dateFormats,
+      })
+    }
+    return {
+      content,
+      recipientMode,
+      groupIds: recipientMode === 'group' ? selectedGroupIds : [],
+      selectedIndividualIds: selectedIndividualIds.size > 0 ? JSON.stringify([...selectedIndividualIds]) : null,
+      excludeIds: excludeIds.size > 0 ? JSON.stringify([...excludeIds]) : null,
+      batchSize,
+      batchDelayMs,
+      scheduledAt: scheduledAt || null,
+      templateState,
+      rsvpListId,
+    }
+  }
+
+  // --- Unsent Message (autosave/restore) ---------------------------------
+  // A device-local recovery buffer, NOT a Draft. See docs/adr/0035-unsent-message-device-local.md.
+  type ComposeSnapshot = ReturnType<typeof getDraftFormData>
+
+  const composeKey = unsentKey({draftId: currentDraftId, editMessageId})
+  // Not ready until the server copy has populated the form, or there is no server copy.
+  const composeReady =
+    !!templatesList &&
+    (!currentDraftId || loadedDraftId === currentDraftId) &&
+    (!editMessageId || loadedEditMessageId === Number(editMessageId))
+
+  const applySnapshot = (d: ComposeSnapshot) => {
+    setContent(d.content || '')
+    setRecipientMode(d.recipientMode)
+    setSelectedGroupIds(d.groupIds ?? [])
+    setScheduledAt(d.scheduledAt || '')
+    setSendTimeMode(d.scheduledAt ? 'schedule' : 'now')
+    setRsvpListId(d.rsvpListId ?? null)
+    setExcludeIds(new Set(parseIdList(d.excludeIds)))
+    setSelectedIndividualIds(new Set(parseIdList(d.selectedIndividualIds)))
+    if (d.templateState) {
+      try {
+        const ts = JSON.parse(d.templateState) as {
+          templateId: number
+          customVarValues: Record<string, string>
+          dateValues: Record<string, string>
+          dateFormats: Record<string, string>
+        }
+        setSelectedTemplateId(String(ts.templateId))
+        setCustomVarValues(ts.customVarValues || {})
+        setDateFormats(ts.dateFormats || {})
+        const parsedDates: Record<string, Date | undefined> = {}
+        for (const [key, iso] of Object.entries(ts.dateValues || {})) {
+          if (iso) parsedDates[key] = new Date(iso)
+        }
+        setDateValues(parsedDates)
+        const template = templatesList?.find((t) => t.id === ts.templateId)
+        if (template?.customVariables) {
+          try {
+            setActiveTemplateVars(JSON.parse(template.customVariables))
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    } else {
+      setSelectedTemplateId('')
+      setActiveTemplateVars([])
+      setCustomVarValues({})
+      setDateValues({})
+      setDateFormats({})
+    }
+  }
+
+  const composeSnapshot = getDraftFormData()
+  const [unsentBaseline, setUnsentBaseline] = useState<string | null>(null)
+  const [unsentInitFor, setUnsentInitFor] = useState<string | null>(null)
+  const [restoredAt, setRestoredAt] = useState<number | null>(null)
+
+  // Render-time restore, the same pattern the draft/message population above uses. It has
+  // to run after those have populated the form, or a buffer applied on mount would be
+  // silently overwritten by the server copy a beat later.
+  if (composeReady && unsentInitFor !== composeKey) {
+    setUnsentInitFor(composeKey)
+    const serialized = JSON.stringify(composeSnapshot)
+    setUnsentBaseline(serialized)
+    const stored = readUnsent<ComposeSnapshot>(composeKey)
+    if (stored && JSON.stringify(stored.data) !== serialized) {
+      applySnapshot(stored.data)
+      setRestoredAt(stored.savedAt)
+    } else {
+      if (stored) clearUnsent(composeKey)
+      if (restoredAt !== null) setRestoredAt(null)
+    }
+  }
+
+  useUnsentAutosave<ComposeSnapshot>({
+    key: composeKey,
+    snapshot: composeSnapshot,
+    baseline: unsentBaseline,
+    enabled: composeReady,
+  })
+
+  /** Retires the buffer without touching the form — for a successful send or explicit save. */
+  const retire = () => {
+    clearUnsent(composeKey)
+    setUnsentBaseline(JSON.stringify(getDraftFormData()))
+    setRestoredAt(null)
+  }
+
+  // Discard blanks the form AND detaches from whatever it was editing. Leaving the
+  // draftId bound to an empty form would let the next "Save Draft" wipe the saved draft.
+  const discardUnsent = () => {
+    clearUnsent(composeKey)
+    setUnsentBaseline(null)
+    setUnsentInitFor(null)
+    setRestoredAt(null)
+    setContent('')
+    setRecipientMode('group')
+    setSelectedGroupIds([])
+    setSelectedIndividualIds(new Set())
+    setExcludeIds(new Set())
+    setScheduledAt('')
+    setSendTimeMode('now')
+    setRsvpListId(null)
+    setSelectedTemplateId('')
+    setActiveTemplateVars([])
+    setCustomVarValues({})
+    setDateValues({})
+    setDateFormats({})
+    setMessageTab('edit')
+    setCurrentDraftId(null)
+    setLoadedDraftId(null)
+    setLoadedEditMessageId(null)
+    setSearchParams({}, {replace: true})
+  }
+
   const sendMutation = useMutation({
     mutationFn: () => {
       const cvv = Object.keys(resolvedCustomVarValues).length > 0 ? resolvedCustomVarValues : undefined
@@ -603,6 +775,7 @@ export function MessageComposePage() {
       return sendMessage(payload)
     },
     onSuccess: async (data) => {
+      retire()
       if (isEditMode) {
         queryClient.invalidateQueries({queryKey: queryKeys.messages()})
         queryClient.invalidateQueries({queryKey: queryKeys.message(editMessageId!)})
@@ -636,34 +809,6 @@ export function MessageComposePage() {
     onError: (err: Error) => toast.error(err.message),
   })
 
-  const getDraftFormData = () => {
-    let templateState: string | null = null
-    if (selectedTemplateId && selectedTemplateId !== 'none') {
-      const dateIsoValues: Record<string, string> = {}
-      for (const [key, date] of Object.entries(dateValues)) {
-        if (date) dateIsoValues[key] = date.toISOString()
-      }
-      templateState = JSON.stringify({
-        templateId: Number(selectedTemplateId),
-        customVarValues,
-        dateValues: dateIsoValues,
-        dateFormats,
-      })
-    }
-    return {
-      content,
-      recipientMode,
-      groupIds: recipientMode === 'group' ? selectedGroupIds : [],
-      selectedIndividualIds: selectedIndividualIds.size > 0 ? JSON.stringify([...selectedIndividualIds]) : null,
-      excludeIds: excludeIds.size > 0 ? JSON.stringify([...excludeIds]) : null,
-      batchSize,
-      batchDelayMs,
-      scheduledAt: scheduledAt || null,
-      templateState,
-      rsvpListId,
-    }
-  }
-
   const saveDraftMutation = useMutation({
     mutationFn: async () => {
       const data = getDraftFormData()
@@ -673,6 +818,7 @@ export function MessageComposePage() {
       return createDraft(data)
     },
     onSuccess: (draft) => {
+      retire()
       if (!currentDraftId) {
         setCurrentDraftId(draft.id)
         setSearchParams({draftId: String(draft.id)}, {replace: true})
@@ -725,6 +871,20 @@ export function MessageComposePage() {
       <div className="flex gap-8">
         {/* Left: Form */}
         <div className="flex-1 min-w-0 space-y-4 max-w-3xl">
+          {/* Restored Unsent Message. Persistent, not a toast: a toast evaporates before
+              you can act on it, leaving no way to clear the buffer later. */}
+          {restoredAt !== null && (
+            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+              <RotateCcw className="h-4 w-4 shrink-0 text-primary" />
+              <span className="min-w-0 flex-1">
+                Restored unsaved changes from {format(new Date(restoredAt), 'EEE h:mm a')}
+              </span>
+              <Button variant="ghost" size="sm" className="shrink-0" onClick={discardUnsent}>
+                {currentDraftId || isEditMode ? 'Discard' : 'Clear'}
+              </Button>
+            </div>
+          )}
+
           {/* === TO Section === */}
           <Card>
             <CardHeader>

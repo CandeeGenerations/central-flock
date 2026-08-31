@@ -15,9 +15,10 @@ export const MUSIC_LEFT_COL_MIN_PX = 84
 export const MUSIC_COL_GAP_PX = 12
 
 // The Sound Booth Sheet's label column. One shared width across every block on
-// the sheet; the value column takes the rest of the page. Held at ~41% of the
-// content width, so it keeps the paper's proportions on the wider margins.
-export const BOOTH_LABEL_COL_PX = 260
+// the sheet; the value column takes the rest of the page. Close to its floor:
+// the longest service heading, "WEDNESDAY EVENING:", measures ~218px here with
+// its cell padding, and below that the heading wraps onto two lines.
+export const BOOTH_LABEL_COL_PX = 230
 export const BOOTH_COL_GAP_PX = 22
 
 // Every cell carries the same padding so a highlight band has air around its

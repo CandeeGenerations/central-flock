@@ -2,6 +2,8 @@ import {PAGE_WIDTH_PX, PrintPage} from '@/components/print/page-frame'
 import {ScaledPage, type ZoomMode} from '@/components/print/scaled-page'
 import {
   SCHEDULE_CONTENT_HEIGHT_PX,
+  SCHEDULE_FOOTER_GAP_PX,
+  SCHEDULE_HEADER_GAP_PX,
   SCHEDULE_LOGO_MAX_PX,
   SCHEDULE_PAGE_PADDING_PX,
   SCHEDULE_SUBTITLE_BAND_PX,
@@ -116,7 +118,7 @@ export function SchedulePreviewFrame({
 
   const page = (forExport: boolean) => (
     <>
-      <div data-region="header" style={{marginBottom: 24, textAlign: 'center'}}>
+      <div data-region="header" style={{marginBottom: SCHEDULE_HEADER_GAP_PX, textAlign: 'center'}}>
         {logoPath ? (
           <img
             src={logoPath}
@@ -145,7 +147,7 @@ export function SchedulePreviewFrame({
       <div data-region="body">{children(forExport)}</div>
 
       {footerBlocks && footerBlocks.length > 0 ? (
-        <div data-region="footer" style={{marginTop: 24}}>
+        <div data-region="footer" style={{marginTop: SCHEDULE_FOOTER_GAP_PX}}>
           {footerBlocks.map((b, i) => {
             if (b.kind === 'spacer') return <div key={i} style={{height: 8}} />
             if (b.kind === 'quote')

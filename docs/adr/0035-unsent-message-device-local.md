@@ -9,7 +9,7 @@ mode, group ids via `draft_groups`, individual ids, excludes, batch settings, `s
 `templateState`, `rsvpListId`), and `createDraft`/`updateDraft` are already wired into the page.
 
 The obvious fix is wrong. A **Draft** in this app is a deliberate artifact, minted only by pressing
-*Save Draft*, and it is loud: it appears in the Drafts tab and its count badge, the dashboard
+_Save Draft_, and it is loud: it appears in the Drafts tab and its count badge, the dashboard
 Drafts stat card, the Home **Needs Attention** strip once two days old, and the command palette.
 Autosaving into that table means every abandoned half-sentence becomes a permanent row nagging you
 from four places.
@@ -18,7 +18,7 @@ from four places.
 
 **Autosave writes an `Unsent Message` — a separate concept — to `localStorage`, never to the
 server.** It appears in none of the four Draft surfaces. It becomes a Draft only if the user
-presses *Save Draft*. See `CONTEXT.md` for both terms.
+presses _Save Draft_. See `CONTEXT.md` for both terms.
 
 **It is keyed per compose context** — `:new`, `:draft:<id>`, `:msg:<id>` — so it is only ever
 restored where it was captured, and the restore notice can say "unsaved changes to this draft"
@@ -32,7 +32,7 @@ the buffer later.
 `/messages/compose`. The server copy is untouched.
 
 **It is written from a ref via `setTimeout`, never React state**, plus a synchronous flush on
-`pagehide` / `visibilitychange`. It is retired on send, on *Save Draft*, on *Discard*, or after
+`pagehide` / `visibilitychange`. It is retired on send, on _Save Draft_, on _Discard_, or after
 7 days.
 
 ## Why
@@ -50,7 +50,7 @@ the buffer later.
     starting on the phone and finishing on the Mac. Rejected because the flag has to be threaded
     through five read paths to stay hidden, an autosave `PUT` at keystroke frequency races the
     explicit save against the same row, and it fails exactly when a phone most needs it — offline
-    or on a weak signal. Cross-device handoff is served by pressing *Save Draft*, which is a
+    or on a weak signal. Cross-device handoff is served by pressing _Save Draft_, which is a
     deliberate act; recovery is not handoff.
   - **A single unkeyed buffer.** Simplest, but it cannot tell whether its contents belong to the
     compose page currently open, so it must either offer Draft #5's text inside a blank compose or
@@ -72,7 +72,7 @@ the buffer later.
 - **Discard and Delete must stay visually and verbally distinct.** Discard walks away from a Draft;
   Delete destroys one. Discard deliberately does not sit in the bottom action bar next to Delete.
 - **Discard must strip the query params, not just clear the fields.** A blank form still bound to
-  `?draftId=5` overwrites Draft #5 with an empty message on the next *Save Draft*.
+  `?draftId=5` overwrites Draft #5 with an empty message on the next _Save Draft_.
 - **Orphaned keys accumulate** for drafts deleted elsewhere; the 7-day TTL is what bounds them.
 - **Restore must sequence after the server draft loads.** `message-compose-page.tsx` populates the
   form from `draftData` at render time once the query resolves; a buffer applied on mount is

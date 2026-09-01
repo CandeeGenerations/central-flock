@@ -31,7 +31,7 @@ route. Instead of hijacking the launch, the Home **Needs Attention** strip gains
 ## Why
 
 - **Surprising without context.** The glaring question a future reader asks about a PWA reloading
-  on every app switch is *"why is there no service worker?"* Without this note, adding one looks
+  on every app switch is _"why is there no service worker?"_ Without this note, adding one looks
   like free money.
 
 - **Real trade-off — alternatives rejected.**
@@ -61,7 +61,7 @@ route. Instead of hijacking the launch, the Home **Needs Attention** strip gains
   route (Messages, People, Groups) out of the main chunk regresses the common path and should not
   be done without re-reading this.
 - **Reintroducing a service worker invalidates the reasoning above**, not just the file. The
-  splitting boundary was chosen *because* there is no cache to fall back on.
+  splitting boundary was chosen _because_ there is no cache to fall back on.
 - **The Home "Unsent message" segment is client-side**, unlike every other `NeedsAttention` segment,
   which comes from the server `HomeAttention` payload. It cannot be computed server-side — the
   buffer only exists on the device.

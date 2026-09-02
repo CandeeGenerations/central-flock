@@ -10,7 +10,7 @@ jobs:
       version: ${{ steps.bump_script.outputs.version }}
       branch: ${{ steps.bump_script.outputs.branch }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [bump_commit]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           token: ${{ github.token }}
           ref: ${{ needs.bump_commit.outputs.branch }}

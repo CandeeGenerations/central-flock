@@ -131,16 +131,28 @@ export function MusicServiceEditorPage() {
   const [showOverrides, setShowOverrides] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
 
-  // The server copy the drafts below were seeded from. React Query hands back
-  // the same object while the data is unchanged, so this stays put through a
-  // refetch and only moves when a real save lands.
+  // The server copy the drafts below were seeded from — the baseline the drafts
+  // are compared against, moved only by a save. Deliberately not the live query
+  // data: a refetch carrying an unrelated header edit would otherwise redefine
+  // "unchanged" underneath the drafts.
   const [seededFrom, setSeededFrom] = useState<MusicService | undefined>(undefined)
 
-  // Re-sync the draft when the server copy changes (after a save invalidates
-  // and refetches) — the same pattern the settings panes use.
+  // Whether the drafts held unsaved work as of the last commit. The re-seed
+  // below runs off a query update rather than a render of its own, so it has to
+  // ask this question about the render before that update landed.
+  const draftsDirty = useRef(false)
+  const seededServiceId = useRef<number | null>(null)
+
+  // Take the server copy on arrival and whenever the editor switches services.
+  // After that, only re-seed when the drafts have nothing to lose. Every write
+  // on this page invalidates the week, and the refetch that follows used to land
+  // on top of whatever had been typed since and silently revert it — one header
+  // PATCH, or one earlier Save, was enough to roll a Service Order back to what
+  // the server already had, leaving only the songs entered after the last one.
   useEffect(() => {
     if (!service) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (seededServiceId.current === service.id && draftsDirty.current) return
+    seededServiceId.current = service.id
     setSeededFrom(service)
     setLines(service.lines.map((l, i) => ({...l, tempKey: `l-${l.id}-${i}`})))
     setBooth(service.boothLines.map((b) => ({slot: b.slot, text: b.text, highlight: b.highlight, stale: b.stale})))
@@ -162,7 +174,11 @@ export function MusicServiceEditorPage() {
 
   const saveLines = useMutation({
     mutationFn: () => saveMusicLines(weekId, svcId, lines.map(toInput)),
-    onSuccess: () => {
+    onSuccess: (r) => {
+      // Move the baseline to what the server just stored, rather than waiting
+      // for the refetch — anything typed while the save was in flight stays
+      // dirty and saves on the next press instead of being counted as saved.
+      setSeededFrom((prev) => (prev ? {...prev, lines: r.lines} : prev))
       queryClient.invalidateQueries({queryKey: musicScheduleKeys.detail(weekId)})
       toast.success('Service saved')
     },
@@ -176,7 +192,8 @@ export function MusicServiceEditorPage() {
         svcId,
         booth.map(({slot, text, highlight}) => ({slot, text, highlight})),
       ),
-    onSuccess: () => {
+    onSuccess: (r) => {
+      setSeededFrom((prev) => (prev ? {...prev, boothLines: r.boothLines} : prev))
       queryClient.invalidateQueries({queryKey: musicScheduleKeys.detail(weekId)})
       toast.success('Sound Booth lines saved')
     },
@@ -197,17 +214,26 @@ export function MusicServiceEditorPage() {
 
   // The Service Order and the Sound Booth lines live in local state until their
   // Save button is pressed, so leaving the page drops them. Compare the drafts
-  // against the server copy they were seeded from — only while they HAVE been
-  // seeded from it, else the first render (drafts still empty) reads as edited.
-  const seeded = seededFrom === service
-  const linesDirty =
-    seeded && !!service && JSON.stringify(lines.map(toInput)) !== JSON.stringify(service.lines.map(toInput))
+  // against the baseline they were seeded from — only while they HAVE been
+  // seeded from this service, else the first render (drafts still empty) reads
+  // as edited.
+  const seeded = !!seededFrom && seededFrom.id === svcId
+  const linesDirty = seeded && JSON.stringify(lines.map(toInput)) !== JSON.stringify(seededFrom.lines.map(toInput))
   const boothDirty =
-    seeded &&
-    !!service &&
-    JSON.stringify(booth.map(toBoothInput)) !== JSON.stringify(service.boothLines.map(toBoothInput))
-  const blocker = useUnsavedChanges(linesDirty || boothDirty)
+    seeded && JSON.stringify(booth.map(toBoothInput)) !== JSON.stringify(seededFrom.boothLines.map(toBoothInput))
+  const dirty = linesDirty || boothDirty
+  const blocker = useUnsavedChanges(dirty)
+  const saving = saveLines.isPending || saveBooth.isPending
 
+  // Mirror for the re-seed guard above. Declared after it so that when a query
+  // update and an edit land in the same commit, the guard still reads the
+  // answer from before the update.
+  useEffect(() => {
+    draftsDirty.current = dirty
+  }, [dirty])
+
+  // One press covers the whole page: the Service Order and the Sound Booth
+  // lines are the only two things here that aren't already written on blur.
   const saveEverything = async () => {
     if (linesDirty) await saveLines.mutateAsync()
     if (boothDirty) await saveBooth.mutateAsync()
@@ -259,7 +285,24 @@ export function MusicServiceEditorPage() {
               </Button>
             </Tip>
           ) : null}
-          <Button size="sm" onClick={() => saveLines.mutate()} disabled={saveLines.isPending}>
+          <span
+            className={
+              dirty ? 'self-center text-xs font-medium text-amber-600' : 'text-muted-foreground self-center text-xs'
+            }
+          >
+            {saving ? 'Saving…' : dirty ? 'Unsaved changes' : 'All changes saved'}
+          </span>
+          <Button
+            size="sm"
+            onClick={() => {
+              if (!dirty) {
+                toast.success('Everything on this page is already saved')
+                return
+              }
+              void saveEverything()
+            }}
+            disabled={saving}
+          >
             Save service
           </Button>
         </div>

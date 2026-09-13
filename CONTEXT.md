@@ -41,6 +41,83 @@ Exchanging the **Devotion Content** of two devotions while each keeps its **Devo
 are left pointing at the number/box and are only warned about, not rewritten.
 _Avoid_: Reorder, Reschedule (those move the slot, not the content).
 
+**Gwendolyn Devotional**:
+A short devotional Gwendolyn writes and texts in — a title, a date, and an ordered run of 📚
+points and **Scripture Blocks** — which the church produces into a reel. Her own work, in her own
+voice: nothing in the app rewrites her points. Unrelated to a numbered **Devotion**.
+_Avoid_: Devotion (that is the numbered daily video), Devotional (bare).
+
+**Original**:
+Gwendolyn's text exactly as she sent it, pasted in once and never altered afterwards — the receipt
+that edits and fixes are measured against. Editing a **Gwendolyn Devotional** changes its blocks,
+never its Original.
+_Avoid_: Raw input (the column's name, not the idea), Source.
+
+**Correction Note**:
+A suggested text to Gwendolyn listing how the published **Scripture Blocks** differ from her
+**Original** — a moved reference, a corrected word. Derived by comparing the two, never stored, and
+never sent by the app: it is offered for copying, and what to tell her is left to whoever talks to
+her. _Reference Format_ changes are left out as not worth mentioning.
+_Avoid_: Notification, Feedback, Message (means an SMS the app sends).
+
+**Scripture Block**:
+One 📖 block of a **Gwendolyn Devotional** — a quotation and the reference it claims to come from.
+Gwendolyn quotes selectively, eliding with `…`, so a Scripture Block is usually a string of
+**Fragments** rather than a whole verse.
+_Avoid_: Verse (a block often spans several, or part of one), Passage (means a generated devotion
+passage).
+
+**Fragment**:
+One run of a **Scripture Block**'s quotation between ellipses. The unit a **Scripture Check**
+locates — each Fragment must appear, word for word, in the **Bible Text** of the cited range; the
+gaps between Fragments are Gwendolyn's elision and are never a fault. Their order is not checked. A
+wording fix corrects only the differing words inside a Fragment — it never widens, trims, or merges
+Fragments, because what she chose to quote is hers.
+
+**Scripture Check**:
+The proofread every **Scripture Block** gets when a **Gwendolyn Devotional** is parsed or edited —
+does the reference exist, and does every **Fragment** appear in it word for word? Scripture Blocks
+only: points and the title are never checked. It reports every **Finding** a block has at once,
+worst first; a block with no open Finding _Matches_. It flags everything, including a single-word
+difference, and blocks nothing: saving with an open Finding asks for confirmation instead of
+refusing. The **Bible Text** decides; the AI is consulted only when that lookup cannot place a
+Fragment, and what it proposes is looked up in the Bible Text before it is offered — an AI
+suggestion the Bible Text cannot confirm is shown as a labelled guess with no one-click fix.
+When it searches for where a block really comes from, a location must contain every **Fragment** to
+be offered as a one-click fix; if several do, all are listed with their text for a person to choose
+— it never picks among ties. Fragments under about four words are too common to search by, though
+they must still appear in whichever verse is chosen.
+Findings are recomputed every time, never stored, because the Bible Text never changes.
+_Avoid_: Validation (implies blocking), Spot check, Fact check (points are out of scope).
+
+**Finding**:
+One problem a **Scripture Check** reports on a **Scripture Block**, most severe first: _Missing
+Reference_ (none given — the Bible Text is searched for one), _Invalid Reference_ (no such verse),
+_Wrong Reference_ (the words are found elsewhere), _Out of Range_ (partly just outside the cited
+verses), _Wording Differs_, _Not Found_, and _Reference Format_ (right verse, written
+non-canonically — the canonical form is the full AKJV book name, `Chapter:Verse`, a hyphen for
+ranges, and "Psalm" for one psalm). A block can carry several at once — "Isa. 41:9" quoting 41:10
+with a changed word is Wrong Reference, Wording Differs, and Reference Format together — and each
+has its own fix and its own **Dismissal**.
+_Avoid_: Verdict (a block has several Findings, not one verdict), Error, Warning.
+
+**Dismissal**:
+A person's decision that one **Finding** is fine as written — "that's how she meant it." The only
+part of a **Scripture Check** that is stored. Bound to exactly what its Finding is about: a wording
+Finding to the quotation and the verses it was checked against, a reference Finding to the
+reference as written. Editing that retires it and the Finding returns; editing the other side
+leaves it standing, so fixing "Isa." to "Isaiah" does not revive a dismissed paraphrase. A
+dismissed Finding shows as dismissed, never as _Matches_.
+_Avoid_: Override, Ignore, Approval (that is the devotional's status).
+
+### Scripture
+
+**Bible Text**:
+The app's own copy of the **AKJV**, held locally and looked up in code — the ground truth any
+feature checks scripture against. Shared across features rather than owned by devotions. Matching
+against it ignores case, punctuation, and British/American spelling (honour/honor).
+_Avoid_: Bible API, KJV (the church's version is the **AKJV**).
+
 ### Fair Booth
 
 **Slot**:
@@ -637,6 +714,13 @@ time — never stored.
 - One export produces zero or more **Master Copies** followed by one **Recipient Copy** per selected
   person, household, or **Guest Performer**
 - The members of one household share a single **Recipient Copy**
+- A **Gwendolyn Devotional** has one **Original** and many **Scripture Blocks**; each Scripture
+  Block has one or more **Fragments**
+- A **Scripture Block** has zero or more **Findings**, derived from the **Bible Text**, never stored
+- A **Dismissal** belongs to exactly one **Finding** and is retired by an edit to what that Finding
+  is about
+- A **Correction Note** is derived from a **Gwendolyn Devotional**'s **Original** and its current
+  **Scripture Blocks**
 
 ## Example dialogue
 
@@ -692,3 +776,7 @@ wednesday_evening` enum, special music's `sunday_am|sunday_pm|wednesday_pm|other
   always a **Person**. Note the two names need not match: worker "Yuny Mejia" is contact "Juni
   Salgado", which is why the name override exists and why matching on name string was rejected
   (there are eight Kims in `people`).
+- "KJV" and "AKJV" are both used for the church's Bible — the **Reflection** prompt says AKJV, the
+  devotion-passage generator says KJV. Resolved: the church's version is the **AKJV**, and the
+  **Bible Text** holds it. The two differ in little more than spelling, which the Scripture Check
+  ignores anyway; the generator's prompt wording is the stray.

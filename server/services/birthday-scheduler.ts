@@ -2,39 +2,37 @@ import * as Sentry from '@sentry/node'
 import {and, eq, sql} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
-import {getSetting} from '../routes/settings.js'
+import {getSetting, setSetting} from '../routes/settings.js'
 import {sendMessageViaUI} from './applescript.js'
 import {sendNotifyMeText} from './notify-me.js'
+import {
+  type DigestItem,
+  type Occasion,
+  type OccasionKind,
+  collectOccasions,
+  formatDigest,
+  formatDigestLine,
+  formatPersonName,
+  ordinal,
+  startOfDay,
+} from './occasion-digest.js'
+
+type SentType = (typeof schema.birthdayMessagesSent.$inferInsert)['type']
+
+// Date (YYYY-MM-DD) of the last Sunday "this week" list, so a re-run that day doesn't resend it.
+const WEEKLY_DIGEST_SENT_KEY = 'birthdayWeeklyDigestSentOn'
+const PRE_NOTIFY_OPTIONS = [3, 7, 10]
 
 let timeoutId: ReturnType<typeof setTimeout> | null = null
 
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] || s[v] || s[0])
-}
-
-function daysUntilBirthday(birthMonth: number, birthDay: number, todayMonth: number, todayDay: number): number {
-  const thisYear = new Date().getFullYear()
-  let birthday = new Date(thisYear, birthMonth - 1, birthDay)
-  const today = new Date(thisYear, todayMonth - 1, todayDay)
-
-  if (birthday < today) {
-    birthday = new Date(thisYear + 1, birthMonth - 1, birthDay)
-  }
-
-  const diff = birthday.getTime() - today.getTime()
-  return Math.round(diff / (1000 * 60 * 60 * 24))
-}
-
-function wasSent(personId: number, type: string, year: number): boolean {
+function wasSent(personId: number, type: SentType, year: number): boolean {
   const row = db
     .select()
     .from(schema.birthdayMessagesSent)
     .where(
       and(
         eq(schema.birthdayMessagesSent.personId, personId),
-        eq(schema.birthdayMessagesSent.type, type as 'birthday' | 'pre_3' | 'pre_7' | 'pre_10'),
+        eq(schema.birthdayMessagesSent.type, type),
         eq(schema.birthdayMessagesSent.year, year),
       ),
     )
@@ -42,18 +40,8 @@ function wasSent(personId: number, type: string, year: number): boolean {
   return !!row
 }
 
-function recordSent(personId: number, type: string, year: number) {
-  db.insert(schema.birthdayMessagesSent)
-    .values({
-      personId,
-      type: type as 'birthday' | 'pre_3' | 'pre_7' | 'pre_10',
-      year,
-    })
-    .run()
-}
-
-function formatPersonName(person: {firstName: string | null; lastName: string | null}): string {
-  return [person.firstName, person.lastName].filter(Boolean).join(' ') || 'Someone'
+function recordSent(personId: number, type: SentType, year: number) {
+  db.insert(schema.birthdayMessagesSent).values({personId, type, year}).run()
 }
 
 function recordMessageInHistory(personId: number, content: string) {
@@ -82,136 +70,102 @@ function recordMessageInHistory(personId: number, content: string) {
     .run()
 }
 
-export async function checkBirthdays() {
-  const preNotifyDays = getSetting('birthdayPreNotifyDays')
-  const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',').map((d) => Number(d.trim())) : [])
-
-  const now = new Date()
-  const todayMonth = now.getMonth() + 1
-  const todayDay = now.getDate()
-  const currentYear = now.getFullYear()
-
-  const allPeople = db.select().from(schema.people).all()
-  const birthdayPeople = allPeople.filter((p) => p.birthMonth != null && p.birthDay != null)
-
-  for (const person of birthdayPeople) {
-    const bMonth = person.birthMonth!
-    const bDay = person.birthDay!
-    const days = daysUntilBirthday(bMonth, bDay, todayMonth, todayDay)
-    const name = formatPersonName(person)
-
-    // Check pre-notifications (via notify-me webhook)
-    for (const n of [3, 7, 10]) {
-      if (!preNotifySet.has(n)) continue
-      if (days !== n) continue
-
-      const type = `pre_${n}` as const
-      if (wasSent(person.id, type, currentYear)) continue
-
-      const message = `Reminder - ${n} days till ${name}'s birthday!`
-
-      try {
-        await sendNotifyMeText(message)
-        recordSent(person.id, type, currentYear)
-        recordMessageInHistory(person.id, message)
-        console.log(`Birthday scheduler: sent ${type} reminder for ${name} via notify-me`)
-      } catch (error) {
-        console.error(`Birthday scheduler: failed to send ${type} for ${name}:`, error)
-      }
-    }
-
-    // Check birthday itself (days === 0 means today)
-    if (days === 0 || (bMonth === todayMonth && bDay === todayDay)) {
-      if (wasSent(person.id, 'birthday', currentYear)) continue
-
-      if (!person.phoneNumber) {
-        console.log(`Birthday scheduler: no phone number for ${name}, skipping`)
-        continue
-      }
-
-      let ageStr = ''
-      if (person.birthYear) {
-        const age = currentYear - person.birthYear
-        if (age > 0) ageStr = ` ${ordinal(age)}`
-      }
-
-      const message = `Happy${ageStr} birthday to you!`
-      try {
-        await sendMessageViaUI(person.phoneNumber, message)
-        recordSent(person.id, 'birthday', currentYear)
-        recordMessageInHistory(person.id, message)
-        console.log(`Birthday scheduler: sent birthday message to ${name}`)
-      } catch (error) {
-        console.error(`Birthday scheduler: failed to send birthday message to ${name}:`, error)
-      }
-    }
-  }
+function parsePreNotifyDays(key: string): Set<number> {
+  const value = getSetting(key)
+  return new Set(value ? value.split(',').map((d) => Number(d.trim())) : [])
 }
 
-export async function checkAnniversaries() {
-  const preNotifyDays = getSetting('anniversaryPreNotifyDays')
-  const preNotifySet = new Set(preNotifyDays ? preNotifyDays.split(',').map((d) => Number(d.trim())) : [])
+function preNotifyType(kind: OccasionKind, days: number): SentType {
+  return (kind === 'birthday' ? `pre_${days}` : `anniversary_pre_${days}`) as SentType
+}
 
-  const now = new Date()
-  const todayMonth = now.getMonth() + 1
-  const todayDay = now.getDate()
-  const currentYear = now.getFullYear()
+function greeting(occasion: Occasion): string {
+  const milestone = occasion.milestone ? ` ${ordinal(occasion.milestone)}` : ''
+  return occasion.kind === 'birthday' ? `Happy${milestone} birthday to you!` : `Happy${milestone} anniversary!`
+}
 
-  const allPeople = db.select().from(schema.people).all()
-  const anniversaryPeople = allPeople.filter((p) => p.anniversaryMonth != null && p.anniversaryDay != null)
+function toDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
-  for (const person of anniversaryPeople) {
-    const aMonth = person.anniversaryMonth!
-    const aDay = person.anniversaryDay!
-    const days = daysUntilBirthday(aMonth, aDay, todayMonth, todayDay)
-    const name = formatPersonName(person)
+/**
+ * Daily run: text each person on their birthday/anniversary, then send me ONE text covering
+ * everything I need to know today — pre-notifications, day-of occasions that couldn't be
+ * auto-texted (no phone number, or the send failed), and on Sundays the full Sun–Sat list.
+ */
+export async function checkOccasions(now = new Date()) {
+  const today = startOfDay(now)
+  const year = today.getFullYear()
+  const todayKey = toDateKey(today)
+  const sendWeekly = today.getDay() === 0 && getSetting(WEEKLY_DIGEST_SENT_KEY) !== todayKey
+  const preNotifyDays: Record<OccasionKind, Set<number>> = {
+    birthday: parsePreNotifyDays('birthdayPreNotifyDays'),
+    anniversary: parsePreNotifyDays('anniversaryPreNotifyDays'),
+  }
 
-    // Check pre-notifications (via notify-me webhook)
-    for (const n of [3, 7, 10]) {
-      if (!preNotifySet.has(n)) continue
-      if (days !== n) continue
+  const people = db.select().from(schema.people).all()
+  const occasions = collectOccasions(people, today, Math.max(...PRE_NOTIFY_OPTIONS))
 
-      const type = `anniversary_pre_${n}`
-      if (wasSent(person.id, type, currentYear)) continue
+  // Day-of: text the person directly. Anything I have to handle myself gets a note for my digest.
+  const dayOfNotes = new Map<Occasion, string>()
+  const recordAfterDigest: {occasion: Occasion; type: SentType}[] = []
+  for (const occasion of occasions) {
+    if (occasion.daysUntil !== 0 || wasSent(occasion.person.id, occasion.kind, year)) continue
+    const name = formatPersonName(occasion.person)
 
-      const message = `Reminder - ${n} days till ${name}'s anniversary!`
-
-      try {
-        await sendNotifyMeText(message)
-        recordSent(person.id, type, currentYear)
-        recordMessageInHistory(person.id, message)
-        console.log(`Anniversary scheduler: sent ${type} reminder for ${name} via notify-me`)
-      } catch (error) {
-        console.error(`Anniversary scheduler: failed to send ${type} for ${name}:`, error)
-      }
+    if (!occasion.person.phoneNumber) {
+      dayOfNotes.set(occasion, 'no phone #, not texted')
+      recordAfterDigest.push({occasion, type: occasion.kind})
+      continue
     }
 
-    // Check anniversary itself
-    if (days === 0 || (aMonth === todayMonth && aDay === todayDay)) {
-      if (wasSent(person.id, 'anniversary', currentYear)) continue
-
-      if (!person.phoneNumber) {
-        console.log(`Anniversary scheduler: no phone number for ${name}, skipping`)
-        continue
-      }
-
-      let yearStr = ''
-      if (person.anniversaryYear) {
-        const years = currentYear - person.anniversaryYear
-        if (years > 0) yearStr = ` ${ordinal(years)}`
-      }
-
-      const message = `Happy${yearStr} anniversary!`
-      try {
-        await sendMessageViaUI(person.phoneNumber, message)
-        recordSent(person.id, 'anniversary', currentYear)
-        recordMessageInHistory(person.id, message)
-        console.log(`Anniversary scheduler: sent anniversary message to ${name}`)
-      } catch (error) {
-        console.error(`Anniversary scheduler: failed to send anniversary message to ${name}:`, error)
-      }
+    const message = greeting(occasion)
+    try {
+      await sendMessageViaUI(occasion.person.phoneNumber, message)
+      recordSent(occasion.person.id, occasion.kind, year)
+      recordMessageInHistory(occasion.person.id, message)
+      console.log(`Birthday scheduler: sent ${occasion.kind} message to ${name}`)
+    } catch (error) {
+      // Not recorded as sent, so a manual re-run retries the text.
+      console.error(`Birthday scheduler: failed to send ${occasion.kind} message to ${name}:`, error)
+      Sentry.captureException(error, {tags: {source: 'birthday-scheduler'}})
+      dayOfNotes.set(occasion, 'auto-text failed')
     }
   }
+
+  const noteFor = (occasion: Occasion) =>
+    dayOfNotes.get(occasion) ?? (occasion.person.phoneNumber ? undefined : 'no phone #')
+
+  let reminders: DigestItem[] = []
+  for (const occasion of occasions) {
+    if (occasion.daysUntil === 0) {
+      if (dayOfNotes.has(occasion)) reminders.push({occasion, note: dayOfNotes.get(occasion)})
+      continue
+    }
+    if (!preNotifyDays[occasion.kind].has(occasion.daysUntil)) continue
+    const type = preNotifyType(occasion.kind, occasion.daysUntil)
+    if (wasSent(occasion.person.id, type, year)) continue
+    reminders.push({occasion, note: noteFor(occasion)})
+    recordAfterDigest.push({occasion, type})
+  }
+
+  let week: DigestItem[] | null = null
+  if (sendWeekly) {
+    week = occasions.filter((o) => o.daysUntil <= 6).map((occasion) => ({occasion, note: noteFor(occasion)}))
+    // Anything inside the week is already on the weekly list; only list what's further out.
+    reminders = reminders.filter((r) => r.occasion.daysUntil > 6)
+  }
+
+  const digest = formatDigest({week, reminders})
+  if (!digest) return
+
+  await sendNotifyMeText(digest)
+  if (sendWeekly) setSetting(WEEKLY_DIGEST_SENT_KEY, todayKey)
+  for (const {occasion, type} of recordAfterDigest) {
+    recordSent(occasion.person.id, type, year)
+    recordMessageInHistory(occasion.person.id, formatDigestLine({occasion, note: noteFor(occasion)}))
+  }
+  console.log(`Birthday scheduler: sent digest via notify-me${sendWeekly ? ' (with weekly list)' : ''}`)
 }
 
 function scheduleNext() {
@@ -235,15 +189,9 @@ function scheduleNext() {
       'birthday-scheduler',
       async () => {
         try {
-          await checkBirthdays()
+          await checkOccasions()
         } catch (error) {
           console.error('Birthday scheduler: error during check:', error)
-          Sentry.captureException(error)
-        }
-        try {
-          await checkAnniversaries()
-        } catch (error) {
-          console.error('Anniversary scheduler: error during check:', error)
           Sentry.captureException(error)
         }
       },

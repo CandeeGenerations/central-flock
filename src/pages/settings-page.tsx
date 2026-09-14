@@ -281,17 +281,26 @@ export function SettingsPage() {
             <div className="space-y-2">
               <Label>Example Messages</Label>
               <div className="rounded-lg border bg-muted/50 p-3 space-y-2 text-sm">
-                {preNotifySet.size > 0 && (
-                  <div>
-                    <span className="text-muted-foreground">Pre-notification (via webhook):</span>
-                    <p className="font-mono text-xs mt-0.5">
-                      &quot;Reminder - {[...preNotifySet][0]} days till John Smith&apos;s birthday!&quot;
-                    </p>
-                    <p className="font-mono text-xs mt-0.5">
-                      &quot;Reminder - {[...preNotifySet][0]} days till John Smith&apos;s anniversary!&quot;
-                    </p>
-                  </div>
-                )}
+                <div>
+                  <span className="text-muted-foreground">
+                    Daily reminders to you (via webhook, one text listing everything):
+                  </span>
+                  <p className="font-mono text-xs mt-0.5 whitespace-pre-line">
+                    {'Birthday & anniversary reminders:\n' +
+                      '• Today – Jane Doe’s birthday (no phone #, not texted)\n' +
+                      (preNotifySet.size > 0
+                        ? `• Thu 9/17 (${[...preNotifySet][0]} days) – John & Mary Smith’s 5th anniversary`
+                        : '')}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Sunday mornings to you (the week ahead, Sun–Sat):</span>
+                  <p className="font-mono text-xs mt-0.5 whitespace-pre-line">
+                    {'Birthdays & anniversaries this week:\n' +
+                      '• Mon 9/14 – John Smith’s 30th birthday\n' +
+                      '• Wed 9/16 – Jane Doe’s birthday (no phone #)'}
+                  </p>
+                </div>
                 <div>
                   <span className="text-muted-foreground">Birthday (to person):</span>
                   <p className="font-mono text-xs mt-0.5">&quot;Happy 30th birthday to you!&quot;</p>

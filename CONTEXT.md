@@ -16,12 +16,22 @@ _Avoid_: Autosave, Unsaved message.
 
 **Unsent Message**:
 The compose form's contents, captured while typing so that a reload cannot lose them. Lives only in
-one device's local storage, keyed to the thing being composed — a new message, a **Draft**, or a
-scheduled message — and appears in none of the **Draft** surfaces. Restores silently when you return
+one device's local storage, keyed to the thing being composed — a new message, a **Prayer Request**, a
+**Draft**, or a scheduled message — and appears in none of the **Draft** surfaces. Restores silently when you return
 to the same compose context, and is offered once on the Home **Needs Attention** strip after a cold
 launch. Becomes a **Draft** only if you press _Save Draft_. _Discard_ clears it and returns the page to a
-blank new compose, detached from whatever it was editing; the **Draft** behind it is left untouched.
+blank new compose, detached from whatever it was editing; the **Draft** behind it is left untouched. In a
+**Prayer Request**, Discard starts a fresh Prayer Request instead.
 _Avoid_: Draft, Autosaved draft, Recovery buffer.
+
+**Prayer Request**:
+A message asking the Prayer Warriors, the church's worldwide prayer chain, to pray for one or more
+needs. Started from a one-press shortcut that opens compose with the configured group (Prayer
+Warriors) and template (Prayer Chain) already chosen, so it can go out quickly; everything stays
+editable. Its own compose context: a half-written Prayer Request is kept as its own **Unsent
+Message**, apart from a plain new message. Describes how a message was started, not a stored kind —
+once sent (or saved as a **Draft**) it is an ordinary message.
+_Avoid_: Prayer Chain (the template's name, and the people are the chain), Prayer message.
 
 ### Devotions
 
@@ -54,18 +64,30 @@ never its Original.
 _Avoid_: Raw input (the column's name, not the idea), Source.
 
 **Correction Note**:
-A suggested text to Gwendolyn listing how the published **Scripture Blocks** differ from her
-**Original** — a moved reference, a corrected word. Derived by comparing the two, never stored, and
-never sent by the app: it is offered for copying, and what to tell her is left to whoever talks to
-her. _Reference Format_ changes are left out as not worth mentioning.
+A suggested text to Gwendolyn listing how her scripture would change — what she sent (her
+**Original**, or the current blocks where there is none) against the current **Scripture Blocks**
+with every open **Finding**'s fix applied. Ready before anything is edited, so she can be asked
+first; still right after the fixes are made. A Finding with no single fix becomes a question ("which
+did you mean: …?"), and a dismissed Finding drops out. Derived, never stored, and never sent by the
+app: it is offered for copying, and what to tell her is left to whoever talks to her. _Reference
+Format_ changes are left out as not worth mentioning.
 _Avoid_: Notification, Feedback, Message (means an SMS the app sends).
 
 **Scripture Block**:
 One 📖 block of a **Gwendolyn Devotional** — a quotation and the reference it claims to come from.
 Gwendolyn quotes selectively, eliding with `…`, so a Scripture Block is usually a string of
 **Fragments** rather than a whole verse.
+Her `[bracketed glosses]` ("stay [rely] upon his God") explain a word and are hers, not quotation;
+the **Scripture Check** skips them.
 _Avoid_: Verse (a block often spans several, or part of one), Passage (means a generated devotion
 passage).
+
+**Lead-in**:
+The 📚 point just before a **Scripture Block** that hands over to it — "God said:", "The Bible
+says,", "Proverbs 3:13 reminds us,". Kept as its own point, never folded into the quotation. When
+the Lead-in names the reference, the block's own reference stays blank so the caption does not
+repeat it, and the **Scripture Check** checks the block against the reference the Lead-in names.
+_Avoid_: Intro, Preamble, Heading.
 
 **Fragment**:
 One run of a **Scripture Block**'s quotation between ellipses. The unit a **Scripture Check**
@@ -719,8 +741,8 @@ time — never stored.
 - A **Scripture Block** has zero or more **Findings**, derived from the **Bible Text**, never stored
 - A **Dismissal** belongs to exactly one **Finding** and is retired by an edit to what that Finding
   is about
-- A **Correction Note** is derived from a **Gwendolyn Devotional**'s **Original** and its current
-  **Scripture Blocks**
+- A **Correction Note** is derived from a **Gwendolyn Devotional**'s **Original**, its current
+  **Scripture Blocks**, and their open **Findings**
 
 ## Example dialogue
 

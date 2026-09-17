@@ -6,6 +6,7 @@ import {Input} from '@/components/ui/input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {InlineSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
+import {PRAYER_REQUEST_TEMPLATE_WARNING, usePrayerRequest} from '@/hooks/use-prayer-request'
 import {createTemplate, deleteTemplates, fetchGlobalVariables, fetchTemplate, updateTemplate} from '@/lib/api'
 import type {TemplateVariable} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
@@ -21,6 +22,7 @@ const VAR_NAME_REGEX = /^[a-zA-Z][a-zA-Z0-9]*$/
 
 export function TemplateEditPage() {
   const {id} = useParams()
+  const prayerRequest = usePrayerRequest()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isEdit = !!id
@@ -396,7 +398,11 @@ export function TemplateEditPage() {
         open={confirmDeleteOpen}
         onOpenChange={setConfirmDeleteOpen}
         title="Delete Template"
-        description="Are you sure you want to delete this template? This action cannot be undone."
+        description={
+          Number(id) === prayerRequest.templateId
+            ? `Are you sure you want to delete this template? This action cannot be undone. ${PRAYER_REQUEST_TEMPLATE_WARNING}`
+            : 'Are you sure you want to delete this template? This action cannot be undone.'
+        }
         confirmLabel="Delete"
         variant="destructive"
         loading={deleteMutation.isPending}

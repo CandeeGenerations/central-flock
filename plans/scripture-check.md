@@ -55,13 +55,20 @@ Running the planned check by eye over existing data already turns up a second ca
 one-word book, and only when the reference is alone on the last line.
 
 - **Multi-word books:** "Song of Solomon 2:10" is never split off. It stays glued to the quote and the
-  reference is left empty. Recognise references by resolving them against the Bible Text's book
-  list (Phase 2), reusing `BOOK_ALIASES` / `normalizeBook` from `server/lib/bible-reference.ts`
-  (export `normalizeBook`).
+  reference is left empty. Recognise references by resolving them against the Bible Text's own
+  book table (Phase 2). As built, `bible-text.ts` carries its own alias table; `bible-reference.ts`
+  is untouched.
 - **Decorated references:** accept `(Psalm 34:1)`, `— Psalm 34:1`, `-Psalm 34:1`, and a reference
   trailing the closing quote on the same line (`…help thee.” Isaiah 41:10`).
-- Quote stripping stays as is. The existing regex also has to handle the `📖”Fear thou not…` form
-  in #26's Original, where a closing-style curly quote is used as the opener.
+- Quote stripping also handles the `📖”Fear thou not…` form in #26's Original, where a closing-style
+  curly quote is used as the opener.
+- **Lead-ins and trailing prose** (added after the first audit run against real Originals): a 📖
+  segment is split the way the blocks were being split by hand. Text before the opening quote
+  ("God said:", "The Bible says,", "Proverbs 3:13 reminds us,") becomes its own point before the
+  Scripture Block. Prose after the reference line ("Just yield to Jesus Christ who says,") becomes
+  its own point after. A 📚 segment whose last line hands over to the next 📖 ("Proverbs 23:7
+  says,") has that line split off as its own point. A reference named only in a **Lead-in** stays
+  there, and the Scripture Block's reference stays blank, as in #13, #15, #17 and #23.
 
 ## Phase 2: Bible Text
 
@@ -120,8 +127,11 @@ type Finding = {
 
 **Algorithm, per block:**
 
-1. **Fragments:** split the quotation on `…` and `...`, trim, and drop empties.
+1. **Fragments:** split the quotation on `…` and `...`, trim, and drop empties. Her `[bracketed
+glosses]` ("stay [rely] upon") are skipped; they are hers, not quotation.
 2. **Reference:**
+   - Empty, but the **Lead-in** (the point just before) names one: check against that, with no
+     _Reference Format_ Finding, since the lead-in is her prose.
    - Empty: search (step 4) and report _Missing Reference_.
    - Unresolvable: _Invalid Reference_, then search.
    - Resolvable but not canonical: _Reference Format_, with fix = `canonicalReference`.
@@ -186,14 +196,19 @@ ignore the new field.
 | GET    | `/`      | Each row gains `openFindings: number` (deterministic, not dismissed)                                                                                                     |
 | GET    | `/:id`   | Adds `checks` and `correctionNote: string \| null`                                                                                                                       |
 
-**Correction Note:** derived in GET `/:id`. `parseDevotional(rawInput)` gives her Scripture Blocks,
-which are paired with the current ones in order (falling back to best text similarity when the
-counts differ). A line is written for each changed reference and each changed wording. References
-whose canonical forms are equal (Reference Format only) are skipped. The result is `null` when
-there is no Original or no difference. The template is deterministic, with no AI:
+**Correction Note:** derived in GET `/:id` from what she sent (the re-parsed Original, or the
+current blocks when there is none) against the current blocks **with every open Finding's fix
+applied** — so it is ready to send _before_ anything is edited, and stays right afterwards (changed
+after first use: the note has to come before the edit, so a correction she declines never needs
+undoing). A Finding with no single fix (a tie, or Not Found) becomes a question; a dismissed Finding
+drops out; Reference Format is skipped. Blocks are paired in order (falling back to best text
+similarity when the counts differ). The template is deterministic, with no AI:
 
-> Hi Gwendolyn, a couple of small scripture corrections on GOOD FEAR (Sep 13):
-> • "The fear of man bringeth a snare…" is Proverbs 29:25 (you had 25:29)
+> I was looking back at this one and noticed this verse “The fear of man bringeth a snare:…” is
+> Proverbs 29:25. You have Proverbs 25:29. Is it okay to change and fix that?
+
+(The phrasing is the one actually sent to her. Several items become a bulleted "noticed a few
+things:" list ending "Is it okay to change and fix those?")
 
 ## Phase 5: UI
 

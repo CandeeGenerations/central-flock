@@ -1,4 +1,5 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
+import {ScriptureFindings} from '@/components/devotions/scripture-findings'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {DateTimePicker} from '@/components/ui/date-time-picker'
@@ -9,8 +10,10 @@ import {PageSpinner, Spinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
 import {formatDate} from '@/lib/date'
 import {
+  type BlockCheck,
   type DevotionalBlock,
   type GwendolynDevotional,
+  type GwendolynDevotionalInput,
   type GwendolynStatus,
   buildBlockText,
   buildCopyContent,
@@ -39,7 +42,7 @@ const STATUS_OPTIONS: {value: GwendolynStatus; label: string}[] = [
   {value: 'done', label: 'Done'},
 ]
 
-function BlockView({block}: {block: DevotionalBlock}) {
+function BlockView({block, check}: {block: DevotionalBlock; check?: BlockCheck | null}) {
   const copy = () => {
     navigator.clipboard.writeText(buildBlockText(block)).then(() => toast.success('Copied'))
   }
@@ -52,7 +55,11 @@ function BlockView({block}: {block: DevotionalBlock}) {
           <>
             <p className="italic">"{block.text}"</p>
             {block.reference && <p className="text-sm text-muted-foreground font-medium">{block.reference}</p>}
-            {!block.reference && <p className="text-xs text-amber-600">No reference — copy will omit it</p>}
+            {check !== undefined && (
+              <div className="pt-1.5">
+                <ScriptureFindings check={check ?? undefined} />
+              </div>
+            )}
           </>
         ) : (
           <p>{block.text}</p>
@@ -86,7 +93,7 @@ export function GwendolynDetailPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<GwendolynDevotional>) => updateGwendolynDevotional(Number(id), data),
+    mutationFn: (data: Partial<GwendolynDevotionalInput>) => updateGwendolynDevotional(Number(id), data),
     onSuccess: () => {
       qc.invalidateQueries({queryKey: queryKeys.gwendolynDevotional(Number(id))})
       qc.invalidateQueries({queryKey: queryKeys.gwendolynDevotions()})
@@ -99,7 +106,9 @@ export function GwendolynDetailPage() {
   const statusMutation = useMutation({
     mutationFn: (status: GwendolynStatus) => updateGwendolynStatus(Number(id), status),
     onSuccess: (updated) => {
-      qc.setQueryData(queryKeys.gwendolynDevotional(Number(id)), updated)
+      qc.setQueryData(queryKeys.gwendolynDevotional(Number(id)), (old: GwendolynDevotional | undefined) =>
+        old ? {...old, ...updated} : updated,
+      )
       qc.invalidateQueries({queryKey: queryKeys.gwendolynDevotions()})
     },
     onError: (err) => {
@@ -182,6 +191,7 @@ export function GwendolynDetailPage() {
                 hashtags: devotional.hashtags,
                 status: devotional.status,
               }}
+              initialChecks={devotional.checks}
               onSubmit={(data) => updateMutation.mutate(data)}
               onCancel={() => setEditing(false)}
               submitLabel="Save"
@@ -239,11 +249,37 @@ export function GwendolynDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {devotional.blocks.map((block, i) => (
-                <BlockView key={i} block={block} />
+                <BlockView key={i} block={block} check={devotional.checks?.[i]} />
               ))}
               <p className="italic text-muted-foreground text-sm pl-8">— Passing the truth along</p>
             </CardContent>
           </Card>
+
+          {devotional.correctionNote && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle>Suggested note to Gwendolyn</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    The open findings' fixes, as she would see them — check with her before editing. Dismissing a
+                    finding drops its line. Nothing is sent.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copy(devotional.correctionNote!, 'Note')}
+                  className="shrink-0"
+                >
+                  <Copy className="h-4 w-4 mr-1" />
+                  Copy
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap">{devotional.correctionNote}</p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Hashtags card */}
           <Card>

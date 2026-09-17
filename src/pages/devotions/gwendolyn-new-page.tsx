@@ -93,6 +93,7 @@ export function GwendolynNewPage() {
                 blocks: parsed.blocks,
                 hashtags: parsed.hashtags,
               }}
+              initialChecks={parsed.checks}
               onSubmit={(data) => saveMutation.mutate({...data, rawInput: parsed.rawInput})}
               submitLabel="Save"
               submitting={saveMutation.isPending}

@@ -1,3 +1,4 @@
+import {usePrayerRequest} from '@/hooks/use-prayer-request'
 import {buildAllActions} from '@/lib/search/actions'
 import {providers} from '@/lib/search/providers'
 import type {SearchItem} from '@/lib/search/registry'
@@ -17,6 +18,7 @@ export interface SearchIndex {
 
 export function useSearchIndex(enabled: boolean): SearchIndex {
   const {toggleDark} = useTheme()
+  const {ready: prayerReady, href: prayerHref} = usePrayerRequest()
 
   // IMPORTANT: the queryFn stores the **raw rows** under the provider's queryKey so
   // the cache can be safely shared with other consumers that read the same key.
@@ -32,7 +34,10 @@ export function useSearchIndex(enabled: boolean): SearchIndex {
     })),
   })
 
-  const actions = useMemo(() => buildAllActions({toggleDark}), [toggleDark])
+  const actions = useMemo(
+    () => buildAllActions({toggleDark, prayerRequest: {ready: prayerReady, href: prayerHref}}),
+    [toggleDark, prayerReady, prayerHref],
+  )
 
   // Frecency scores per section reorder the Navigation group (empty-state).
   const sectionsQuery = useQuery({

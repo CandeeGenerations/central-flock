@@ -15,6 +15,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/c
 import {Separator} from '@/components/ui/separator'
 import {Textarea} from '@/components/ui/textarea'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
+import {usePrayerRequest} from '@/hooks/use-prayer-request'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {useUnsentAutosave} from '@/hooks/use-unsent-message'
 import {
@@ -55,7 +56,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import {type ReactNode, useCallback, useMemo, useRef, useState} from 'react'
+import {type ReactNode, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -122,6 +123,8 @@ export function MessageComposePage() {
 
   const draftIdParam = searchParams.get('draftId')
   const editMessageId = searchParams.get('editMessageId')
+  const isPrayerRequest = searchParams.get('prayerRequest') === '1'
+  const prayerRequest = usePrayerRequest()
   const presetGroupIdParam = searchParams.get('groupId')
   const initialGroupIds: number[] = (() => {
     if (dupState?.groupIds?.length) return dupState.groupIds
@@ -415,6 +418,39 @@ export function MessageComposePage() {
     setDateFormats(defaultFormats)
   }
 
+  // --- Prayer Request ----------------------------------------------------
+  // The one-press shortcut: compose opened with the configured group and template already
+  // chosen, cursor on the first numbered line. Fully editable from there, and nothing about
+  // the sent message records that it started here. See plans/prayer-request.md.
+  // A render-time init rather than a useState initializer, because the settings that say
+  // which group and template arrive a beat after mount.
+  const [prayerPrefilled, setPrayerPrefilled] = useState(false)
+  const [prayerFocusPending, setPrayerFocusPending] = useState(false)
+  if (isPrayerRequest && !prayerPrefilled && templatesList && prayerRequest.loaded) {
+    setPrayerPrefilled(true)
+    // An unconfigured (or since-deleted) group or template leaves a plain compose. The
+    // shortcut is hidden in that state, so this is only reachable by URL.
+    if (prayerRequest.groupId && prayerRequest.templateId) {
+      setRecipientMode('group')
+      setSelectedGroupIds([prayerRequest.groupId])
+      handleTemplateSelect(String(prayerRequest.templateId))
+      setPrayerFocusPending(true)
+    }
+  }
+
+  // Caret after the template's last "1. ", so the first need can be typed straight away.
+  // Only on a fresh prefill — a restored buffer keeps the caret at the end.
+  useEffect(() => {
+    if (!prayerFocusPending) return
+    const el = textareaRef.current
+    if (!el) return
+    setPrayerFocusPending(false)
+    const marker = el.value.lastIndexOf('1. ')
+    const pos = marker >= 0 ? marker + '1. '.length : el.value.length
+    el.focus()
+    el.setSelectionRange(pos, pos)
+  }, [prayerFocusPending, content])
+
   const groupMemberIds = useMemo(() => new Set(unionedMembers.map((m) => m.id)), [unionedMembers])
   const hasSelectedGroups = recipientMode === 'group' && selectedGroupIds.length > 0
 
@@ -639,12 +675,15 @@ export function MessageComposePage() {
   // A device-local recovery buffer, NOT a Draft. See docs/adr/0035-unsent-message-device-local.md.
   type ComposeSnapshot = ReturnType<typeof getDraftFormData>
 
-  const composeKey = unsentKey({draftId: currentDraftId, editMessageId})
+  const composeKey = unsentKey({draftId: currentDraftId, editMessageId, prayerRequest: isPrayerRequest})
   // Not ready until the server copy has populated the form, or there is no server copy.
   const composeReady =
     !!templatesList &&
     (!currentDraftId || loadedDraftId === currentDraftId) &&
-    (!editMessageId || loadedEditMessageId === Number(editMessageId))
+    (!editMessageId || loadedEditMessageId === Number(editMessageId)) &&
+    // A Prayer Request's prefill is a server copy too: restoring over a form that has not
+    // been prefilled yet would capture a baseline missing the group and template.
+    (!isPrayerRequest || prayerPrefilled)
 
   const applySnapshot = (d: ComposeSnapshot) => {
     setContent(d.content || '')
@@ -751,6 +790,13 @@ export function MessageComposePage() {
     setCurrentDraftId(null)
     setLoadedDraftId(null)
     setLoadedEditMessageId(null)
+    if (isPrayerRequest) {
+      // Discarding inside a Prayer Request starts a fresh one — you pressed the shortcut,
+      // so the context survives what you threw away. The prefill re-runs on the next render.
+      setPrayerPrefilled(false)
+      setSearchParams({prayerRequest: '1'}, {replace: true})
+      return
+    }
     setSearchParams({}, {replace: true})
   }
 
@@ -864,7 +910,9 @@ export function MessageComposePage() {
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <X className="h-4 w-4" />
         </Button>
-        <h2 className="text-xl font-semibold">{isEditMode ? 'Edit Scheduled Message' : 'Compose Message'}</h2>
+        <h2 className="text-xl font-semibold">
+          {isEditMode ? 'Edit Scheduled Message' : isPrayerRequest ? 'Prayer Request' : 'Compose Message'}
+        </h2>
       </div>
 
       {/* Two-column layout: form + phone preview */}

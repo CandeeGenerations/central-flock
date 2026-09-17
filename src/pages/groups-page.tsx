@@ -11,6 +11,7 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
+import {PRAYER_REQUEST_GROUP_WARNING, usePrayerRequest} from '@/hooks/use-prayer-request'
 import {createGroup, deleteGroup, duplicateGroup, fetchGroups} from '@/lib/api'
 import {formatDate} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
@@ -25,6 +26,7 @@ type SortDir = 'asc' | 'desc'
 
 export function GroupsPage() {
   const navigate = useNavigate()
+  const prayerRequest = usePrayerRequest()
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const addFromParam = searchParams.get('add') === '1'
@@ -310,7 +312,11 @@ export function GroupsPage() {
           if (!open) setDeleteTarget(null)
         }}
         title={`Delete group "${deleteTarget?.name}"?`}
-        description="Members will not be deleted."
+        description={
+          deleteTarget && deleteTarget.id === prayerRequest.groupId
+            ? `Members will not be deleted. ${PRAYER_REQUEST_GROUP_WARNING}`
+            : 'Members will not be deleted.'
+        }
         confirmLabel="Delete"
         variant="destructive"
         loading={deleteMutation.isPending}

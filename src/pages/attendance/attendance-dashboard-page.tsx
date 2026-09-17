@@ -19,6 +19,7 @@ import {
   updateRecord,
 } from '@/lib/attendance-api'
 import {linreg} from '@/lib/chart-math'
+import {formatDate} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Church, History, Pencil, TrendingDown, TrendingUp} from 'lucide-react'
@@ -347,7 +348,7 @@ function RecordsTable({serviceTimeId, from, to}: {serviceTimeId: number | null; 
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.id}>
-                <TableCell>{r.serviceDate}</TableCell>
+                <TableCell className="whitespace-nowrap">{formatDate(r.serviceDate)}</TableCell>
                 <TableCell>{r.serviceTimeName}</TableCell>
                 <TableCell className="text-right">{r.attendance ?? '—'}</TableCell>
                 <TableCell className="text-right">{r.streaming ?? '—'}</TableCell>
@@ -400,7 +401,7 @@ function HistoryDialog({record, onClose}: {record: ServiceRecordRow | null; onCl
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            History · {record?.serviceTimeName} · {record?.serviceDate}
+            History · {record?.serviceTimeName} · {record ? formatDate(record.serviceDate) : ''}
           </DialogTitle>
         </DialogHeader>
         {isLoading ? (
@@ -453,7 +454,7 @@ function EditRecordDialog(props: {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {record?.serviceTimeName} · {record?.serviceDate}
+            {record?.serviceTimeName} · {record ? formatDate(record.serviceDate) : ''}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">

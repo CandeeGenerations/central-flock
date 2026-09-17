@@ -206,7 +206,10 @@ attendanceRouter.get(
       .from(schema.serviceRecords)
       .innerJoin(schema.serviceTimes, eq(schema.serviceTimes.id, schema.serviceRecords.serviceTimeId))
       .where(conds.length ? and(...conds) : undefined)
-      .orderBy(desc(schema.serviceRecords.serviceDate))
+      // Newest day first, and within a day the latest service first — Sunday
+      // Evening, Sunday Morning, Sunday School — which is the order the week is
+      // entered in and so the order it reads back in.
+      .orderBy(desc(schema.serviceRecords.serviceDate), desc(schema.serviceTimes.sortOrder))
       .limit(limit)
       .all()
     res.json(rows)

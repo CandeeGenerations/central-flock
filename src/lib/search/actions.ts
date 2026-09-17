@@ -1,11 +1,12 @@
 import {navGroups} from '@/lib/nav-config'
-import type {ActionsBuildContext, SearchItem} from '@/lib/search/registry'
+import type {ActionsBuildContext, SearchActionContext, SearchItem} from '@/lib/search/registry'
 import {
   BookOpen,
   CheckSquare,
   ClipboardList,
   FileText,
   FolderPlus,
+  HandHeart,
   LayoutDashboard,
   Mail,
   Moon,
@@ -95,7 +96,7 @@ export function buildNavigationActions(): SearchItem[] {
   return [...nonNavRoutes, ...fromSidebar]
 }
 
-export function buildCreateActions(): SearchItem[] {
+export function buildCreateActions(ctx: ActionsBuildContext): SearchItem[] {
   return [
     {
       id: 'create-person',
@@ -130,6 +131,21 @@ export function buildCreateActions(): SearchItem[] {
         close()
       },
     },
+    ...(ctx.prayerRequest.ready
+      ? [
+          {
+            id: 'create-prayer-request',
+            label: 'Prayer Request',
+            group: 'Create',
+            icon: HandHeart,
+            keywords: ['prayer', 'chain', 'warriors', 'request', 'urgent'],
+            action: ({navigate, close}: SearchActionContext) => {
+              navigate(ctx.prayerRequest.href)
+              close()
+            },
+          } satisfies SearchItem,
+        ]
+      : []),
     {
       id: 'create-template',
       label: 'New Template',
@@ -238,5 +254,5 @@ export function buildCommandActions(ctx: ActionsBuildContext): SearchItem[] {
 }
 
 export function buildAllActions(ctx: ActionsBuildContext): SearchItem[] {
-  return [...buildNavigationActions(), ...buildCreateActions(), ...buildCommandActions(ctx)]
+  return [...buildNavigationActions(), ...buildCreateActions(ctx), ...buildCommandActions(ctx)]
 }

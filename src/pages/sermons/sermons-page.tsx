@@ -50,6 +50,15 @@ function todayIso(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
+// The most recent date on or before today falling on `dayOfWeek` (0 = Sunday).
+// Transcripts are uploaded after the fact — on Monday, "Sunday Evening" means
+// yesterday, not next week — so picking a service picks its last occurrence.
+function lastOccurrenceIso(dayOfWeek: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - ((d.getDay() - dayOfWeek + 7) % 7))
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function SermonsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -78,6 +87,9 @@ export function SermonsPage() {
   const [serviceTimeId, setServiceTimeId] = usePersistedState<number | null>('sermons.new.serviceTimeId', null)
   const [speakerPersonId, setSpeakerPersonId] = usePersistedState<number | null>('sermons.new.speakerPersonId', null)
   const [sermonDate, setSermonDate] = useState(todayIso())
+  // Once a filename or a deliberate edit has named the date, picking a service
+  // stops overwriting it.
+  const [dateLocked, setDateLocked] = useState(false)
   const [title, setTitle] = useState('')
   const [series, setSeries] = useState('')
   const [transcript, setTranscript] = useState('')
@@ -118,6 +130,7 @@ export function SermonsPage() {
       setTranscript('')
       setFileName('')
       setTitle('')
+      setDateLocked(false)
       navigate(`/sermons/social/${res.id}`)
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Generation failed'),
@@ -146,10 +159,29 @@ export function SermonsPage() {
       setTranscript(String(reader.result ?? ''))
       setFileName(file.name)
       const fromName = dateFromFilename(file.name)
-      if (fromName) setSermonDate(fromName)
+      if (fromName) {
+        setSermonDate(fromName)
+        setDateLocked(true)
+      }
     }
     reader.onerror = () => toast.error('Could not read that file')
     reader.readAsText(file)
+  }
+
+  // Remembered service + remembered date do not go together: the service is the
+  // same every week, the date never is. Opening the dialog re-derives it.
+  function dateForService(id: number): string | null {
+    const st = (serviceTimes ?? []).find((s) => s.id === id)
+    return st ? lastOccurrenceIso(st.dayOfWeek) : null
+  }
+
+  function openNewSermon() {
+    setDateLocked(false)
+    if (serviceTimeId != null) {
+      const d = dateForService(serviceTimeId)
+      if (d) setSermonDate(d)
+    }
+    setDialogOpen(true)
   }
 
   const canSubmit = serviceTimeId != null && speakerPersonId != null && sermonDate && transcript.trim().length > 0
@@ -163,7 +195,7 @@ export function SermonsPage() {
           Social Content
           {data ? <span className="ml-2 text-base font-normal text-muted-foreground">({data.total})</span> : null}
         </h2>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={openNewSermon}>
           <Plus className="h-4 w-4 mr-1" /> New Sermon
         </Button>
       </div>
@@ -261,7 +293,14 @@ export function SermonsPage() {
               <Label>Service</Label>
               <Select
                 value={serviceTimeId ? String(serviceTimeId) : undefined}
-                onValueChange={(v) => setServiceTimeId(Number(v))}
+                onValueChange={(v) => {
+                  const id = Number(v)
+                  setServiceTimeId(id)
+                  if (!dateLocked) {
+                    const d = dateForService(id)
+                    if (d) setSermonDate(d)
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select service…" />
@@ -277,7 +316,13 @@ export function SermonsPage() {
             </div>
             <div className="space-y-2">
               <Label>Date</Label>
-              <DatePicker value={sermonDate} onChange={setSermonDate} />
+              <DatePicker
+                value={sermonDate}
+                onChange={(v) => {
+                  setSermonDate(v)
+                  setDateLocked(true)
+                }}
+              />
             </div>
             <div className="space-y-2">
               <Label>Speaker</Label>

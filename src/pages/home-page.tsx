@@ -2,6 +2,7 @@ import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {PageSpinner} from '@/components/ui/spinner'
+import {usePrayerRequest} from '@/hooks/use-prayer-request'
 import {
   type HomeAttention,
   type HomeResponse,
@@ -23,15 +24,21 @@ import {
   Cake,
   Calendar,
   CalendarCheck,
+  ClipboardList,
   FileText,
   FolderOpen,
+  GraduationCap,
+  HandHeart,
   Hash,
   Heart,
+  ListMusic,
   LogOut,
+  Megaphone,
   MessageSquare,
   Music,
   Quote,
   ScrollText,
+  Search,
   Send,
   Settings,
   Sparkles,
@@ -81,7 +88,10 @@ export function HomePage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Home</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Home</h1>
+        <PrayerRequestHomeButton />
+      </div>
 
       {/* Needs attention */}
       <NeedsAttention attention={attention} />
@@ -215,6 +225,21 @@ export function HomePage() {
   )
 }
 
+// One press sends the prayer chain a request: compose opens with the configured group and
+// template already chosen. Hidden until Settings points at a live group and template.
+function PrayerRequestHomeButton() {
+  const {ready, href} = usePrayerRequest()
+  if (!ready) return null
+  return (
+    <Link to={href}>
+      <Button>
+        <HandHeart className="h-4 w-4 mr-2" />
+        Prayer Request
+      </Button>
+    </Link>
+  )
+}
+
 // --- Needs attention -------------------------------------------------------
 
 function NeedsAttention({attention}: {attention: HomeAttention}) {
@@ -284,6 +309,8 @@ function NeedsAttention({attention}: {attention: HomeAttention}) {
 
 // --- Jump back in ----------------------------------------------------------
 
+// One entry per entityType in server/services/usage-entity-resolver.ts. A type
+// missing here still works — it just falls back to a generic hash.
 const ENTITY_ICON: Record<string, LucideIcon> = {
   person: Users,
   group: FolderOpen,
@@ -293,11 +320,17 @@ const ENTITY_ICON: Record<string, LucideIcon> = {
   passage: Sparkles,
   gwendolyn_devotion: BookOpen,
   quote: Quote,
+  quote_search: Search,
+  sermon: ScrollText,
   special: Music,
   hymn_search: Music,
   special_music_schedule: Music,
+  music_schedule: ListMusic,
   nursery_schedule: Baby,
   fair_booth_schedule: Tent,
+  workers_notes_edition: GraduationCap,
+  sunday_school_roll: ClipboardList,
+  'fill-america-campaign': Megaphone,
   rsvp_list: CalendarCheck,
 }
 

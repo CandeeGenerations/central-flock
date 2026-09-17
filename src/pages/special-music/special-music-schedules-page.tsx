@@ -2,6 +2,7 @@ import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
+import {Checkbox} from '@/components/ui/checkbox'
 import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
@@ -14,6 +15,7 @@ import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {formatDate} from '@/lib/date'
 import {
   type Schedule,
+  clearSpecialMusicCells,
   createSpecialMusicSchedule,
   deleteSchedule,
   duplicateSchedule,
@@ -64,6 +66,12 @@ export function SpecialMusicSchedulesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [deleteTarget, setDeleteTarget] = useState<Schedule | null>(null)
+  // A special_music entry belongs to its DATE, not to the schedule that shows
+  // it, so deleting the envelope leaves every performer and song behind — and a
+  // brand-new schedule over the same weeks shows them again, which reads as a
+  // bug. Off by default: the usual delete is of a duplicate/mistaken envelope
+  // over dates whose entries are the real plan.
+  const [deleteEntriesToo, setDeleteEntriesToo] = useState(false)
   const [duplicateTarget, setDuplicateTarget] = useState<Schedule | null>(null)
   const [dupStart, setDupStart] = useState('')
   const [dupEnd, setDupEnd] = useState('')
@@ -95,11 +103,19 @@ export function SpecialMusicSchedulesPage() {
   }, [filtered, page])
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => deleteSchedule(id),
-    onSuccess: () => {
+    mutationFn: async (id: number) => {
+      // Entries first: dropping the envelope makes the scope unreadable, so the
+      // clear has nothing left to scope itself to.
+      const cleared = deleteEntriesToo ? (await clearSpecialMusicCells(id)).deleted : 0
+      await deleteSchedule(id)
+      return {cleared}
+    },
+    onSuccess: ({cleared}) => {
       queryClient.invalidateQueries({queryKey: schedulesKeys.list('special_music')})
       setDeleteTarget(null)
-      toast.success('Schedule deleted')
+      toast.success(
+        cleared > 0 ? `Schedule deleted — ${cleared} entr${cleared === 1 ? 'y' : 'ies'} removed` : 'Schedule deleted',
+      )
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to delete'),
   })
@@ -221,6 +237,7 @@ export function SpecialMusicSchedulesPage() {
                         title="Delete"
                         onClick={(e) => {
                           e.stopPropagation()
+                          setDeleteEntriesToo(false)
                           setDeleteTarget(s)
                         }}
                       >
@@ -291,12 +308,28 @@ export function SpecialMusicSchedulesPage() {
         open={!!deleteTarget}
         onOpenChange={(v) => !v && setDeleteTarget(null)}
         title="Delete Schedule"
-        description={`Delete the ${deleteTarget?.scopeLabel ?? ''} schedule? Special music entries are unaffected.`}
+        description={`Delete the ${deleteTarget?.scopeLabel ?? ''} schedule? By default this removes only the schedule — the special music entries stay on their dates, so another schedule covering those weeks still shows them.`}
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
         loading={deleteMutation.isPending}
-      />
+      >
+        <label className="flex cursor-pointer items-start gap-2 rounded-md border p-3 text-sm">
+          <Checkbox
+            checked={deleteEntriesToo}
+            onCheckedChange={(v) => setDeleteEntriesToo(v === true)}
+            className="mt-0.5"
+          />
+          <span>
+            Also delete the special music entries between{' '}
+            <span className="font-medium">{deleteTarget?.scopeStart ? formatDate(deleteTarget.scopeStart) : '—'}</span>{' '}
+            and <span className="font-medium">{deleteTarget?.scopeEnd ? formatDate(deleteTarget.scopeEnd) : '—'}</span>
+            <span className="text-muted-foreground block">
+              Performers, song titles and links on those dates go with them.
+            </span>
+          </span>
+        </label>
+      </ConfirmDialog>
 
       <Dialog open={!!duplicateTarget} onOpenChange={(v) => !v && setDuplicateTarget(null)}>
         <DialogContent className="max-w-sm">

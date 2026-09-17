@@ -46,4 +46,6 @@ export interface ActionsProvider {
 
 export interface ActionsBuildContext {
   toggleDark: () => void
+  /** The Prayer Request shortcut, absent from the palette until it is configured. */
+  prayerRequest: {ready: boolean; href: string}
 }

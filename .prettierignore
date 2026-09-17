@@ -7,3 +7,4 @@ schema.graphql
 data
 backups
 server/db/migrations/meta
+server/data/bible/akjv.json

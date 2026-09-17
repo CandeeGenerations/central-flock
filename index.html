@@ -12,7 +12,10 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Flock" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <!-- viewport-fit=cover is what makes env(safe-area-inset-*) report real values. iOS 26+
+         paints a status-bar scrim over the top of a standalone web app, so the mobile header
+         pads itself by the top inset and lets its own background take the scrim. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
     <title>Central Flock</title>
   </head>
   <body>

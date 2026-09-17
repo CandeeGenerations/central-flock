@@ -1,3 +1,4 @@
+import {ConfirmDialog} from '@/components/confirm-dialog'
 import type {ZoomMode} from '@/components/print/scaled-page'
 import {ExportSchedulePdfDialog} from '@/components/schedule/export-schedule-pdf-dialog'
 import {ScheduleActionsToolbar} from '@/components/schedule/schedule-actions-toolbar'
@@ -8,12 +9,15 @@ import {SpecialMusicSchedulePreview} from '@/components/schedule/special-music-s
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
 import {Dialog, DialogContent} from '@/components/ui/dialog'
+import {Input} from '@/components/ui/input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {describeExportError, useScheduleExport} from '@/hooks/use-schedule-export'
 import {useServiceTimes} from '@/hooks/use-service-times'
+import {formatDate} from '@/lib/date'
 import {
   type Household,
   type SpecialMusicCell,
+  clearSpecialMusicCells,
   fetchHouseholds,
   fetchSchedulesSettings,
   fetchSpecialMusicCells,
@@ -21,7 +25,7 @@ import {
   updateSchedule,
 } from '@/lib/schedules-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft} from 'lucide-react'
+import {ArrowLeft, Pencil} from 'lucide-react'
 import {useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -120,6 +124,9 @@ export function SpecialMusicScheduleViewPage() {
   const [highlightCellIds, setHighlightCellIds] = useState<Set<number>>(new Set())
   const [highlightDates, setHighlightDates] = useState<Set<string>>(new Set())
   const [recipientSubtitle, setRecipientSubtitle] = useState<string>('')
+  const [editingLabel, setEditingLabel] = useState(false)
+  const [labelDraft, setLabelDraft] = useState('')
+  const [clearOpen, setClearOpen] = useState(false)
 
   const {exporting, generateImage, exportJpg, exportPackPdf, whileExporting} = useScheduleExport(pageRef)
 
@@ -150,6 +157,28 @@ export function SpecialMusicScheduleViewPage() {
       toast.success('Schedule reopened as draft')
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to reopen'),
+  })
+
+  const renameMutation = useMutation({
+    mutationFn: (scopeLabel: string) => updateSchedule(scheduleId, {scopeLabel}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: schedulesKeys.cells(scheduleId)})
+      queryClient.invalidateQueries({queryKey: schedulesKeys.list('special_music')})
+      setEditingLabel(false)
+      toast.success('Renamed')
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to rename'),
+  })
+
+  const clearMutation = useMutation({
+    mutationFn: () => clearSpecialMusicCells(scheduleId),
+    onSuccess: ({deleted}) => {
+      queryClient.invalidateQueries({queryKey: schedulesKeys.cells(scheduleId)})
+      queryClient.invalidateQueries({queryKey: schedulesKeys.list('special_music')})
+      setClearOpen(false)
+      toast.success(deleted === 0 ? 'Nothing to clear' : `Cleared ${deleted} entr${deleted === 1 ? 'y' : 'ies'}`)
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to clear'),
   })
 
   async function handleExport(format: 'pdf' | 'jpg') {
@@ -238,11 +267,50 @@ export function SpecialMusicScheduleViewPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/special-music')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-2xl font-bold">{schedule.scopeLabel}</h1>
+        {editingLabel ? (
+          <div className="flex items-center gap-2">
+            <Input
+              autoFocus
+              value={labelDraft}
+              onChange={(e) => setLabelDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && labelDraft.trim()) renameMutation.mutate(labelDraft.trim())
+                if (e.key === 'Escape') setEditingLabel(false)
+              }}
+              className="h-9 w-72"
+            />
+            <Button
+              size="sm"
+              onClick={() => labelDraft.trim() && renameMutation.mutate(labelDraft.trim())}
+              disabled={renameMutation.isPending}
+            >
+              Save
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEditingLabel(false)}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <h1 className="flex items-center gap-2 text-2xl font-bold">
+            {schedule.scopeLabel}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              title="Rename schedule"
+              onClick={() => {
+                setLabelDraft(schedule.scopeLabel)
+                setEditingLabel(true)
+              }}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </h1>
+        )}
         <span className="text-muted-foreground text-sm">({schedule.status})</span>
       </div>
 
@@ -254,6 +322,7 @@ export function SpecialMusicScheduleViewPage() {
         onReopen={() => reopenMutation.mutate()}
         onExport={handleExport}
         onSend={() => setSendOpen(true)}
+        onClearAll={cells.length > 0 ? () => setClearOpen(true) : undefined}
         zoom={zoom}
         onZoomChange={setZoom}
         finalizing={finalizeMutation.isPending}
@@ -289,6 +358,21 @@ export function SpecialMusicScheduleViewPage() {
           </SchedulePreviewFrame>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={clearOpen}
+        onOpenChange={(v) => !v && setClearOpen(false)}
+        title="Clear the whole schedule?"
+        description={`Deletes all ${cells.length} special music ${
+          cells.length === 1 ? 'entry' : 'entries'
+        } between ${formatDate(schedule.scopeStart!)} and ${formatDate(
+          schedule.scopeEnd!,
+        )} — performers, song titles, links and notes. The entries belong to those dates, so any other schedule covering them is emptied too.`}
+        confirmLabel="Clear all"
+        variant="destructive"
+        loading={clearMutation.isPending}
+        onConfirm={() => clearMutation.mutate()}
+      />
 
       <ExportSchedulePdfDialog
         open={pdfOpen}

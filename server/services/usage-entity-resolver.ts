@@ -148,6 +148,18 @@ const RESOLVERS: Record<string, ResolverDef> = {
       get(db.select({title: schema.quotes.title}).from(schema.quotes).where(eq(schema.quotes.id, id)).get())?.title ??
       null,
   },
+  '/sermons/searches': {
+    entityType: 'quote_search',
+    typeLabel: 'Quote Search',
+    resolveLabel: (id) =>
+      get(
+        db
+          .select({topic: schema.quoteSearches.topic})
+          .from(schema.quoteSearches)
+          .where(eq(schema.quoteSearches.id, id))
+          .get(),
+      )?.topic ?? null,
+  },
   '/sermons/social': {
     entityType: 'sermon',
     typeLabel: 'Sermon',

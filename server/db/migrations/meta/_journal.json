@@ -372,6 +372,13 @@
       "when": 1788099481413,
       "tag": "0052_attendance_edit_idempotency",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1789603200000,
+      "tag": "0053_prayer_request_seed",
+      "breakpoints": true
     }
   ]
 }

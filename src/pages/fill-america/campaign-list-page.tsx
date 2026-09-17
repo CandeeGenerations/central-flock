@@ -10,7 +10,7 @@ import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {createCampaign, fetchCampaigns} from '@/lib/fill-america-api'
+import {type CampaignSummary, createCampaign, fetchCampaigns} from '@/lib/fill-america-api'
 import {
   SEASONS,
   SEASON_LABELS,
@@ -18,12 +18,13 @@ import {
   campaignWeekDates,
   defaultSeason,
   defaultTitle,
+  weekLabel,
 } from '@/lib/fill-america-core'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Megaphone, Plus} from 'lucide-react'
-import {useState} from 'react'
-import {useNavigate, useSearchParams} from 'react-router-dom'
+import {ArrowRight, Megaphone, Plus} from 'lucide-react'
+import {useMemo, useState} from 'react'
+import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 import {FillAmericaDashboard} from './campaign-dashboard'
@@ -50,6 +51,23 @@ function addDaysIso(iso: string, days: number): string {
   const d = new Date(iso + 'T12:00:00Z')
   d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().slice(0, 10)
+}
+
+// A campaign is worth a shortcut while it is running and for a fortnight after
+// it ends — the window in which numbers are still coming in from families.
+const LIVE_WINDOW_DAYS = 14
+
+function dayDelta(fromIso: string, toIso: string): number {
+  return Math.round((new Date(toIso + 'T12:00:00').getTime() - new Date(fromIso + 'T12:00:00').getTime()) / 86400000)
+}
+
+/** The one campaign to surface at the top: running now, else the last one to finish inside the window. */
+function liveCampaign(campaigns: CampaignSummary[], today: string): CampaignSummary | null {
+  const ongoing = campaigns.filter((c) => c.startDate <= today && c.endDate >= today)
+  if (ongoing.length > 0) return [...ongoing].sort((a, b) => b.startDate.localeCompare(a.startDate))[0]
+  const cutoff = addDaysIso(today, -LIVE_WINDOW_DAYS)
+  const recent = campaigns.filter((c) => c.endDate < today && c.endDate >= cutoff)
+  return [...recent].sort((a, b) => b.endDate.localeCompare(a.endDate))[0] ?? null
 }
 
 /**
@@ -105,6 +123,8 @@ export function FillAmericaCampaignListPage() {
 
   if (isLoading) return <PageSpinner />
 
+  const live = liveCampaign(campaigns ?? [], todayIso())
+
   const q = search.trim().toLowerCase()
   const filtered = (campaigns ?? []).filter(
     (c) => !q || c.title.toLowerCase().includes(q) || SEASON_LABELS[c.season].toLowerCase().includes(q),
@@ -130,6 +150,8 @@ export function FillAmericaCampaignListPage() {
           New Campaign
         </Button>
       </div>
+
+      <LiveCampaignCard campaign={live} />
 
       <FillAmericaDashboard />
 
@@ -221,6 +243,70 @@ export function FillAmericaCampaignListPage() {
         onClose={() => setOpen(false)}
         onCreated={(id) => navigate(`/fill-america/${id}`)}
       />
+    </div>
+  )
+}
+
+/**
+ * The shortcut at the top of the page. A campaign is three weeks of numbers
+ * arriving a family at a time, and the list it sits in is below a full
+ * dashboard — so while one is live it gets its own row, with the figures that
+ * say whether anything still needs entering.
+ */
+function LiveCampaignCard({campaign}: {campaign: CampaignSummary | null}) {
+  const status = useMemo(() => {
+    if (!campaign) return ''
+    const today = todayIso()
+    if (campaign.endDate < today) {
+      const days = dayDelta(campaign.endDate, today)
+      return days <= 1 ? 'Finished yesterday' : `Finished ${days} days ago`
+    }
+    const week = Math.floor(dayDelta(campaign.startDate, today) / 7) + 1
+    const left = dayDelta(today, campaign.endDate)
+    const ends = left === 0 ? 'ends today' : left === 1 ? 'ends tomorrow' : `${left} days left`
+    return `Week ${Math.min(week, campaign.weekCount)} of ${campaign.weekCount} · ${ends}`
+  }, [campaign])
+
+  if (!campaign) return null
+
+  const pct = campaign.doorHangerGoal ? Math.round((campaign.doorHangers / campaign.doorHangerGoal) * 100) : null
+
+  return (
+    <Card className="border-primary/40 bg-primary/5">
+      <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
+        <div className="min-w-48">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-semibold">{campaign.title}</span>
+            <Badge variant="secondary">{SEASON_LABELS[campaign.season]}</Badge>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            {status} · from {weekLabel(campaign.startDate)}
+          </p>
+        </div>
+        <Stat label="Tracts" value={campaign.tracts.toLocaleString()} />
+        <Stat label="Participants" value={campaign.uniqueParticipants.toLocaleString()} />
+        <Stat
+          label="Door Hangers"
+          value={
+            pct === null ? campaign.doorHangers.toLocaleString() : `${campaign.doorHangers.toLocaleString()} · ${pct}%`
+          }
+        />
+        <Button asChild className="ml-auto">
+          <Link to={`/fill-america/${campaign.id}`}>
+            Enter numbers
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Stat({label, value}: {label: string; value: string}) {
+  return (
+    <div>
+      <p className="text-muted-foreground text-xs uppercase tracking-wide">{label}</p>
+      <p className="text-xl font-bold tabular-nums">{value}</p>
     </div>
   )
 }

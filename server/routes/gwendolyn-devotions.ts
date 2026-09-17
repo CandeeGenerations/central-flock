@@ -3,13 +3,50 @@ import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
 import {asyncHandler} from '../lib/route-helpers.js'
+import {buildCorrectionNote} from '../services/gwendolyn-correction-note.js'
 import {generateHashtags} from '../services/gwendolyn-hashtags.js'
 import {parseDevotional} from '../services/gwendolyn-parse.js'
+import {
+  type BlockCheck,
+  type Dismissal,
+  checkBlock,
+  explainNotFound,
+  openFindingCount,
+  pruneDismissals,
+} from '../services/scripture-check.js'
 import {getSetting} from './settings.js'
 
 export const gwendolynDevotionsRouter = Router()
 
 const table = schema.gwendolynDevotions
+
+type StoredBlock =
+  | {type: 'point'; text: string}
+  | {type: 'scripture'; text: string; reference: string; dismissals?: Dismissal[]}
+
+// A scripture block's lead-in is the point just before it
+function leadInOf(blocks: StoredBlock[], i: number): string | undefined {
+  const prev = blocks[i - 1]
+  return prev?.type === 'point' ? prev.text : undefined
+}
+
+// Index-aligned with the blocks; null for points, which the Scripture Check never looks at
+function checksFor(blocks: StoredBlock[]): (BlockCheck | null)[] {
+  return blocks.map((b, i) => (b.type === 'scripture' ? checkBlock({...b, leadIn: leadInOf(blocks, i)}) : null))
+}
+
+function countOpenFindings(blocks: StoredBlock[]): number {
+  return checksFor(blocks).reduce((n, c) => n + (c ? openFindingCount(c) : 0), 0)
+}
+
+// Drops Dismissals that no longer match a Finding, so edits don't leave stale ones behind
+function withPrunedDismissals(blocks: StoredBlock[]): StoredBlock[] {
+  return blocks.map((b, i) => {
+    if (b.type !== 'scripture') return b
+    const kept = pruneDismissals({...b, leadIn: leadInOf(blocks, i)})
+    return {type: 'scripture', text: b.text, reference: b.reference, ...(kept ? {dismissals: kept} : {})}
+  })
+}
 
 // GET / — list
 gwendolynDevotionsRouter.get(
@@ -18,10 +55,12 @@ gwendolynDevotionsRouter.get(
     const search = req.query.search as string | undefined
     const status = req.query.status as string | undefined
     const page = Math.max(1, parseInt(req.query.page as string) || 1)
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25))
+    // limit=all returns every row on one page
+    const all = req.query.limit === 'all'
+    const limit = all ? -1 : Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25))
     const sort = (req.query.sort as string) || 'date'
     const sortDir = (req.query.sortDir as string) === 'asc' ? 'asc' : 'desc'
-    const offset = (page - 1) * limit
+    const offset = all ? 0 : (page - 1) * limit
 
     const conditions = []
     if (search) conditions.push(like(table.title, `%${search}%`))
@@ -43,10 +82,10 @@ gwendolynDevotionsRouter.get(
 
     const total = totalRow?.count ?? 0
 
-    const parsed = data.map((row) => ({
-      ...row,
-      blocks: JSON.parse(row.blocks),
-    }))
+    const parsed = data.map((row) => {
+      const blocks = JSON.parse(row.blocks) as StoredBlock[]
+      return {...row, blocks, openFindings: countOpenFindings(blocks)}
+    })
 
     res.json({data: parsed, total, page, limit})
   }),
@@ -59,7 +98,14 @@ gwendolynDevotionsRouter.get(
     const id = parseInt(String(req.params.id))
     const row = db.select().from(table).where(eq(table.id, id)).get()
     if (!row) return void res.status(404).json({error: 'Not found'})
-    res.json({...row, blocks: JSON.parse(row.blocks)})
+    const blocks = JSON.parse(row.blocks) as StoredBlock[]
+    const checks = checksFor(blocks)
+    res.json({
+      ...row,
+      blocks,
+      checks,
+      correctionNote: buildCorrectionNote({rawInput: row.rawInput, blocks, checks}),
+    })
   }),
 )
 
@@ -79,20 +125,43 @@ gwendolynDevotionsRouter.post(
     let hashtags = ''
     let warning: string | undefined
 
-    try {
-      hashtags = await generateHashtags(deriveText)
-    } catch (err) {
-      warning = err instanceof Error ? err.message : 'Hashtag generation failed'
-    }
+    // The AI fallback only runs for blocks the Bible Text lookup couldn't place
+    const [, checks] = await Promise.all([
+      generateHashtags(deriveText).then(
+        (h) => void (hashtags = h),
+        (err) => void (warning = err instanceof Error ? err.message : 'Hashtag generation failed'),
+      ),
+      Promise.all(
+        parsed.blocks.map((b, i) =>
+          b.type === 'scripture' ? explainNotFound({...b, leadIn: leadInOf(parsed.blocks, i)}) : null,
+        ),
+      ),
+    ])
 
     res.json({
       title: parsed.title,
       date: parsed.date,
       blocks: parsed.blocks,
+      checks,
       hashtags,
       rawInput: parsed.rawInput,
       ...(warning ? {warning} : {}),
     })
+  }),
+)
+
+// POST /check — Scripture Check without persistence. Deterministic (the live re-check) unless
+// `ai` is set, which runs the AI fallback on the blocks' Not Found Findings.
+gwendolynDevotionsRouter.post(
+  '/check',
+  asyncHandler(async (req, res) => {
+    // Each block carries its own `leadIn`; the client sends only the blocks it needs checked
+    const {blocks, ai} = req.body as {blocks?: (StoredBlock & {leadIn?: string})[]; ai?: boolean}
+    if (!Array.isArray(blocks)) return void res.status(400).json({error: 'blocks is required'})
+    const checks = ai
+      ? await Promise.all(blocks.map((b) => (b?.type === 'scripture' ? explainNotFound(b) : null)))
+      : blocks.map((b) => (b?.type === 'scripture' ? checkBlock(b) : null))
+    res.json({checks})
   }),
 )
 
@@ -118,7 +187,7 @@ gwendolynDevotionsRouter.post(
       .values({
         title,
         date,
-        blocks: JSON.stringify(blocks),
+        blocks: JSON.stringify(withPrunedDismissals(blocks as StoredBlock[])),
         hashtags: hashtags ?? '',
         rawInput: rawInput ?? null,
         status: (status as never) ?? 'received',
@@ -138,12 +207,12 @@ gwendolynDevotionsRouter.put(
     const existing = db.select().from(table).where(eq(table.id, id)).get()
     if (!existing) return void res.status(404).json({error: 'Not found'})
 
-    const {title, date, blocks, hashtags, rawInput, status} = req.body as {
+    // No rawInput: the Original is set once, on create, and never altered
+    const {title, date, blocks, hashtags, status} = req.body as {
       title?: string
       date?: string
-      blocks?: unknown[]
+      blocks?: StoredBlock[]
       hashtags?: string
-      rawInput?: string
       status?: string
     }
 
@@ -152,9 +221,8 @@ gwendolynDevotionsRouter.put(
       .set({
         ...(title !== undefined ? {title} : {}),
         ...(date !== undefined ? {date} : {}),
-        ...(blocks !== undefined ? {blocks: JSON.stringify(blocks)} : {}),
+        ...(blocks !== undefined ? {blocks: JSON.stringify(withPrunedDismissals(blocks))} : {}),
         ...(hashtags !== undefined ? {hashtags} : {}),
-        ...(rawInput !== undefined ? {rawInput} : {}),
         ...(status !== undefined ? {status: status as never} : {}),
         updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
       })

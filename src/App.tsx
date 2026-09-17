@@ -6,6 +6,7 @@ import {PageSpinner, Spinner} from '@/components/ui/spinner'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useCommandPalette} from '@/hooks/use-command-palette'
 import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts'
+import {usePrayerRequest} from '@/hooks/use-prayer-request'
 import {useRouteVisitLogger} from '@/hooks/use-route-visit-logger'
 import {useSidebarCollapsed} from '@/hooks/use-sidebar-collapsed'
 import {checkAuthStatus, logout} from '@/lib/api'
@@ -31,6 +32,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import {
+  HandHeart,
   Home,
   LogOut,
   Moon,
@@ -53,6 +55,7 @@ import {
   createBrowserRouter,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from 'react-router-dom'
 
 import {Sentry} from './lib/sentry'
@@ -295,7 +298,7 @@ function AuthGate() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <Spinner size="lg" />
       </div>
     )
@@ -359,6 +362,14 @@ function SidebarFooter({onNavClick, collapsed}: {onNavClick?: () => void; collap
           </TooltipTrigger>
           <TooltipContent side="right">Settings</TooltipContent>
         </Tooltip>
+        <PrayerRequestButton
+          tooltip
+          className={cn(
+            iconBtnBase,
+            'hover:bg-sidebar-accent/50 border border-transparent hover:border-border hover:shadow-sm dark:hover:border-transparent dark:hover:shadow-none',
+          )}
+          iconClassName="h-5 w-5"
+        />
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -413,6 +424,11 @@ function SidebarFooter({onNavClick, collapsed}: {onNavClick?: () => void; collap
         <span className="flex-1 text-left">Settings</span>
         <kbd className="text-[10px] font-mono text-sidebar-foreground/50 hidden md:inline">{mod},</kbd>
       </button>
+      <PrayerRequestButton
+        className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 border border-transparent hover:border-border hover:shadow-sm dark:hover:border-transparent dark:hover:shadow-none w-full transition-colors cursor-pointer"
+        iconClassName="h-5 w-5 md:h-4 md:w-4"
+        label="Prayer Request"
+      />
       <button
         onClick={toggleDark}
         className="flex items-center gap-3 md:gap-2 px-3 py-3 md:py-2 rounded-md text-base md:text-sm hover:bg-sidebar-accent/50 border border-transparent hover:border-border hover:shadow-sm dark:hover:border-transparent dark:hover:shadow-none w-full transition-colors cursor-pointer"
@@ -446,6 +462,58 @@ const fabActions: Record<string, {label: string; to: string}> = {
   '/templates': {label: 'New Template', to: '/templates/new'},
 }
 
+// The compose form is initialized from its context — a Draft, a scheduled message, a Prayer
+// Request, or a plain new message — so switching context has to remount it: pressing the
+// Prayer Request shortcut while already composing must re-run the prefill. Keyed on the
+// context alone, so an unrelated setSearchParams does not throw the form away.
+function ComposeRoute() {
+  const [params] = useSearchParams()
+  const editMessageId = params.get('editMessageId')
+  const draftId = params.get('draftId')
+  const key = editMessageId
+    ? `msg:${editMessageId}`
+    : draftId
+      ? `draft:${draftId}`
+      : params.get('prayerRequest') === '1'
+        ? 'prayer-request'
+        : 'new'
+  return <MessageComposePage key={key} />
+}
+
+// The Prayer Request shortcut, on every page: an urgent need should take one press. Hidden
+// until Settings points at a live group and template. See plans/prayer-request.md.
+function PrayerRequestButton({
+  className,
+  iconClassName,
+  tooltip,
+  label,
+}: {
+  className?: string
+  iconClassName?: string
+  tooltip?: boolean
+  /** Rendered beside the icon in the expanded sidebar, where every row is icon + text. */
+  label?: string
+}) {
+  const {ready, href} = usePrayerRequest()
+  const navigate = useNavigate()
+  if (!ready) return null
+  const button = (
+    <button type="button" onClick={() => navigate(href)} aria-label="Prayer Request" className={className}>
+      <HandHeart className={iconClassName} />
+      {label && <span className="flex-1 text-left">{label}</span>}
+    </button>
+  )
+  // The tooltip is wrapped here rather than at the call site: TooltipTrigger asChild cannot
+  // take the null this renders when the shortcut is not configured.
+  if (!tooltip) return button
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="right">Prayer Request</TooltipContent>
+    </Tooltip>
+  )
+}
+
 function MobileSearchButton() {
   const {setOpen} = useCommandPalette()
   return (
@@ -453,7 +521,7 @@ function MobileSearchButton() {
       type="button"
       onClick={() => setOpen(true)}
       aria-label="Open search"
-      className="absolute right-4 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
     >
       <Search className="h-5 w-5" />
     </button>
@@ -562,7 +630,7 @@ function AppLayoutInner({
   useRouteVisitLogger()
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-dvh overflow-hidden">
         {/* Desktop Sidebar */}
         <aside
           className={cn(
@@ -602,16 +670,28 @@ function AppLayoutInner({
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Mobile top bar */}
-          <header className="md:hidden relative flex items-center justify-center border-b px-4 py-3 bg-background shrink-0">
-            <Link to="/">
+          {/* A 3-column grid, not absolutely positioned side buttons: the top padding carries
+              the status-bar inset, and `top-1/2` would centre the icons against that padding
+              instead of against the logo. Fixed side columns keep the logo centred whether or
+              not the Prayer Request button is showing. */}
+          <header className="md:hidden grid grid-cols-[2rem_1fr_2rem] items-center gap-2 border-b px-4 pb-3 pt-[calc(max(0.75rem,env(safe-area-inset-top))+1.25rem)] bg-background shrink-0">
+            <div className="flex items-center justify-start">
+              <PrayerRequestButton
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                iconClassName="h-5 w-5"
+              />
+            </div>
+            <Link to="/" className="flex items-center justify-center">
               <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-5 dark:hidden" />
               <img src="/logos/default-monochrome-white.svg" alt="Central Flock" className="h-5 hidden dark:block" />
             </Link>
-            <MobileSearchButton />
+            <div className="flex items-center justify-end">
+              <MobileSearchButton />
+            </div>
           </header>
 
           {/* Main content */}
-          <main className="flex-1 overflow-auto pb-48 md:pb-8">
+          <main className="flex-1 overflow-auto overscroll-none pb-48 md:pb-8">
             {/* When adding/removing routes here, keep the Cmd+K command palette in sync:
                 sidebar routes derive from src/lib/nav-config.ts; non-sidebar routes need an
                 explicit entry in src/lib/search/actions.ts. See CLAUDE.md → Key Patterns. */}
@@ -624,7 +704,7 @@ function AppLayoutInner({
                 <Route path="/groups" element={<GroupsPage />} />
                 <Route path="/groups/:id" element={<GroupDetailPage />} />
                 <Route path="/messages" element={<MessageHistoryPage />} />
-                <Route path="/messages/compose" element={<MessageComposePage />} />
+                <Route path="/messages/compose" element={<ComposeRoute />} />
                 <Route path="/messages/:id" element={<MessageDetailPage />} />
                 <Route path="/templates" element={<TemplatesPage />} />
                 <Route path="/templates/new" element={<TemplateEditPage />} />

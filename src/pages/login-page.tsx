@@ -33,7 +33,7 @@ export function LoginPage() {
 
   return (
     <div className={isDark ? 'dark' : ''}>
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-dvh flex items-center justify-center bg-background">
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
             <img src="/logos/default-monochrome.svg" alt="Central Flock" className="h-8 mx-auto dark:hidden" />

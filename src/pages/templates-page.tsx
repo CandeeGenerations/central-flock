@@ -10,6 +10,7 @@ import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
+import {PRAYER_REQUEST_TEMPLATE_WARNING, usePrayerRequest} from '@/hooks/use-prayer-request'
 import {useSetToggle} from '@/hooks/use-set-toggle'
 import {
   createGlobalVariable,
@@ -31,6 +32,7 @@ import {toast} from 'sonner'
 
 export function TemplatesPage() {
   const queryClient = useQueryClient()
+  const prayerRequest = usePrayerRequest()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'templates' | 'variables'>('templates')
   const [search, setSearch] = useState('')
@@ -355,7 +357,11 @@ export function TemplatesPage() {
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title={`Delete ${selectedIds.size} template${selectedIds.size !== 1 ? 's' : ''}?`}
-        description="This will permanently delete the selected templates. This action cannot be undone."
+        description={
+          prayerRequest.templateId != null && selectedIds.has(prayerRequest.templateId)
+            ? `This will permanently delete the selected templates. This action cannot be undone. ${PRAYER_REQUEST_TEMPLATE_WARNING}`
+            : 'This will permanently delete the selected templates. This action cannot be undone.'
+        }
         confirmLabel="Delete"
         variant="destructive"
         loading={deleteMutation.isPending}

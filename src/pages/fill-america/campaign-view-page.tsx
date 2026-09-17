@@ -4,7 +4,9 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {SearchInput} from '@/components/ui/search-input'
 import {SearchableSelect} from '@/components/ui/searchable-select'
+import {type SortState, SortableTableHead, compareValues, useTableSort} from '@/components/ui/sortable-table-head'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {
@@ -204,6 +206,16 @@ function WeeksCard({
   )
 }
 
+/** One roster row's value for a sort key: 'name' | 'size' | 'goal' | 'total' | 'week:<i>'. */
+function sortValue(r: RosterEntry, sort: SortState): string | number | null {
+  if (sort.key === 'name') return r.householdName.toLowerCase()
+  if (sort.key === 'size') return r.size
+  if (sort.key === 'goal') return r.goal
+  if (sort.key === 'total') return r.total
+  const week = sort.key.startsWith('week:') ? Number(sort.key.slice(5)) : NaN
+  return Number.isInteger(week) ? (r.tracts[week] ?? null) : null
+}
+
 function RosterCard({
   campaignId,
   weeks,
@@ -225,11 +237,24 @@ function RosterCard({
 }) {
   const [adding, setAdding] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [search, setSearch] = useState('')
+  // Unsorted means the hand-arranged roster order, which is how the sheet is
+  // read aloud — so sorting is a view on top of it, never a replacement.
+  const {sort, toggle} = useTableSort()
 
   // Rosters are copied forward from the previous campaign, so a fresh campaign
   // starts full of households that may never report. "Empty" is the strict
   // sense the participant rule uses: not one week with tracts above zero.
   const empties = roster.filter((r) => !r.tracts.some((t) => t !== null && t > 0))
+
+  // Search first, then sort. Both are local to this table: the totals row and
+  // every campaign figure stay derived from the whole roster.
+  const q = search.trim().toLowerCase()
+  const shown = useMemo(() => {
+    const matched = q ? roster.filter((r) => r.householdName.toLowerCase().includes(q)) : roster
+    if (!sort) return matched
+    return [...matched].sort((a, b) => compareValues(sortValue(a, sort), sortValue(b, sort), sort.dir))
+  }, [roster, q, sort])
 
   const weekTotals = weeks.map((w) => w.tracts)
   const goalTotal = totals.rosterGoal
@@ -263,25 +288,47 @@ function RosterCard({
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          onClear={() => setSearch('')}
+          placeholder="Find a household…"
+          containerClassName="sm:max-w-xs"
+        />
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Household</TableHead>
-                <TableHead className="w-20 text-center">Size</TableHead>
-                <TableHead className="w-24 text-center">Goal</TableHead>
-                {weeks.map((w) => (
-                  <TableHead key={w.id} className="w-24 text-center">
+                <SortableTableHead sortKey="name" sort={sort} onToggle={toggle}>
+                  Household
+                </SortableTableHead>
+                <SortableTableHead sortKey="size" sort={sort} onToggle={toggle} className="w-20" align="center">
+                  Size
+                </SortableTableHead>
+                <SortableTableHead sortKey="goal" sort={sort} onToggle={toggle} className="w-24" align="center">
+                  Goal
+                </SortableTableHead>
+                {weeks.map((w, i) => (
+                  <SortableTableHead
+                    key={w.id}
+                    sortKey={`week:${i}`}
+                    sort={sort}
+                    onToggle={toggle}
+                    className="w-24"
+                    align="center"
+                  >
                     {weekLabel(w.weekDate)}
-                  </TableHead>
+                  </SortableTableHead>
                 ))}
-                <TableHead className="text-right">Total</TableHead>
+                <SortableTableHead sortKey="total" sort={sort} onToggle={toggle} align="right">
+                  Total
+                </SortableTableHead>
                 <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {roster.map((r) => (
+              {shown.map((r) => (
                 <TableRow key={r.id} className={r.householdActive ? '' : 'opacity-60'}>
                   <TableCell className="p-1">
                     <SearchableSelect
@@ -327,14 +374,14 @@ function RosterCard({
                   </TableCell>
                 </TableRow>
               ))}
-              {roster.length === 0 && (
+              {shown.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5 + weeks.length} className="text-muted-foreground py-8 text-center">
-                    No households on this campaign yet.
+                    {q ? `No household matches “${search.trim()}”.` : 'No households on this campaign yet.'}
                   </TableCell>
                 </TableRow>
               )}
-              {roster.length > 0 && (
+              {shown.length > 0 && (
                 <TableRow className="bg-muted/40 font-semibold">
                   <TableCell>Total</TableCell>
                   <TableCell className="text-center tabular-nums">
@@ -355,9 +402,10 @@ function RosterCard({
             </TableBody>
           </Table>
         </div>
-        <p className="text-muted-foreground mt-3 text-xs">
+        <p className="text-muted-foreground text-xs">
           Blank is not zero: leave a cell empty when a household reported nothing. Size is this campaign&rsquo;s
           headcount and is stored per campaign, so editing it never restates an earlier one.
+          {q ? ` Showing ${shown.length} of ${roster.length} households — the Total row stays campaign-wide.` : ''}
         </p>
       </CardContent>
 

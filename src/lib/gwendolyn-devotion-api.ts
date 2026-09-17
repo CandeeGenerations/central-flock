@@ -27,7 +27,50 @@ function buildQueryString(params?: Record<string, string | number | undefined>):
   return qs ? `?${qs}` : ''
 }
 
-export type DevotionalBlock = {type: 'point'; text: string} | {type: 'scripture'; text: string; reference: string}
+export type FindingKind =
+  | 'missing_reference'
+  | 'invalid_reference'
+  | 'wrong_reference'
+  | 'out_of_range'
+  | 'wording_differs'
+  | 'not_found'
+  | 'reference_format'
+
+export interface Dismissal {
+  kind: FindingKind
+  basis: string
+}
+
+export type DevotionalBlock =
+  | {type: 'point'; text: string}
+  | {type: 'scripture'; text: string; reference: string; dismissals?: Dismissal[]}
+
+// Scripture Check — see CONTEXT.md. Findings are derived server-side and never stored.
+export interface ScriptureFinding {
+  kind: FindingKind
+  message: string
+  basis: string
+  fix?: {reference?: string; text?: string}
+  candidates?: {reference: string; text: string}[]
+  diff?: {op: 'same' | 'del' | 'ins' | 'gap'; word: string}[]
+  aiNote?: string
+  dismissed?: boolean
+}
+
+export interface BlockCheck {
+  findings: ScriptureFinding[]
+  passage?: {reference: string; text: string}
+  aiChecked?: boolean
+}
+
+export function isDismissedBy(dismissals: Dismissal[] | undefined, f: ScriptureFinding): boolean {
+  return !!dismissals?.some((d) => d.kind === f.kind && d.basis === f.basis)
+}
+
+export function countOpenFindings(check: BlockCheck | undefined | null, dismissals?: Dismissal[]): number {
+  if (!check) return 0
+  return check.findings.filter((f) => !isDismissedBy(dismissals, f)).length
+}
 
 export type GwendolynStatus = 'received' | 'producing' | 'waiting_for_approval' | 'ready_to_upload' | 'done'
 
@@ -41,6 +84,11 @@ export interface GwendolynDevotional {
   status: GwendolynStatus
   createdAt: string
   updatedAt: string
+  // Present on the detail response (index-aligned with blocks; null for points)
+  checks?: (BlockCheck | null)[]
+  correctionNote?: string | null
+  // Present on list rows
+  openFindings?: number
 }
 
 export interface GwendolynListResponse {
@@ -56,6 +104,7 @@ export interface ParseResult {
   blocks: DevotionalBlock[]
   hashtags: string
   rawInput: string
+  checks: (BlockCheck | null)[]
   warning?: string
 }
 
@@ -63,7 +112,7 @@ export function fetchGwendolynDevotionals(params?: {
   search?: string
   status?: string
   page?: number
-  limit?: number
+  limit?: number | 'all'
   sort?: string
   sortDir?: string
 }): Promise<GwendolynListResponse> {
@@ -81,8 +130,18 @@ export function parseGwendolynDevotional(rawText: string): Promise<ParseResult> 
   })
 }
 
+// Each block carries its lead-in (the point before it), which may name the reference
+export function checkGwendolynBlocks(
+  blocks: (DevotionalBlock & {leadIn?: string})[],
+  ai = false,
+): Promise<{checks: (BlockCheck | null)[]}> {
+  return request('/gwendolyn-devotions/check', {method: 'POST', body: JSON.stringify({blocks, ai})})
+}
+
+export type GwendolynDevotionalInput = Pick<GwendolynDevotional, 'title' | 'date' | 'blocks' | 'hashtags' | 'status'>
+
 export function createGwendolynDevotional(
-  data: Omit<GwendolynDevotional, 'id' | 'createdAt' | 'updatedAt'>,
+  data: GwendolynDevotionalInput & {rawInput?: string | null},
 ): Promise<GwendolynDevotional> {
   return request<GwendolynDevotional>('/gwendolyn-devotions', {
     method: 'POST',
@@ -92,7 +151,7 @@ export function createGwendolynDevotional(
 
 export function updateGwendolynDevotional(
   id: number,
-  data: Partial<GwendolynDevotional>,
+  data: Partial<GwendolynDevotionalInput>,
 ): Promise<GwendolynDevotional> {
   return request<GwendolynDevotional>(`/gwendolyn-devotions/${id}`, {
     method: 'PUT',

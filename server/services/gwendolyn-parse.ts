@@ -1,3 +1,5 @@
+import {isBookName, looksLikeReference} from '../lib/bible-text.js'
+
 export type Block = {type: 'point'; text: string} | {type: 'scripture'; text: string; reference: string}
 
 export interface ParsedDevotional {
@@ -8,7 +10,91 @@ export interface ParsedDevotional {
 }
 
 const TAGLINE_RE = /^—?\s*Passing the truth along\s*$/i
-const BIBLE_REF_RE = /^[1-3]?\s*[A-Za-z]+\s+\d+:\d+/
+// Chapter/verse numbers at the end of a line: "3:17-18", "34:1", "14:2, 4", "23"
+const TRAILING_NUMBERS_RE =
+  /(\d+(?::\d+[ab]?)?(?:\s*[-–—]\s*\d+(?::\d+)?[ab]?)?(?:\s*[,;]\s*\d+(?::\d+)?[ab]?(?:\s*[-–—]\s*\d+[ab]?)?)*)\s*\)?\s*$/
+// A line that hands over to a quotation: "God said:", "The Bible says,", "Proverbs 23:7 says,"
+const LEAD_IN_RE = /[:,]\s*$/
+
+/**
+ * A reference at the end of a line — alone, in parentheses, after a dash, or trailing the quote
+ * itself (`…help thee.” Isaiah 41:10`). Book names can be several words ("Song of Solomon").
+ */
+export function splitTrailingReference(line: string): {rest: string; reference: string} | null {
+  const nums = line.match(TRAILING_NUMBERS_RE)
+  if (!nums || nums.index === undefined) return null
+  const before = line.slice(0, nums.index).trimEnd()
+  const words = before.split(/\s+/)
+  // Longest run of trailing words that names a book, e.g. "Song of Solomon", "1 John", "Psalm"
+  for (let k = Math.min(4, words.length); k >= 1; k--) {
+    const book = words
+      .slice(-k)
+      .join(' ')
+      .replace(/^[("“”'‘’—–-]+/, '')
+      .trim()
+    if (!book || !isBookName(book)) continue
+    const reference = `${book} ${nums[1].trim()}`
+    if (!looksLikeReference(reference)) continue
+    const rest = words
+      .slice(0, -k)
+      .join(' ')
+      .replace(/[\s(—–-]+$/, '')
+      .trim()
+    return {rest, reference}
+  }
+  return null
+}
+
+// Strip surrounding quotes (straight or curly) — she sometimes opens with a closing curly quote
+function stripQuotes(text: string): string {
+  return text.replace(/^["“”‘’]+|["“”‘’]+$/g, '').trim()
+}
+
+/**
+ * One 📖 segment → blocks, the way they are split by hand: a lead-in ("The Bible says,") becomes
+ * its own point before the Scripture Block, prose after the reference ("Just yield to Jesus Christ
+ * who says,") its own point after. A reference named only in the lead-in ("Proverbs 3:13 reminds
+ * us,") stays there — the Scripture Check reads it from the lead-in, and the caption doesn't repeat it.
+ */
+function parseScripture(lines: string[]): Block[] {
+  const joined = lines.join('\n')
+  const open = joined.search(/["“”]/)
+  const close = Math.max(joined.lastIndexOf('"'), joined.lastIndexOf('”'))
+
+  if (open >= 0 && close > open) {
+    const leadIn = joined.slice(0, open).trim()
+    const quote = joined.slice(open + 1, close).trim()
+    const after = joined
+      .slice(close + 1)
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+    let reference = ''
+    const first = after[0] ? splitTrailingReference(after[0]) : null
+    if (first && !first.rest) {
+      reference = first.reference
+      after.shift()
+    }
+    const blocks: Block[] = []
+    if (leadIn) blocks.push({type: 'point', text: leadIn})
+    if (quote) blocks.push({type: 'scripture', text: quote, reference})
+    if (after.length) blocks.push({type: 'point', text: after.join('\n')})
+    return blocks
+  }
+
+  // No quotation marks: the reference ends the block, on its own line or trailing the text
+  let reference = ''
+  let textLines = [...lines]
+  if (textLines.length > 0) {
+    const split = splitTrailingReference(textLines[textLines.length - 1])
+    if (split && (split.rest || textLines.length > 1)) {
+      reference = split.reference
+      textLines = split.rest ? [...textLines.slice(0, -1), split.rest] : textLines.slice(0, -1)
+    }
+  }
+  const text = stripQuotes(textLines.join('\n'))
+  return text ? [{type: 'scripture', text, reference}] : []
+}
 
 function parseDate(raw: string): string {
   // Normalize separators
@@ -80,25 +166,18 @@ export function parseDevotional(rawText: string): ParsedDevotional {
       .filter((l) => !TAGLINE_RE.test(l))
 
     if (marker === '📚') {
-      const text = contentLines.join('\n')
-      if (text) blocks.push({type: 'point', text})
-    } else {
-      // 📖 scripture: last line may be the reference
-      let reference = ''
-      let textLines = [...contentLines]
-
-      if (textLines.length > 1) {
-        const lastLine = textLines[textLines.length - 1]
-        if (BIBLE_REF_RE.test(lastLine)) {
-          reference = lastLine
-          textLines = textLines.slice(0, -1)
-        }
+      // A last line handing over to the next 📖 ("Proverbs 23:7 says,") is its own lead-in point
+      const nextIsScripture = segments.slice(j).find((s) => s === '📚' || s === '📖') === '📖'
+      const last = contentLines[contentLines.length - 1]
+      if (nextIsScripture && contentLines.length > 1 && LEAD_IN_RE.test(last)) {
+        blocks.push({type: 'point', text: contentLines.slice(0, -1).join('\n')})
+        blocks.push({type: 'point', text: last})
+      } else {
+        const text = contentLines.join('\n')
+        if (text) blocks.push({type: 'point', text})
       }
-
-      const raw = textLines.join('\n')
-      // Strip surrounding quotes (straight or curly) added by Gwendolyn
-      const text = raw.replace(/^["\u201C\u2018]+|["\u201D\u2019]+$/g, '').trim()
-      if (text) blocks.push({type: 'scripture', text, reference})
+    } else {
+      blocks.push(...parseScripture(contentLines))
     }
   }
 

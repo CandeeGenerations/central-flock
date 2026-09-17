@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {Pagination} from '@/components/ui/pagination'
+import {type PageSize, Pagination, resolvePageSize} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
@@ -27,11 +27,13 @@ import {
   fetchGwendolynDevotionals,
 } from '@/lib/gwendolyn-devotion-api'
 import {queryKeys} from '@/lib/query-keys'
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {keepPreviousData, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {EllipsisVertical, Plus, Trash2} from 'lucide-react'
-import {useState} from 'react'
+import {useEffect, useState} from 'react'
 import {Link, useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
+
+const PAGE_SIZES: PageSize[] = [10, 25, 50, 'all']
 
 const STATUS_STYLES: Record<GwendolynStatus, {className: string; label: string}> = {
   received: {className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200', label: 'Received'},
@@ -86,21 +88,24 @@ export function GwendolynListPage() {
   const [search, setSearch] = usePersistedState('gwend-list-search', '')
   const [statusFilter, setStatusFilter] = usePersistedState('gwend-list-status', 'all')
   const [page, setPage] = usePersistedState('gwend-list-page', 1)
+  const [size, setSize] = usePersistedState<PageSize>('gwend-list-size', 25)
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const debouncedSearch = useDebouncedValue(search, 300)
 
   const {data, isLoading} = useQuery({
-    queryKey: queryKeys.gwendolynDevotions(debouncedSearch, statusFilter),
+    queryKey: queryKeys.gwendolynDevotions(debouncedSearch, statusFilter, page, size),
     queryFn: () =>
       fetchGwendolynDevotionals({
         search: debouncedSearch || undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
         page,
-        limit: 25,
+        limit: size,
         sort: 'date',
         sortDir: 'desc',
       }),
+    // Keep the current page on screen while the next one loads
+    placeholderData: keepPreviousData,
   })
 
   const deleteMutation = useMutation({
@@ -115,7 +120,13 @@ export function GwendolynListPage() {
 
   const devotionals = data?.data ?? []
   const total = data?.total ?? 0
-  const limit = 25
+  const pageSize = resolvePageSize(size, total)
+
+  // A delete or a bigger page size can leave the remembered page past the end
+  const lastPage = Math.max(1, Math.ceil(total / pageSize))
+  useEffect(() => {
+    if (data && page > lastPage) setPage(lastPage)
+  }, [data, page, lastPage, setPage])
 
   return (
     <div className="p-4 md:p-6 max-w-6xl space-y-4">
@@ -192,7 +203,18 @@ export function GwendolynListPage() {
                         onClick={() => navigate(`/devotions/gwendolyn/${d.id}`)}
                       >
                         <TableCell className="text-sm">{formatDate(d.date)}</TableCell>
-                        <TableCell className="font-medium">{d.title}</TableCell>
+                        <TableCell className="font-medium">
+                          {d.title}
+                          {!!d.openFindings && (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                              title={`${d.openFindings} open scripture ${d.openFindings === 1 ? 'finding' : 'findings'}`}
+                            >
+                              ⚠️ {d.openFindings}
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <StatusBadge status={d.status} />
                         </TableCell>
@@ -216,7 +238,19 @@ export function GwendolynListPage() {
             </div>
             {total > 0 && (
               <CardContent>
-                <Pagination page={page} pageSize={limit} total={total} onPageChange={setPage} noun="devotionals" />
+                <Pagination
+                  page={page}
+                  pageSize={pageSize}
+                  total={total}
+                  onPageChange={setPage}
+                  noun="devotionals"
+                  size={size}
+                  sizeOptions={PAGE_SIZES}
+                  onSizeChange={(s) => {
+                    setSize(s)
+                    setPage(1)
+                  }}
+                />
               </CardContent>
             )}
           </Card>

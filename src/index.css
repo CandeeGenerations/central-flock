@@ -138,6 +138,14 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* The app shell owns the only scroller (see <main> in App.tsx). Pinning the document
+     keeps iOS from adding a second one behind it once viewport-fit=cover is in play. */
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
   html {
     @apply font-sans;
     font-size: 17px;

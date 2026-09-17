@@ -4,8 +4,10 @@ import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {PersonPicker} from '@/components/ui/person-picker'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {fetchAvailableCalendars, fetchSettings, updateSetting} from '@/lib/api'
+import {PRAYER_REQUEST_GROUP_KEY, PRAYER_REQUEST_TEMPLATE_KEY} from '@/hooks/use-prayer-request'
+import {fetchAvailableCalendars, fetchGroups, fetchSettings, fetchTemplates, updateSetting} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
 import {type ThemeMode, useTheme} from '@/lib/theme-context'
 import {cn} from '@/lib/utils'
@@ -32,6 +34,9 @@ export function SettingsPage() {
     },
   })
 
+  const {data: groups} = useQuery({queryKey: queryKeys.groups, queryFn: fetchGroups})
+  const {data: templates} = useQuery({queryKey: queryKeys.templates(), queryFn: () => fetchTemplates()})
+
   const [testingWebhook, setTestingWebhook] = useState(false)
 
   const testWebhook = async () => {
@@ -57,6 +62,8 @@ export function SettingsPage() {
   const defaultAiModel = settings?.defaultAiModel ?? 'sonnet'
   const webhookUrl = settings?.webhookUrl ?? ''
   const gwendolynPersonId = settings?.gwendolynPersonId ? Number(settings.gwendolynPersonId) : null
+  const prayerGroupId = settings?.[PRAYER_REQUEST_GROUP_KEY] ?? ''
+  const prayerTemplateId = settings?.[PRAYER_REQUEST_TEMPLATE_KEY] ?? ''
   const sendTime = settings?.birthdaySendTime ?? '07:00'
   const preNotifyDays = settings?.birthdayPreNotifyDays ?? ''
   const {mode, setMode} = useTheme()
@@ -181,6 +188,41 @@ export function SettingsPage() {
                 Used when scheduling a Gwendolyn clip text from a Gwendolyn devotional page.
               </p>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Prayer Request</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Group</Label>
+              <SearchableSelect
+                value={prayerGroupId}
+                onValueChange={(value) => mutation.mutate({key: PRAYER_REQUEST_GROUP_KEY, value})}
+                options={(groups ?? []).map((g) => ({value: String(g.id), label: g.name}))}
+                placeholder="Choose a group..."
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Template</Label>
+              <SearchableSelect
+                value={prayerTemplateId}
+                onValueChange={(value) => mutation.mutate({key: PRAYER_REQUEST_TEMPLATE_KEY, value})}
+                options={[...(templates ?? [])]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((t) => ({value: String(t.id), label: t.name}))}
+                placeholder="Choose a template..."
+                className="w-full"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              The Prayer Request shortcut opens a new message with this group and template already chosen. It stays
+              hidden on Home, the sidebar and the command palette until both point at a group and template that still
+              exist.
+            </p>
           </CardContent>
         </Card>
 

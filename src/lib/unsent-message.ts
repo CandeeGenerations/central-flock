@@ -13,9 +13,16 @@ export type UnsentEnvelope<T> = {savedAt: number; data: T}
  * Scopes a buffer to what is being composed, so it is only ever restored in the context
  * it was captured in. A `:new` buffer is never offered inside an open draft, and vice versa.
  */
-export function unsentKey(params: {draftId?: number | null; editMessageId?: string | null}): string {
+export function unsentKey(params: {
+  draftId?: number | null
+  editMessageId?: string | null
+  prayerRequest?: boolean
+}): string {
   if (params.editMessageId) return `${PREFIX}msg:${params.editMessageId}`
   if (params.draftId) return `${PREFIX}draft:${params.draftId}`
+  // A Prayer Request is its own compose context, so a leftover plain new message can never
+  // replace its preselected group and template — nor be clobbered by it.
+  if (params.prayerRequest) return `${PREFIX}prayer-request`
   return `${PREFIX}new`
 }
 
@@ -103,5 +110,6 @@ export function unsentComposeHref(key: string): string {
   const rest = key.slice(PREFIX.length)
   if (rest.startsWith('draft:')) return `/messages/compose?draftId=${rest.slice('draft:'.length)}`
   if (rest.startsWith('msg:')) return `/messages/compose?editMessageId=${rest.slice('msg:'.length)}`
+  if (rest === 'prayer-request') return '/messages/compose?prayerRequest=1'
   return '/messages/compose'
 }

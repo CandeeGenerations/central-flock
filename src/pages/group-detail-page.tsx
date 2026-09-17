@@ -12,6 +12,7 @@ import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
+import {PRAYER_REQUEST_GROUP_WARNING, usePrayerRequest} from '@/hooks/use-prayer-request'
 import {
   type Person,
   addGroupMembers,
@@ -44,6 +45,7 @@ import {toast} from 'sonner'
 
 export function GroupDetailPage() {
   const {id} = useParams<{id: string}>()
+  const prayerRequest = usePrayerRequest()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const groupId = Number(id)
@@ -501,7 +503,11 @@ export function GroupDetailPage() {
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
         title="Delete this group?"
-        description="Members will not be deleted."
+        description={
+          groupId === prayerRequest.groupId
+            ? `Members will not be deleted. ${PRAYER_REQUEST_GROUP_WARNING}`
+            : 'Members will not be deleted.'
+        }
         confirmLabel="Delete"
         variant="destructive"
         loading={deleteMutation.isPending}

@@ -3,6 +3,7 @@ import {Button} from '@/components/ui/button'
 import {Calendar as CalendarWidget} from '@/components/ui/calendar'
 import {Card, CardContent} from '@/components/ui/card'
 import {Pagination} from '@/components/ui/pagination'
+import {SearchInput} from '@/components/ui/search-input'
 import {PageSpinner} from '@/components/ui/spinner'
 import {type CalendarEvent, fetchCalendarEvents, fetchSettings, triggerCalendarSync} from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
@@ -120,6 +121,7 @@ export function CalendarPage() {
   const [dismissedMissing, setDismissedMissing] = useState<Set<string>>(new Set())
   const [enabledCalendars, setEnabledCalendars] = useState<Set<string> | null>(null)
   const [rsvpFromEvent, setRsvpFromEvent] = useState<{eventUid: string; title: string} | null>(null)
+  const [search, setSearch] = useState('')
 
   const queryClient = useQueryClient()
   const {data: settings} = useQuery({queryKey: queryKeys.settings, queryFn: fetchSettings})
@@ -188,19 +190,25 @@ export function CalendarPage() {
     return out
   }, [visibleEvents])
 
-  const monthEvents = useMemo(() => {
+  // Searching leaves the month behind on purpose: "when is the fall banquet"
+  // cannot be answered by a filter that only ever looks at one month, and
+  // month-by-month hunting for it is the thing being replaced. The calendar
+  // sidebar keeps its own month either way.
+  const q = search.trim().toLowerCase()
+  const listedEvents = useMemo(() => {
     const monthStart = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth(), 1).getTime()
     const monthEnd = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() + 1, 1).getTime()
-    return visibleEvents
-      .filter((e) => {
-        const start = new Date(e.startDate).getTime()
-        const end = new Date(e.endDate).getTime()
-        return start < monthEnd && end > monthStart
-      })
-      .sort((a, b) => a.startDate.localeCompare(b.startDate))
-  }, [visibleEvents, displayedMonth])
+    const inScope = q
+      ? visibleEvents.filter((e) => [e.title, e.location, e.calendarName].some((f) => f?.toLowerCase().includes(q)))
+      : visibleEvents.filter((e) => {
+          const start = new Date(e.startDate).getTime()
+          const end = new Date(e.endDate).getTime()
+          return start < monthEnd && end > monthStart
+        })
+    return [...inScope].sort((a, b) => a.startDate.localeCompare(b.startDate))
+  }, [visibleEvents, displayedMonth, q])
 
-  const filterKey = `${displayedMonth.getTime()}|${[...effectiveEnabled].sort().join(',')}`
+  const filterKey = `${displayedMonth.getTime()}|${q}|${[...effectiveEnabled].sort().join(',')}`
   const [lastFilterKey, setLastFilterKey] = useState(filterKey)
   if (lastFilterKey !== filterKey) {
     setLastFilterKey(filterKey)
@@ -209,8 +217,8 @@ export function CalendarPage() {
 
   const paginatedEvents = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE
-    return monthEvents.slice(start, start + PAGE_SIZE)
-  }, [monthEvents, page])
+    return listedEvents.slice(start, start + PAGE_SIZE)
+  }, [listedEvents, page])
 
   const missingToShow = (data?.missing ?? []).filter((m) => !dismissedMissing.has(m))
 
@@ -328,13 +336,29 @@ export function CalendarPage() {
           <div className="grid grid-cols-1 lg:grid-cols-5">
             {/* Events list */}
             <div className="lg:col-span-3 p-4 md:p-6 space-y-3 lg:border-r">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-lg font-semibold">Events in {monthLabel}</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold">
+                  {q ? `Matching “${search.trim()}”` : `Events in ${monthLabel}`}
+                </h2>
+                <SearchInput
+                  value={search}
+                  onChange={setSearch}
+                  onClear={() => setSearch('')}
+                  placeholder="Search all events…"
+                  containerClassName="w-full sm:w-64"
+                />
               </div>
+              {q && (
+                <p className="text-xs text-muted-foreground">
+                  Searching every event in the next {DAYS_AHEAD} days, not just {monthLabel}.
+                </p>
+              )}
 
-              {monthEvents.length === 0 ? (
+              {listedEvents.length === 0 ? (
                 <div className="py-12 text-center">
-                  <p className="text-sm text-muted-foreground">No events in {monthLabel}.</p>
+                  <p className="text-sm text-muted-foreground">
+                    {q ? `No events match “${search.trim()}”.` : `No events in ${monthLabel}.`}
+                  </p>
                 </div>
               ) : (
                 <>
@@ -379,7 +403,7 @@ export function CalendarPage() {
                   <Pagination
                     page={page}
                     pageSize={PAGE_SIZE}
-                    total={monthEvents.length}
+                    total={listedEvents.length}
                     onPageChange={setPage}
                     noun="events"
                   />

@@ -709,6 +709,44 @@ function firstSundayOnOrAfter(iso: string): string {
   return `${y}-${m}-${day}`
 }
 
+// DELETE /api/schedules/:id/cells
+// Empties the schedule: every special_music row the scope is a view over goes,
+// performers with them (FK cascade). Because a special_music row belongs to a
+// DATE and not to a schedule, this is also what a second schedule over the same
+// weeks sees — deleting the envelope alone leaves the entries behind, which is
+// why the list page offers to run this alongside the delete.
+schedulesRouter.delete(
+  '/:id/cells',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    const schedule = db.select().from(schema.schedules).where(eq(schema.schedules.id, id)).get()
+    if (!schedule) {
+      res.status(404).json({error: 'Schedule not found'})
+      return
+    }
+    if (schedule.scheduleType !== 'special_music' || !schedule.scopeStart || !schedule.scopeEnd) {
+      res.status(400).json({error: 'Schedule is not a special_music date-range schedule'})
+      return
+    }
+    const scoped = and(
+      between(schema.specialMusic.date, schedule.scopeStart, schedule.scopeEnd),
+      inArray(schema.specialMusic.serviceTimeId, specialMusicServiceTimeIds()),
+    )
+    const doomed = db.select({id: schema.specialMusic.id}).from(schema.specialMusic).where(scoped).all()
+    if (doomed.length > 0) {
+      db.delete(schema.specialMusic)
+        .where(
+          inArray(
+            schema.specialMusic.id,
+            doomed.map((r) => r.id),
+          ),
+        )
+        .run()
+    }
+    res.json({deleted: doomed.length})
+  }),
+)
+
 // ── Special Music body: cells in scope ─────────────────────────────────
 // Returns the special_music rows that the schedule's date range
 // (Sundays only, AM + PM) is a view over, decorated with performers and

@@ -1,6 +1,6 @@
 import type {ZoomMode} from '@/components/print/scaled-page'
 import {Button} from '@/components/ui/button'
-import {Check, Download, FileImage, MessageSquare, Pencil} from 'lucide-react'
+import {Check, Download, FileImage, MessageSquare, Pencil, Trash2} from 'lucide-react'
 
 // ADR 0021: a fixed page box on a narrow viewport renders 12pt body text far
 // smaller than 12pt, so every sheet that prints from one carries a zoom stepper.
@@ -18,6 +18,8 @@ interface ScheduleActionsToolbarProps {
   onReopen: () => void
   onExport: (format: 'pdf' | 'jpg') => void
   onSend: () => void
+  /** Draft + edit mode only, and only when the sheet has something to clear. */
+  onClearAll?: () => void
   finalizing?: boolean
   reopening?: boolean
   zoom: ZoomMode
@@ -32,6 +34,7 @@ export function ScheduleActionsToolbar({
   onReopen,
   onExport,
   onSend,
+  onClearAll,
   finalizing,
   reopening,
   zoom,
@@ -58,6 +61,12 @@ export function ScheduleActionsToolbar({
             <Pencil className="mr-1 h-4 w-4" />
             {editMode ? 'Preview' : 'Edit'}
           </Button>
+          {editMode && onClearAll && (
+            <Button variant="outline" size="sm" className="hidden md:flex" onClick={onClearAll}>
+              <Trash2 className="mr-1 h-4 w-4" />
+              Clear All
+            </Button>
+          )}
           <Button size="sm" className="hidden md:flex" onClick={onFinalize} disabled={finalizing}>
             <Check className="mr-1 h-4 w-4" />
             Finalize

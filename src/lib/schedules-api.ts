@@ -217,6 +217,10 @@ export interface DoubleBooking {
   specialMusicTitle: string | null
 }
 
+/** Empties a special-music schedule — the entries in its scope, not the envelope. */
+export const clearSpecialMusicCells = (scheduleId: number) =>
+  request<{deleted: number}>(`/schedules/${scheduleId}/cells`, {method: 'DELETE'})
+
 export const fetchSpecialMusicCells = (scheduleId: number) =>
   request<{schedule: Schedule; cells: SpecialMusicCell[]; doubleBookings: DoubleBooking[]}>(
     `/schedules/${scheduleId}/cells`,

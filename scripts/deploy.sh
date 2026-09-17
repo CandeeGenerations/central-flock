@@ -50,7 +50,7 @@ fi
 
 # 2. Lint + typecheck
 echo "==> Lint + typecheck"
-pnpm eslint
+pnpm lint
 
 # 2b. Apply any pending DB migrations.
 #

@@ -50,7 +50,9 @@ function toggleDay(eligibleDays: string, day: 'sun' | 'wed' | 'sat'): string {
   const current = new Set(eligibleDays.split(',').filter(Boolean))
   if (current.has(day)) current.delete(day)
   else current.add(day)
-  return [...DAYS.map((d) => d.key)].filter((d) => current.has(d)).join(',')
+  return DAYS.map((d) => d.key)
+    .filter((d) => current.has(d))
+    .join(',')
 }
 
 interface Props {

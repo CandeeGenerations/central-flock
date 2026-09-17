@@ -8,7 +8,7 @@ Central Flock is a macOS desktop app for managing contacts and sending personali
 
 - `pnpm dev` — Start frontend (Vite, port 5173) and backend (Express, port 5172) concurrently
 - `pnpm build` — TypeScript compile + Vite production build
-- `pnpm lint` — Run ESLint + TypeScript type checking (both `tsconfig.app.json` and `tsconfig.server.json`)
+- `pnpm lint` — Run TypeScript type checking (both `tsconfig.app.json` and `tsconfig.server.json`) + oxlint
 - `pnpm db:generate` — Generate Drizzle migration files
 - `pnpm db:migrate` — Apply pending migration files (idempotent; ledger in `__drizzle_migrations`)
 - `pnpm db:push` — Diff schema and push directly (skips migration files; dev convenience, not for prod)

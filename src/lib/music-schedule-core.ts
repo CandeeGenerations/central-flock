@@ -516,7 +516,10 @@ export function draftBoothLine(slot: MusicBoothSlot, lines: OrderLine[]): {text:
   const sel = lines.find((l) => l.role === 'pastor_selection')
   if (!sel) return null
   const idx = lines.indexOf(sel)
-  const lead = [...lines.slice(0, idx)].reverse().find((l) => l.role === 'plain' && l.text.trim())
+  const lead = lines
+    .slice(0, idx)
+    .reverse()
+    .find((l) => l.role === 'plain' && l.text.trim())
   const leadText = lead?.text.trim() || 'Prayer, Announcements'
   return {text: `${leadText}, _${sel.text.trim()}_`, highlight: sel.boothHighlight}
 }

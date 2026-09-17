@@ -9,7 +9,7 @@ For deployment plumbing (launchd plists, env vars, cloudflared tunnel), see [mem
 `./scripts/deploy.sh` is the only sanctioned path. It performs, in order:
 
 1. Working-tree clean check (warns + prompts if dirty).
-2. Lint + typecheck (`pnpm eslint`).
+2. Lint + typecheck (`pnpm lint`).
 3. **Atomic DB backup** (`sqlite3 .backup`) to `backups/central-flock.db.pre-migrate-<utc-ts>-<sha>`. Bails if the backup file is empty.
 4. **Apply pending DB migrations** (`pnpm db:migrate`). Idempotent — no-ops when nothing pending.
 5. Build with Sentry release tagging (uploads source maps when `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` are set).

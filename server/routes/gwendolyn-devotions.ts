@@ -21,8 +21,7 @@ export const gwendolynDevotionsRouter = Router()
 const table = schema.gwendolynDevotions
 
 type StoredBlock =
-  | {type: 'point'; text: string}
-  | {type: 'scripture'; text: string; reference: string; dismissals?: Dismissal[]}
+  {type: 'point'; text: string} | {type: 'scripture'; text: string; reference: string; dismissals?: Dismissal[]}
 
 // A scripture block's lead-in is the point just before it
 function leadInOf(blocks: StoredBlock[], i: number): string | undefined {

@@ -233,8 +233,7 @@ const SERVICES: SeedService[] = [
 /* ------------------------------------------------------------------ seed */
 
 const existing = db.prepare('select id from music_schedules where week_start = ?').get(WEEK_START) as
-  | {id: number}
-  | undefined
+  {id: number} | undefined
 if (existing) {
   console.log(`Week ${WEEK_START} already exists (id ${existing.id}) — nothing to do.`)
   process.exit(0)
@@ -242,8 +241,7 @@ if (existing) {
 
 const hymnId = (book: Book, number: number): number | null => {
   const row = db.prepare('select id from hymns where book = ? and number = ?').get(book, number) as
-    | {id: number}
-    | undefined
+    {id: number} | undefined
   if (!row) {
     console.warn(`  ! no ${book} #${number} in the hymns catalogue — seeding the line with no reference`)
     return null

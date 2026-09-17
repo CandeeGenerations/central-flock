@@ -45,8 +45,7 @@ export interface Alignment extends Occurrence {
 export type ResolveFailure = 'unparseable' | 'unknown-book' | 'no-such-chapter' | 'no-such-verse' | 'bad-range'
 
 export type Resolved =
-  | {ok: true; canonical: string; verses: number[]}
-  | {ok: false; reason: ResolveFailure; message: string}
+  {ok: true; canonical: string; verses: number[]} | {ok: false; reason: ResolveFailure; message: string}
 
 // ---------------------------------------------------------------------------
 // Data + index (lazy)

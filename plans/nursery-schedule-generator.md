@@ -19,31 +19,34 @@ Following the Devotions pattern (`server/db-devotions/`), nursery gets its own S
 ### Schema
 
 **`nursery_workers`** — People who can work nursery
-| Column | Type | Notes |
-|---|---|---|
-| id | integer PK auto | |
-| name | text NOT NULL | |
-| maxPerMonth | integer NOT NULL default 4 | Overall monthly cap |
-| allowMultiplePerDay | boolean NOT NULL default false | Can work >1 service same day |
-| isActive | boolean NOT NULL default true | |
-| createdAt, updatedAt | text (datetime) | |
+
+| Column               | Type                           | Notes                        |
+| -------------------- | ------------------------------ | ---------------------------- |
+| id                   | integer PK auto                |                              |
+| name                 | text NOT NULL                  |                              |
+| maxPerMonth          | integer NOT NULL default 4     | Overall monthly cap          |
+| allowMultiplePerDay  | boolean NOT NULL default false | Can work >1 service same day |
+| isActive             | boolean NOT NULL default true  |                              |
+| createdAt, updatedAt | text (datetime)                |                              |
 
 **`nursery_worker_services`** — Which services each worker is eligible for
-| Column | Type | Notes |
-|---|---|---|
-| id | integer PK auto | |
-| workerId | integer FK → nursery*workers (cascade) | |
-| serviceType | text enum | `sunday_school`, `morning`, `evening`, `wednesday_evening` |
-| maxPerMonth | integer nullable | Per-service cap; null = no per-service limit |
-| \_unique* | (workerId, serviceType) | |
+
+| Column      | Type                                   | Notes                                                      |
+| ----------- | -------------------------------------- | ---------------------------------------------------------- |
+| id          | integer PK auto                        |                                                            |
+| workerId    | integer FK → nursery*workers (cascade) |                                                            |
+| serviceType | text enum                              | `sunday_school`, `morning`, `evening`, `wednesday_evening` |
+| maxPerMonth | integer nullable                       | Per-service cap; null = no per-service limit               |
+| \_unique*   | (workerId, serviceType)                |                                                            |
 
 **`nursery_service_config`** — How many workers each service needs
-| Column | Type | Notes |
-|---|---|---|
-| serviceType | text PK | `sunday_school`, `morning`, `evening`, `wednesday_evening` |
-| label | text NOT NULL | Display name (e.g., "Sunday School Service") |
-| workerCount | integer NOT NULL default 2 | 1 or 2 |
-| sortOrder | integer NOT NULL | Display order |
+
+| Column      | Type                       | Notes                                                      |
+| ----------- | -------------------------- | ---------------------------------------------------------- |
+| serviceType | text PK                    | `sunday_school`, `morning`, `evening`, `wednesday_evening` |
+| label       | text NOT NULL              | Display name (e.g., "Sunday School Service")               |
+| workerCount | integer NOT NULL default 2 | 1 or 2                                                     |
+| sortOrder   | integer NOT NULL           | Display order                                              |
 
 Seeded at startup via INSERT OR IGNORE in `db-nursery/index.ts` with defaults from the PDF:
 
@@ -53,31 +56,34 @@ Seeded at startup via INSERT OR IGNORE in `db-nursery/index.ts` with defaults fr
 - Wednesday Evening Service → 2 workers, sort 4
 
 **`nursery_schedules`** — Generated schedules (historical record)
-| Column | Type | Notes |
-|---|---|---|
-| id | integer PK auto | |
-| month | integer NOT NULL | 1-12 |
-| year | integer NOT NULL | |
-| status | text enum `draft` / `final` | draft = editable, final = locked |
-| createdAt, updatedAt | text (datetime) | |
+
+| Column               | Type                        | Notes                            |
+| -------------------- | --------------------------- | -------------------------------- |
+| id                   | integer PK auto             |                                  |
+| month                | integer NOT NULL            | 1-12                             |
+| year                 | integer NOT NULL            |                                  |
+| status               | text enum `draft` / `final` | draft = editable, final = locked |
+| createdAt, updatedAt | text (datetime)             |                                  |
 
 **`nursery_assignments`** — Individual worker slot assignments
-| Column | Type | Notes |
-|---|---|---|
-| id | integer PK auto | |
-| scheduleId | integer FK → nursery*schedules (cascade) | |
-| date | text NOT NULL | YYYY-MM-DD (actual date, may cross month boundary) |
-| serviceType | text enum | |
-| slot | integer NOT NULL | 1 or 2 |
-| workerId | integer FK → nursery_workers (set null on delete) | nullable for unassigned slots |
-| \_unique* | (scheduleId, date, serviceType, slot) | |
+
+| Column      | Type                                              | Notes                                              |
+| ----------- | ------------------------------------------------- | -------------------------------------------------- |
+| id          | integer PK auto                                   |                                                    |
+| scheduleId  | integer FK → nursery*schedules (cascade)          |                                                    |
+| date        | text NOT NULL                                     | YYYY-MM-DD (actual date, may cross month boundary) |
+| serviceType | text enum                                         |                                                    |
+| slot        | integer NOT NULL                                  | 1 or 2                                             |
+| workerId    | integer FK → nursery_workers (set null on delete) | nullable for unassigned slots                      |
+| \_unique*   | (scheduleId, date, serviceType, slot)             |                                                    |
 
 **`nursery_settings`** — Key-value store for logo path, etc.
-| Column | Type | Notes |
-|---|---|---|
-| key | text PK | |
-| value | text NOT NULL | |
-| updatedAt | text (datetime) | |
+
+| Column    | Type            | Notes |
+| --------- | --------------- | ----- |
+| key       | text PK         |       |
+| value     | text NOT NULL   |       |
+| updatedAt | text (datetime) |       |
 
 ---
 

@@ -233,7 +233,7 @@ function headerCountsForDay(signups, day): string // '(8)' or '(7-6 // 8-7)' or 
 
 For each slot: `open = headcount at slot.startMinute`,
 `close = headcount at (slot.endMinute - 1)`. Render as
-`open === close ? `${open}` : `${open}-${close}``. Join slots with ` // `.
+`open === close ? `${open}` : `${open}-${close}``. Join slots with `//`.
 
 **Hispanic coverage:**
 

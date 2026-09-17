@@ -265,8 +265,7 @@ function rowsForTerm2(): RowSeed[] {
 
 function seedEdition(term: 1 | 2, startingLessonNumber: number, months: MonthSeed[], rows: RowSeed[]) {
   const existing = db.prepare('SELECT id FROM workers_notes_editions WHERE year = ? AND term = ?').get(2026, term) as
-    | {id: number}
-    | undefined
+    {id: number} | undefined
   if (existing) {
     console.log(`  2026 term ${term}: already seeded (edition ${existing.id}) — left alone`)
     return existing.id

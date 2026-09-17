@@ -212,8 +212,7 @@ const tx = sqlite.transaction(() => {
   // 6. Move logo path from nursery_settings to settings
   if (tableExists('nursery_settings')) {
     const oldRow = sqlite.prepare(`SELECT value FROM nursery_settings WHERE key='logoPath'`).get() as
-      | {value: string}
-      | undefined
+      {value: string} | undefined
     if (oldRow) {
       const newPath = oldRow.value.replace('/nursery-logos/', '/schedule-logos/')
       console.log(`  migrating logo path -> ${newPath}`)

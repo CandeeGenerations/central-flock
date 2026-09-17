@@ -69,8 +69,7 @@ function backupAll(): string {
 
 function checkSentinel(target: Database.Database): void {
   const row = target.prepare(`SELECT value FROM settings WHERE key = ?`).get(SENTINEL_KEY) as
-    | {value: string}
-    | undefined
+    {value: string} | undefined
   if (row) {
     throw new Error(
       `Consolidation sentinel already set (settings.${SENTINEL_KEY} = ${row.value}). ` +

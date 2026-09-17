@@ -42,8 +42,7 @@ export interface Dismissal {
 }
 
 export type DevotionalBlock =
-  | {type: 'point'; text: string}
-  | {type: 'scripture'; text: string; reference: string; dismissals?: Dismissal[]}
+  {type: 'point'; text: string} | {type: 'scripture'; text: string; reference: string; dismissals?: Dismissal[]}
 
 // Scripture Check — see CONTEXT.md. Findings are derived server-side and never stored.
 export interface ScriptureFinding {

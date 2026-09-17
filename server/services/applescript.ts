@@ -1,8 +1,14 @@
 import {spawn} from 'child_process'
 
+// pbcopy, pbpaste and osascript decode their stdin using the locale's text encoding. The
+// launchd service runs with no LANG, and __CF_USER_TEXT_ENCODING then falls back to MacRoman,
+// so a UTF-8 emoji (😘 = f0 9f 98 98) reaches Messages as "üòò". A terminal sets LANG, which is
+// why this only ever bites in production. See memory/deployment.md.
+const UTF8_ENV = {...process.env, LANG: process.env.LANG || 'en_US.UTF-8'}
+
 function spawnStdin(command: string, args: string[], input: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(command, args)
+    const proc = spawn(command, args, {env: UTF8_ENV})
     let stdout = ''
     let stderr = ''
     proc.stdout.on('data', (data) => (stdout += data))

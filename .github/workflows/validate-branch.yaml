@@ -46,5 +46,5 @@ jobs:
           cache: pnpm
       - name: Install deps
         run: pnpm install --ignore-scripts
-      - name: Run ESLint
-        run: pnpm run eslint
+      - name: Run Lint
+        run: pnpm run lint

@@ -18,7 +18,7 @@ jobs:
           node-version-file: '.nvmrc'
           cache: pnpm
       - name: Install deps
-        run: pnpm install:ci
+        run: pnpm install --frozen-lockfile
       - name: Configure Git
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"

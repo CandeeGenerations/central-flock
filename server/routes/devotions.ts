@@ -3,7 +3,6 @@ import {and, asc, desc, eq, inArray, like, or, sql} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'fs'
 import path from 'path'
-import * as XLSX from 'xlsx'
 import {YoutubeTranscript} from 'youtube-transcript'
 
 import {db, schema} from '../db/index.js'
@@ -12,6 +11,7 @@ import {parseReference, referenceKeys} from '../lib/bible-reference.js'
 import {retargetDescriptionHeader} from '../lib/devotion-description-header.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 import {uploadPath, uploadUrl, urlToDiskPath} from '../lib/uploads.js'
+import {readWorkbookFromBuffer, sheetNames, sheetRows} from '../lib/xlsx-rows.js'
 import {generateDevotionPassage} from '../services/devotion-generation.js'
 import {importDevotions, parseSheetRows} from '../services/devotion-import.js'
 import {parseDevotionImage} from '../services/devotion-ocr.js'
@@ -2460,7 +2460,7 @@ devotionsRouter.post(
     }
 
     const buffer = Buffer.from(data, 'base64')
-    const workbook = XLSX.read(buffer, {type: 'buffer', cellDates: true, raw: true})
+    const workbook = await readWorkbookFromBuffer(buffer)
 
     // Extract year from filename like "Devotional Log (2026).xlsx"
     const yearMatch = filename?.match(/\((\d{4})\)/)
@@ -2484,15 +2484,16 @@ devotionsRouter.post(
     const allDevotions: ReturnType<typeof parseSheetRows>['devotions'] = []
     const allWarnings: string[] = []
 
-    for (const sheetName of workbook.SheetNames) {
+    for (const sheetName of sheetNames(workbook)) {
       const month = monthNames[sheetName.toLowerCase()]
       if (!month) {
         allWarnings.push(`Skipping unknown sheet: ${sheetName}`)
         continue
       }
 
-      const sheet = workbook.Sheets[sheetName]
-      const rows = XLSX.utils.sheet_to_json(sheet, {header: 1}) as unknown[][]
+      const sheet = workbook.getWorksheet(sheetName)
+      if (!sheet) continue
+      const rows = sheetRows(sheet)
 
       const {devotions, warnings} = parseSheetRows(rows, fileYear, month)
       allDevotions.push(...devotions)

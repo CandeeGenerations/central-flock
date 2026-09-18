@@ -35,14 +35,14 @@ export function ExportSchedulePdfDialog({
   // When the modal opens (or the recipient list changes), reset selection
   // to "everyone." That way a user reopening for a reprint always sees a
   // fresh full list and can prune.
-  /* eslint-disable react-hooks/set-state-in-effect */
+  /* oxlint-disable react/set-state-in-effect */
   useEffect(() => {
     if (open) {
       setSelected(new Set(recipients.map((r) => r.key)))
       setCopies(defaultUnhighlightedCopies)
     }
   }, [open, recipients, defaultUnhighlightedCopies])
-  /* eslint-enable react-hooks/set-state-in-effect */
+  /* oxlint-enable react/set-state-in-effect */
 
   const allSelected = selected.size === recipients.length && recipients.length > 0
   const noneSelected = selected.size === 0

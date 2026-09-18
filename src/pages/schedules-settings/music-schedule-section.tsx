@@ -35,7 +35,7 @@ export function MusicScheduleSettingsSection() {
   })
 
   const [headings, setHeadings] = useState<Record<string, {music: string; booth: string}>>({})
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // oxlint-disable-next-line react/set-state-in-effect
   useEffect(() => setHeadings(settings?.musicSchedule.serviceHeadings ?? {}), [settings?.musicSchedule.serviceHeadings])
 
   if (!settings) return <PageSpinner />

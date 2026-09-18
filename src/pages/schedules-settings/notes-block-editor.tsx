@@ -37,7 +37,7 @@ export function NotesBlockEditor({
   saving?: boolean
 }) {
   const [local, setLocal] = useState<WorkersNotesBlock[]>(blocks)
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // oxlint-disable-next-line react/set-state-in-effect
   useEffect(() => setLocal(blocks), [blocks])
   const dirty = JSON.stringify(local) !== JSON.stringify(blocks)
 

@@ -243,7 +243,7 @@ includeMusic: hasMusic})` so it reproduces the original's portion set; for the
 
 ## Verification checklist
 
-- [ ] `pnpm lint` (ESLint + tsc for app + server) clean; `pnpm prettier` applied.
+- [ ] `pnpm lint` (oxlint + tsc for app + server) clean; `pnpm prettier` applied.
 - [ ] Existing quotes-only searches still open (music tab shows "not searched" CTA).
 - [ ] Both-on search: quotes appear immediately; lyrics arrive later with toast.
 - [ ] Music-only search (quotes toggle off) creates a row, Quotes tab shows

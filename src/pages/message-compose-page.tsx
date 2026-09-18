@@ -1505,7 +1505,7 @@ export function MessageComposePage() {
                   <div className="space-y-2">
                     <Label>Send Date and Time</Label>
                     <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
-                    {/* eslint-disable-next-line react-hooks/purity */}
+                    {/* oxlint-disable-next-line react/purity */}
                     {scheduledAt && new Date(scheduledAt).getTime() <= Date.now() && (
                       <p className="text-xs text-destructive">Scheduled time must be in the future</p>
                     )}
@@ -1554,7 +1554,7 @@ export function MessageComposePage() {
                   sendMutation.isPending ||
                   recipients.length === 0 ||
                   !content.trim() ||
-                  // eslint-disable-next-line react-hooks/purity
+                  // oxlint-disable-next-line react/purity
                   (sendTimeMode === 'schedule' && !!scheduledAt && new Date(scheduledAt).getTime() <= Date.now())
                 }
               >

@@ -375,4 +375,4 @@ After generation, the route handler filters `slots` to drop carryover entries be
 11. **Export JPG**: Download → open → verify image is clean and readable
 12. **History**: Generate multiple months → verify schedule list shows all with correct status
 13. **Finalize**: Finalize a schedule → confirm edits are blocked
-14. **Run `pnpm eslint`** — confirm no type errors or lint violations
+14. **Run `pnpm lint`** — confirm no type errors or lint violations

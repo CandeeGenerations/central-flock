@@ -122,7 +122,6 @@ Sentry.setupExpressErrorHandler(app)
 // Final JSON error responder — replaces Express's default HTML error page.
 // Sentry has already captured the exception by this point.
 // Four args required for Express to recognize this as an error handler.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Unhandled error:', err)
   res.status(500).json({error: 'Internal server error'})

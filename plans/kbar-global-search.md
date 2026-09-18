@@ -124,7 +124,7 @@ Folders don't have a dedicated detail page — they expand inline on [notes-page
 
 ## Verification
 
-1. **Install deps**: `pnpm add cmdk fuse.js`. Run `pnpm eslint && pnpm prettier` (per memory).
+1. **Install deps**: `pnpm add cmdk fuse.js`. Run `pnpm lint && pnpm prettier` (per memory).
 2. **No manual dev server** — launchd restart per [feedback_no_manual_dev.md](feedback_no_manual_dev.md). Verify at http://localhost:5173 after launchd picks up the Vite change.
 3. **Functional:**
    - Press `⌘K` anywhere → palette opens, input auto-focused.
@@ -141,7 +141,7 @@ Folders don't have a dedicated detail page — they expand inline on [notes-page
    - `⌘D` and `⌘,` still work.
    - All 16 pages using `SearchInput` now show `⌘⇧K` hint.
 5. **Mobile:** Resize to `<768px` → sidebar hidden, header search icon visible, tap opens palette full-screen.
-6. **Type check:** `pnpm eslint` (runs `tsc -b` + server tsc) passes.
+6. **Type check:** `pnpm lint` (runs `tsc -b` + server tsc) passes.
 
 ## Phased Implementation
 

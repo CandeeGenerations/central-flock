@@ -22,7 +22,7 @@ A macOS desktop application for managing contacts and sending personalized bulk 
 | Backend  | Express 5, TypeScript                           |
 | Database | SQLite (better-sqlite3) with Drizzle ORM        |
 | UI       | Radix UI, Lucide icons, Sonner toasts           |
-| Tooling  | Vite 7, pnpm, ESLint, Prettier, Husky           |
+| Tooling  | Vite 7, pnpm, oxlint, Prettier, Husky           |
 
 ## Prerequisites
 
@@ -53,7 +53,7 @@ The app will be available at [http://localhost:5173](http://localhost:5173). The
 | `pnpm dev:client`  | Start Vite dev server only                   |
 | `pnpm dev:server`  | Start Express backend only (with hot reload) |
 | `pnpm build`       | TypeScript compile + Vite production build   |
-| `pnpm lint`        | Run ESLint and TypeScript type checking      |
+| `pnpm lint`        | Run oxlint and TypeScript type checking      |
 | `pnpm db:generate` | Generate Drizzle migration files             |
 | `pnpm db:migrate`  | Push schema changes to the database          |
 | `pnpm db:studio`   | Open Drizzle Studio for visual DB management |

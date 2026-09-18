@@ -98,7 +98,7 @@ export function RollViewPage() {
 
   // Reseed the working copy whenever the server row changes. Same pattern as
   // the Music Schedule service editor.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // oxlint-disable-next-line react/set-state-in-effect
   useEffect(() => setDrafts(roll ? toDraft(roll.sheets) : null), [roll])
 
   const save = useMutation({

@@ -182,7 +182,7 @@ Nursery (July) · 4 devotions`).
 5. **Scheduled-message** interleave in Upcoming Events.
 6. Responsive pass (mobile: everything stacks; attention segments wrap; chips
    wrap).
-7. `pnpm lint` (eslint + prettier) per project convention.
+7. `pnpm lint` (oxlint + prettier) per project convention.
 
 ## Out of scope / deferred
 

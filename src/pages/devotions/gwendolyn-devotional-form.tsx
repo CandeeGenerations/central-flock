@@ -129,7 +129,7 @@ export function GwendolynDevotionalForm({
       runChecks(targets).catch(() => {})
     }, 400)
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [uncheckedSignature])
 
   async function aiRecheck(block: Checkable) {

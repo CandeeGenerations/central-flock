@@ -74,7 +74,7 @@ export function Sheet({
   const overflowKey = overflow.map((o) => `${o.key}:${o.px}`).join(',')
   useLayoutEffect(() => {
     onOverflow?.(overflow)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [overflowKey])
 
   // The footer needs room on the last page, else it gets a page of its own.

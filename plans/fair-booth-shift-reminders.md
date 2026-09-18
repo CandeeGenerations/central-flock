@@ -76,7 +76,7 @@ Add one exported helper used by both surfaces:
 export function formatShiftReminderTimeSlot(days: ShiftDay[]): string
 ```
 
-Verify with `pnpm eslint` that both tsconfigs still typecheck.
+Verify with `pnpm lint` that both tsconfigs still typecheck.
 
 ### 2. Schema + migration
 
@@ -211,7 +211,7 @@ header, then every recipient with name, masked phone and full rendered message. 
 Working tree currently has 24 uncommitted files (export delivery, devotion scan validation, ADR 0017) — **decide whether those ship tonight** before running deploy, since `deploy.sh` prompts on a
 dirty tree and will otherwise carry them.
 
-`pnpm eslint` + `pnpm prettier`, commit, then `./scripts/deploy.sh` (backs up the DB, migrates,
+`pnpm lint` + `pnpm prettier`, commit, then `./scripts/deploy.sh` (backs up the DB, migrates,
 builds, reloads the service). Do not run `pnpm dev` — the launchd service is the only runtime.
 
 ### 9. Tonight

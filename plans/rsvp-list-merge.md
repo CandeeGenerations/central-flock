@@ -225,7 +225,7 @@ Manual smoke (run after Slice 3):
 5. **Cross-event merge.** Source linked to a different calendar event than target. Confirm screen shows the "⚠ linked to a different event" line. After merge, target's event metadata is unchanged.
 6. **Concurrent source deletion.** Open the merge dialog, then in another tab delete one of the selected sources, then hit "Merge." Expect a 409 with a friendly message — no 500, no partial commit.
 7. **Stale resolutions.** Open the dialog through to the conflict picker, then in another tab add a new entry to a source for a person already on target. Submit the original resolutions. Expect the new conflict to be auto-resolved by `defaultKeep` server-side; merge succeeds.
-8. **`pnpm eslint` and `pnpm prettier`** both pass.
+8. **`pnpm lint` and `pnpm prettier`** both pass.
 
 ---
 

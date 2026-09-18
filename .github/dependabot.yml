@@ -7,6 +7,10 @@ version: 2
 updates:
   - package-ecosystem: 'npm'
     directory: '/'
+    # npm version updates are owned by CGENovate, which bundles them into a single
+    # reviewed PR each cycle. 0 stops duplicate version PRs while leaving the ignore
+    # block below alive as the mute source of truth. Security updates still flow.
+    open-pull-requests-limit: 0
     pull-request-branch-name:
       separator: '-' # Use hyphens to separate branch name segments
     schedule:
@@ -18,6 +22,14 @@ updates:
           - 'patch'
         patterns:
           - '*'
+    ignore:
+      # muted 2026-09-18 — @types/node is capped by .nvmrc, not by latest. This repo pins
+      # Node 24 (Krypton, the current Active LTS); Node 26 is still Current. Dependabot reads
+      # latest and cannot see the cap, so it re-proposed 26 every cycle (PR #21). Types a major
+      # ahead of the runtime make tsc check against APIs that do not exist at run time.
+      # Un-mute when .nvmrc moves to the next LTS. Dashboard #25
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: 'github-actions' # Check for updates to GitHub Actions every week
     directory: '/'
     pull-request-branch-name:

@@ -635,7 +635,7 @@ Send-as-image dialog reuses `<SendScheduleDialog>` with the live JPG.
 
 ## Phase 10 — Cleanup, regression check, and ship
 
-- Run `pnpm eslint` + `pnpm prettier` over all new/changed files.
+- Run `pnpm lint` + `pnpm prettier` over all new/changed files.
 - Smoke-test other schedule types (Nursery, Special Music) to confirm no
   regression from the `scheduleTypes` enum widening or the new column on
   `people`.

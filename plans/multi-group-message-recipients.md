@@ -181,7 +181,7 @@ Lands together with Phase 1 — the column is gone, so the routes must already s
 
 ## Phase 5 — Cleanup + verification
 
-- `pnpm eslint` and `pnpm prettier` pass.
+- `pnpm lint` and `pnpm prettier` pass.
 - Spot-check the Group detail page's "Send Message to Group" button → preloads compose with one chip selected.
 - Spot-check the Person detail page's "Message" button (if it sends to one person) → individual mode, unchanged.
 - RSVP "Send Message (N)" path uses `recipientMode='individual'` → still works, no group chips involved.

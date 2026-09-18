@@ -206,4 +206,4 @@ per-child data (that is the Roll, and ADR-0029 explains why it stays paper); any
 - Q1 and Q2 each show 13 Sundays; Q3 shows 8 filled and 5 blank; Q4 is empty.
 - `2026-01-25` reads `0`, not blank; `2026-08-30` reads blank, not `0`.
 - Departments can be renamed, reordered and retired; deleting one with counts is refused.
-- `pnpm eslint` and `pnpm prettier` clean.
+- `pnpm lint` and `pnpm prettier` clean.

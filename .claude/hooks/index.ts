@@ -27,7 +27,7 @@ const main = async (): Promise<void> => {
   try {
     console.log('Running quality checks...')
 
-    await runCommand('eslint', ['pnpm', 'run', 'eslint'])
+    await runCommand('lint', ['pnpm', 'run', 'lint'])
     await runCommand('prettier', ['pnpm', 'run', 'prettier:ci'])
 
     console.log('All quality checks passed!')

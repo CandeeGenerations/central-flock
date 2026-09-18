@@ -250,7 +250,7 @@ There is no test runner, so verification is an audit script plus manual runs.
    Joshua 1 → candidates, no fix), and a Reference Format fix after a dismissed Wording Differs
    (the Dismissal survives).
 4. The AI path with `ANTHROPIC_API_KEY` unset: _Not Found_ still shows, and nothing errors.
-5. `pnpm eslint` and `pnpm prettier`.
+5. `pnpm lint` and `pnpm prettier`.
 
 Review the audit output for the other 22 devotionals before shipping. Every Finding there is
 either a real catch or a matching-rule gap to fix first.

@@ -15,6 +15,7 @@
     "dev:client": "vite",
     "dev:server": "tsx watch --import ./server/lib/sentry.ts server/index.ts",
     "lint": "tsc -b && tsc -p tsconfig.server.json && oxlint",
+    "lint:fix": "oxlint --fix",
     "prepare": "husky",
     "prettier": "prettier --cache --check --write --ignore-unknown .",
     "prettier:ci": "pnpm exec prettier --check .",

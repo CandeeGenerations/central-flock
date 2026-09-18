@@ -64,7 +64,7 @@ topic-agnostic — it produces generic passages into a pool and only injects
 
 ## Verification
 
-- `pnpm lint` (eslint + tsc for app and server) and `pnpm prettier` after edits.
+- `pnpm lint` (oxlint + tsc for app and server) and `pnpm prettier` after edits.
 - Manual: generate with a topic → passages carry `Topic: …` notes, visible in pool
   → assign one → devotion notes contains the topic (appended if notes already set).
 - Blank topic → unchanged behavior, notes null.

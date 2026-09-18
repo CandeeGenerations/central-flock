@@ -267,7 +267,7 @@ Run from the worktree root unless noted.
    Expect two rows summing ~652.
 3. **Lint + format** (per user memory — always):
    ```
-   pnpm eslint
+   pnpm lint
    pnpm prettier
    ```
 4. **Restart via launchd.** Do NOT run `pnpm dev` manually (per user memory). `launchctl kickstart -k gui/$(id -u)/<plist-label>`.

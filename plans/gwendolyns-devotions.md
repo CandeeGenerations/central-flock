@@ -408,7 +408,7 @@ Validation on submit:
    - Delete → confirmation → row gone from list
 
 5. **Quality gates**
-   - `pnpm eslint` clean
+   - `pnpm lint` clean
    - `pnpm prettier` clean
    - `pnpm build` (TS strict, both `tsconfig.app.json` and `tsconfig.server.json`) passes
 

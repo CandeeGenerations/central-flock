@@ -59,7 +59,7 @@ Drizzle generates migrations by diffing the schema files, so the right flow is:
 
 ### Verification
 
-- `pnpm lint` (eslint + both tsconfigs) passes
+- `pnpm lint` (oxlint + both tsconfigs) passes
 - `grep -ri "\bnote" src/ server/` returns only unrelated user-facing copy (e.g., the word "note" in other features), no imports
 - App boots; nav has no Notes entry; `/notes` URL renders the 404 fallback
 - `pnpm db:studio` shows no `notes_items` or `notes_attachments` tables

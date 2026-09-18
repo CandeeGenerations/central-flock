@@ -7,7 +7,7 @@
       "Bash(pnpm run check-formatting)",
       "Bash(pnpm run biome:*)",
       "Bash(pnpm run prettier:*)",
-      "Bash(pnpm run eslint:*)",
+      "Bash(pnpm run lint:*)",
       "Bash(fnm use)",
       "Bash(git status:*)",
       "Bash(git diff:*)",

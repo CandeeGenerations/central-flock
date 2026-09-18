@@ -226,7 +226,7 @@ Register globally in `useKeyboardShortcuts` or a new notes-scoped hook (`useNote
 - **Routes:** `curl` each endpoint after restart — create folder, nested folder, note in nested folder, fetch tree, breadcrumb, update content, upload image, delete folder, sweep attachments.
 - **Frontend (M1):** Sidebar "Notes" entry routes to `/notes`. Create folder → create sub-folder → create note inside → chevron expands correctly, sub-folders nest, row click on note navigates to preview. Bulk select parent folder → descendant count in dialog → delete → all rows gone. Search finds deeply-nested items and keeps ancestors visible. Pagination only affects root rows.
 - **Frontend (M2):** Type in editor → wait 1.5s → refresh → content persists. Paste an image → uploads, URL resolves, renders in preview and editor. Delete note → image file removed from disk.
-- **Lint:** `pnpm eslint && pnpm prettier --write .` per your workflow rule.
+- **Lint:** `pnpm lint && pnpm prettier --write .` per your workflow rule.
 - **Bundle:** `pnpm build`, verify notes chunk is code-split (check `dist/assets/` for a `note-editor-*.js` chunk distinct from main).
 
 Per your workflow rules: don't run `pnpm dev` manually; launchd owns the service. Stop service before DB migration, restart after. Save this plan under `central-flock/plans/project-notes.md` for Typora review after approval (plan mode initially wrote it to `~/.claude/plans/` — will move on exit).

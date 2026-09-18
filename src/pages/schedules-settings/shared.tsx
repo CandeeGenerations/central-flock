@@ -35,7 +35,7 @@ export function FairBoothFooterEditor({
   onSave: (blocks: FooterBlock[]) => void
 }) {
   const [local, setLocal] = useState<FooterBlock[]>(blocks)
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // oxlint-disable-next-line react/set-state-in-effect
   useEffect(() => setLocal(blocks), [blocks])
   const dirty = JSON.stringify(local) !== JSON.stringify(blocks)
   return (
@@ -169,9 +169,9 @@ export function TypeDefaultsCard({titleLabel, titlePrefix, footerBlocks, middleS
 
   // Re-sync local edit state when the upstream defaults change (e.g. after a
   // successful save invalidates the query and refetches).
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // oxlint-disable-next-line react/set-state-in-effect
   useEffect(() => setPrefix(titlePrefix), [titlePrefix])
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // oxlint-disable-next-line react/set-state-in-effect
   useEffect(() => setBlocks(footerBlocks), [footerBlocks])
 
   const dirty = prefix !== titlePrefix || JSON.stringify(blocks) !== JSON.stringify(footerBlocks)

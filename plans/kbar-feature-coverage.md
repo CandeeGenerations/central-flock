@@ -101,7 +101,7 @@ Skip any that have no create affordance rather than inventing routes.
 
 ## Verification
 
-- `pnpm eslint` + `pnpm prettier`.
+- `pnpm lint` + `pnpm prettier`.
 - Manual: Cmd+K → each new label navigates to the right page; new providers
   return records that open the correct detail route.
 - Confirm no duplicate-looking entries (Specials vs Special Music Schedules).

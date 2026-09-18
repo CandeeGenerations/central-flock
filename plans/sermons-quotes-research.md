@@ -831,7 +831,7 @@ Example: file `2026-04-13T18-12-00-167Z-dr-arthur-maricle-quote.md` →
 9. Reload `/sermons/research` — a "Recent" pill for "God is Light" appears; click it → same search re-runs and a new history entry is created.
 10. Navigate to `/sermons/searches` → both history entries listed; click the first → detail page replays it.
 11. Settings page → switch `defaultAiModel` to Haiku → re-run research → confirm faster response. Devotions page also honors the same setting.
-12. `pnpm eslint` and `pnpm prettier` clean (per CLAUDE.md workflow memo).
+12. `pnpm lint` and `pnpm prettier` clean (per CLAUDE.md workflow memo).
 
 ---
 

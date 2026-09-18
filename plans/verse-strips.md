@@ -67,7 +67,7 @@ Mirrors the form pattern from `src/pages/sermons/hymns-prep-page.tsx` (lines 49�
 
 ## Verification
 
-1. After implementation, run `pnpm eslint` and `pnpm prettier` (per `feedback_lint_format.md`).
+1. After implementation, run `pnpm lint` and `pnpm prettier` (per `feedback_lint_format.md`).
 2. Do **not** run `pnpm dev` manually — the launchd service is already serving (per `feedback_no_manual_dev.md`). Just open the running app in the browser.
 3. Manual check:
    - Navigate Sermon Prep → Verse Strips.

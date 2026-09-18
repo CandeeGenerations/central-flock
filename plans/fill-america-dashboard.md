@@ -142,4 +142,4 @@ Sunday School Stats or `service_records`.
 - Both leaderboards match the tables above.
 - Selecting a single household removes the Unique Participants metric rather than showing a wrong
   number.
-- `pnpm eslint` and `pnpm prettier` clean.
+- `pnpm lint` and `pnpm prettier` clean.

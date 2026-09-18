@@ -286,4 +286,4 @@ season comparison and all-time leaderboards (slice 3).
   (Brad + Gwendolyn).
 - `Sells` shows size 3 in its 2024 campaigns and 4 in its 2025 ones.
 - A new campaign created from two dates derives its weeks and copies the last roster forward.
-- `pnpm eslint` and `pnpm prettier` clean.
+- `pnpm lint` and `pnpm prettier` clean.

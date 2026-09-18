@@ -113,7 +113,7 @@ typeLabel, resolveLabel(id) }` (one small SQL per type). Generic fallback for
 
 ## Verification
 
-- `pnpm eslint` + `pnpm prettier`; migration applied via runbook.
+- `pnpm lint` + `pnpm prettier`; migration applied via runbook.
 - Manual: visit pages → top sections rise into the empty-palette Navigation 6;
   Recents populate with live labels; rename an entity → its Recent label updates;
   type a query → full search across all types, capped at 25; delete an entity →

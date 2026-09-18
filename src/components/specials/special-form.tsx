@@ -97,7 +97,7 @@ export function SpecialForm({state, onChange, excludeSpecialId}: SpecialFormProp
     if (state.type !== lastSuggestedType) {
       onChange({...state, type: lastSuggestedType})
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [lastSuggestedType])
 
   const {data: warnings} = useQuery({

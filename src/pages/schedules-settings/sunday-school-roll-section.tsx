@@ -14,7 +14,7 @@ export function SundaySchoolRollSettingsSection() {
   const {data: settings} = useQuery({queryKey: schedulesKeys.settings, queryFn: fetchSchedulesSettings})
   const [prefix, setPrefix] = useState('')
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // oxlint-disable-next-line react/set-state-in-effect
   useEffect(() => setPrefix(settings?.sundaySchoolRoll.titlePrefix ?? ''), [settings])
 
   const save = useMutation({

@@ -38,8 +38,8 @@ import Database from 'better-sqlite3'
 import os from 'node:os'
 import path from 'node:path'
 import {fileURLToPath} from 'node:url'
-import XLSX from 'xlsx'
 
+import {readWorkbookFromFile, sheetRows} from '../server/lib/xlsx-rows.js'
 import {QUARTERS, type Quarter, sundaysInQuarter} from '../src/lib/sunday-school-roll-core.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -47,10 +47,9 @@ const DB_PATH = path.join(__dirname, '..', 'central-flock.db')
 const DEFAULT_WORKBOOK = path.join(os.homedir(), 'Desktop', 'Sunday School Stats (2026).xlsx')
 
 /** Excel serial (1900 system) -> 'YYYY-MM-DD'. */
-function serialToIso(serial: number): string {
-  const ms = Date.UTC(1899, 11, 30) + serial * 86_400_000
-  return new Date(ms).toISOString().slice(0, 10)
-}
+/** Local getters, matching how the reader hands dates back (local wall clock). */
+const dateToIso = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 const monthDay = (iso: string) => iso.slice(5)
 
@@ -90,20 +89,20 @@ type QuarterSummary = {
   repaired: number
 }
 
-function collect(file: string, pending: Cell[], departmentIds: number[]): QuarterSummary[] {
+async function collect(file: string, pending: Cell[], departmentIds: number[]): Promise<QuarterSummary[]> {
   const year = yearFromFilename(file)
-  const wb = XLSX.readFile(file)
+  const wb = await readWorkbookFromFile(file)
   const out: QuarterSummary[] = []
 
   for (const quarter of QUARTERS) {
     const sheetName = `Quarter ${quarter}`
-    const sheet = wb.Sheets[sheetName]
+    const sheet = wb.getWorksheet(sheetName)
     if (!sheet) throw new Error(`${path.basename(file)}: missing sheet "${sheetName}"`)
 
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {header: 1, defval: null})
-    const dateRows = rows.filter((r) => typeof r[0] === 'number')
+    const rows = sheetRows(sheet)
+    const dateRows = rows.filter((r) => r[0] instanceof Date)
     const derived = sundaysInQuarter(year, quarter)
-    const sheetDates = dateRows.map((r) => serialToIso(r[0] as number))
+    const sheetDates = dateRows.map((r) => dateToIso(r[0] as Date))
 
     if (sheetDates.length !== derived.length) {
       throw new Error(
@@ -150,7 +149,7 @@ function collect(file: string, pending: Cell[], departmentIds: number[]): Quarte
   return out
 }
 
-function main() {
+async function main() {
   const files = process.argv.slice(2)
   const workbooks = files.length > 0 ? files : [DEFAULT_WORKBOOK]
 
@@ -169,7 +168,7 @@ function main() {
   const ids = departments.map((d) => d.id)
   const pending: Cell[] = []
   const summary: QuarterSummary[] = []
-  for (const file of workbooks) summary.push(...collect(file, pending, ids))
+  for (const file of workbooks) summary.push(...(await collect(file, pending, ids)))
 
   console.log('\nYear  Qtr  Sundays  With data  Scholars  Dates repaired')
   for (const s of summary) {

@@ -47,12 +47,13 @@
  * campaign sum: sizes add and each week's tracts add. See ADR 0033.
  */
 import Database from 'better-sqlite3'
+import type ExcelJS from 'exceljs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {fileURLToPath} from 'node:url'
-import XLSX from 'xlsx'
 
+import {readWorkbookFromFile, sheetRows, sheetNames as workbookSheetNames} from '../server/lib/xlsx-rows.js'
 import {addDays, campaignWeekDates, defaultSeason, defaultTitle} from '../src/lib/fill-america-core.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -62,10 +63,9 @@ const DEFAULT_WORKBOOK = path.join(os.homedir(), 'Desktop', 'Fill America Stats.
 
 const TOTALS_SHEET = 'Grand Totals'
 
-function serialToIso(serial: number): string {
-  const ms = Date.UTC(1899, 11, 30) + serial * 86_400_000
-  return new Date(ms).toISOString().slice(0, 10)
-}
+/** Local getters, matching how the reader hands dates back (local wall clock). */
+const dateToIso = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 /** "Candees x 5" -> 5. No suffix -> 1. */
 function sizeFromLabel(label: string): number {
@@ -135,8 +135,14 @@ interface ParsedCampaign {
  * Parses one campaign tab. Every column is located by its header text, which is
  * what keeps the irregular oldest tab working.
  */
-function parseCampaign(wb: XLSX.WorkBook, sheetName: string, labelToHousehold: Record<string, string>): ParsedCampaign {
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], {header: 1, defval: null})
+function parseCampaign(
+  wb: ExcelJS.Workbook,
+  sheetName: string,
+  labelToHousehold: Record<string, string>,
+): ParsedCampaign {
+  const sheet = wb.getWorksheet(sheetName)
+  if (!sheet) throw new Error(`${sheetName}: sheet not found`)
+  const rows = sheetRows(sheet)
   const header = (rows[0] ?? []).map((v) => (v === null ? '' : String(v).trim()))
   const col = (name: string) => header.indexOf(name)
 
@@ -159,12 +165,12 @@ function parseCampaign(wb: XLSX.WorkBook, sheetName: string, labelToHousehold: R
     if (idx === -1) throw new Error(`${sheetName}: header is missing a "${label}" column`)
   }
 
-  const dateRows = rows.filter((r) => typeof r[dateCol] === 'number')
+  const dateRows = rows.filter((r) => r[dateCol] instanceof Date)
   if (dateRows.length === 0) throw new Error(`${sheetName}: no date rows`)
 
   // The cells supply the week COUNT and are cross-checked; the tab name supplies
   // the dates, because four tabs' cells drift off the Saturday anchor.
-  const cellDates = dateRows.map((r) => serialToIso(r[dateCol] as number))
+  const cellDates = dateRows.map((r) => dateToIso(r[dateCol] as Date))
   const startDate = startDateFromSheetName(sheetName)
   const endDate = addDays(startDate, 7 * (cellDates.length - 1))
   const weekDates = campaignWeekDates(startDate, endDate)
@@ -232,7 +238,7 @@ function derivedUnique(roster: RosterRow[]): number {
   return n
 }
 
-function main() {
+async function main() {
   const workbookPath = process.argv[2] ?? DEFAULT_WORKBOOK
   const groups = JSON.parse(fs.readFileSync(MAP_PATH, 'utf8')) as Record<string, string[]>
 
@@ -248,9 +254,11 @@ function main() {
   const householdNames = Object.keys(groups).sort((a, b) => a.localeCompare(b))
   console.log(`Merge map: ${Object.keys(labelToHousehold).length} labels -> ${householdNames.length} households`)
 
-  const wb = XLSX.readFile(workbookPath)
+  const wb = await readWorkbookFromFile(workbookPath)
   // Oldest first, so campaign ids and sort orders read chronologically.
-  const sheetNames = wb.SheetNames.filter((n) => n !== TOTALS_SHEET).reverse()
+  const sheetNames = workbookSheetNames(wb)
+    .filter((n) => n !== TOTALS_SHEET)
+    .reverse()
   const campaigns = sheetNames.map((n) => parseCampaign(wb, n, labelToHousehold))
 
   const drifted = campaigns.filter((c) => c.dateDrift)

@@ -10,8 +10,9 @@ Sentry's default SDK behavior captures a substantial PII surface: HTTP request b
 
 Both the Node and browser SDKs are configured with **strict scrubbing**:
 
-- `sendDefaultPii: false`
-- `beforeSend` drops `event.request.data` (request body), `event.request.query_string`, and `event.request.cookies` before transmission.
+- `dataCollection` with every category off: user info, cookies, headers, HTTP bodies, URL query params, GraphQL, gen-AI inputs/outputs, DB query data, queue args, and stack-frame local variables. (SDK v11 replaced `sendDefaultPii: false` with this option, and an unset `dataCollection` collects nearly everything, so each category is listed explicitly.)
+- `beforeSend` drops `event.request.data` (request body), `event.request.query_string`, `event.request.cookies`, and `event.request.headers`, strips the query string from `event.request.url`, and redacts RSVP webhook tokens before transmission.
+- `beforeSendSpan` strips query strings and RSVP webhook tokens from span names and `url.*` / `http.*` span attributes, and drops client-address attributes. Spans are streamed in SDK v11, so `beforeSendTransaction` no longer runs and cannot be the scrubbing point.
 - `beforeBreadcrumb` drops `data.input` and `data.response` on `fetch` / `xhr` breadcrumbs.
 - No use of `Sentry.setUser` with a real identifier; if user context is set at all, it is a static `{id: 'operator'}` since the app is single-operator.
 - The Express error-handler middleware passes the raw `Error` to Sentry — never the `req.body`, `req.query`, or `req.user` — and the strict scrub still applies as a second line of defense.

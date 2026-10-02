@@ -2,8 +2,8 @@
 // can patch http/express before those modules are first used.
 // Sentry is preloaded via Node's --import flag (see package.json scripts +
 // the launchd plist's ProgramArguments). That ensures Sentry.init runs before
-// http/express modules load, which lets the OpenTelemetry instrumentation
-// patch them. Importing './lib/sentry.js' here would be a no-op fallback at
+// http/express modules load, which lets Sentry's instrumentation hook
+// them. Importing './lib/sentry.js' here would be a no-op fallback at
 // best and is omitted intentionally.
 import * as Sentry from '@sentry/node'
 import cookieParser from 'cookie-parser'

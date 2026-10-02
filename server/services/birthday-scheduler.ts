@@ -22,6 +22,8 @@ type SentType = (typeof schema.birthdayMessagesSent.$inferInsert)['type']
 // Date (YYYY-MM-DD) of the last Sunday "this week" list, so a re-run that day doesn't resend it.
 const WEEKLY_DIGEST_SENT_KEY = 'birthdayWeeklyDigestSentOn'
 const PRE_NOTIFY_OPTIONS = [3, 7, 10]
+// Minutes to wait before each webhook retry (n8n sometimes 502s while Docker restarts).
+const WEBHOOK_RETRY_DELAYS_MIN = [1, 5, 15]
 
 let timeoutId: ReturnType<typeof setTimeout> | null = null
 
@@ -86,6 +88,39 @@ function greeting(occasion: Occasion): string {
 
 function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Send the digest to me: the notify-me webhook with retries, then a direct iMessage to my own
+ * contact as a fallback. Returns whether it reached me by either route.
+ */
+async function deliverDigest(digest: string): Promise<boolean> {
+  if (await sendNotifyMeText(digest)) return true
+  for (const minutes of WEBHOOK_RETRY_DELAYS_MIN) {
+    console.log(`Birthday scheduler: webhook failed, retrying in ${minutes}m`)
+    await sleep(minutes * 60_000)
+    if (await sendNotifyMeText(digest)) return true
+  }
+
+  const myId = Number(getSetting('birthdayMyContactId'))
+  const me = myId ? db.select().from(schema.people).where(eq(schema.people.id, myId)).get() : undefined
+  const error = new Error('Birthday digest webhook failed after retries')
+  Sentry.captureException(error, {tags: {source: 'birthday-scheduler'}})
+  if (!me?.phoneNumber) {
+    console.error('Birthday scheduler: webhook failed and no birthdayMyContactId phone to fall back to')
+    return false
+  }
+  try {
+    await sendMessageViaUI(me.phoneNumber, digest)
+    console.log('Birthday scheduler: webhook failed, sent digest via Messages instead')
+    return true
+  } catch (err) {
+    console.error('Birthday scheduler: Messages fallback failed:', err)
+    Sentry.captureException(err, {tags: {source: 'birthday-scheduler'}})
+    return false
+  }
 }
 
 /**
@@ -159,13 +194,17 @@ export async function checkOccasions(now = new Date()) {
   const digest = formatDigest({week, reminders})
   if (!digest) return
 
-  await sendNotifyMeText(digest)
+  // Not recorded as sent when undelivered, so a manual re-run (or tomorrow's run) retries it.
+  if (!(await deliverDigest(digest))) {
+    console.error('Birthday scheduler: digest not delivered')
+    return
+  }
   if (sendWeekly) setSetting(WEEKLY_DIGEST_SENT_KEY, todayKey)
   for (const {occasion, type} of recordAfterDigest) {
     recordSent(occasion.person.id, type, year)
     recordMessageInHistory(occasion.person.id, formatDigestLine({occasion, note: noteFor(occasion)}))
   }
-  console.log(`Birthday scheduler: sent digest via notify-me${sendWeekly ? ' (with weekly list)' : ''}`)
+  console.log(`Birthday scheduler: sent digest${sendWeekly ? ' (with weekly list)' : ''}`)
 }
 
 function scheduleNext() {

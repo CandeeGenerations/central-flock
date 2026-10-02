@@ -8,7 +8,8 @@
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
     "unicorn/no-new-array": "off",
-    "react/immutability": "off"
+    "react/immutability": "off",
+    "react/purity": "off"
   },
   "ignorePatterns": ["dist", "server/data", "server/db/migrations"]
 }

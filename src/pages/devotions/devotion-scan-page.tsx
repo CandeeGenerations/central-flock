@@ -11,14 +11,17 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {Textarea} from '@/components/ui/textarea'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {useProgressOperation} from '@/hooks/use-sse'
+import {formatDate} from '@/lib/date'
 import {type PoolPassage, fetchAvailablePassages, pullPassagesForScan} from '@/lib/devotion-api'
 import {useQuery, useQueryClient} from '@tanstack/react-query'
+import {format} from 'date-fns'
 import {
   AlertTriangle,
   Camera,
   Check,
   CircleX,
   Flag,
+  History,
   Loader2,
   Save,
   Sparkles,
@@ -48,6 +51,8 @@ interface ParsedDevotion {
   generatedTalkingPoints?: string
   generatedPassageId?: number
   generatedRecorded?: boolean
+  /** Number of the past Tyler devotion this one re-uses instead of a pool passage. */
+  reusedFromNumber?: number
   flagged?: boolean
   notes?: string | null
 }
@@ -157,11 +162,13 @@ function NotesModal({
 function PassagePickerModal({
   open,
   currentPassageId,
+  usedPassageIds,
   onClose,
   onSelect,
 }: {
   open: boolean
   currentPassageId: number | undefined
+  usedPassageIds: Set<number>
   onClose: () => void
   onSelect: (passage: PoolPassage) => void
 }) {
@@ -229,10 +236,130 @@ function PassagePickerModal({
                         Current
                       </Badge>
                     )}
+                    {usedPassageIds.has(p.id) && (
+                      <Badge variant="secondary" className="shrink-0 ml-auto">
+                        Used on this sheet
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">{p.bibleReference}</div>
                   {p.subcode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{p.subcode}</div>}
                   <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.talkingPoints}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface PreviousTylerDevotion {
+  id: number
+  number: number
+  date: string
+  subcode: string | null
+  bibleReference: string | null
+  title: string | null
+  talkingPoints: string | null
+}
+
+const AUTO_FILL_TYLER_KEY = 'devotion-scan:auto-fill-tyler'
+
+function readAutoFillTyler(): boolean {
+  try {
+    return localStorage.getItem(AUTO_FILL_TYLER_KEY) !== 'false'
+  } catch {
+    return true
+  }
+}
+
+function PreviousTylerPickerModal({
+  open,
+  rowDate,
+  usedNumbers,
+  onClose,
+  onSelect,
+}: {
+  open: boolean
+  rowDate: string | undefined
+  usedNumbers: Set<number>
+  onClose: () => void
+  onSelect: (devotion: PreviousTylerDevotion) => void
+}) {
+  const [search, setSearch] = useState('')
+  const {data: devotions = [], isLoading} = useQuery({
+    queryKey: ['tyler-previous'],
+    queryFn: () =>
+      fetch('/api/devotions/tyler-previous', {credentials: 'include'}).then((r) => r.json()) as Promise<
+        PreviousTylerDevotion[]
+      >,
+    enabled: open,
+  })
+
+  // With no search, default to the same month one year before the row's date.
+  const lastYearMonth = rowDate ? `${Number(rowDate.slice(0, 4)) - 1}-${rowDate.slice(5, 7)}` : null
+  const q = search.trim().toLowerCase()
+  const filtered = devotions
+    .filter((d) => {
+      if (!q) return !lastYearMonth || d.date.startsWith(lastYearMonth)
+      return (
+        String(d.number).includes(q) ||
+        d.date.includes(q) ||
+        formatDate(d.date).toLowerCase().includes(q) ||
+        d.title?.toLowerCase().includes(q) ||
+        d.bibleReference?.toLowerCase().includes(q) ||
+        d.subcode?.toLowerCase().includes(q)
+      )
+    })
+    // Newest month first, then start of the month to the end.
+    .sort((a, b) => b.date.slice(0, 7).localeCompare(a.date.slice(0, 7)) || a.date.localeCompare(b.date))
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Reuse Previous Tyler Devotion</DialogTitle>
+        </DialogHeader>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by number, date, title, or reference…"
+          autoFocus
+        />
+        {!q && lastYearMonth && (
+          <p className="text-xs text-muted-foreground mb-2">
+            Showing {format(new Date(`${lastYearMonth}-01T12:00:00`), 'MMMM yyyy')}. Search to find any Tyler devotion.
+          </p>
+        )}
+        <div className="overflow-y-auto flex-1 -mx-6 px-6">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No previous Tyler devotions found.</p>
+          ) : (
+            <div className="space-y-1">
+              {filtered.map((d) => (
+                <button
+                  key={d.id}
+                  className="w-full text-left rounded-lg border border-border p-3 hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => onSelect(d)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground shrink-0">#{d.number}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{formatDate(d.date)}</span>
+                    <span className="font-medium text-sm truncate">{d.bibleReference || '—'}</span>
+                    {usedNumbers.has(d.number) && (
+                      <Badge variant="secondary" className="shrink-0 ml-auto">
+                        Used on this sheet
+                      </Badge>
+                    )}
+                  </div>
+                  {d.title && <div className="text-xs mt-1">{d.title}</div>}
+                  {d.subcode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{d.subcode}</div>}
                 </button>
               ))}
             </div>
@@ -372,6 +499,8 @@ export function DevotionScanPage() {
     podcast: boolean
   } | null>(null)
   const [passagePickerRow, setPassagePickerRow] = useState<number | null>(null)
+  const [tylerPickerRow, setTylerPickerRow] = useState<number | null>(null)
+  const [autoFillTyler, setAutoFillTyler] = useState(readAutoFillTyler)
   const [issues, setIssues] = useState<ScanIssue[]>([])
   const [validating, setValidating] = useState(false)
   const [importAnyway, setImportAnyway] = useState(false)
@@ -492,7 +621,13 @@ export function DevotionScanPage() {
     // Pull or generate passages only for Tyler devotions that don't already have one
     const tylerIndicesNeedingPassage: number[] = []
     devotions.forEach((d, i) => {
-      if (d.devotionType === 'guest' && d.guestSpeaker === 'Tyler' && !d.generatedPassageId) {
+      if (
+        autoFillTyler &&
+        d.devotionType === 'guest' &&
+        d.guestSpeaker === 'Tyler' &&
+        !d.generatedPassageId &&
+        !d.reusedFromNumber
+      ) {
         tylerIndicesNeedingPassage.push(i)
       }
     })
@@ -765,6 +900,7 @@ export function DevotionScanPage() {
                 generatedRecorded: passage.recorded,
                 bibleReference: passage.bibleReference,
                 subcode: passage.subcode ?? null,
+                reusedFromNumber: undefined,
               },
             }
           : r,
@@ -773,6 +909,36 @@ export function DevotionScanPage() {
     queryClient.invalidateQueries({queryKey: ['available-passages-picker']})
     setPassagePickerRow(null)
     toast.success(`Assigned "${passage.title}"`)
+  }
+
+  const handlePreviousTylerSelect = (prev: PreviousTylerDevotion) => {
+    if (tylerPickerRow === null) return
+    setRows((rs) =>
+      rs.map((r, i) => {
+        if (i !== tylerPickerRow) return r
+        const oldNote = r.devotion.reusedFromNumber ? `Revisit of Tyler #${r.devotion.reusedFromNumber}` : null
+        const baseNotes = (r.devotion.notes && r.devotion.notes !== oldNote ? r.devotion.notes : '').trim()
+        const note = `Revisit of Tyler #${prev.number}`
+        return {
+          ...r,
+          devotion: {
+            ...r.devotion,
+            // Drop any pool passage so it stays available for a future sheet.
+            generatedPassageId: undefined,
+            generatedRecorded: undefined,
+            generatedBibleReference: undefined,
+            generatedTitle: prev.title ?? undefined,
+            generatedTalkingPoints: prev.talkingPoints ?? undefined,
+            bibleReference: prev.bibleReference,
+            subcode: prev.subcode,
+            reusedFromNumber: prev.number,
+            notes: baseNotes ? `${baseNotes}\n${note}` : note,
+          },
+        }
+      }),
+    )
+    setTylerPickerRow(null)
+    toast.success(`Reusing Tyler #${prev.number}${prev.bibleReference ? ` (${prev.bibleReference})` : ''}`)
   }
 
   const handleEditChainSave = async () => {
@@ -982,6 +1148,23 @@ export function DevotionScanPage() {
                       )}
                     </Button>
                   )}
+                </div>
+                <div className="flex items-center justify-center gap-2 text-sm">
+                  <Checkbox
+                    id="auto-fill-tyler"
+                    checked={autoFillTyler}
+                    onCheckedChange={(checked) => {
+                      setAutoFillTyler(!!checked)
+                      try {
+                        localStorage.setItem(AUTO_FILL_TYLER_KEY, String(!!checked))
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                  />
+                  <label htmlFor="auto-fill-tyler" className="cursor-pointer text-muted-foreground">
+                    Auto-fill Tyler devotions with pool passages
+                  </label>
                 </div>
                 {parseState.isRunning && (
                   <AIProgress message={parseState.message} progress={parseState.progress} className="mt-3" />
@@ -1197,7 +1380,18 @@ export function DevotionScanPage() {
                         </Select>
                         {row.devotion.devotionType === 'guest' && row.devotion.guestSpeaker === 'Tyler' && (
                           <div className="mt-1 space-y-0.5">
-                            {row.devotion.generatedTitle ? (
+                            {row.devotion.reusedFromNumber ? (
+                              <button
+                                className="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-800 cursor-pointer"
+                                onClick={() => setTylerPickerRow(i)}
+                              >
+                                <History className="h-3 w-3 shrink-0" />
+                                <span className="truncate max-w-28">
+                                  Reuse #{row.devotion.reusedFromNumber}
+                                  {row.devotion.generatedTitle ? ` · ${row.devotion.generatedTitle}` : ''}
+                                </span>
+                              </button>
+                            ) : row.devotion.generatedTitle ? (
                               <button
                                 className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 cursor-pointer"
                                 onClick={() => setPassagePickerRow(i)}
@@ -1215,6 +1409,23 @@ export function DevotionScanPage() {
                               >
                                 <Sparkles className="h-3 w-3" />
                                 Pick passage…
+                              </button>
+                            )}
+                            {row.devotion.reusedFromNumber ? (
+                              <button
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                                onClick={() => setPassagePickerRow(i)}
+                              >
+                                <Sparkles className="h-3 w-3" />
+                                Pick new passage…
+                              </button>
+                            ) : (
+                              <button
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                                onClick={() => setTylerPickerRow(i)}
+                              >
+                                <History className="h-3 w-3" />
+                                Reuse previous…
                               </button>
                             )}
                             {row.devotion.subcode && (
@@ -1499,8 +1710,31 @@ export function DevotionScanPage() {
       <PassagePickerModal
         open={passagePickerRow !== null}
         currentPassageId={passagePickerRow !== null ? rows[passagePickerRow]?.devotion.generatedPassageId : undefined}
+        usedPassageIds={
+          new Set(
+            rows.flatMap((r, i) =>
+              i !== passagePickerRow && r.devotion.generatedPassageId != null ? [r.devotion.generatedPassageId] : [],
+            ),
+          )
+        }
         onClose={() => setPassagePickerRow(null)}
         onSelect={handlePassageSelect}
+      />
+
+      {/* Previous Tyler Devotion Picker */}
+      <PreviousTylerPickerModal
+        key={tylerPickerRow ?? 'closed'}
+        open={tylerPickerRow !== null}
+        rowDate={tylerPickerRow !== null ? rows[tylerPickerRow]?.devotion.date : undefined}
+        usedNumbers={
+          new Set(
+            rows.flatMap((r, i) =>
+              i !== tylerPickerRow && r.devotion.reusedFromNumber ? [r.devotion.reusedFromNumber] : [],
+            ),
+          )
+        }
+        onClose={() => setTylerPickerRow(null)}
+        onSelect={handlePreviousTylerSelect}
       />
 
       {/* Devotion Detail Modal */}

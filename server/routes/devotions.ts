@@ -785,6 +785,28 @@ devotionsRouter.get(
   }),
 )
 
+// GET /api/devotions/tyler-previous - Past Tyler devotions, newest first, for reusing on a scan
+devotionsRouter.get(
+  '/tyler-previous',
+  asyncHandler(async (_req, res) => {
+    const result = db
+      .select({
+        id: schema.devotions.id,
+        number: schema.devotions.number,
+        date: schema.devotions.date,
+        subcode: schema.devotions.subcode,
+        bibleReference: schema.devotions.bibleReference,
+        title: schema.devotions.title,
+        talkingPoints: schema.devotions.talkingPoints,
+      })
+      .from(schema.devotions)
+      .where(and(eq(schema.devotions.devotionType, 'guest'), eq(schema.devotions.guestSpeaker, 'Tyler')))
+      .orderBy(desc(schema.devotions.date))
+      .all()
+    res.json(result)
+  }),
+)
+
 // GET /api/devotions/scriptures/lookup - Search for verse usage with parsed matching
 devotionsRouter.get(
   '/scriptures/lookup',

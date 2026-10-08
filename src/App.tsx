@@ -1,5 +1,6 @@
 import {CollapsibleNavGroup, NavPopoverProvider} from '@/components/collapsible-nav-group'
 import {CommandPaletteProvider} from '@/components/command-palette-provider'
+import {PageErrorBoundary} from '@/components/page-error-boundary'
 import {Sheet, SheetContent, SheetTitle, SheetTrigger} from '@/components/ui/sheet'
 import {Toaster} from '@/components/ui/sonner'
 import {PageSpinner, Spinner} from '@/components/ui/spinner'
@@ -695,114 +696,116 @@ function AppLayoutInner({
             {/* When adding/removing routes here, keep the Cmd+K command palette in sync:
                 sidebar routes derive from src/lib/nav-config.ts; non-sidebar routes need an
                 explicit entry in src/lib/search/actions.ts. See CLAUDE.md → Key Patterns. */}
-            <Suspense fallback={<PageSpinner />}>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/people" element={<PeoplePage />} />
-                <Route path="/people/:id" element={<PersonDetailPage />} />
-                <Route path="/groups" element={<GroupsPage />} />
-                <Route path="/groups/:id" element={<GroupDetailPage />} />
-                <Route path="/messages" element={<MessageHistoryPage />} />
-                <Route path="/messages/compose" element={<ComposeRoute />} />
-                <Route path="/messages/:id" element={<MessageDetailPage />} />
-                <Route path="/templates" element={<TemplatesPage />} />
-                <Route path="/templates/new" element={<TemplateEditPage />} />
-                <Route path="/templates/:id/edit" element={<TemplateEditPage />} />
-                <Route path="/import" element={<ImportPage />} />
-                <Route path="/import/contacts" element={<ContactsImportPage />} />
-                <Route path="/devotions" element={<DevotionListPage />} />
-                <Route path="/devotions/stats" element={<DevotionStatsPage />} />
-                <Route path="/devotions/scan" element={<DevotionScanPage />} />
-                <Route path="/devotions/scriptures" element={<DevotionScripturesPage />} />
-                <Route path="/devotions/passages" element={<DevotionPassagesPage />} />
-                <Route path="/devotions/passages/:id" element={<DevotionPassageDetailPage />} />
-                <Route path="/devotions/audit" element={<DevotionAuditPage />} />
-                <Route path="/devotions/missing" element={<DevotionMissingPage />} />
-                <Route path="/devotions/gwendolyn" element={<GwendolynListPage />} />
-                <Route path="/devotions/gwendolyn/new" element={<GwendolynNewPage />} />
-                <Route path="/devotions/gwendolyn/:id" element={<GwendolynDetailPage />} />
-                <Route path="/devotions/new" element={<DevotionDetailPage />} />
-                <Route path="/devotions/:id" element={<DevotionDetailPage />} />
-                <Route path="/nursery" element={<NurserySchedulesPage />} />
-                <Route
-                  path="/nursery/workers"
-                  element={<Navigate to="/schedules/settings/nursery/workers" replace />}
-                />
-                <Route path="/nursery/settings" element={<Navigate to="/schedules/settings" replace />} />
-                <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
-                <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
-                <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
-                <Route path="/schedules/music" element={<MusicSchedulesListPage />} />
-                <Route path="/schedules/music/:id" element={<MusicWeekViewPage />} />
-                <Route path="/schedules/music/:id/service/:serviceId" element={<MusicServiceEditorPage />} />
-                <Route path="/schedules/sunday-school-rolls" element={<RollListPage />} />
-                <Route path="/schedules/sunday-school-rolls/:id" element={<RollViewPage />} />
-                <Route path="/schedules/sunday-school" element={<WorkersNotesListPage />} />
-                <Route path="/schedules/sunday-school/:id" element={<WorkersNotesViewPage />} />
-                <Route path="/schedules/sunday-school/:id/theme" element={<WorkersNotesThemePage />} />
-                <Route path="/schedules/sunday-school/:id/blocks" element={<WorkersNotesBlocksPage />} />
-                <Route path="/schedules/sunday-school/:id/months" element={<WorkersNotesMonthsPage />} />
-                <Route path="/schedules/sunday-school/:id/lessons" element={<WorkersNotesLessonsPage />} />
-                <Route path="/schedules/settings" element={<SchedulesSettingsLayout />}>
-                  <Route index element={<Navigate to="general" replace />} />
-                  <Route path="general" element={<GeneralSettingsSection />} />
-                  <Route path="nursery" element={<NurserySettingsSection />}>
-                    <Route index element={<Navigate to="defaults" replace />} />
-                    <Route path="defaults" element={<NurseryDefaultsPane />} />
-                    <Route path="workers" element={<NurseryWorkersPane />} />
+            <PageErrorBoundary>
+              <Suspense fallback={<PageSpinner />}>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/people" element={<PeoplePage />} />
+                  <Route path="/people/:id" element={<PersonDetailPage />} />
+                  <Route path="/groups" element={<GroupsPage />} />
+                  <Route path="/groups/:id" element={<GroupDetailPage />} />
+                  <Route path="/messages" element={<MessageHistoryPage />} />
+                  <Route path="/messages/compose" element={<ComposeRoute />} />
+                  <Route path="/messages/:id" element={<MessageDetailPage />} />
+                  <Route path="/templates" element={<TemplatesPage />} />
+                  <Route path="/templates/new" element={<TemplateEditPage />} />
+                  <Route path="/templates/:id/edit" element={<TemplateEditPage />} />
+                  <Route path="/import" element={<ImportPage />} />
+                  <Route path="/import/contacts" element={<ContactsImportPage />} />
+                  <Route path="/devotions" element={<DevotionListPage />} />
+                  <Route path="/devotions/stats" element={<DevotionStatsPage />} />
+                  <Route path="/devotions/scan" element={<DevotionScanPage />} />
+                  <Route path="/devotions/scriptures" element={<DevotionScripturesPage />} />
+                  <Route path="/devotions/passages" element={<DevotionPassagesPage />} />
+                  <Route path="/devotions/passages/:id" element={<DevotionPassageDetailPage />} />
+                  <Route path="/devotions/audit" element={<DevotionAuditPage />} />
+                  <Route path="/devotions/missing" element={<DevotionMissingPage />} />
+                  <Route path="/devotions/gwendolyn" element={<GwendolynListPage />} />
+                  <Route path="/devotions/gwendolyn/new" element={<GwendolynNewPage />} />
+                  <Route path="/devotions/gwendolyn/:id" element={<GwendolynDetailPage />} />
+                  <Route path="/devotions/new" element={<DevotionDetailPage />} />
+                  <Route path="/devotions/:id" element={<DevotionDetailPage />} />
+                  <Route path="/nursery" element={<NurserySchedulesPage />} />
+                  <Route
+                    path="/nursery/workers"
+                    element={<Navigate to="/schedules/settings/nursery/workers" replace />}
+                  />
+                  <Route path="/nursery/settings" element={<Navigate to="/schedules/settings" replace />} />
+                  <Route path="/nursery/:id" element={<NurseryScheduleViewPage />} />
+                  <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
+                  <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
+                  <Route path="/schedules/music" element={<MusicSchedulesListPage />} />
+                  <Route path="/schedules/music/:id" element={<MusicWeekViewPage />} />
+                  <Route path="/schedules/music/:id/service/:serviceId" element={<MusicServiceEditorPage />} />
+                  <Route path="/schedules/sunday-school-rolls" element={<RollListPage />} />
+                  <Route path="/schedules/sunday-school-rolls/:id" element={<RollViewPage />} />
+                  <Route path="/schedules/sunday-school" element={<WorkersNotesListPage />} />
+                  <Route path="/schedules/sunday-school/:id" element={<WorkersNotesViewPage />} />
+                  <Route path="/schedules/sunday-school/:id/theme" element={<WorkersNotesThemePage />} />
+                  <Route path="/schedules/sunday-school/:id/blocks" element={<WorkersNotesBlocksPage />} />
+                  <Route path="/schedules/sunday-school/:id/months" element={<WorkersNotesMonthsPage />} />
+                  <Route path="/schedules/sunday-school/:id/lessons" element={<WorkersNotesLessonsPage />} />
+                  <Route path="/schedules/settings" element={<SchedulesSettingsLayout />}>
+                    <Route index element={<Navigate to="general" replace />} />
+                    <Route path="general" element={<GeneralSettingsSection />} />
+                    <Route path="nursery" element={<NurserySettingsSection />}>
+                      <Route index element={<Navigate to="defaults" replace />} />
+                      <Route path="defaults" element={<NurseryDefaultsPane />} />
+                      <Route path="workers" element={<NurseryWorkersPane />} />
+                    </Route>
+                    <Route path="special-music" element={<SpecialMusicSettingsSection />} />
+                    <Route path="fair-booth" element={<FairBoothSettingsSection />} />
+                    <Route path="music" element={<MusicScheduleSettingsSection />} />
+                    <Route path="sunday-school-roll" element={<SundaySchoolRollSettingsSection />} />
+                    <Route path="sunday-school" element={<SundaySchoolSettingsSection />}>
+                      <Route index element={<Navigate to="defaults" replace />} />
+                      <Route path="defaults" element={<SundaySchoolDefaultsPane />} />
+                      <Route path="themes" element={<SundaySchoolThemesPane />} />
+                      <Route path="lessons" element={<SundaySchoolLessonsPane />} />
+                    </Route>
                   </Route>
-                  <Route path="special-music" element={<SpecialMusicSettingsSection />} />
-                  <Route path="fair-booth" element={<FairBoothSettingsSection />} />
-                  <Route path="music" element={<MusicScheduleSettingsSection />} />
-                  <Route path="sunday-school-roll" element={<SundaySchoolRollSettingsSection />} />
-                  <Route path="sunday-school" element={<SundaySchoolSettingsSection />}>
-                    <Route index element={<Navigate to="defaults" replace />} />
-                    <Route path="defaults" element={<SundaySchoolDefaultsPane />} />
-                    <Route path="themes" element={<SundaySchoolThemesPane />} />
-                    <Route path="lessons" element={<SundaySchoolLessonsPane />} />
+                  <Route path="/schedules/fair-booth" element={<FairBoothSchedulesPage />} />
+                  <Route path="/schedules/fair-booth/:id" element={<FairBoothSchedulePage />} />
+                  <Route path="/schedules/fair-booth/:id/day/:date" element={<FairBoothDayPage />} />
+                  <Route path="/sermons/quotes" element={<QuotesPage />} />
+                  <Route path="/sermons/quotes/:id" element={<QuoteDetailPage />} />
+                  <Route path="/sermons/research" element={<QuotesResearchPage />} />
+                  <Route path="/sermons/searches" element={<QuoteSearchesPage />} />
+                  <Route path="/sermons/searches/:id" element={<QuoteSearchDetailPage />} />
+                  <Route path="/sermons/social" element={<SermonsPage />} />
+                  <Route path="/sermons/social/:id" element={<SermonDetailPage />} />
+                  <Route path="/sermons/verse-strips" element={<VerseStripsPage />} />
+                  <Route path="/music/hymns" element={<HymnsPrepPage />} />
+                  <Route path="/music/hymns/searches" element={<HymnSearchesPage />} />
+                  <Route path="/music/hymns/searches/:id" element={<HymnSearchDetailPage />} />
+                  <Route path="/music/specials" element={<SpecialsListPage />} />
+                  <Route path="/music/specials/new" element={<SpecialNewPage />} />
+                  <Route path="/music/specials/:id" element={<SpecialDetailPage />} />
+                  <Route path="/calendar" element={<CalendarPage />} />
+                  <Route path="/calendar/print" element={<CalendarPrintPage />} />
+                  <Route path="/rsvp" element={<RsvpListPage />} />
+                  <Route path="/rsvp/:id" element={<RsvpDetailPage />} />
+                  <Route path="/attendance" element={<AttendanceDashboardPage />} />
+                  <Route path="/attendance/times" element={<Navigate to="/attendance/settings/times" replace />} />
+                  <Route
+                    path="/attendance/recorders"
+                    element={<Navigate to="/attendance/settings/recorders" replace />}
+                  />
+                  <Route path="/attendance/settings" element={<AttendanceSettingsLayout />}>
+                    <Route index element={<Navigate to="times" replace />} />
+                    <Route path="times" element={<ServiceTimesSection />} />
+                    <Route path="recorders" element={<RecordersSection />} />
+                    <Route path="departments" element={<SundaySchoolDepartmentsSection />} />
+                    <Route path="households" element={<FillAmericaHouseholdsSection />} />
                   </Route>
-                </Route>
-                <Route path="/schedules/fair-booth" element={<FairBoothSchedulesPage />} />
-                <Route path="/schedules/fair-booth/:id" element={<FairBoothSchedulePage />} />
-                <Route path="/schedules/fair-booth/:id/day/:date" element={<FairBoothDayPage />} />
-                <Route path="/sermons/quotes" element={<QuotesPage />} />
-                <Route path="/sermons/quotes/:id" element={<QuoteDetailPage />} />
-                <Route path="/sermons/research" element={<QuotesResearchPage />} />
-                <Route path="/sermons/searches" element={<QuoteSearchesPage />} />
-                <Route path="/sermons/searches/:id" element={<QuoteSearchDetailPage />} />
-                <Route path="/sermons/social" element={<SermonsPage />} />
-                <Route path="/sermons/social/:id" element={<SermonDetailPage />} />
-                <Route path="/sermons/verse-strips" element={<VerseStripsPage />} />
-                <Route path="/music/hymns" element={<HymnsPrepPage />} />
-                <Route path="/music/hymns/searches" element={<HymnSearchesPage />} />
-                <Route path="/music/hymns/searches/:id" element={<HymnSearchDetailPage />} />
-                <Route path="/music/specials" element={<SpecialsListPage />} />
-                <Route path="/music/specials/new" element={<SpecialNewPage />} />
-                <Route path="/music/specials/:id" element={<SpecialDetailPage />} />
-                <Route path="/calendar" element={<CalendarPage />} />
-                <Route path="/calendar/print" element={<CalendarPrintPage />} />
-                <Route path="/rsvp" element={<RsvpListPage />} />
-                <Route path="/rsvp/:id" element={<RsvpDetailPage />} />
-                <Route path="/attendance" element={<AttendanceDashboardPage />} />
-                <Route path="/attendance/times" element={<Navigate to="/attendance/settings/times" replace />} />
-                <Route
-                  path="/attendance/recorders"
-                  element={<Navigate to="/attendance/settings/recorders" replace />}
-                />
-                <Route path="/attendance/settings" element={<AttendanceSettingsLayout />}>
-                  <Route index element={<Navigate to="times" replace />} />
-                  <Route path="times" element={<ServiceTimesSection />} />
-                  <Route path="recorders" element={<RecordersSection />} />
-                  <Route path="departments" element={<SundaySchoolDepartmentsSection />} />
-                  <Route path="households" element={<FillAmericaHouseholdsSection />} />
-                </Route>
-                <Route path="/sunday-school/stats" element={<SundaySchoolStatsPage />} />
-                <Route path="/fill-america" element={<FillAmericaCampaignListPage />} />
-                <Route path="/fill-america/:id" element={<FillAmericaCampaignViewPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-              </Routes>
-            </Suspense>
+                  <Route path="/sunday-school/stats" element={<SundaySchoolStatsPage />} />
+                  <Route path="/fill-america" element={<FillAmericaCampaignListPage />} />
+                  <Route path="/fill-america/:id" element={<FillAmericaCampaignViewPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                </Routes>
+              </Suspense>
+            </PageErrorBoundary>
           </main>
         </div>
 

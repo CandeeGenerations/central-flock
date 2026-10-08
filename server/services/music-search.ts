@@ -3,6 +3,7 @@ import {eq} from 'drizzle-orm'
 
 import {db, schema, sqlite} from '../db/index.js'
 import {effortConfig, resolveModel, webSearchTool} from '../lib/ai-models.js'
+import {createMessage, requireAnthropicKey} from '../lib/anthropic-client.js'
 
 export type HymnBook = 'burgundy' | 'silver'
 
@@ -139,7 +140,7 @@ function isVerified(lyrics: string, storedFirstLine: string | null): boolean {
   return fetched.startsWith(stored) || stored.startsWith(fetched)
 }
 
-function parseAiResponse(
+export function parseAiResponse(
   text: string,
   hymnsById: Map<number, HymnRow>,
 ): {results: MusicResult[]; droppedIds: number[]} {
@@ -190,8 +191,7 @@ function collectText(content: Anthropic.Messages.ContentBlock[]): string {
 }
 
 export async function runMusicSearch(topic: string): Promise<{model: string; results: MusicResult[]}> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set')
+  requireAnthropicKey()
 
   const model = getConfiguredModel()
   const hymns = loadHymns()
@@ -204,9 +204,7 @@ export async function runMusicSearch(topic: string): Promise<{model: string; res
   const hymnsById = new Map(hymns.map((h) => [h.id, h]))
   const corpusText = buildCorpusText(hymns)
 
-  const client = new Anthropic({apiKey})
-
-  const response = await client.messages.create({
+  const response = await createMessage('music-search', {
     model,
     max_tokens: 8192,
     ...effortConfig(model, 'medium'),

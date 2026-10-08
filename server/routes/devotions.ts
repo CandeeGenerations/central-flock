@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import {and, asc, desc, eq, inArray, like, or, sql} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'fs'
@@ -6,18 +5,16 @@ import path from 'path'
 import {YoutubeTranscript} from 'youtube-transcript'
 
 import {db, schema} from '../db/index.js'
-import {AI_MODELS, effortConfig} from '../lib/ai-models.js'
 import {parseReference, referenceKeys} from '../lib/bible-reference.js'
 import {retargetDescriptionHeader} from '../lib/devotion-description-header.js'
 import {asyncHandler, isUniqueConstraintError} from '../lib/route-helpers.js'
 import {uploadPath, uploadUrl, urlToDiskPath} from '../lib/uploads.js'
 import {readWorkbookFromBuffer, sheetNames, sheetRows} from '../lib/xlsx-rows.js'
+import {findBibleVerses} from '../services/bible-verses.js'
 import {generateDevotionPassage} from '../services/devotion-generation.js'
 import {importDevotions, parseSheetRows} from '../services/devotion-import.js'
 import {parseDevotionImage} from '../services/devotion-ocr.js'
 import {type ValidatableDevotion, validateParsedDevotions} from '../services/devotion-scan-validation.js'
-
-const anthropic = new Anthropic()
 
 const SCAN_IMAGES_DIR = uploadPath('scan-images')
 
@@ -2267,29 +2264,7 @@ devotionsRouter.post(
       })
       .join('\n')
 
-    const message = await anthropic.messages.create({
-      model: AI_MODELS.sonnet,
-      max_tokens: 8192,
-      ...effortConfig(AI_MODELS.sonnet, 'low'),
-      system: `You analyze YouTube video transcripts to identify Bible verse references.
-
-First, look ONLY for direct references — places where the speaker explicitly names a Bible book, chapter, and/or verse (e.g., "John 3:16", "Romans chapter 8", "in First Corinthians Paul says..."), or directly reads/quotes scripture by name.
-
-If you find direct references, list ONLY those. Do NOT include indirect or paraphrased references.
-
-If and ONLY if there are NO direct references at all, then look for indirect/paraphrased references where the speaker is clearly alluding to a specific Bible passage without naming it.
-
-For each verse found, provide:
-1. The Bible reference (book, chapter, verse)
-2. The approximate timestamp where it's mentioned
-3. A brief snippet of what the speaker said
-
-Format your response as a clean, readable list. If no Bible verses are found at all (direct or indirect), say so.`,
-      messages: [{role: 'user', content: `TRANSCRIPT:\n${transcriptText}`}],
-    })
-
-    const textBlock = message.content.find((b) => b.type === 'text')
-    const result = textBlock && textBlock.type === 'text' ? textBlock.text : ''
+    const result = await findBibleVerses(transcriptText)
 
     res.json({result, videoId, transcriptSegments: transcript.length})
   }),

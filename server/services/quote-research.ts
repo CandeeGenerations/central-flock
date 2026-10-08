@@ -1,8 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk'
 import {eq} from 'drizzle-orm'
 
 import {db, schema, sqlite} from '../db/index.js'
 import {effortConfig, resolveModel} from '../lib/ai-models.js'
+import {createMessage, requireAnthropicKey} from '../lib/anthropic-client.js'
 
 const PREFILTER_THRESHOLD = 300
 
@@ -127,7 +127,7 @@ function buildCorpusText(quotes: QuoteRow[]): string {
     .join('\n\n')
 }
 
-function parseAiResponse(
+export function parseAiResponse(
   text: string,
   quotesById: Map<number, QuoteRow>,
 ): {synthesis: string; results: Array<{quoteId: number; note: string; relevance: string; quote: PublicQuote}>} {
@@ -170,8 +170,7 @@ export interface QuoteComputeResult {
 // Run the quote-research LLM call without persisting. Used by runQuoteResearch
 // (insert path) and the "add quotes to an existing search" route (update path).
 export async function computeQuoteResearch(topic: string): Promise<QuoteComputeResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set')
+  requireAnthropicKey()
 
   const start = Date.now()
   const model = getConfiguredModel()
@@ -184,9 +183,7 @@ export async function computeQuoteResearch(topic: string): Promise<QuoteComputeR
   const quotesById = new Map(candidates.map((q) => [q.id, q]))
   const corpusText = buildCorpusText(candidates)
 
-  const client = new Anthropic({apiKey})
-
-  const response = await client.messages.create({
+  const response = await createMessage('quote-research', {
     model,
     max_tokens: 8192,
     ...effortConfig(model, 'medium'),

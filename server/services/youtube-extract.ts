@@ -1,10 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk'
 import {YoutubeTranscript} from 'youtube-transcript'
 
 import {db, schema} from '../db/index.js'
 import {AI_MODELS, effortConfig} from '../lib/ai-models.js'
-
-const anthropic = new Anthropic()
+import {createMessage} from '../lib/anthropic-client.js'
 
 export type YoutubeExtraction = {
   videoId: string
@@ -135,7 +133,7 @@ type AiPayload = {
   performers?: string[]
 }
 
-async function extractFieldsViaClaude(input: {
+export async function extractFieldsViaClaude(input: {
   title: string | null
   description: string | null
   uploadDate: string | null
@@ -150,7 +148,7 @@ async function extractFieldsViaClaude(input: {
 
   if (!userContent.trim()) return {}
 
-  const message = await anthropic.messages.create({
+  const message = await createMessage('youtube-extract', {
     model: AI_MODELS.sonnet,
     max_tokens: 4096,
     ...effortConfig(AI_MODELS.sonnet, 'low'),

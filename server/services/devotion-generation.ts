@@ -1,8 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk'
 import {and, desc, eq, sql} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
 import {effortConfig, resolveModel} from '../lib/ai-models.js'
+import {createMessage, requireAnthropicKey} from '../lib/anthropic-client.js'
 import {parseReference} from '../lib/bible-reference.js'
 
 export interface GeneratedPassage {
@@ -119,7 +119,7 @@ function extractTag(text: string, names: string[]): string | null {
   return null
 }
 
-function parseResponse(text: string): GeneratedPassage | null {
+export function parseResponse(text: string): GeneratedPassage | null {
   const cleaned = text.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '')
 
   const title = extractTag(cleaned, ['title'])
@@ -171,15 +171,11 @@ export async function generateDevotionPassage(
   onProgress?: ProgressCallback,
   topic?: string,
 ): Promise<GeneratedPassage[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY environment variable is not set')
-  }
+  requireAnthropicKey()
 
   onProgress?.('querying_history', 'Checking previous passages\u2026', 10)
 
   const model = getConfiguredModel()
-  const client = new Anthropic({apiKey})
   const results: GeneratedPassage[] = []
   const freshRefs: string[] = []
   const freshTitles: string[] = []
@@ -196,7 +192,7 @@ export async function generateDevotionPassage(
     let lastStop: string | null = null
 
     for (let attempt = 1; attempt <= MAX_PARSE_ATTEMPTS && !passage; attempt++) {
-      const response = await client.messages.create({
+      const response = await createMessage('devotion-generation', {
         model,
         max_tokens: 4096,
         ...effortConfig(model, 'medium'),

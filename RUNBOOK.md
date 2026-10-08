@@ -101,6 +101,23 @@ tail -50 ~/Library/Logs/central-flock.log | grep -iE "error|listening|server run
 - Keep the pre-migrate backup until you've verified the rollback is stable. The deploy script's auto-prune may otherwise drop it after 10 more deploys.
 - Investigate what went wrong on a copy (`cp central-flock.db central-flock.db.investigate`) before retrying the deploy — don't fix-in-place on prod.
 
+## Upgrading Claude models
+
+Models are configured only in `server/lib/ai-models.ts` (`AI_MODELS`). To upgrade:
+
+1. Point the key (`sonnet` / `opus` / `haiku`) at the new model ID.
+2. Add the old ID to `LEGACY_MODEL_TO_KEY` so any exact ID stored in the DB follows the upgrade.
+3. Read the new model's migration guide for breaking changes and check our call sites for each: `temperature`/`top_p`/`top_k`, assistant prefill, forced `tool_choice`, disabled thinking, the default effort, and whether `max_tokens` leaves room for adaptive thinking. Revisit the `claude-haiku-4-` special cases in `effortConfig` / `webSearchTool` if a model line changes capabilities.
+4. Run the full live suite once by hand, including the expensive features:
+   ```bash
+   ANTHROPIC_API_KEY=$(/usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:ANTHROPIC_API_KEY' \
+     ~/Library/LaunchAgents/cc.cgen.central-flock.plist) AI_TEST_ALL=1 pnpm test:ai
+   ```
+   `AI_TEST_MODEL=opus` (etc.) runs the settings-driven features on a model other than the configured `defaultAiModel`.
+5. Commit. The pre-commit hook re-runs `pnpm test && pnpm test:ai` (default features) whenever `ai-models.ts` or the `@anthropic-ai/sdk` version is staged, and blocks the commit (and therefore the deploy) on failure. `SKIP_AI_TESTS=1` bypasses.
+
+The live suite runs against a temp copy of `central-flock.db` (via `CENTRAL_FLOCK_DB_PATH`), never the real DB. The OCR test needs `server/test/fixtures/devotion-sheet.jpg` and is skipped without it.
+
 ## Restoring from the daily backups directory
 
 The `backups/` directory also contains dated full snapshots (subdirectories like `2026-04-21T13-57-58-951Z/`) from some other source. Those are not produced by `deploy.sh`. If a `pre-migrate-*` snapshot is missing or corrupted, fall back to the newest of those:

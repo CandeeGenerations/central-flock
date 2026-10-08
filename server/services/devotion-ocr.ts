@@ -1,6 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk'
-
 import {AI_MODELS, effortConfig} from '../lib/ai-models.js'
+import {createMessage, requireAnthropicKey} from '../lib/anthropic-client.js'
 import {parseReference} from '../lib/bible-reference.js'
 
 export interface ParsedDevotionRow {
@@ -77,16 +76,11 @@ export async function parseDevotionImage(
   year: number
   devotions: ParsedDevotionRow[]
 }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY environment variable is not set')
-  }
+  requireAnthropicKey()
 
   onProgress?.('calling_ai', 'Analyzing handwritten sheet\u2026', 20)
 
-  const client = new Anthropic({apiKey})
-
-  const response = await client.messages.create({
+  const response = await createMessage('devotion-ocr', {
     model: AI_MODELS.sonnet,
     max_tokens: 8192,
     ...effortConfig(AI_MODELS.sonnet, 'low'),
@@ -119,8 +113,12 @@ export async function parseDevotionImage(
 
   onProgress?.('parsing', 'Extracting devotion entries\u2026', 80)
 
+  return parseOcrResponse(textBlock.text)
+}
+
+export function parseOcrResponse(text: string): {month: string; year: number; devotions: ParsedDevotionRow[]} {
   // Extract JSON from the response (may be wrapped in markdown code block)
-  let jsonStr = textBlock.text
+  let jsonStr = text
   const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/)
   if (jsonMatch) {
     jsonStr = jsonMatch[1]

@@ -1,8 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk'
 import {eq} from 'drizzle-orm'
 
 import {db, schema, sqlite} from '../db/index.js'
 import {effortConfig, resolveModel} from '../lib/ai-models.js'
+import {createMessage, requireAnthropicKey} from '../lib/anthropic-client.js'
 
 export type HymnBook = 'burgundy' | 'silver'
 export type HymnalFilter = 'burgundy' | 'silver' | 'both'
@@ -228,7 +228,7 @@ function buildPick(
   }
 }
 
-function parseAiResponse(
+export function parseAiResponse(
   text: string,
   hymnsById: Map<number, HymnRow>,
 ): {sections: HymnSuggestionSections; droppedIds: number[]} {
@@ -318,8 +318,7 @@ function parseAiResponse(
 }
 
 export async function runHymnSuggestion(input: HymnSuggestionInput): Promise<HymnSuggestionResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set')
+  requireAnthropicKey()
 
   const filter = input.hymnalFilter ?? 'both'
   const start = Date.now()
@@ -336,9 +335,7 @@ export async function runHymnSuggestion(input: HymnSuggestionInput): Promise<Hym
   const corpusText = buildCorpusText(hymns)
   const sermonText = buildSermonInputsText(input)
 
-  const client = new Anthropic({apiKey})
-
-  const response = await client.messages.create({
+  const response = await createMessage('hymn-suggestion', {
     model,
     max_tokens: 8192,
     ...effortConfig(model, 'medium'),

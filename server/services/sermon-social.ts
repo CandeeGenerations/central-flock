@@ -1,8 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk'
 import {eq} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
 import {effortConfig, resolveModel} from '../lib/ai-models.js'
+import {createMessage, requireAnthropicKey} from '../lib/anthropic-client.js'
 
 function getConfiguredModel(): string {
   const row = db
@@ -257,14 +257,12 @@ export function parseGeneration(text: string, transcript: string): Omit<SermonGe
 }
 
 export async function generateSermonSocial(transcript: string): Promise<SermonGeneration> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set')
+  requireAnthropicKey()
 
   const start = Date.now()
   const model = getConfiguredModel()
-  const client = new Anthropic({apiKey})
 
-  const response = await client.messages.create({
+  const response = await createMessage('sermon-social', {
     model,
     max_tokens: 16384,
     ...effortConfig(model, 'medium'),

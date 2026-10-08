@@ -3,9 +3,9 @@ import type Anthropic from '@anthropic-ai/sdk'
 // Abstract model keys stored in the DB and referenced throughout the app.
 // Update the right-hand side when a new model version ships — nothing else needs to change.
 export const AI_MODELS = {
-  sonnet: 'claude-sonnet-5',
-  opus: 'claude-opus-5',
-  haiku: 'claude-haiku-4-5',
+  sonnet: 'claude-sonnet-5-5',
+  opus: 'claude-opus-5-5',
+  haiku: 'claude-haiku-5-5',
 } as const
 
 export type AiModelKey = keyof typeof AI_MODELS
@@ -32,18 +32,21 @@ export const LEGACY_MODEL_TO_KEY: Record<string, AiModelKey> = {
   'claude-sonnet-4-5-20250514': 'sonnet',
   'claude-sonnet-4-5': 'sonnet',
   'claude-sonnet-4-6': 'sonnet',
+  'claude-sonnet-5': 'sonnet',
   'claude-opus-4-20250514': 'opus',
   'claude-opus-4-5': 'opus',
   'claude-opus-4-6': 'opus',
   'claude-opus-4-7': 'opus',
   'claude-opus-4-8': 'opus',
+  'claude-opus-5': 'opus',
   'claude-haiku-4-5-20251001': 'haiku',
+  'claude-haiku-4-5': 'haiku',
 }
 
-// The dynamic-filtering web search tool needs Opus 4.6+ / Sonnet 4.6+; Haiku 4.5 only
-// supports the basic variant, so pick the newest one the configured model can run.
+// The dynamic-filtering web search tool needs a 4.6+ model; Haiku 4.5 only supports
+// the basic variant, so pick the newest one the configured model can run.
 export function webSearchTool(model: string, maxUses: number): Anthropic.ToolUnion {
-  if (model.startsWith('claude-haiku-')) {
+  if (model.startsWith('claude-haiku-4-')) {
     return {type: 'web_search_20250305', name: 'web_search', max_uses: maxUses}
   }
   return {type: 'web_search_20260209', name: 'web_search', max_uses: maxUses}
@@ -51,10 +54,10 @@ export function webSearchTool(model: string, maxUses: number): Anthropic.ToolUni
 
 export type AiEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
-// Sonnet 5 / Opus 5 think adaptively unless told otherwise, which eats into max_tokens
-// and costs. Pin the effort per call site instead of taking the "high" default.
+// Sonnet 5.5 / Opus 5.5 / Haiku 5.5 think adaptively by default, which eats into max_tokens and
+// costs. Pin the effort per call site instead of taking the model default (Sonnet: high, others: medium).
 // Haiku 4.5 rejects output_config.effort, so omit it there.
 export function effortConfig(model: string, effort: AiEffort): {output_config?: Anthropic.OutputConfig} {
-  if (model.startsWith('claude-haiku-')) return {}
+  if (model.startsWith('claude-haiku-4-')) return {}
   return {output_config: {effort}}
 }

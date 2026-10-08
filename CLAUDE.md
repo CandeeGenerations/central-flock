@@ -9,6 +9,8 @@ Central Flock is a macOS desktop app for managing contacts and sending personali
 - `pnpm dev` — Start frontend (Vite, port 5173) and backend (Express, port 5172) concurrently
 - `pnpm build` — TypeScript compile + Vite production build
 - `pnpm lint` — Run TypeScript type checking (both `tsconfig.app.json` and `tsconfig.server.json`) + oxlint
+- `pnpm test` — Offline unit tests (Vitest; DB module is stubbed)
+- `pnpm test:ai` — Live Claude smoke test, one call per AI feature against a temp DB copy (costs cents; `AI_TEST_ALL=1` adds the expensive features)
 - `pnpm db:generate` — Generate Drizzle migration files
 - `pnpm db:migrate` — Apply pending migration files (idempotent; ledger in `__drizzle_migrations`)
 - `pnpm db:push` — Diff schema and push directly (skips migration files; dev convenience, not for prod)
@@ -44,6 +46,7 @@ Schema is in `server/db/schema.ts` using Drizzle ORM. Tables: `people`, `groups`
 
 - API client with typed helpers in `src/lib/api.ts`
 - Express routes in `server/routes/` (people, groups, messages, drafts, templates, global-variables, import, contacts)
+- Claude models are configured only in `server/lib/ai-models.ts`; changing it (or the SDK version) triggers `pnpm test:ai` in pre-commit — see RUNBOOK.md → Upgrading Claude models. All Claude calls go through `createMessage` in `server/lib/anthropic-client.ts`; a new AI feature should too, and should get a case in `server/test/ai-smoke.ai.test.ts`.
 - Message sending is async with batch processing via `server/services/message-queue.ts`
 - Template variables: `{{firstName}}`, `{{lastName}}`, `{{fullName}}`
 - Phone numbers stored in E.164 format, validated as 10-digit US numbers

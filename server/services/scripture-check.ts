@@ -6,12 +6,12 @@
  * list. `explainNotFound` is the only part that calls the model, and anything it proposes is run
  * back through `checkBlock` before it is offered as a fix.
  */
-import Anthropic from '@anthropic-ai/sdk'
 import crypto from 'crypto'
 import {eq} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
 import {effortConfig, resolveModel} from '../lib/ai-models.js'
+import {createMessage, hasAnthropicKey} from '../lib/anthropic-client.js'
 import {
   type Alignment,
   type Token,
@@ -511,15 +511,13 @@ function configuredModel(): string {
 
 export async function explainNotFound(block: ScriptureBlockInput, check = checkBlock(block)): Promise<BlockCheck> {
   const notFound = check.findings.find((f) => f.kind === 'not_found')
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!notFound || !apiKey) return check
+  if (!notFound || !hasAnthropicKey()) return check
 
   let aiRef: string
   let note: string
   try {
     const model = configuredModel()
-    const client = new Anthropic({apiKey})
-    const response = await client.messages.create({
+    const response = await createMessage('scripture-check', {
       model,
       max_tokens: 1024,
       ...effortConfig(model, 'low'),

@@ -6,7 +6,8 @@ import {fileURLToPath} from 'url'
 import * as schema from './schema.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const dbPath = path.join(__dirname, '..', '..', 'central-flock.db')
+// CENTRAL_FLOCK_DB_PATH lets the AI smoke tests run against a throwaway copy of the DB.
+const dbPath = process.env.CENTRAL_FLOCK_DB_PATH || path.join(__dirname, '..', '..', 'central-flock.db')
 
 const sqlite = new Database(dbPath)
 sqlite.pragma('journal_mode = WAL')

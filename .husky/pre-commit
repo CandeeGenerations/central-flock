@@ -1,1 +1,16 @@
 npx lint-staged
+
+# Claude model/SDK changes: run the offline + live AI tests before the commit, since a commit on
+# main deploys. Live run costs a few cents. Bypass with: SKIP_AI_TESTS=1 git commit ...
+if [ -z "${SKIP_AI_TESTS:-}" ] && {
+  git diff --cached --name-only | grep -qx 'server/lib/ai-models.ts' ||
+    git diff --cached -U0 package.json | grep -q '^[+-].*"@anthropic-ai/sdk"'
+}; then
+  if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+    # GUI git clients and plain shells don't have the key; the launchd plist is its only home.
+    ANTHROPIC_API_KEY=$(/usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:ANTHROPIC_API_KEY' \
+      "$HOME/Library/LaunchAgents/cc.cgen.central-flock.plist" 2>/dev/null) && export ANTHROPIC_API_KEY
+  fi
+  echo "pre-commit: Claude model/SDK change → pnpm test && pnpm test:ai (SKIP_AI_TESTS=1 to bypass)"
+  pnpm test && pnpm test:ai || exit 1
+fi

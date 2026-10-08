@@ -15,6 +15,7 @@ const TRAILING_NUMBERS_RE =
   /(\d+(?::\d+[ab]?)?(?:\s*[-–—]\s*\d+(?::\d+)?[ab]?)?(?:\s*[,;]\s*\d+(?::\d+)?[ab]?(?:\s*[-–—]\s*\d+[ab]?)?)*)\s*\)?\s*$/
 // A line that hands over to a quotation: "God said:", "The Bible says,", "Proverbs 23:7 says,"
 const LEAD_IN_RE = /[:,]\s*$/
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /**
  * A reference at the end of a line — alone, in parentheses, after a dash, or trailing the quote
@@ -132,21 +133,27 @@ export function parseDevotional(rawText: string): ParsedDevotional {
   let i = 0
   while (i < lines.length && lines[i].trim() === '') i++
 
-  const title = lines[i]?.trim() ?? ''
+  let title = lines[i]?.trim() ?? ''
   i++
 
   // Skip blank lines between title and date
   while (i < lines.length && lines[i].trim() === '') i++
 
-  const dateRaw = lines[i]?.trim() ?? ''
-  const date = parseDate(dateRaw)
+  let date = parseDate(lines[i]?.trim() ?? '')
   i++
+
+  // Sometimes the date comes before the title
+  if (!ISO_DATE_RE.test(date) && ISO_DATE_RE.test(parseDate(title))) {
+    ;[title, date] = [date, parseDate(title)]
+  }
 
   // Remaining text — join and split on emoji markers
   const remaining = lines.slice(i).join('\n')
 
   // Split on 📚 and 📖 markers — each marker starts a new segment
   const segments = remaining.split(/(📚|📖)/).filter((s) => s !== '')
+  // Text before the first marker ("God will punish the proud man,") is a point too
+  if (segments[0] && segments[0] !== '📚' && segments[0] !== '📖' && segments[0].trim()) segments.unshift('📚')
 
   const blocks: Block[] = []
   let j = 0

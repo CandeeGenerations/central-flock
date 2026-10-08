@@ -1,4 +1,4 @@
-import {format} from 'date-fns'
+import {format, isValid} from 'date-fns'
 
 /**
  * Parse a UTC datetime string from SQLite (which omits the Z suffix)
@@ -13,10 +13,9 @@ export function parseUTC(dateStr: string): Date {
 
 export function formatDate(dateStr: string): string {
   // Date-only strings (YYYY-MM-DD) should be parsed as local, not UTC
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    return format(new Date(dateStr + 'T12:00:00'), 'MMM d, yyyy')
-  }
-  return format(parseUTC(dateStr), 'MMM d, yyyy')
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? new Date(dateStr + 'T12:00:00') : parseUTC(dateStr)
+  // Show unparseable values as-is rather than crashing the page
+  return isValid(date) ? format(date, 'MMM d, yyyy') : dateStr
 }
 
 export function formatDateTime(dateStr: string): string {

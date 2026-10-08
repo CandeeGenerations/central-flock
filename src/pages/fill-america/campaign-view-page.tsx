@@ -26,15 +26,18 @@ import {
 import {SEASON_LABELS, seasonalPredecessors, weekLabel} from '@/lib/fill-america-core'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Eraser, Megaphone, Plus, Trash2} from 'lucide-react'
+import {ArrowLeft, Eraser, Megaphone, Plus, Send, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link, useParams} from 'react-router-dom'
 import {Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts'
 import {toast} from 'sonner'
 
+import {SendResultsDialog} from './send-results-dialog'
+
 export function FillAmericaCampaignViewPage() {
   const {id = ''} = useParams()
   const qc = useQueryClient()
+  const [sendOpen, setSendOpen] = useState(false)
 
   const {data, isLoading} = useQuery({
     queryKey: queryKeys.fillAmericaCampaign(id),
@@ -115,6 +118,10 @@ export function FillAmericaCampaignViewPage() {
             </span>
           ) : null}
         </div>
+        <Button variant="outline" onClick={() => setSendOpen(true)}>
+          <Send className="mr-2 h-4 w-4" />
+          Send Results
+        </Button>
       </div>
 
       <SeasonalComparison campaignId={campaign.id} totals={totals} />
@@ -139,6 +146,8 @@ export function FillAmericaCampaignViewPage() {
       />
 
       <TopEffortsCard roster={roster} weeks={weeks} />
+
+      {sendOpen && <SendResultsDialog totals={totals} onClose={() => setSendOpen(false)} />}
     </div>
   )
 }

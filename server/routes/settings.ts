@@ -65,13 +65,13 @@ settingsRouter.post(
 
       if (!response.ok) {
         const text = await response.text()
-        res.status(502).json({error: `Webhook returned ${response.status}: ${text}`})
+        res.status(422).json({error: `Webhook returned ${response.status}: ${text}`})
         return
       }
 
       res.json({success: true})
     } catch (error) {
-      res.status(502).json({error: error instanceof Error ? error.message : 'Webhook request failed'})
+      res.status(422).json({error: error instanceof Error ? error.message : 'Webhook request failed'})
     }
   }),
 )

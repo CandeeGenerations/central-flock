@@ -23,6 +23,28 @@ const SCAN_IMAGES_DIR = uploadPath('scan-images')
 
 export const devotionsRouter = Router()
 
+// A guest's number counts their appearances, so it's one past the highest number
+// that speaker holds on any earlier devotion. `extra` lets a batch see rows it
+// hasn't written yet.
+function nextGuestNumber(
+  speaker: string,
+  devotionNumber: number,
+  extra: Array<{number: number; guestSpeaker?: string | null; guestNumber?: number | null}> = [],
+): number {
+  const row = db
+    .select({max: sql<number | null>`max(${schema.devotions.guestNumber})`})
+    .from(schema.devotions)
+    .where(and(eq(schema.devotions.guestSpeaker, speaker), sql`${schema.devotions.number} < ${devotionNumber}`))
+    .get()
+  let max = row?.max ?? 0
+  for (const d of extra) {
+    if (d.guestSpeaker === speaker && d.number < devotionNumber && d.guestNumber != null) {
+      max = Math.max(max, d.guestNumber)
+    }
+  }
+  return max + 1
+}
+
 export function cleanupOrphanedScanImages(): {deleted: number; kept: number} {
   if (!fs.existsSync(SCAN_IMAGES_DIR)) return {deleted: 0, kept: 0}
 
@@ -2227,7 +2249,7 @@ devotionsRouter.post(
       transcript = await YoutubeTranscript.fetchTranscript(videoId)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
-      res.status(502).json({error: `Failed to fetch transcript. Make sure the video has captions. ${msg}`})
+      res.status(422).json({error: `Failed to fetch transcript. Make sure the video has captions. ${msg}`})
       return
     }
 
@@ -2286,7 +2308,11 @@ devotionsRouter.post(
           devotionType: req.body.devotionType,
           subcode: req.body.subcode || null,
           guestSpeaker: req.body.guestSpeaker || null,
-          guestNumber: req.body.guestNumber ?? null,
+          guestNumber:
+            req.body.guestNumber ??
+            (req.body.devotionType === 'guest' && req.body.guestSpeaker
+              ? nextGuestNumber(req.body.guestSpeaker, req.body.number)
+              : null),
           referencedDevotions: req.body.referencedDevotions || null,
           bibleReference: req.body.bibleReference || null,
           songName: req.body.songName || null,
@@ -2670,6 +2696,14 @@ devotionsRouter.post(
     if (!devotions || !Array.isArray(devotions)) {
       res.status(400).json({error: 'devotions array is required'})
       return
+    }
+
+    // Scanned sheets rarely print guest numbers, so continue each speaker's
+    // sequence. Walk in devotion order so rows in this batch chain off each other.
+    for (const d of [...devotions].sort((a, b) => a.number - b.number)) {
+      if (d.devotionType === 'guest' && d.guestSpeaker && d.guestNumber == null) {
+        d.guestNumber = nextGuestNumber(d.guestSpeaker, d.number, devotions)
+      }
     }
 
     let inserted = 0

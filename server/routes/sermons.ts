@@ -45,7 +45,7 @@ function clearGenerated(sermonId: number): void {
   db.delete(schema.sermonScriptures).where(eq(schema.sermonScriptures.sermonId, sermonId)).run()
 }
 
-async function runGeneration(sermonId: number, transcript: string): Promise<{skippedQuotes: number}> {
+export async function runGeneration(sermonId: number, transcript: string): Promise<{skippedQuotes: number}> {
   const result = await generateSermonSocial(transcript)
 
   clearGenerated(sermonId)

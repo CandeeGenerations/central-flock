@@ -38,6 +38,7 @@ import {peopleRouter} from './routes/people.js'
 import {quotesRouter} from './routes/quotes.js'
 import {rsvpRouter} from './routes/rsvp.js'
 import {schedulesRouter} from './routes/schedules.js'
+import {recoverUngeneratedSermons} from './routes/sermons-webhook.js'
 import {sermonsRouter} from './routes/sermons.js'
 import {settingsRouter} from './routes/settings.js'
 import {specialsRouter} from './routes/specials.js'
@@ -156,4 +157,5 @@ app.listen(PORT, () => {
   startCalendarSyncScheduler()
   startSpecialsScheduler()
   cleanupOrphanedScanImages()
+  recoverUngeneratedSermons().catch((err) => console.error('[sermons-webhook] boot recovery failed:', err))
 })

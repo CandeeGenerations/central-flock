@@ -600,7 +600,9 @@ Volunteers, Participants (bare).
 ### Social Media
 
 **Sermon**:
-One preached message, recorded in the app by uploading its transcript. Identified by its
+One preached message, recorded in the app by uploading its transcript — by hand, or by the sermon
+pipeline handing off a transcribed **Recording** (see `~/repos/cgen/sermon-pipeline/CONTEXT.md`). A
+hand-off never replaces an existing Sermon. Identified by its
 **Service Time** and date — the same key a **Service Record** uses, so AM and PM on one Sunday are
 two Sermons. Owns the raw transcript and everything derived from it — **Social Quotes** and social
 posts. Only sermons preached at a regular **Service Time** are recorded; funerals and outside
@@ -707,6 +709,7 @@ time — never stored.
 - **Total Attendance** is derived, never entered directly
 - A **Sermon** belongs to exactly one **Service Time** on exactly one date; that pair is unique
 - A **Sermon** has exactly one **Speaker**, who is always a **Person**
+- A **Sermon** is created from at most one **Recording**; a **Recording** is the media file, never the Sermon itself
 - A **Sermon** and a **Service Record** for the same (**Service Time**, date) describe the same gathering
 - A **Sermon** has many **Social Quotes**; each belongs to exactly one Sermon
 - Every **Social Quote** has one **Verbatim** span, one **Cleaned** form, and one **Polished** form

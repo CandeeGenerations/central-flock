@@ -4,6 +4,7 @@ import {requireInternalSecret} from '../middleware/require-internal-secret.js'
 import {attendanceWebhookRouter} from './attendance-webhook.js'
 import {quotesWebhookRouter} from './quotes-webhook.js'
 import {rsvpWebhookRouter} from './rsvp-webhook.js'
+import {sermonsWebhookRouter} from './sermons-webhook.js'
 
 export const webhooksRouter = Router()
 
@@ -14,3 +15,4 @@ webhooksRouter.use(requireInternalSecret)
 webhooksRouter.use('/quotes', quotesWebhookRouter)
 webhooksRouter.use('/rsvp', rsvpWebhookRouter)
 webhooksRouter.use('/attendance', attendanceWebhookRouter)
+webhooksRouter.use('/sermons', sermonsWebhookRouter)

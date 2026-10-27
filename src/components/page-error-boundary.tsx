@@ -20,23 +20,36 @@ export function PageErrorBoundary({children}: {children: React.ReactNode}) {
   )
 }
 
+// A lazy page whose chunk failed to download. React.lazy caches the rejected import, so
+// resetting the boundary just re-throws it — only a full reload fetches the module again.
+// Messages per engine: Safari, Chrome, Firefox.
+const CHUNK_LOAD_ERROR =
+  /Importing a module script failed|Failed to fetch dynamically imported module|error loading dynamically imported module/i
+
 function PageErrorFallback({error, onRetry}: {error: unknown; onRetry: () => void}) {
   const navigate = useNavigate()
   const [showDetails, setShowDetails] = useState(false)
   const message = error instanceof Error ? error.message : String(error)
+  const isChunkLoadError = CHUNK_LOAD_ERROR.test(message)
 
   return (
     <div className="mx-auto flex max-w-md flex-col items-center px-4 py-16 text-center">
       <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
         <AlertTriangle className="size-6" />
       </div>
-      <h1 className="text-lg font-semibold">Something went wrong on this page</h1>
-      <p className="mt-1 text-sm text-muted-foreground">The error has been reported. Try again, or go back.</p>
+      <h1 className="text-lg font-semibold">
+        {isChunkLoadError ? "This page didn't finish loading" : 'Something went wrong on this page'}
+      </h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {isChunkLoadError
+          ? 'Usually a dropped connection. Try again to reload it.'
+          : 'The error has been reported. Try again, or go back.'}
+      </p>
       <div className="mt-6 flex gap-2">
         <Button variant="outline" onClick={() => navigate(-1)}>
           Go back
         </Button>
-        <Button onClick={onRetry}>Try again</Button>
+        <Button onClick={isChunkLoadError ? () => window.location.reload() : onRetry}>Try again</Button>
       </div>
       <button
         type="button"

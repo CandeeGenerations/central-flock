@@ -9,7 +9,7 @@ import {MultiSelect} from '@/components/ui/multi-select'
 import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import {formatDate, formatDateTime, localTimeFromUTC} from '@/lib/date'
@@ -65,9 +65,23 @@ export function RsvpDetailPage() {
       if (statusFilters.length > 0 && !statusFilters.includes(e.status)) return false
       if (!q) return true
       const fullName = `${e.firstName ?? ''} ${e.lastName ?? ''}`.toLowerCase()
-      return fullName.includes(q) || (e.phoneDisplay ?? '').includes(q)
+      return fullName.includes(q) || (e.phoneDisplay ?? '').includes(q) || (e.note ?? '').toLowerCase().includes(q)
     })
   }, [list, search, statusFilters])
+
+  // Totals for the current filter view. Headcount mirrors the server's people-based counts (blank = 1).
+  const filteredTotals = useMemo(() => {
+    const byStatus: Record<RsvpStatus, number> = {yes: 0, no: 0, maybe: 0, no_response: 0}
+    let headcount = 0
+    let notes = 0
+    for (const e of filteredEntries) {
+      const eff = e.headcount ?? 1
+      byStatus[e.status] += eff
+      headcount += eff
+      if (e.note) notes++
+    }
+    return {byStatus, headcount, notes}
+  }, [filteredEntries])
 
   const updateEntryMutation = useMutation({
     mutationFn: ({entryId, status}: {entryId: number; status: RsvpStatus}) => updateRsvpEntry(entryId, {status}),
@@ -277,7 +291,7 @@ export function RsvpDetailPage() {
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
             <SearchInput
-              placeholder="Search names..."
+              placeholder="Search names or notes..."
               value={search}
               onChange={setSearch}
               containerClassName="sm:max-w-sm"
@@ -425,6 +439,29 @@ export function RsvpDetailPage() {
                 </TableRow>
               ))}
             </TableBody>
+            {filteredEntries.length > 0 && (
+              <TableFooter>
+                <TableRow>
+                  <TableCell />
+                  <TableCell className="font-medium">
+                    {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'}
+                  </TableCell>
+                  <TableCell className="text-xs whitespace-normal">
+                    <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                      <span className="text-emerald-700 dark:text-emerald-400">Y {filteredTotals.byStatus.yes}</span>
+                      <span className="text-rose-700 dark:text-rose-400">N {filteredTotals.byStatus.no}</span>
+                      <span className="text-amber-700 dark:text-amber-400">M {filteredTotals.byStatus.maybe}</span>
+                      <span className="text-muted-foreground">NR {filteredTotals.byStatus.no_response}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center tabular-nums font-medium">{filteredTotals.headcount}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {filteredTotals.notes} with {filteredTotals.notes === 1 ? 'note' : 'notes'}
+                  </TableCell>
+                  <TableCell colSpan={2} />
+                </TableRow>
+              </TableFooter>
+            )}
           </Table>
         </div>
       </Card>

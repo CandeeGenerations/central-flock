@@ -12,7 +12,9 @@ import {
   fetchHome,
   logout,
 } from '@/lib/api'
+import {localDateFromUTC, localTimeFromUTC} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
+import {type RsvpListSummary, fetchRsvpLists} from '@/lib/rsvp-api'
 import {dismissUnsent, listUnsent, unsentComposeHref} from '@/lib/unsent-message'
 import {type RecentEntity, fetchRecents} from '@/lib/usage-api'
 import {cn} from '@/lib/utils'
@@ -95,6 +97,9 @@ export function HomePage() {
 
       {/* Needs attention */}
       <NeedsAttention attention={attention} />
+
+      {/* Today's RSVPs */}
+      <TodaysRsvps />
 
       {/* Jump back in */}
       <JumpBackIn recents={recents ?? []} />
@@ -304,6 +309,82 @@ function NeedsAttention({attention}: {attention: HomeAttention}) {
         </span>
       ))}
     </div>
+  )
+}
+
+// --- Today's RSVPs --------------------------------------------------------
+
+function localDateOf(list: RsvpListSummary): string | null {
+  // Standalone date wins (same override rule as the server's effectiveDate). Calendar starts
+  // are UTC, so take the local date — an evening event's UTC date is already tomorrow.
+  if (list.standaloneDate) return list.standaloneDate
+  return list.calendarEventStartDate ? localDateFromUTC(list.calendarEventStartDate) : null
+}
+
+function formatHHmm(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm
+  const ampm = h < 12 ? 'AM' : 'PM'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}${m > 0 ? `:${String(m).padStart(2, '0')}` : ''} ${ampm}`
+}
+
+function TodaysRsvps() {
+  // Archived included: the server's archive cutoff is a UTC date, which drops today's lists
+  // in the evening. Filtering on the local date here keeps them up until local midnight.
+  // The interval re-renders the page so a tab left open past midnight hides the card.
+  const {data: lists} = useQuery({
+    queryKey: queryKeys.rsvpLists(true),
+    queryFn: () => fetchRsvpLists(true),
+    refetchInterval: 5 * 60 * 1000,
+  })
+
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const todays = (lists ?? []).filter((l) => localDateOf(l) === today)
+  if (todays.length === 0) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+          Today's RSVPs
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-1">
+          {todays.map((list) => {
+            const time =
+              list.standaloneTime ??
+              (list.calendarEventStartDate ? localTimeFromUTC(list.calendarEventStartDate) : null)
+            return (
+              <Link
+                key={list.id}
+                to={`/rsvp/${list.id}`}
+                className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{list.name}</p>
+                  <p className="text-xs text-muted-foreground flex flex-wrap gap-x-2">
+                    <span className="text-emerald-700 dark:text-emerald-400">Yes {list.counts.yes}</span>
+                    <span className="text-rose-700 dark:text-rose-400">No {list.counts.no}</span>
+                    <span className="text-amber-700 dark:text-amber-400">Maybe {list.counts.maybe}</span>
+                    <span>No response {list.counts.no_response}</span>
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-lg font-semibold tabular-nums leading-none">{list.counts.expectedAttendees}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    attending{time ? ` · ${formatHHmm(time)}` : ''}
+                  </p>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

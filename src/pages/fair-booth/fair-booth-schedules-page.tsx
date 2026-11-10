@@ -21,7 +21,7 @@ import {
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
-import {useNavigate} from 'react-router-dom'
+import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 const PAGE_SIZE = 25
@@ -50,7 +50,22 @@ export function FairBoothSchedulesPage() {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 250)
   const [page, setPage] = useState(1)
-  const [createOpen, setCreateOpen] = useState(false)
+  const [createOpenManual, setCreateOpenManual] = useState(false)
+  const [params, setParams] = useSearchParams()
+  // The command palette lands here with ?new=1; derived so the dialog opens on the first render.
+  const wantsNew = params.get('new') === '1'
+  const createOpen = createOpenManual || wantsNew
+  const setCreateOpen = (next: boolean) => {
+    setCreateOpenManual(next)
+    if (!next && wantsNew)
+      setParams(
+        (p) => {
+          p.delete('new')
+          return p
+        },
+        {replace: true},
+      )
+  }
   const [scopeStart, setScopeStart] = useState(nextFridayIso())
   const [scopeLabel, setScopeLabel] = useState('')
 
@@ -99,57 +114,79 @@ export function FairBoothSchedulesPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Fair Booth Schedules</h2>
         <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> New Schedule
+          <Plus className="mr-2 h-4 w-4" />
+          New Schedule
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search by scope label..." />
-          {filtered.length === 0 ? (
-            <div className="text-muted-foreground text-sm py-8 text-center">
-              No fair booth schedules yet. Click "New Schedule" to create one.
-            </div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Scope</TableHead>
-                    <TableHead>Signups</TableHead>
-                    <TableHead>Updated</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginated.map((s) => (
-                    <TableRow
-                      key={s.id}
-                      onClick={() => navigate(`/schedules/fair-booth/${s.id}`)}
-                      className="cursor-pointer"
+      <Card size="sm">
+        <CardContent>
+          <SearchInput
+            placeholder="Search by scope label..."
+            value={search}
+            onChange={(v) => {
+              setSearch(v)
+              setPage(1)
+            }}
+            onClear={() => setPage(1)}
+            containerClassName="sm:max-w-sm"
+          />
+        </CardContent>
+        <div className="overflow-x-auto border-t">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Scope</TableHead>
+                <TableHead>Signups</TableHead>
+                <TableHead>Updated</TableHead>
+                <TableHead className="w-16" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginated.map((s) => (
+                <TableRow
+                  key={s.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate(`/schedules/fair-booth/${s.id}`)}
+                >
+                  <TableCell className="font-medium">{s.scopeLabel}</TableCell>
+                  <TableCell>{s.signupCount}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(s.updatedAt)}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Delete schedule"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteTarget(s)
+                      }}
                     >
-                      <TableCell className="font-medium">{s.scopeLabel}</TableCell>
-                      <TableCell>{s.signupCount}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{formatDate(s.updatedAt)}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDeleteTarget(s)
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
-            </>
-          )}
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {paginated.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-muted-foreground py-8 text-center">
+                    {debouncedSearch
+                      ? 'No schedules match your search.'
+                      : 'No fair booth schedules yet. Click "New Schedule" to create one.'}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <CardContent>
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={filtered.length}
+            onPageChange={setPage}
+            noun="schedules"
+          />
         </CardContent>
       </Card>
 

@@ -1,0 +1,1 @@
+ALTER TABLE `music_schedule_lines` ADD `note_column` text DEFAULT 'all' NOT NULL;

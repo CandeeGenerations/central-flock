@@ -25,7 +25,7 @@ export const musicLineRoles = [
 ] as const
 export type MusicLineRole = (typeof musicLineRoles)[number]
 
-export const musicLineKinds = ['song', 'prose', 'page_break'] as const
+export const musicLineKinds = ['song', 'prose', 'note', 'page_break'] as const
 export type MusicLineKind = (typeof musicLineKinds)[number]
 
 // 'auto' defers to the role's default; the other two are the explicit override.
@@ -35,7 +35,9 @@ export type MusicBoothMode = (typeof musicBoothModes)[number]
 export const musicBoothSlots = ['motto_verse_theme', 'prayer_announcements'] as const
 export type MusicBoothSlot = (typeof musicBoothSlots)[number]
 
-export const musicLineAligns = ['left', 'center'] as const
+export const musicLineAligns = ['left', 'center', 'right'] as const
+export const musicNoteColumns = ['all', 'first', 'second'] as const
+export type MusicNoteColumn = (typeof musicNoteColumns)[number]
 export type MusicLineAlign = (typeof musicLineAligns)[number]
 
 // Body table for the `schedules` envelope (schedule_type='music_schedule').
@@ -152,6 +154,12 @@ export const musicScheduleLines = sqliteTable(
     booth: text('booth', {enum: musicBoothModes}).notNull().default('auto'),
     boothLabel: text('booth_label').notNull().default(''),
     boothNote: text('booth_note').notNull().default(''), // '(Choir & Cong.)'
+    // Prints on the Musicians sheet. Off for a note meant only for the sound booth.
+    musicSheet: integer('music_sheet', {mode: 'boolean'}).notNull().default(true),
+    // Where a note sits: across both columns, or in the first or second only.
+    noteColumn: text('note_column', {enum: musicNoteColumns}).notNull().default('all'),
+    // A song on the Sound Booth Sheet prints its number and title on one line.
+    boothOneLine: integer('booth_one_line', {mode: 'boolean'}).notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (t) => [index('music_schedule_lines_service_idx').on(t.serviceId, t.sortOrder)],

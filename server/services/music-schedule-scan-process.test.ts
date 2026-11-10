@@ -1,5 +1,7 @@
 import {describe, expect, it} from 'vitest'
 
+import {mergeRows, rowsToLines} from '../../src/lib/music-scan-rows.js'
+import type {ProposedLine, ProposedRow} from '../../src/lib/music-scan-types.js'
 import type {HymnBook, MusicLineRole} from '../../src/lib/music-schedule-core.js'
 import {resolveReference} from '../lib/bible-text.js'
 import {
@@ -10,6 +12,7 @@ import {
   buildProposal,
   normaliseText,
   normaliseTitle,
+  rowsFromSides,
   weekStartOf,
 } from './music-schedule-scan-process.js'
 
@@ -174,6 +177,9 @@ function line(kind: 'song' | 'prose', role: MusicLineRole, text = '', extra: Par
     booth: 'auto',
     boothLabel: '',
     boothNote: '',
+    musicSheet: true,
+    noteColumn: 'all',
+    boothOneLine: false,
     ...extra,
   }
 }
@@ -248,7 +254,9 @@ const ctx: ScanContext = {
 
 const propose = (raw = nov22()) => buildProposal(raw, ctx, weekStartOf(raw)!)
 const svc = (p: ReturnType<typeof propose>, id: number) => p.services.find((s) => s.serviceTimeId === id)!
-const active = (s: ReturnType<typeof svc>) => (s.orderMode === 'scanned' ? s.scannedLines : s.usualLines)
+const active = (s: ReturnType<typeof svc>) => rowsToLines(s.rows)
+const acceptAll = (rows: ProposedRow[]) => rows.map((r) => ({...r, accepted: true}))
+const removed = (s: ReturnType<typeof svc>) => s.rows.filter((r) => r.change === 'removed').map((r) => r.usual!.text)
 
 describe('Schedule Scan proposal — Nov 22, 2026', () => {
   it('reads the week and resolves every song by book and number', () => {
@@ -288,7 +296,8 @@ describe('Schedule Scan proposal — Nov 22, 2026', () => {
   it('fills songs into the usual order when it matches', () => {
     const s = svc(propose(), 1)
     expect(s.orderDiffers).toBe(false)
-    expect(s.orderMode).toBe('usual')
+    expect(s.rows.map((r) => r.change)).not.toContain('added')
+    expect(active(s)).toEqual(s.usualLines)
     expect(s.usualLines.filter((l) => l.status === 'filled').map((l) => l.hymnNumber)).toEqual([219, 27, 122, 251])
     expect(s.usualLines[5].suffix).toBe('(x2)')
   })
@@ -306,7 +315,7 @@ describe('Schedule Scan proposal — Nov 22, 2026', () => {
   it('takes the scanned order for the candlelight service', () => {
     const s = svc(propose(), 4)
     expect(s.orderDiffers).toBe(true)
-    expect(s.orderMode).toBe('scanned')
+    expect(rowsToLines(acceptAll(s.rows))).toEqual(s.scannedLines)
     expect(s.scannedLines.map((l) => (l.kind === 'song' ? l.hymnNumber : l.text))).toEqual([
       'Live Stream - Welcome',
       191,
@@ -317,14 +326,14 @@ describe('Schedule Scan proposal — Nov 22, 2026', () => {
     ])
     expect(s.scannedLines[1].role).toBe('opening')
     expect(s.scannedLines[5].role).toBe('invitation')
-    expect(s.removedLines).toContain('Prayer, Announcements')
+    expect(removed(s)).toContain('Prayer, Announcements')
     expect(s.notes).toContain('FILM IT ALL')
   })
 
   it('drops a struck-out line and adds what was written in', () => {
     const s = svc(propose(), 3)
     expect(s.orderDiffers).toBe(true)
-    expect(s.removedLines).toEqual(['Birthdays, Anniversaries'])
+    expect(removed(s)).toEqual(['Birthdays, Anniversaries'])
     const testimonies = s.scannedLines.find((l) => l.text === 'Testimonies')
     expect(testimonies?.status).toBe('added')
     expect(s.scannedLines.find((l) => l.hymnNumber === 128)?.role).toBe('invitation')
@@ -347,7 +356,7 @@ describe('Schedule Scan proposal — Nov 22, 2026', () => {
     const p = propose(raw)
     const s = svc(p, 4)
     const flag = s.flags.find((f) => f.kind === 'song_unresolved')!
-    expect(flag.lineIndex).toBe(2)
+    expect(s.rows[flag.lineIndex!].sheet).toBe(s.scannedLines[2])
     expect(s.scannedLines[2].hymnId).toBeNull()
     expect(p.summary.resolved).toBe(18)
   })
@@ -391,5 +400,50 @@ describe('normalising helpers', () => {
     const check = ctx.checkReference
     expect(normaliseText('Deut 2:7 & 2 Cor 9:1-15', check).text).toBe('Deuteronomy 2:7 & 2 Corinthians 9:1-15')
     expect(normaliseText('Ps 40:3', check)).toEqual({text: 'Psalm 40:3', invalid: []})
+  })
+})
+
+describe('Schedule Scan proposal — per-row review', () => {
+  it('rejecting a removal keeps the usual line, rejecting an addition drops it', () => {
+    const s = svc(propose(), 3)
+    const rows = s.rows.map((r) => (r.change === 'removed' || r.change === 'added' ? {...r, accepted: false} : r))
+    const texts = rowsToLines(rows).map((l) => l.text)
+    expect(texts).toContain('Birthdays, Anniversaries')
+    expect(texts).not.toContain('Testimonies')
+  })
+
+  it('rejecting a Motto change keeps the usual wording', () => {
+    const s = svc(propose(), 2)
+    const motto = s.rows.find((r) => r.sheet?.role === 'motto')!
+    expect(motto.change).toBe('changed')
+    expect(motto.usual!.text).not.toBe(motto.sheet!.text)
+    const rejected = s.rows.map((r) => (r === motto ? {...r, accepted: false} : r))
+    expect(rowsToLines(rejected).find((l) => l.role === 'motto')!.text).toBe(motto.usual!.text)
+  })
+
+  it('rebuilds rows for a proposal saved before rows existed', () => {
+    const s = svc(propose(), 4)
+    const rows = acceptAll(rowsFromSides(s.usualLines, s.scannedLines))
+    expect(rowsToLines(rows).map((l) => (l.kind === 'song' ? l.hymnNumber : l.text))).toEqual(
+      s.scannedLines.map((l) => (l.kind === 'song' ? l.hymnNumber : l.text)),
+    )
+  })
+
+  it('pairs a reworded line into one change and starts it on the usual wording', () => {
+    const usual = [
+      {kind: 'prose', role: 'offering', text: 'Offering, Praises, Prayer Requests'},
+      {kind: 'prose', role: 'plain', text: 'Prayer, Announcements'},
+    ] as ProposedLine[]
+    const sheet = [
+      {kind: 'prose', role: 'plain', text: 'S.S. Lesson'},
+      {kind: 'prose', role: 'plain', text: 'S.S. Offering, Praises, Prayer Requests'},
+    ] as ProposedLine[]
+    const {rows} = mergeRows(usual, sheet, [])
+    expect(rows.map((r) => r.change)).toEqual(['changed', 'removed', 'added'])
+    expect(rows[0].sheet).toMatchObject({role: 'offering', text: 'S.S. Offering, Praises, Prayer Requests'})
+    expect(rowsToLines(rows).map((l) => l.text)).toEqual([
+      'Offering, Praises, Prayer Requests',
+      'Prayer, Announcements',
+    ])
   })
 })

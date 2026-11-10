@@ -127,3 +127,19 @@ and the per-recipient pack would double in length.
 **Fair booth is deliberately not migrated.** The `CAPTURE_WIDTH = 900` comment quoted in the
 Context section above therefore stays live and correct _for fair booth_ — do not delete it on the
 strength of this note. If fair booth is ever migrated, that is when it goes.
+
+## Amendment (2026-11-10)
+
+The Fit / 100% / 150% zoom stepper has been removed from every document page (Music Schedule, Workers' Notes,
+Sunday School Roll, Nursery, Special Music) at the user's request, as part of giving those pages one shared heading
+row. Pages always render fit-to-width; reading the fixed page box on a phone now relies on the browser's own
+pinch-zoom. The fixed page box itself, and everything above about how it prints, is unchanged.
+
+## Amendment (2026-11-10): shrink to fit one page
+
+The Music Schedule's Sound Booth sheet, and the Musicians "Sunday" sheet (Sunday School through Sunday
+Evening), must each print on exactly one page. When their blocks would overflow, the page content is
+scaled down uniformly _inside_ the fixed page box — the page size and margins never change — so the
+exported node is the shrunk page and the screen still shows exactly what prints. The scale is
+`CONTENT_HEIGHT / natural height` measured at full size, floored at 70%; past the floor the sheet is
+reported as overflowing as before. The Midweek sheet still paginates normally (ADR 0023).

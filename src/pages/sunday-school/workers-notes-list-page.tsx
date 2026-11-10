@@ -1,19 +1,31 @@
+import {ConfirmDialog} from '@/components/confirm-dialog'
+import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {createWorkersNotesEdition, fetchWorkersNotesEditions, workersNotesKeys} from '@/lib/workers-notes-api'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
+import {
+  type WorkersNotesEditionSummary,
+  createWorkersNotesEdition,
+  deleteWorkersNotesEdition,
+  fetchWorkersNotesEditions,
+  workersNotesKeys,
+} from '@/lib/workers-notes-api'
 import {type WorkersNotesTerm, termLabel, termRangeLabel} from '@/lib/workers-notes-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {GraduationCap, Plus} from 'lucide-react'
+import {Plus, Trash2} from 'lucide-react'
 import {useState} from 'react'
-import {useNavigate} from 'react-router-dom'
+import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
+
+const PAGE_SIZE = 25
 
 const TERM_OPTIONS: {value: WorkersNotesTerm; label: string}[] = [
   {value: 1, label: 'January – April'},
@@ -24,12 +36,30 @@ const TERM_OPTIONS: {value: WorkersNotesTerm; label: string}[] = [
 export function WorkersNotesListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
+  const [openManual, setOpenManual] = useState(false)
+  const [params, setParams] = useSearchParams()
+  // The command palette lands here with ?new=1; derived so the dialog opens on the first render.
+  const wantsNew = params.get('new') === '1'
+  const open = openManual || wantsNew
+  const setOpen = (next: boolean) => {
+    setOpenManual(next)
+    if (!next && wantsNew)
+      setParams(
+        (p) => {
+          p.delete('new')
+          return p
+        },
+        {replace: true},
+      )
+  }
   const currentYear = new Date().getFullYear()
   const [year, setYear] = useState(String(currentYear))
   const [term, setTerm] = useState<string>('1')
   const [startOverride, setStartOverride] = useState('')
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search, 250)
+  const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<WorkersNotesEditionSummary | null>(null)
 
   const {data: editions, isLoading} = useQuery({
     queryKey: workersNotesKeys.list,
@@ -46,9 +76,19 @@ export function WorkersNotesListPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to create edition'),
   })
 
+  const remove = useMutation({
+    mutationFn: (id: number) => deleteWorkersNotesEdition(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: workersNotesKeys.all})
+      setDeleteTarget(null)
+      toast.success('Edition deleted')
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to delete'),
+  })
+
   if (isLoading) return <PageSpinner />
 
-  const q = search.trim().toLowerCase()
+  const q = debouncedSearch.trim().toLowerCase()
   const filtered = (editions ?? []).filter(
     (e) =>
       !q ||
@@ -58,12 +98,13 @@ export function WorkersNotesListPage() {
         .includes(q),
   )
 
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   return (
     <div className="space-y-4 p-4 md:p-6">
-      <div className="mb-6 flex items-center gap-3">
-        <GraduationCap className="h-6 w-6" />
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-2xl font-bold">Sunday School</h2>
-        <Button className="ml-auto" onClick={() => setOpen(true)}>
+        <Button onClick={() => setOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           New Edition
         </Button>
@@ -74,53 +115,87 @@ export function WorkersNotesListPage() {
         and mottos, and the Betty Lukens lesson schedule.
       </p>
 
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search by term or months..." />
-          {filtered.length === 0 ? (
-            <div className="text-muted-foreground py-8 text-center text-sm">
-              {editions?.length
-                ? 'No editions match that search.'
-                : 'No editions yet. Click "New Edition" to create one.'}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Term</TableHead>
-                  <TableHead className="hidden sm:table-cell">Months</TableHead>
-                  <TableHead className="w-28">Lessons</TableHead>
-                  <TableHead className="w-24">Status</TableHead>
+      <Card size="sm">
+        <CardContent>
+          <SearchInput
+            placeholder="Search by term or months..."
+            value={search}
+            onChange={(v) => {
+              setSearch(v)
+              setPage(1)
+            }}
+            onClear={() => setPage(1)}
+            containerClassName="sm:max-w-sm"
+          />
+        </CardContent>
+        <div className="overflow-x-auto border-t">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Term</TableHead>
+                <TableHead className="hidden sm:table-cell">Months</TableHead>
+                <TableHead>Lessons</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-16" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginated.map((e) => (
+                <TableRow
+                  key={e.id}
+                  className="hover:bg-muted/50 cursor-pointer"
+                  onClick={() => navigate(`/schedules/sunday-school/${e.id}`)}
+                >
+                  <TableCell className="font-medium">{termRangeLabel(e.year, e.term as WorkersNotesTerm)}</TableCell>
+                  <TableCell className="text-muted-foreground hidden sm:table-cell">{e.scopeLabel}</TableCell>
+                  <TableCell className="text-muted-foreground">from #{e.startingLessonNumber}</TableCell>
+                  <TableCell>
+                    <Badge variant={e.status === 'final' ? 'default' : 'secondary'}>
+                      {e.status === 'final' ? 'Final' : 'Draft'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Delete edition"
+                      onClick={(ev) => {
+                        ev.stopPropagation()
+                        setDeleteTarget(e)
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((e) => (
-                  <TableRow
-                    key={e.id}
-                    className="hover:bg-muted/50 cursor-pointer"
-                    onClick={() => navigate(`/schedules/sunday-school/${e.id}`)}
-                  >
-                    <TableCell className="font-medium">{termRangeLabel(e.year, e.term as WorkersNotesTerm)}</TableCell>
-                    <TableCell className="text-muted-foreground hidden sm:table-cell">{e.scopeLabel}</TableCell>
-                    <TableCell className="text-muted-foreground">from #{e.startingLessonNumber}</TableCell>
-                    <TableCell>
-                      <span
-                        className={
-                          e.status === 'final'
-                            ? 'rounded bg-green-100 px-2 py-0.5 text-xs text-green-800'
-                            : 'bg-muted rounded px-2 py-0.5 text-xs'
-                        }
-                      >
-                        {e.status}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ))}
+              {paginated.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-muted-foreground py-8 text-center">
+                    {editions?.length
+                      ? 'No editions match your search.'
+                      : 'No editions yet. Click "New Edition" to create one.'}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <CardContent>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} noun="editions" />
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        title="Delete Edition"
+        description={`Delete the ${deleteTarget ? termRangeLabel(deleteTarget.year, deleteTarget.term as WorkersNotesTerm) : ''} edition? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+        loading={remove.isPending}
+      />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

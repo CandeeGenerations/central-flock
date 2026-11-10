@@ -1,7 +1,6 @@
 import {NurserySchedulePreview} from '@/components/nursery/nursery-schedule-preview'
-import type {ZoomMode} from '@/components/print/scaled-page'
+import {DocumentHeader} from '@/components/schedule/document-header'
 import {ExportSchedulePdfDialog} from '@/components/schedule/export-schedule-pdf-dialog'
-import {ScheduleActionsToolbar} from '@/components/schedule/schedule-actions-toolbar'
 import {SchedulePreviewFrame} from '@/components/schedule/schedule-preview-frame'
 import {SendScheduleDialog} from '@/components/schedule/send-schedule-dialog'
 import {Button} from '@/components/ui/button'
@@ -19,7 +18,7 @@ import {
 import {nurseryKeys} from '@/lib/nursery-query-keys'
 import {fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft} from 'lucide-react'
+import {MessageSquare} from 'lucide-react'
 import {useCallback, useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -69,8 +68,6 @@ export function NurseryScheduleViewPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const pageRef = useRef<HTMLDivElement>(null)
-  const [zoom, setZoom] = useState<ZoomMode>('fit')
-  const [editMode, setEditMode] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [pdfOpen, setPdfOpen] = useState(false)
   const [highlightAssignmentIds, setHighlightAssignmentIds] = useState<Set<number>>(new Set())
@@ -102,7 +99,6 @@ export function NurseryScheduleViewPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: nurseryKeys.schedule(Number(id))})
       queryClient.invalidateQueries({queryKey: nurseryKeys.schedules})
-      setEditMode(false)
       toast.success('Schedule finalized')
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : 'Failed to finalize'),
@@ -130,16 +126,12 @@ export function NurseryScheduleViewPage() {
     const monthName = MONTH_NAMES[schedule.month - 1]
     const filename = `Nursery Schedule - ${monthName} ${schedule.year}`
     if (format === 'jpg') {
-      const wasEditing = editMode
       try {
-        if (wasEditing) setEditMode(false)
         await exportJpg(filename)
         toast.success('Exported as JPG')
       } catch (error) {
         console.error('Export error:', error)
         toast.error(`Export failed: ${describeExportError(error)}`)
-      } finally {
-        if (wasEditing) setEditMode(true)
       }
       return
     }
@@ -163,9 +155,7 @@ export function NurseryScheduleViewPage() {
       ...recipients.map((r) => ({assignmentIds: r.assignmentIds, dates: r.dates, subtitle: r.name}) as NurseryPagePlan),
     ]
     if (pages.length === 0) return
-    const wasEditing = editMode
     try {
-      if (wasEditing) setEditMode(false)
       await exportPackPdf(pages, {
         filename,
         prepare: (p) => {
@@ -181,8 +171,6 @@ export function NurseryScheduleViewPage() {
     } catch (error) {
       console.error('Export error:', error)
       toast.error(`Export failed: ${describeExportError(error)}`)
-    } finally {
-      if (wasEditing) setEditMode(true)
     }
   }
 
@@ -199,28 +187,31 @@ export function NurseryScheduleViewPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/nursery')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-2xl font-bold">
-          {MONTH_NAMES[schedule.month - 1]} {schedule.year}
-        </h1>
-        <span className="text-muted-foreground text-sm">({schedule.status})</span>
-      </div>
-
-      <ScheduleActionsToolbar
+      <DocumentHeader
+        onBack={() => navigate('/nursery')}
+        title={`${MONTH_NAMES[schedule.month - 1]} ${schedule.year}`}
         status={schedule.status}
-        editMode={editMode}
-        onToggleEdit={() => setEditMode(!editMode)}
         onFinalize={() => finalizeMutation.mutate()}
         onReopen={() => reopenMutation.mutate()}
-        onExport={handleExport}
-        onSend={() => setSendOpen(true)}
-        zoom={zoom}
-        onZoomChange={setZoom}
-        finalizing={finalizeMutation.isPending}
-        reopening={reopenMutation.isPending}
+        statusPending={finalizeMutation.isPending || reopenMutation.isPending}
+        exporting={exporting}
+        downloadDisabledReason={isDraft ? 'Finalize the schedule to export' : undefined}
+        downloads={[
+          {label: 'PDF', onSelect: () => handleExport('pdf')},
+          {label: 'JPG', onSelect: () => handleExport('jpg')},
+        ]}
+        actions={
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isDraft}
+            title={isDraft ? 'Finalize the schedule to send' : undefined}
+            onClick={() => setSendOpen(true)}
+          >
+            <MessageSquare className="mr-1 h-4 w-4" />
+            Send
+          </Button>
+        }
       />
 
       {schedule.overlap?.missing && (
@@ -252,14 +243,14 @@ export function NurseryScheduleViewPage() {
             footerBlocks={settings?.nursery.footerBlocks}
             subtitle={recipientSubtitle}
             exporting={exporting}
-            zoom={zoom}
+            zoom="fit"
             settingsPath="/schedules/settings/nursery"
           >
             {(forExport) => (
               <NurserySchedulePreview
                 assignments={schedule.assignments}
                 serviceConfig={serviceConfig}
-                editMode={isDraft && editMode && !forExport}
+                editMode={isDraft && !forExport}
                 workers={workers}
                 onAssignmentChange={handleAssignmentChange}
                 exporting={forExport}
@@ -284,15 +275,7 @@ export function NurseryScheduleViewPage() {
         open={sendOpen}
         onOpenChange={setSendOpen}
         recipientStorageKey="nursery.lastRecipientId"
-        getImage={async () => {
-          const wasEditing = editMode
-          if (wasEditing) setEditMode(false)
-          try {
-            return await whileExporting(generateImage)
-          } finally {
-            if (wasEditing) setEditMode(true)
-          }
-        }}
+        getImage={() => whileExporting(generateImage)}
         describeError={describeExportError}
       />
     </div>

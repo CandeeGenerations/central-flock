@@ -1,4 +1,6 @@
+import {FitWidth} from '@/components/music-schedule/editor/preview-panel'
 import {ScanPhotoViewer} from '@/components/music-schedule/scan-photo-viewer'
+import {BoothServiceBlock, MusicServiceBlock} from '@/components/music-schedule/service-block'
 import {SongInput} from '@/components/music-schedule/song-input'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -7,9 +9,18 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Sheet, SheetContent, SheetHeader, SheetTitle} from '@/components/ui/sheet'
 import {PageSpinner} from '@/components/ui/spinner'
+import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
 import {applyMusicScan, discardMusicScan, fetchMusicScan, musicScanKeys, updateMusicScan} from '@/lib/music-scan-api'
-import type {MusicScan, ProposedLine, ProposedService, ScanFlag, ScanServicePatch} from '@/lib/music-scan-types'
-import {musicScheduleKeys} from '@/lib/music-schedule-api'
+import {isRowChoice, rowLine, rowsToLines} from '@/lib/music-scan-rows'
+import type {
+  MusicScan,
+  ProposedLine,
+  ProposedRow,
+  ProposedService,
+  ScanFlag,
+  ScanServicePatch,
+} from '@/lib/music-scan-types'
+import {type MusicService, musicScheduleKeys} from '@/lib/music-schedule-api'
 import {ROLE_LABELS, hymnRef, toTitleCase, weekLabel} from '@/lib/music-schedule-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {AlertTriangle, ArrowLeft, Check, Images, StickyNote} from 'lucide-react'
@@ -26,8 +37,6 @@ function shortDate(iso: string) {
   return `${DAY[d.getDay()]} ${d.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}`
 }
 
-const activeLines = (s: ProposedService) => (s.orderMode === 'scanned' ? s.scannedLines : s.usualLines)
-
 /**
  * The review step of a Schedule Scan: what the pastor's pages say each service
  * should be, against the week as it would be copied forward. Nothing is written
@@ -38,6 +47,7 @@ export function MusicScanReviewPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [photosOpen, setPhotosOpen] = useState(false)
+  const [tab, setTab] = useState<string>()
 
   const {data: scan, isLoading} = useQuery({
     queryKey: musicScanKeys.detail(scanId),
@@ -75,6 +85,7 @@ export function MusicScanReviewPage() {
   const {proposal} = scan
   const applied = scan.status !== 'unfinished'
   const update = (p: ScanServicePatch) => patch.mutate([p])
+  const active = proposal.services.find((s) => String(s.serviceTimeId) === tab) ?? proposal.services[0]
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -93,7 +104,7 @@ export function MusicScanReviewPage() {
         <div className="ml-auto flex gap-2">
           <Button variant="outline" className="lg:hidden" onClick={() => setPhotosOpen(true)}>
             <Images className="mr-2 h-4 w-4" />
-            Photos
+            Preview
           </Button>
           {!applied ? (
             <>
@@ -116,25 +127,132 @@ export function MusicScanReviewPage() {
         </div>
       </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[1fr_460px]">
-        <div className="space-y-4">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Tabs value={String(active?.serviceTimeId)} onValueChange={setTab} className="min-w-0 gap-3">
+          <TabsList className="h-auto max-w-full flex-wrap justify-start">
+            {proposal.services.map((s) => (
+              <TabsTrigger key={s.serviceTimeId} value={String(s.serviceTimeId)} className="gap-1.5">
+                {s.name}
+                {s.flags.length ? (
+                  <span className="rounded-full bg-amber-500 px-1.5 text-[10px] leading-4 font-medium text-white">
+                    {s.flags.length}
+                  </span>
+                ) : null}
+              </TabsTrigger>
+            ))}
+          </TabsList>
           {proposal.services.map((s) => (
-            <ServiceReview key={s.serviceTimeId} service={s} disabled={applied} onPatch={update} />
+            <TabsContent key={s.serviceTimeId} value={String(s.serviceTimeId)}>
+              <ServiceReview service={s} disabled={applied} onPatch={update} />
+            </TabsContent>
           ))}
-        </div>
+        </Tabs>
         <aside className="hidden lg:sticky lg:top-4 lg:block">
-          <ScanPhotoViewer photos={scan.photos} className="h-[calc(100vh-7rem)]" />
+          {active ? <ReviewSidePanel service={active} photos={scan.photos} className="h-[calc(100vh-7rem)]" /> : null}
         </aside>
       </div>
 
       <Sheet open={photosOpen} onOpenChange={setPhotosOpen}>
         <SheetContent side="right" className="w-[90vw] sm:max-w-[90vw]">
           <SheetHeader>
-            <SheetTitle>Scanned pages</SheetTitle>
+            <SheetTitle>{active?.name ?? 'Preview'}</SheetTitle>
           </SheetHeader>
-          <ScanPhotoViewer photos={scan.photos} className="h-[calc(100vh-6rem)] px-4 pb-4" />
+          {active ? (
+            <ReviewSidePanel service={active} photos={scan.photos} className="h-[calc(100vh-6rem)] px-4 pb-4" />
+          ) : null}
         </SheetContent>
       </Sheet>
+    </div>
+  )
+}
+
+/** The service as Create week would write it, shaped for the print block. */
+function previewService(s: ProposedService): MusicService {
+  return {
+    id: s.serviceTimeId,
+    serviceTimeId: s.serviceTimeId,
+    name: s.name,
+    musicHeading: s.musicHeading ?? s.name,
+    boothHeading: s.boothHeading ?? s.name,
+    date: s.date,
+    dayOfWeek: new Date(`${s.date}T12:00:00`).getDay(),
+    time: null,
+    meeting: true,
+    uploaded: false,
+    episodeNumber: null,
+    title: s.title,
+    titleNote: '',
+    titleHighlight: false,
+    scripture: s.text,
+    scriptureNote: '',
+    scriptureHighlight: false,
+    standalone: s.standalone,
+    occasion: s.occasion,
+    sortOrder: 0,
+    nameOverride: '',
+    timeOverride: null,
+    musicHeadingOverride: '',
+    boothHeadingOverride: '',
+    nameDefault: s.name,
+    timeDefault: null,
+    musicHeadingDefault: '',
+    boothHeadingDefault: '',
+    lines: rowsToLines(s.rows).map(({status: _status, ...l}, i) => ({
+      ...l,
+      id: -(i + 1),
+      sortOrder: i,
+      highlight: false,
+      boothHighlight: false,
+    })),
+    boothLines: (s.boothLines ?? []).map((bl) => ({...bl, stale: false})),
+  }
+}
+
+function PreviewLabel({children}: {children: React.ReactNode}) {
+  return <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{children}</h4>
+}
+
+/** The active service's Sound Booth and Musicians sheets with the current choices, or the scanned pages. */
+function ReviewSidePanel({
+  service,
+  photos,
+  className,
+}: {
+  service: ProposedService
+  photos: string[]
+  className?: string
+}) {
+  const [view, setView] = useState<'preview' | 'photos'>('preview')
+  const sheet = previewService(service)
+  return (
+    <div className={`flex min-h-0 flex-col gap-2 ${className ?? ''}`}>
+      <div className="flex gap-1">
+        <Button size="sm" variant={view === 'preview' ? 'default' : 'outline'} onClick={() => setView('preview')}>
+          Preview
+        </Button>
+        <Button size="sm" variant={view === 'photos' ? 'default' : 'outline'} onClick={() => setView('photos')}>
+          Photos
+        </Button>
+      </div>
+      {view === 'preview' ? (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="space-y-3">
+            <PreviewLabel>Sound Booth</PreviewLabel>
+            <FitWidth>
+              <BoothServiceBlock service={sheet} showRule={false} />
+            </FitWidth>
+            <PreviewLabel>Musicians</PreviewLabel>
+            <FitWidth>
+              <MusicServiceBlock service={sheet} />
+            </FitWidth>
+            <p className="text-muted-foreground text-xs">
+              {service.name} with your choices. Highlights are set in the editor afterwards.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <ScanPhotoViewer photos={photos} className="min-h-0 flex-1" />
+      )}
     </div>
   )
 }
@@ -148,12 +266,20 @@ function ServiceReview({
   disabled: boolean
   onPatch: (p: ScanServicePatch) => void
 }) {
-  const lines = activeLines(s)
   const serviceFlags = s.flags.filter((f) => f.lineIndex == null)
   const flagsAt = (i: number) => s.flags.filter((f) => f.lineIndex === i)
   const id = s.serviceTimeId
-  const setLine = (i: number, next: Partial<ProposedLine>) =>
-    onPatch({serviceTimeId: id, lines: lines.map((l, j) => (j === i ? {...l, ...next} : l))})
+  const setRows = (rows: ProposedRow[]) => onPatch({serviceTimeId: id, rows})
+  const setRow = (i: number, next: Partial<ProposedRow>) =>
+    setRows(s.rows.map((r, j) => (j === i ? {...r, ...next} : r)))
+  // A fixed song goes on the line that row writes: the sheet's when it has one.
+  const setLine = (i: number, next: Partial<ProposedLine>) => {
+    const r = s.rows[i]
+    setRow(i, r.sheet ? {sheet: {...r.sheet, ...next}} : {usual: {...r.usual!, ...next}})
+  }
+  const choices = s.rows.filter(isRowChoice)
+  const acceptedCount = choices.filter((r) => r.accepted).length
+  const setAll = (accepted: boolean) => setRows(s.rows.map((r) => (isRowChoice(r) ? {...r, accepted} : r)))
 
   return (
     <Card>
@@ -204,74 +330,92 @@ function ServiceReview({
           <FlagNote key={i} flag={f} />
         ))}
 
-        {s.orderDiffers ? (
-          <div className="flex flex-wrap items-center gap-2 rounded border border-sky-200 bg-sky-50 p-2 text-sm text-sky-900">
-            <span className="font-medium">Order differs from usual.</span>
+        {choices.length ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 p-2 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
+            <span className="font-medium">
+              {choices.length} change{choices.length === 1 ? '' : 's'} from the usual order · {acceptedCount} accepted
+            </span>
             <div className="ml-auto flex gap-1">
-              <Button
-                size="sm"
-                variant={s.orderMode === 'scanned' ? 'default' : 'outline'}
-                disabled={disabled}
-                onClick={() => onPatch({serviceTimeId: id, orderMode: 'scanned'})}
-              >
-                Use the sheet&rsquo;s order
+              <Button size="sm" variant="outline" disabled={disabled} onClick={() => setAll(true)}>
+                Accept all
               </Button>
-              <Button
-                size="sm"
-                variant={s.orderMode === 'usual' ? 'default' : 'outline'}
-                disabled={disabled}
-                onClick={() => onPatch({serviceTimeId: id, orderMode: 'usual'})}
-              >
-                Keep usual, fill songs
+              <Button size="sm" variant="outline" disabled={disabled} onClick={() => setAll(false)}>
+                Reject all
               </Button>
             </div>
           </div>
         ) : null}
 
         <ol className="divide-y rounded border">
-          {lines.map((l, i) => (
-            <li key={i} className="space-y-1 p-2">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground w-24 shrink-0 truncate text-xs">{ROLE_LABELS[l.role]}</span>
-                {l.kind === 'song' ? (
-                  <SongInput
-                    className="min-w-0 flex-1"
-                    value={songValue(l)}
-                    onCommit={(next) => setLine(i, songPatch(next))}
+          {s.rows.map((r, i) => {
+            const written = rowLine(r)
+            const l = written ?? r.usual ?? r.sheet!
+            return (
+              <li key={i} className={`space-y-1 p-2 ${written ? '' : 'opacity-60'}`}>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground w-24 shrink-0 truncate text-xs">{ROLE_LABELS[l.role]}</span>
+                  {l.kind === 'song' ? (
+                    <SongInput
+                      className={`min-w-0 flex-1 ${written ? '' : 'line-through'}`}
+                      value={songValue(l)}
+                      onCommit={(next) => setLine(i, songPatch(next))}
+                    />
+                  ) : (
+                    <span className={`min-w-0 flex-1 truncate text-sm ${written ? '' : 'line-through'}`}>{l.text}</span>
+                  )}
+                  {l.suffix ? <span className="text-muted-foreground shrink-0 text-xs">{l.suffix}</span> : null}
+                  <ChangeTag row={r} />
+                  {isRowChoice(r) ? (
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        size="sm"
+                        variant={r.accepted ? 'default' : 'outline'}
+                        className="h-7 px-2 text-xs pointer-coarse:h-9"
+                        disabled={disabled}
+                        onClick={() => setRow(i, {accepted: true})}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={r.accepted ? 'outline' : 'default'}
+                        className="h-7 px-2 text-xs pointer-coarse:h-9"
+                        disabled={disabled}
+                        onClick={() => setRow(i, {accepted: false})}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+                {r.change === 'changed' ? (
+                  <p className="text-muted-foreground pl-26 text-xs">
+                    Usual: {r.usual!.kind === 'song' ? ROLE_LABELS[r.usual!.role] : r.usual!.text || '(blank)'} → sheet:{' '}
+                    {r.sheet!.kind === 'song' ? ROLE_LABELS[r.sheet!.role] : r.sheet!.text}
+                  </p>
+                ) : null}
+                {flagsAt(i).map((f, j) => (
+                  <FlagNote
+                    key={j}
+                    flag={f}
+                    onPick={
+                      disabled
+                        ? undefined
+                        : (o) =>
+                            setLine(i, {
+                              hymnId: o.hymnId,
+                              hymnBook: o.book,
+                              hymnNumber: o.number,
+                              hymnTitle: o.title,
+                              freeSongTitle: null,
+                            })
+                    }
                   />
-                ) : (
-                  <span className="min-w-0 flex-1 truncate text-sm">{l.text}</span>
-                )}
-                {l.suffix ? <span className="text-muted-foreground shrink-0 text-xs">{l.suffix}</span> : null}
-                <StatusTag status={l.status} />
-              </div>
-              {flagsAt(i).map((f, j) => (
-                <FlagNote
-                  key={j}
-                  flag={f}
-                  onPick={
-                    disabled
-                      ? undefined
-                      : (o) =>
-                          setLine(i, {
-                            hymnId: o.hymnId,
-                            hymnBook: o.book,
-                            hymnNumber: o.number,
-                            hymnTitle: o.title,
-                            freeSongTitle: null,
-                          })
-                  }
-                />
-              ))}
-            </li>
-          ))}
+                ))}
+              </li>
+            )
+          })}
         </ol>
-
-        {s.orderMode === 'scanned' && s.removedLines.length ? (
-          <div className="text-muted-foreground text-xs">
-            Not on the sheet, so left out: {s.removedLines.map((t) => `“${t}”`).join(', ')}
-          </div>
-        ) : null}
 
         {s.notes.length ? (
           <div className="rounded border border-dashed p-2 text-sm">
@@ -303,19 +447,17 @@ function Field({label, children}: {label: string; children: React.ReactNode}) {
   )
 }
 
-function StatusTag({status}: {status: ProposedLine['status']}) {
-  if (status === 'unchanged') return null
-  return (
-    <span
-      className={
-        status === 'added'
-          ? 'shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-900'
-          : 'shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-900'
-      }
-    >
-      {status === 'added' ? 'new line' : 'song filled'}
-    </span>
-  )
+const CHANGE_TAGS: Partial<Record<ProposedRow['change'], {label: string; className: string}>> = {
+  filled: {label: 'song filled', className: 'bg-green-100 text-green-900 dark:bg-green-950/50 dark:text-green-200'},
+  changed: {label: 'changed', className: 'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200'},
+  added: {label: 'new on sheet', className: 'bg-sky-100 text-sky-900 dark:bg-sky-950/50 dark:text-sky-200'},
+  removed: {label: 'not on sheet', className: 'bg-rose-100 text-rose-900 dark:bg-rose-950/50 dark:text-rose-200'},
+}
+
+function ChangeTag({row}: {row: ProposedRow}) {
+  const tag = CHANGE_TAGS[row.change]
+  if (!tag) return null
+  return <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${tag.className}`}>{tag.label}</span>
 }
 
 function FlagNote({flag, onPick}: {flag: ScanFlag; onPick?: (o: NonNullable<ScanFlag['options']>[number]) => void}) {

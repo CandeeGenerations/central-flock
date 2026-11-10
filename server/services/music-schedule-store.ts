@@ -21,6 +21,8 @@ const LINE_KINDS = new Set<string>(schema.musicLineKinds)
 const LINE_ROLES = new Set<string>(schema.musicLineRoles)
 const BOOTH_MODES = new Set<string>(schema.musicBoothModes)
 const LINE_ALIGNS = new Set<string>(schema.musicLineAligns)
+type NoteColumn = (typeof schema.musicNoteColumns)[number]
+const NOTE_COLUMNS = new Set<string>(schema.musicNoteColumns)
 
 export interface LineTemplate {
   kind?: string
@@ -35,6 +37,9 @@ export interface LineTemplate {
   booth?: string
   boothLabel?: string
   boothNote?: string
+  musicSheet?: boolean
+  noteColumn?: string
+  boothOneLine?: boolean
   sticky?: boolean
 }
 
@@ -57,6 +62,16 @@ export function readJson<T>(key: string, fallback: T): T {
   } catch {
     return fallback
   }
+}
+
+export interface ServiceHeadings {
+  music: string
+  booth: string
+}
+
+/** The Music/Sound Booth heading configured per Service Time, keyed by its id. */
+export function readHeadings(): Record<string, ServiceHeadings> {
+  return readJson<Record<string, ServiceHeadings>>('schedules.musicSchedule.serviceHeadings', {})
 }
 
 export function readDefaultOrders(): Record<string, LineTemplate[]> {
@@ -112,6 +127,9 @@ export function linesFor(serviceId: number): OrderLine[] {
       booth: line.booth,
       boothLabel: line.boothLabel,
       boothNote: line.boothNote,
+      musicSheet: line.musicSheet,
+      noteColumn: line.noteColumn,
+      boothOneLine: line.boothOneLine,
       sortOrder: line.sortOrder,
     }))
 }
@@ -175,6 +193,9 @@ export function insertLines(serviceId: number, lines: LineInput[]) {
         booth: BOOTH_MODES.has(String(l.booth)) ? (l.booth as BoothMode) : 'auto',
         boothLabel: String(l.boothLabel ?? ''),
         boothNote: String(l.boothNote ?? ''),
+        musicSheet: l.musicSheet ?? true,
+        noteColumn: NOTE_COLUMNS.has(String(l.noteColumn)) ? (l.noteColumn as NoteColumn) : 'all',
+        boothOneLine: Boolean(l.boothOneLine),
         sortOrder: i,
       })
       .run()
@@ -205,6 +226,9 @@ export function lineAsInput(l: OrderLine, opts: {keepSongs: 'all' | 'sticky'}): 
     booth: l.booth,
     boothLabel: l.boothLabel,
     boothNote: l.boothNote,
+    musicSheet: l.musicSheet,
+    noteColumn: l.noteColumn,
+    boothOneLine: l.boothOneLine,
     sticky: l.sticky,
     hymnId: keep ? l.hymnId : null,
     freeSongTitle: keep ? l.freeSongTitle : null,

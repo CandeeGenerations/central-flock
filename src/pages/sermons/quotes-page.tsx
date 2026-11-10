@@ -13,7 +13,7 @@ import {listAuthors, listQuotes} from '@/lib/quotes-api'
 import {useQuery} from '@tanstack/react-query'
 import {ArrowDown, ArrowUp, ArrowUpDown, Plus, X} from 'lucide-react'
 import {useState} from 'react'
-import {useNavigate} from 'react-router-dom'
+import {useNavigate, useSearchParams} from 'react-router-dom'
 
 import {QuoteFormDialog} from './quote-form-dialog'
 
@@ -43,7 +43,22 @@ export function QuotesPage() {
     return sortDir === 'desc' ? <ArrowDown className="h-3 w-3 ml-1" /> : <ArrowUp className="h-3 w-3 ml-1" />
   }
 
-  const [addOpen, setAddOpen] = useState(false)
+  const [addOpenManual, setAddOpenManual] = useState(false)
+  const [params, setParams] = useSearchParams()
+  // The command palette lands here with ?new=1; derived so the dialog opens on the first render.
+  const wantsNew = params.get('new') === '1'
+  const addOpen = addOpenManual || wantsNew
+  const setAddOpen = (next: boolean) => {
+    setAddOpenManual(next)
+    if (!next && wantsNew)
+      setParams(
+        (p) => {
+          p.delete('new')
+          return p
+        },
+        {replace: true},
+      )
+  }
 
   const hasFilters = !!debouncedSearch || !!authorFilter
 

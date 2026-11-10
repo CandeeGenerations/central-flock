@@ -2,18 +2,18 @@ import {Button} from '@/components/ui/button'
 import {Checkbox} from '@/components/ui/checkbox'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle} from '@/components/ui/sheet'
 import type {MusicService} from '@/lib/music-schedule-api'
 import {formatServiceTime} from '@/lib/music-schedule-core'
 import {cn} from '@/lib/utils'
 import {Copy, Highlighter, Save, Settings2} from 'lucide-react'
-import type {ReactNode} from 'react'
+import {type ReactNode, useState} from 'react'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 // The two notes written week after week; either can go on either field.
-const NOTE_SUGGESTIONS = ['(Pastor Candee)', '(Preacher)']
+const NOTE_SUGGESTIONS = ['Pastor Candee', 'Preacher']
 
 /** The service's own fields as the editor holds them while typing. */
 export interface ServiceFieldsDraft {
@@ -162,9 +162,9 @@ function Note({
           size="sm"
           variant="outline"
           className="h-8 shrink-0 px-2 text-xs pointer-coarse:h-10"
-          onClick={() => onChange(s, true)}
+          onClick={() => onChange(`*__(${s})__*`, true)}
         >
-          {s}
+          ({s})
         </Button>
       ))}
       <Button
@@ -211,106 +211,121 @@ export function ServiceSettings({
       ? 'A one-off service has no Service Time to be the default for.'
       : null
 
+  const [open, setOpen] = useState(false)
+
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button size="sm" variant="outline" className="pointer-coarse:h-10">
-          <Settings2 className="mr-1 h-4 w-4" />
-          Service settings
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(92vw,26rem)] space-y-4">
-        <label className="flex items-start gap-2">
-          <Checkbox
-            className="mt-0.5"
-            checked={fields.standalone}
-            onCheckedChange={(v) => onChange({standalone: v === true}, {immediate: true})}
-          />
-          <span className="text-sm">
-            <span className="font-medium">Standalone</span>
-            <span className="text-muted-foreground block text-xs">
-              This week&rsquo;s order is its own — a candlelight, anniversary or testimony service. The next week copies
-              from the last ordinary one instead.
-            </span>
-          </span>
-        </label>
-
-        <div className="space-y-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-start pointer-coarse:h-10"
-            onClick={onCopyOrder}
-          >
-            <Copy className="mr-2 h-4 w-4" />
-            Copy order from…
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-start pointer-coarse:h-10"
-            disabled={!!defaultBlocked || savingDefault}
-            onClick={onSaveDefault}
-          >
-            <Save className="mr-2 h-4 w-4" />
-            Save as default order
-          </Button>
-          <p className="text-muted-foreground text-xs">
-            {defaultBlocked ?? 'The starting order for a first week of this service with nothing before it.'}
-          </p>
-        </div>
-
-        <div className="space-y-2 border-t pt-3">
-          <p className="text-muted-foreground text-xs">
-            Blank means “take it from the Service Time”. Set one only when this week differs.
-          </p>
-          <Field label="Service">
-            <Select
-              value={service.serviceTimeId == null ? 'none' : String(service.serviceTimeId)}
-              onValueChange={(v) => onServiceTime(v === 'none' ? null : Number(v))}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {serviceTimes.map((t) => (
-                  <SelectItem key={t.id} value={String(t.id)}>
-                    {t.name} — {DAY_NAMES[t.dayOfWeek]} {formatServiceTime(t.time)}
-                  </SelectItem>
-                ))}
-                <SelectItem value="none">One-off (no Service Time)</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Name">
-              <Input
-                value={fields.name}
-                placeholder={service.nameDefault || 'from the Service Time'}
-                onChange={(e) => onChange({name: e.target.value})}
+    <>
+      <Button size="sm" variant="outline" className="pointer-coarse:h-10" onClick={() => setOpen(true)}>
+        <Settings2 className="mr-1 h-4 w-4" />
+        Service settings
+      </Button>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="right" className="overflow-y-auto data-[side=right]:sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Service settings</SheetTitle>
+            <SheetDescription>Saves as you go.</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 px-6 pb-6">
+            <label className="flex items-start gap-2">
+              <Checkbox
+                className="mt-0.5"
+                checked={fields.standalone}
+                onCheckedChange={(v) => onChange({standalone: v === true}, {immediate: true})}
               />
-            </Field>
-            <Field label="Time">
-              <Input type="time" value={fields.time ?? ''} onChange={(e) => onChange({time: e.target.value || null})} />
-            </Field>
+              <span className="text-sm">
+                <span className="font-medium">Standalone</span>
+                <span className="text-muted-foreground block text-xs">
+                  This week&rsquo;s order is its own — a candlelight, anniversary or testimony service. The next week
+                  copies from the last ordinary one instead.
+                </span>
+              </span>
+            </label>
+
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start pointer-coarse:h-10"
+                onClick={() => {
+                  setOpen(false)
+                  onCopyOrder()
+                }}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy order from…
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start pointer-coarse:h-10"
+                disabled={!!defaultBlocked || savingDefault}
+                onClick={onSaveDefault}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Save as default order
+              </Button>
+              <p className="text-muted-foreground text-xs">
+                {defaultBlocked ?? 'The starting order for a first week of this service with nothing before it.'}
+              </p>
+            </div>
+
+            <div className="space-y-2 border-t pt-3">
+              <p className="text-muted-foreground text-xs">
+                Blank means “take it from the Service Time”. Set one only when this week differs.
+              </p>
+              <Field label="Service">
+                <Select
+                  value={service.serviceTimeId == null ? 'none' : String(service.serviceTimeId)}
+                  onValueChange={(v) => onServiceTime(v === 'none' ? null : Number(v))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {serviceTimes.map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        {t.name} — {DAY_NAMES[t.dayOfWeek]} {formatServiceTime(t.time)}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="none">One-off (no Service Time)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Name">
+                  <Input
+                    value={fields.name}
+                    placeholder={service.nameDefault || 'from the Service Time'}
+                    onChange={(e) => onChange({name: e.target.value})}
+                  />
+                </Field>
+                <Field label="Time">
+                  <Input
+                    type="time"
+                    value={fields.time ?? ''}
+                    onChange={(e) => onChange({time: e.target.value || null})}
+                  />
+                </Field>
+              </div>
+              <Field label="Music Sheet heading">
+                <Input
+                  value={fields.musicHeading}
+                  placeholder={service.musicHeadingDefault || 'from Schedules settings'}
+                  onChange={(e) => onChange({musicHeading: e.target.value})}
+                />
+              </Field>
+              <Field label="Sound Booth heading">
+                <Input
+                  value={fields.boothHeading}
+                  placeholder={service.boothHeadingDefault || 'from Schedules settings'}
+                  onChange={(e) => onChange({boothHeading: e.target.value})}
+                />
+              </Field>
+            </div>
           </div>
-          <Field label="Music Sheet heading">
-            <Input
-              value={fields.musicHeading}
-              placeholder={service.musicHeadingDefault || 'from Schedules settings'}
-              onChange={(e) => onChange({musicHeading: e.target.value})}
-            />
-          </Field>
-          <Field label="Sound Booth heading">
-            <Input
-              value={fields.boothHeading}
-              placeholder={service.boothHeadingDefault || 'from Schedules settings'}
-              onChange={(e) => onChange({boothHeading: e.target.value})}
-            />
-          </Field>
-        </div>
-      </PopoverContent>
-    </Popover>
+        </SheetContent>
+      </Sheet>
+    </>
   )
 }
 

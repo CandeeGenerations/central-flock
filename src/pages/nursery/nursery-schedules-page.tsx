@@ -16,7 +16,7 @@ import {nurseryKeys} from '@/lib/nursery-query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
-import {useNavigate} from 'react-router-dom'
+import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 const MONTH_NAMES = [
@@ -49,7 +49,22 @@ export function NurserySchedulesPage() {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 250)
   const [page, setPage] = useState(1)
-  const [generateOpen, setGenerateOpen] = useState(false)
+  const [generateOpenManual, setGenerateOpenManual] = useState(false)
+  const [params, setParams] = useSearchParams()
+  // The command palette lands here with ?new=1; derived so the dialog opens on the first render.
+  const wantsNew = params.get('new') === '1'
+  const generateOpen = generateOpenManual || wantsNew
+  const setGenerateOpen = (next: boolean) => {
+    setGenerateOpenManual(next)
+    if (!next && wantsNew)
+      setParams(
+        (p) => {
+          p.delete('new')
+          return p
+        },
+        {replace: true},
+      )
+  }
 
   const defaults = getDefaultMonth()
   const [selectedMonth, setSelectedMonth] = useState(String(defaults.month))

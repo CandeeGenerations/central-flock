@@ -51,6 +51,7 @@ import {type RepeatRule, describeRule, guessRule, parseRule, ruleAlternatives, s
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Download} from 'lucide-react'
 import {useEffect, useMemo, useRef, useState} from 'react'
+import {useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 const MONTH_NAMES = [
@@ -225,9 +226,36 @@ const COLORS_BY_MONTH: Record<number, ColorSuggestion[]> = {
 
 export function CalendarPrintPage() {
   const today = new Date()
-  const [year, setYear] = useState<number>(today.getFullYear())
-  const [month, setMonth] = useState<number>(today.getMonth() + 1)
-  const [yearCopyOpen, setYearCopyOpen] = useState(false)
+  const [params, setParams] = useSearchParams()
+  // ?month=YYYY-MM (from the command palette) picks the month shown on arrival.
+  const linkedMonth = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(params.get('month') ?? '')
+  const [year, setYear] = useState<number>(() => (linkedMonth ? Number(linkedMonth[1]) : today.getFullYear()))
+  const [month, setMonth] = useState<number>(() => (linkedMonth ? Number(linkedMonth[2]) : today.getMonth() + 1))
+  useEffect(() => {
+    if (!params.has('month')) return
+    setParams(
+      (p) => {
+        p.delete('month')
+        return p
+      },
+      {replace: true},
+    )
+  }, [params, setParams])
+  const [yearCopyOpenManual, setYearCopyOpenManual] = useState(false)
+  // The command palette lands here with ?yearCopy=1; derived so the dialog opens on the first render.
+  const wantsYearCopy = params.get('yearCopy') === '1'
+  const yearCopyOpen = yearCopyOpenManual || wantsYearCopy
+  const setYearCopyOpen = (next: boolean) => {
+    setYearCopyOpenManual(next)
+    if (!next && wantsYearCopy)
+      setParams(
+        (p) => {
+          p.delete('yearCopy')
+          return p
+        },
+        {replace: true},
+      )
+  }
   const [pickerOpen, setPickerOpen] = useState(false)
   // The year shown in the month picker; browsing it doesn't move the page until a month is clicked.
   const [pickerYear, setPickerYear] = useState(year)
@@ -250,6 +278,16 @@ export function CalendarPrintPage() {
     }
     setYear(y)
     setMonth(m)
+  }
+
+  const captureRef = useRef<HTMLDivElement>(null)
+  const handleDownload = async (format: CalendarExportFormat) => {
+    if (!captureRef.current) return
+    try {
+      await generateCalendarExport({element: captureRef.current, year, month, format})
+    } catch (err) {
+      toast.error(`Export failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
   const goToToday = () => {
@@ -327,6 +365,19 @@ export function CalendarPrintPage() {
           <Button variant="outline" size="sm" onClick={() => setYearCopyOpen(true)}>
             <CalendarPlus className="h-4 w-4 mr-1.5" /> Copy {year - 1} into {year}…
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" disabled={!pageQuery.data || pageQuery.isFetching}>
+                <Download className="mr-1 h-4 w-4" />
+                Download
+                <ChevronDown className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleDownload('pdf')}>PDF</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownload('jpg')}>JPG image</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
@@ -347,7 +398,7 @@ export function CalendarPrintPage() {
           events={pageQuery.data.events}
           scheduleItems={pageQuery.data.scheduleItems}
           dayOverrides={pageQuery.data.dayOverrides}
-          isFetching={pageQuery.isFetching}
+          captureRef={captureRef}
         />
       )}
     </div>
@@ -361,12 +412,11 @@ interface EditorProps {
   events: CalendarPrintEvent[]
   scheduleItems: NormalScheduleItem[]
   dayOverrides: CalendarPrintDayOverride[]
-  isFetching: boolean
+  captureRef: React.RefObject<HTMLDivElement | null>
 }
 
-function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverrides, isFetching}: EditorProps) {
+function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverrides, captureRef}: EditorProps) {
   const queryClient = useQueryClient()
-  const captureRef = useRef<HTMLDivElement>(null)
 
   // Initial form state seeded from server data; component is keyed by year-month so it
   // remounts on month change and these initializers re-run.
@@ -608,32 +658,8 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
     }
   }
 
-  const handleDownload = async (format: CalendarExportFormat) => {
-    if (!captureRef.current) return
-    try {
-      await generateCalendarExport({element: captureRef.current, year, month, format})
-    } catch (err) {
-      toast.error(`Export failed: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
-
   return (
     <>
-      <div className="flex justify-end -mt-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button disabled={isFetching}>
-              <Download className="h-4 w-4 mr-2" />
-              Download
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleDownload('pdf')}>PDF</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleDownload('jpg')}>JPG image</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       <div className="grid lg:grid-cols-[420px_1fr] gap-6">
         <div className="space-y-4">
           <Card>

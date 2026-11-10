@@ -190,8 +190,8 @@ export function FairBoothSchedulePage() {
         <div className="ml-auto flex gap-2 flex-wrap">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={exporting}>
-                <Download className="h-4 w-4 mr-1" /> Export <ChevronDown className="h-3 w-3 ml-1" />
+              <Button size="sm" disabled={exporting}>
+                <Download className="h-4 w-4 mr-1" /> Download <ChevronDown className="h-3 w-3 ml-1" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

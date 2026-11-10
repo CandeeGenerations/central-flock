@@ -4,11 +4,12 @@ import {
   type RenderedLine,
   boothHeading,
   musicHeading as buildMusicHeading,
+  musicSheetLines,
   renderLine,
   resolveBoothRows,
 } from '@/lib/music-schedule-core'
 import {renderInline} from '@/lib/render-inline-markup'
-import {type CSSProperties, useLayoutEffect, useRef, useState} from 'react'
+import {type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState} from 'react'
 
 import {
   BOOTH_COL_GAP_PX,
@@ -113,7 +114,7 @@ function rowStyle(row: {bold: boolean; italic: boolean; highlight: boolean}, opt
  * styles — so the export path can mount it directly (ADR 0005).
  */
 export function MusicServiceBlock({service}: {service: MusicService}) {
-  const lines = service.lines.filter((l) => l.kind !== 'page_break')
+  const lines = musicSheetLines(service.lines)
   const rendered: RenderedLine[] = lines.map((l, i) => renderLine(l, service, i === 0))
 
   return (
@@ -154,12 +155,16 @@ export function MusicServiceBlock({service}: {service: MusicService}) {
                 style={{
                   ...rowStyle(r, {dense: true}),
                   gridColumn: '1 / -1',
-                  textAlign: r.align === 'center' ? 'center' : 'left',
+                  textAlign: r.align,
                 }}
               >
                 {renderInline(r.left ? `${r.left} ${r.right}` : r.right)}
                 {r.suffix ? <span style={{fontWeight: 400}}> {renderInline(r.suffix)}</span> : null}
               </div>
+            ) : r.column ? (
+              <NoteCells key={r.id} column={r.column} align={r.align} style={rowStyle(r, {dense: true})}>
+                {renderInline(r.column === 'first' ? r.left : r.right)}
+              </NoteCells>
             ) : (
               <SplitCells key={r.id} row={r} />
             ),
@@ -167,6 +172,33 @@ export function MusicServiceBlock({service}: {service: MusicService}) {
         </div>
       </div>
     </div>
+  )
+}
+
+/** A note in one column of a two-column grid: its cell, and an empty one beside it. */
+function NoteCells({
+  column,
+  align,
+  style,
+  children,
+}: {
+  column: 'all' | 'first' | 'second'
+  align: 'left' | 'center' | 'right'
+  style: CSSProperties
+  children: ReactNode
+}) {
+  const cell = <div style={{...style, textAlign: align, minWidth: 0}}>{children}</div>
+  const empty = <div />
+  return column === 'first' ? (
+    <>
+      {cell}
+      {empty}
+    </>
+  ) : (
+    <>
+      {empty}
+      {cell}
+    </>
   )
 }
 
@@ -231,13 +263,22 @@ export function BoothServiceBlock({service, showRule = true}: {service: MusicSer
             <div
               key={r.key}
               style={{
-                ...rowStyle({bold: false, italic: false, highlight: r.highlight}),
+                ...rowStyle({bold: false, italic: r.kind === 'note', highlight: r.highlight}),
                 gridColumn: '1 / -1',
-                textAlign: 'center',
+                textAlign: r.kind === 'note' ? r.align : 'center',
               }}
             >
               {renderInline(r.value)}
             </div>
+          ) : r.kind === 'note' && r.column ? (
+            <NoteCells
+              key={r.key}
+              column={r.column}
+              align={r.align}
+              style={rowStyle({bold: false, italic: true, highlight: r.highlight})}
+            >
+              {renderInline(r.value)}
+            </NoteCells>
           ) : (
             <BoothCells key={r.key} row={r} />
           ),
@@ -268,7 +309,10 @@ function BoothCells({row}: {row: BoothRow}) {
       {/* minWidth 0: a grid item's automatic minimum is its content, so without
           this a long unbroken title grows past the 1fr track instead of wrapping. */}
       <div style={{...rowStyle({bold: isSong, italic: false, highlight: false}), minWidth: 0}}>
-        <div>{renderInline(row.value)}</div>
+        <div>
+          {renderInline(row.value)}
+          {!row.valueSecond && row.suffix ? <span style={{fontWeight: 400}}> {renderInline(row.suffix)}</span> : null}
+        </div>
         {row.valueSecond ? (
           <div>
             {renderInline(row.valueSecond)}

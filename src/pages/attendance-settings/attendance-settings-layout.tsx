@@ -1,5 +1,12 @@
+import {PageSpinner} from '@/components/ui/spinner'
+import {fetchAttendanceConfig, fetchRecorders, fetchServiceTimes} from '@/lib/attendance-api'
+import {fetchHouseholds} from '@/lib/fill-america-api'
+import {queryKeys} from '@/lib/query-keys'
+import {fetchDepartments} from '@/lib/sunday-school-stats-api'
 import {cn} from '@/lib/utils'
+import {useQueries} from '@tanstack/react-query'
 import {Clock, Contact, GraduationCap, Megaphone, Settings} from 'lucide-react'
+import {Suspense} from 'react'
 import {NavLink, Outlet} from 'react-router-dom'
 
 // Mirrors Schedule Settings: a left rail of routed sections, so each pane is a
@@ -13,6 +20,19 @@ const SECTIONS = [
 ]
 
 export function AttendanceSettingsLayout() {
+  // Warm every section's cache here so switching sections never flashes a spinner.
+  const ready = useQueries({
+    queries: [
+      {queryKey: queryKeys.serviceTimes(true), queryFn: () => fetchServiceTimes(true)},
+      {queryKey: queryKeys.attendanceRecorders, queryFn: fetchRecorders},
+      {queryKey: queryKeys.attendanceConfig, queryFn: fetchAttendanceConfig},
+      {queryKey: queryKeys.sundaySchoolDepartments(true), queryFn: () => fetchDepartments(true)},
+      {queryKey: queryKeys.fillAmericaHouseholds(true), queryFn: () => fetchHouseholds(true)},
+    ],
+    combine: (results) => results.every((r) => r.data !== undefined || r.isError),
+  })
+  if (!ready) return <PageSpinner />
+
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div className="mb-6 flex items-center gap-3">
@@ -40,7 +60,10 @@ export function AttendanceSettingsLayout() {
         </nav>
 
         <div className="min-w-0 flex-1">
-          <Outlet />
+          {/* Sections are lazy chunks; a local boundary keeps the rail mounted while one loads. */}
+          <Suspense fallback={<PageSpinner />}>
+            <Outlet />
+          </Suspense>
         </div>
       </div>
     </div>

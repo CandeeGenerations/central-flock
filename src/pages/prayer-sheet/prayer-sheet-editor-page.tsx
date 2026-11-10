@@ -10,7 +10,9 @@ import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Sheet, SheetContent, SheetHeader, SheetTitle} from '@/components/ui/sheet'
 import {PageSpinner} from '@/components/ui/spinner'
+import {ZoomableImage} from '@/components/zoomable-image'
 import {usePersistedState} from '@/hooks/use-persisted-state'
 import type {PrayerSheetEdition, PrayerSheetEntry, PrayerSheetSunday} from '@/lib/api'
 import {
@@ -27,7 +29,7 @@ import {
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ChevronLeft, ChevronRight, Columns2, Download, Plus, Trash2} from 'lucide-react'
+import {ArrowLeft, ChevronLeft, ChevronRight, Columns2, Download, Eye, Plus, Trash2} from 'lucide-react'
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {Link, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -178,12 +180,16 @@ function FitSheet({children}: {children: React.ReactNode}) {
   )
 }
 
+// Both halves' top bars share one height so the split lines up.
+const BAR = 'flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4'
+
 export function PrayerSheetEditorPage() {
   const {id} = useParams<{id: string}>()
   const editionId = Number(id)
   const queryClient = useQueryClient()
 
   const [previewSide, setPreviewSide] = useState<'front' | 'back'>('front')
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [comparePhoto, setComparePhoto] = usePersistedState('prayer-sheet:compare-photo', true)
   const [addSundayOpen, setAddSundayOpen] = useState(false)
   const [newSundayDate, setNewSundayDate] = useState('')
@@ -314,26 +320,44 @@ export function PrayerSheetEditorPage() {
 
   const splitAt = edition.columnSplit ?? Math.ceil(edition.sundays.length / 2)
   const showPhoto = comparePhoto && !!edition.sourcePhotoPath
+  const latestSunday = edition.sundays[edition.sundays.length - 1]?.sundayDate
+  const titleDate = latestSunday
+    ? new Date(latestSunday + 'T12:00:00').toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'})
+    : 'Prayer Sheet'
 
   return (
-    // The shell's <main> pads its bottom (md:pb-8); grow into that padding and cancel it
-    // with a matching negative margin so this full-height editor leaves no empty band.
-    <div className="flex h-full overflow-hidden md:-mb-8 md:h-[calc(100%+2rem)]">
+    // The shell's <main> pads its bottom (pb-48 for the phone tab bar, md:pb-8); grow into that
+    // padding and cancel it with a matching negative margin so this full-height editor leaves no
+    // empty band. On a phone the editor pads its own scroll instead so the last entry clears the tab bar.
+    <div className="-mb-48 flex h-[calc(100%+12rem)] overflow-hidden md:-mb-8 md:h-[calc(100%+2rem)]">
       {/* ── Left: editor ── */}
       <div
         className={cn(
-          'flex shrink-0 flex-col overflow-y-auto border-r',
-          showPhoto ? 'w-1/4 min-w-[300px]' : 'w-2/5 min-w-[340px]',
+          'flex w-full shrink-0 flex-col overflow-y-auto pb-48 md:border-r md:pb-0',
+          showPhoto ? 'md:w-1/4 md:min-w-[300px]' : 'md:w-2/5 md:min-w-[340px]',
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-background sticky top-0 z-10">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/prayer-sheet">← Editions</Link>
+        <div className={cn(BAR, 'sticky top-0 z-10')}>
+          <Button variant="ghost" size="icon" aria-label="Back" asChild>
+            <Link to="/prayer-sheet">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
-          <Button size="sm" onClick={handleExportPdf}>
-            <Download className="w-4 h-4 mr-1" />
-            Export PDF
+          <h2 className="min-w-0 truncate text-2xl font-bold">{titleDate}</h2>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto shrink-0 md:hidden"
+            aria-label="Preview"
+            onClick={() => setPreviewOpen(true)}
+          >
+            <Eye className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Preview</span>
+          </Button>
+          <Button size="sm" className="shrink-0 md:ml-auto" aria-label="Download" onClick={handleExportPdf}>
+            <Download className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Download</span>
           </Button>
         </div>
 
@@ -416,40 +440,35 @@ export function PrayerSheetEditorPage() {
         </div>
       </div>
 
-      {/* ── Right: preview ── */}
-      <div className="flex-1 bg-muted/30 flex flex-col overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-2 border-b bg-background">
+      {/* ── Right: preview (a full-screen sheet on a phone, below) ── */}
+      <div className="bg-muted/30 hidden flex-1 flex-col overflow-hidden md:flex">
+        <div className={BAR}>
           {(
             [
               ['front', 'Front'],
               ['back', 'Back'],
             ] as const
           ).map(([side, label]) => (
-            <button
+            <Button
               key={side}
-              className={cn(
-                'rounded-full px-3 py-1 text-sm',
-                previewSide === side
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
+              size="sm"
+              variant={previewSide === side ? 'default' : 'outline'}
               onClick={() => setPreviewSide(side)}
             >
               {label}
-            </button>
+            </Button>
           ))}
           {edition.sourcePhotoPath && (
-            <button
+            <Button
+              size="sm"
               aria-pressed={comparePhoto}
-              className={cn(
-                'ml-auto flex items-center gap-1.5 rounded-full px-3 py-1 text-sm',
-                comparePhoto ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
-              )}
+              variant={comparePhoto ? 'default' : 'outline'}
+              className="ml-auto"
               onClick={() => setComparePhoto(!comparePhoto)}
             >
-              <Columns2 className="h-4 w-4" />
+              <Columns2 className="mr-1 h-4 w-4" />
               Compare with photo
-            </button>
+            </Button>
           )}
         </div>
 
@@ -465,19 +484,11 @@ export function PrayerSheetEditorPage() {
             </FitSheet>
           </div>
           {showPhoto && edition.sourcePhotoPath && (
-            <a
-              href={edition.sourcePhotoPath}
-              target="_blank"
-              rel="noreferrer"
-              title="Open full size"
-              className="relative min-w-0 flex-[35]"
-            >
-              <img
-                src={edition.sourcePhotoPath}
-                alt="Photo this edition was imported from"
-                className="absolute inset-0 h-full w-full object-contain"
-              />
-            </a>
+            <ZoomableImage
+              src={edition.sourcePhotoPath}
+              alt="Photo this edition was imported from"
+              className="min-w-0 flex-[35] rounded border"
+            />
           )}
         </div>
 
@@ -498,6 +509,40 @@ export function PrayerSheetEditorPage() {
           </div>
         </div>
       </div>
+
+      <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
+        <SheetContent side="bottom" className="gap-0 p-0 data-[side=bottom]:h-[92dvh]">
+          <SheetHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+            <SheetTitle className="sr-only">Preview</SheetTitle>
+            {(
+              [
+                ['front', 'Front'],
+                ['back', 'Back'],
+              ] as const
+            ).map(([side, label]) => (
+              <Button
+                key={side}
+                size="sm"
+                variant={previewSide === side ? 'default' : 'outline'}
+                onClick={() => setPreviewSide(side)}
+              >
+                {label}
+              </Button>
+            ))}
+          </SheetHeader>
+          <div className="bg-muted/30 relative min-h-0 flex-1 p-4">
+            {previewOpen ? (
+              <FitSheet>
+                {previewSide === 'back' ? (
+                  <PrayerSheetBack ministryItems={ministryItems} themeColor={edition.themeColor} />
+                ) : (
+                  <PrayerSheetFront edition={edition} settings={settings} />
+                )}
+              </FitSheet>
+            ) : null}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Add Sunday dialog */}
       <Dialog open={addSundayOpen} onOpenChange={setAddSundayOpen}>

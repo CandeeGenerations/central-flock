@@ -1,7 +1,6 @@
 import {ConfirmDialog} from '@/components/confirm-dialog'
-import type {ZoomMode} from '@/components/print/scaled-page'
+import {DocumentHeader, SettingsAction} from '@/components/schedule/document-header'
 import {ExportSchedulePdfDialog} from '@/components/schedule/export-schedule-pdf-dialog'
-import {ScheduleActionsToolbar} from '@/components/schedule/schedule-actions-toolbar'
 import {ScheduleCellEditor} from '@/components/schedule/schedule-cell-editor'
 import {SchedulePreviewFrame} from '@/components/schedule/schedule-preview-frame'
 import {SendScheduleDialog} from '@/components/schedule/send-schedule-dialog'
@@ -10,6 +9,7 @@ import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
 import {Dialog, DialogContent} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
 import {PageSpinner} from '@/components/ui/spinner'
 import {describeExportError, useScheduleExport} from '@/hooks/use-schedule-export'
 import {useServiceTimes} from '@/hooks/use-service-times'
@@ -25,7 +25,7 @@ import {
   updateSchedule,
 } from '@/lib/schedules-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, Pencil} from 'lucide-react'
+import {Eraser, MessageSquare} from 'lucide-react'
 import {useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -116,16 +116,13 @@ export function SpecialMusicScheduleViewPage() {
   const queryClient = useQueryClient()
   const serviceTimes = useServiceTimes()
   const pageRef = useRef<HTMLDivElement>(null)
-  const [zoom, setZoom] = useState<ZoomMode>('fit')
-  const [editMode, setEditMode] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [pdfOpen, setPdfOpen] = useState(false)
   const [openCell, setOpenCell] = useState<OpenCell | null>(null)
   const [highlightCellIds, setHighlightCellIds] = useState<Set<number>>(new Set())
   const [highlightDates, setHighlightDates] = useState<Set<string>>(new Set())
   const [recipientSubtitle, setRecipientSubtitle] = useState<string>('')
-  const [editingLabel, setEditingLabel] = useState(false)
-  const [labelDraft, setLabelDraft] = useState('')
+  const [labelDraft, setLabelDraft] = useState<string | null>(null)
   const [clearOpen, setClearOpen] = useState(false)
 
   const {exporting, generateImage, exportJpg, exportPackPdf, whileExporting} = useScheduleExport(pageRef)
@@ -143,7 +140,6 @@ export function SpecialMusicScheduleViewPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: schedulesKeys.cells(scheduleId)})
       queryClient.invalidateQueries({queryKey: schedulesKeys.list('special_music')})
-      setEditMode(false)
       toast.success('Schedule finalized')
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to finalize'),
@@ -164,7 +160,7 @@ export function SpecialMusicScheduleViewPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: schedulesKeys.cells(scheduleId)})
       queryClient.invalidateQueries({queryKey: schedulesKeys.list('special_music')})
-      setEditingLabel(false)
+      setLabelDraft(null)
       toast.success('Renamed')
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to rename'),
@@ -185,16 +181,12 @@ export function SpecialMusicScheduleViewPage() {
     if (!data) return
     if (format === 'jpg') {
       const filename = `Special Music Schedule - ${data.schedule.scopeLabel}`
-      const wasEditing = editMode
       try {
-        if (wasEditing) setEditMode(false)
         await exportJpg(filename)
         toast.success('Exported as JPG')
       } catch (e) {
         console.error('Export error:', e)
         toast.error(`Export failed: ${describeExportError(e)}`)
-      } finally {
-        if (wasEditing) setEditMode(true)
       }
       return
     }
@@ -219,9 +211,7 @@ export function SpecialMusicScheduleViewPage() {
       ...recipients.map((r) => ({cellIds: r.cellIds, dates: r.dates, subtitle: r.name}) as PagePlan),
     ]
     if (pages.length === 0) return
-    const wasEditing = editMode
     try {
-      if (wasEditing) setEditMode(false)
       await exportPackPdf(pages, {
         filename,
         prepare: (p) => {
@@ -237,8 +227,6 @@ export function SpecialMusicScheduleViewPage() {
     } catch (e) {
       console.error('Export error:', e)
       toast.error(`Export failed: ${describeExportError(e)}`)
-    } finally {
-      if (wasEditing) setEditMode(true)
     }
   }
 
@@ -261,72 +249,77 @@ export function SpecialMusicScheduleViewPage() {
   const pdfRecipients = buildSpecialMusicRecipients(cells, households ?? []).map((r) => ({key: r.key, name: r.name}))
   const titlePrefix = settings?.specialMusic.titlePrefix ?? 'Special Music Schedule'
   const title = `${titlePrefix} - ${schedule.scopeLabel}`
+  const isDraft = schedule.status === 'draft'
+  const labelValue = labelDraft ?? schedule.scopeLabel
   const openCellModel: SpecialMusicCell | null = openCell
     ? (cells.find((c) => c.date === openCell.date && c.serviceTimeId === openCell.serviceTimeId) ?? null)
     : null
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/special-music')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        {editingLabel ? (
-          <div className="flex items-center gap-2">
-            <Input
-              autoFocus
-              value={labelDraft}
-              onChange={(e) => setLabelDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && labelDraft.trim()) renameMutation.mutate(labelDraft.trim())
-                if (e.key === 'Escape') setEditingLabel(false)
-              }}
-              className="h-9 w-72"
-            />
-            <Button
-              size="sm"
-              onClick={() => labelDraft.trim() && renameMutation.mutate(labelDraft.trim())}
-              disabled={renameMutation.isPending}
-            >
-              Save
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setEditingLabel(false)}>
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
-            {schedule.scopeLabel}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              title="Rename schedule"
-              onClick={() => {
-                setLabelDraft(schedule.scopeLabel)
-                setEditingLabel(true)
-              }}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-          </h1>
-        )}
-        <span className="text-muted-foreground text-sm">({schedule.status})</span>
-      </div>
-
-      <ScheduleActionsToolbar
+      <DocumentHeader
+        onBack={() => navigate('/special-music')}
+        title={schedule.scopeLabel}
         status={schedule.status}
-        editMode={editMode}
-        onToggleEdit={() => setEditMode(!editMode)}
         onFinalize={() => finalizeMutation.mutate()}
         onReopen={() => reopenMutation.mutate()}
-        onExport={handleExport}
-        onSend={() => setSendOpen(true)}
-        onClearAll={cells.length > 0 ? () => setClearOpen(true) : undefined}
-        zoom={zoom}
-        onZoomChange={setZoom}
-        finalizing={finalizeMutation.isPending}
-        reopening={reopenMutation.isPending}
+        statusPending={finalizeMutation.isPending || reopenMutation.isPending}
+        exporting={exporting}
+        downloadDisabledReason={isDraft ? 'Finalize the schedule to export' : undefined}
+        downloads={[
+          {label: 'PDF', onSelect: () => handleExport('pdf')},
+          {label: 'JPG', onSelect: () => handleExport('jpg')},
+        ]}
+        actions={
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isDraft}
+            title={isDraft ? 'Finalize the schedule to send' : undefined}
+            onClick={() => setSendOpen(true)}
+          >
+            <MessageSquare className="mr-1 h-4 w-4" />
+            Send
+          </Button>
+        }
+        settings={(close) => (
+          <>
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={labelValue}
+                  onChange={(e) => setLabelDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && labelValue.trim()) renameMutation.mutate(labelValue.trim())
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="h-9"
+                  disabled={!labelValue.trim() || labelValue === schedule.scopeLabel || renameMutation.isPending}
+                  onClick={() => renameMutation.mutate(labelValue.trim())}
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+            {isDraft && cells.length > 0 ? (
+              <div className="space-y-2 border-t pt-4">
+                <SettingsAction
+                  icon={<Eraser />}
+                  destructive
+                  onClick={() => {
+                    close()
+                    setClearOpen(true)
+                  }}
+                >
+                  Clear all entries…
+                </SettingsAction>
+              </div>
+            ) : null}
+          </>
+        )}
       />
 
       <Card>
@@ -338,7 +331,7 @@ export function SpecialMusicScheduleViewPage() {
             footerBlocks={settings?.specialMusic.footerBlocks}
             subtitle={recipientSubtitle}
             exporting={exporting}
-            zoom={zoom}
+            zoom="fit"
             settingsPath="/schedules/settings/special-music"
           >
             {(forExport) => (
@@ -347,7 +340,7 @@ export function SpecialMusicScheduleViewPage() {
                 scopeEnd={schedule.scopeEnd!}
                 cells={cells}
                 services={previewServices}
-                editMode={schedule.status === 'draft' && editMode && !forExport}
+                editMode={isDraft && !forExport}
                 exporting={forExport}
                 doubleBookings={upcomingDoubleBookings}
                 onCellClick={(date, serviceTimeId) => setOpenCell({date, serviceTimeId})}
@@ -385,15 +378,7 @@ export function SpecialMusicScheduleViewPage() {
         open={sendOpen}
         onOpenChange={setSendOpen}
         recipientStorageKey="specialMusic.lastRecipientId"
-        getImage={async () => {
-          const wasEditing = editMode
-          if (wasEditing) setEditMode(false)
-          try {
-            return await whileExporting(generateImage)
-          } finally {
-            if (wasEditing) setEditMode(true)
-          }
-        }}
+        getImage={() => whileExporting(generateImage)}
         describeError={describeExportError}
       />
 

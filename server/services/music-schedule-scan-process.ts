@@ -1,5 +1,7 @@
+import {mergeRows} from '../../src/lib/music-scan-rows.js'
 import type {
   ProposedLine,
+  ProposedRow,
   ProposedService,
   ScanFlag,
   ScanPageKind,
@@ -201,7 +203,7 @@ interface ScannedItem {
 }
 
 function lineKey(
-  kind: 'song' | 'prose' | 'page_break',
+  kind: 'song' | 'prose' | 'note' | 'page_break',
   role: MusicLineRole | null,
   text: string,
   invitationKeyed = false,
@@ -211,6 +213,8 @@ function lineKey(
   // the marked one lands as an extra line.
   if (kind === 'song') return invitationKeyed && role === 'invitation' ? 'song:invitation' : 'song'
   if (kind === 'page_break') return 'break'
+  // The pastor's sheets never carry the week's notes, so a note never matches.
+  if (kind === 'note') return `note:${text}`
   if (role === 'motto' || role === 'verse') return `role:${role}`
   return `prose:${proseKey(text)}`
 }
@@ -255,6 +259,9 @@ function blankLine(kind: 'song' | 'prose', role: MusicLineRole): UsualLine {
     booth: 'auto',
     boothLabel: '',
     boothNote: '',
+    musicSheet: true,
+    noteColumn: 'all',
+    boothOneLine: false,
   }
 }
 
@@ -458,22 +465,17 @@ function proposeService(
     return {...u, status: 'unchanged'}
   })
 
-  const removedLines = usual
-    .map((u, ui) => (scannedFor.has(ui) ? null : describe(u)))
-    .filter((d): d is string => d != null)
-
   const orderDiffers = pairs.length !== usual.length || pairs.length !== items.length
 
-  // Line flags point into the order Create week will write by default.
-  const orderMode = orderDiffers ? 'scanned' : 'usual'
-  for (const [i, flag] of songFlags) {
-    const usualIndex = usualFor.get(i)
-    flags.push({...flag, lineIndex: orderMode === 'scanned' ? i : usualIndex})
-  }
-  if (orderMode === 'usual') {
-    for (const f of flags)
-      if (f.kind === 'song_conflict' && f.lineIndex != null) f.lineIndex = usualFor.get(f.lineIndex)
-  }
+  // A rejected Motto/Verse change keeps the usual wording, not the filled-in one.
+  const {rows, rowOfScanned} = mergeRows(usualLines, scannedLines, pairs, (ui) => ({
+    ...usual[ui],
+    status: 'unchanged',
+  }))
+
+  // Line flags point at rows. Conflict flags were placed by scanned index.
+  for (const f of flags) if (f.lineIndex != null) f.lineIndex = rowOfScanned.get(f.lineIndex)
+  for (const [i, flag] of songFlags) flags.push({...flag, lineIndex: rowOfScanned.get(i)})
 
   const textRaw = pick('text')
   const text = textRaw ? normaliseText(textRaw, ctx.checkReference) : {text: '', invalid: []}
@@ -493,22 +495,20 @@ function proposeService(
     occasion,
     standalone: !!occasion,
     orderDiffers,
-    orderMode,
     scannedLines,
     usualLines,
-    removedLines,
+    rows,
     notes,
     flags,
   }
 }
 
-function describe(l: UsualLine): string {
-  if (l.kind === 'song') {
-    const label = ROLE_DEFAULTS[l.role].leftLabel || l.leftText
-    const song = l.hymnBook && l.hymnNumber != null ? refOf(l.hymnBook, l.hymnNumber) : 'song'
-    return [label, song].filter(Boolean).join(' ')
-  }
-  if (l.kind === 'page_break') return 'Page break'
-  const label = ROLE_DEFAULTS[l.role].leftLabel
-  return [label, l.text.replace(/[*_]/g, '')].filter(Boolean).join(' ')
+/**
+ * Rows for a proposal saved before rows existed: re-align its two saved orders.
+ * A Motto/Verse change shows as unchanged here, since the usual side already took the sheet's wording.
+ */
+export function rowsFromSides(usualLines: ProposedLine[], scannedLines: ProposedLine[]): ProposedRow[] {
+  const invitationKeyed = scannedLines.some((l) => l.kind === 'song' && l.role === 'invitation')
+  const key = (l: ProposedLine) => lineKey(l.kind, l.role, l.text, invitationKeyed)
+  return mergeRows(usualLines, scannedLines, alignKeys(usualLines.map(key), scannedLines.map(key))).rows
 }

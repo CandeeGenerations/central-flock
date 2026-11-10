@@ -26,6 +26,7 @@ import {
   insertLines,
   linesFor,
   readDefaultOrders,
+  readHeadings,
   readJson,
   readSetting,
   replaceLines,
@@ -40,15 +41,6 @@ export const musicSchedulesRouter = Router()
 // pattern as fair-booth and workers-notes). See CONTEXT.md → Music Schedule.
 
 const BOOTH_SLOTS = new Set<string>(schema.musicBoothSlots)
-
-export interface ServiceHeadings {
-  music: string
-  booth: string
-}
-
-function readHeadings(): Record<string, ServiceHeadings> {
-  return readJson<Record<string, ServiceHeadings>>('schedules.musicSchedule.serviceHeadings', {})
-}
 
 /** A service by id, only if it belongs to the given week. */
 function serviceInWeek(weekId: number, serviceId: number) {
@@ -323,6 +315,9 @@ musicSchedulesRouter.post(
           booth: l.booth,
           boothLabel: l.boothLabel,
           boothNote: l.boothNote,
+          musicSheet: l.musicSheet,
+          noteColumn: l.noteColumn,
+          boothOneLine: l.boothOneLine,
           sticky: l.sticky,
           hymnId: l.hymnId,
           freeSongTitle: l.freeSongTitle,
@@ -792,6 +787,9 @@ musicSchedulesRouter.post(
       booth: l.booth,
       boothLabel: l.boothLabel,
       boothNote: l.boothNote,
+      musicSheet: l.musicSheet,
+      noteColumn: l.noteColumn,
+      boothOneLine: l.boothOneLine,
       sticky: l.sticky,
     }))
     db.insert(schema.settings)

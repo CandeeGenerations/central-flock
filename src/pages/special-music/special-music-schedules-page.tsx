@@ -25,7 +25,7 @@ import {
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Copy, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
-import {useNavigate} from 'react-router-dom'
+import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 const PAGE_SIZE = 25
@@ -79,7 +79,22 @@ export function SpecialMusicSchedulesPage() {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 250)
   const [page, setPage] = useState(1)
-  const [createOpen, setCreateOpen] = useState(false)
+  const [createOpenManual, setCreateOpenManual] = useState(false)
+  const [params, setParams] = useSearchParams()
+  // The command palette lands here with ?new=1; derived so the dialog opens on the first render.
+  const wantsNew = params.get('new') === '1'
+  const createOpen = createOpenManual || wantsNew
+  const setCreateOpen = (next: boolean) => {
+    setCreateOpenManual(next)
+    if (!next && wantsNew)
+      setParams(
+        (p) => {
+          p.delete('new')
+          return p
+        },
+        {replace: true},
+      )
+  }
 
   const [scopeStart, setScopeStart] = useState(isoToday())
   const [scopeEnd, setScopeEnd] = useState(threeMonthsOutIso())

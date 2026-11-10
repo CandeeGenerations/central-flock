@@ -1,22 +1,36 @@
+import {ConfirmDialog} from '@/components/confirm-dialog'
 import {ScanCaptureDialog} from '@/components/music-schedule/scan-capture-dialog'
+import {PageHeader} from '@/components/page-header'
+import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
 import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Label} from '@/components/ui/label'
+import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {discardMusicScan, fetchMusicScans, musicScanKeys} from '@/lib/music-scan-api'
-import {createMusicWeek, fetchMusicWeekYears, fetchMusicWeeks, musicScheduleKeys} from '@/lib/music-schedule-api'
+import {
+  type MusicWeekSummary,
+  createMusicWeek,
+  deleteMusicWeek,
+  fetchMusicWeekYears,
+  fetchMusicWeeks,
+  musicScheduleKeys,
+} from '@/lib/music-schedule-api'
 import {addDays, toIso, weekLabel, weekStartFor} from '@/lib/music-schedule-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertTriangle, Camera, ListMusic, Plus, ScanLine, Trash2} from 'lucide-react'
+import {AlertTriangle, Camera, Plus, ScanLine, Trash2} from 'lucide-react'
 import {useState} from 'react'
 import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
+
+const PAGE_SIZE = 25
 
 /** Today's date as YYYY-MM-DD, local. */
 function today(): string {
@@ -34,13 +48,30 @@ function nextFreeSunday(taken: Set<string>): string {
 export function MusicSchedulesListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
+  const [openManual, setOpenManual] = useState(false)
   const [year, setYear] = useState(String(new Date().getFullYear()))
   const [newWeek, setNewWeek] = useState('')
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search, 250)
+  const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<MusicWeekSummary | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   // ?scan=1 (the command palette's "from photos" action) opens the capture dialog.
   const [scanOpen, setScanOpenState] = useState(searchParams.get('scan') === '1')
+  // ?new=1 (the command palette's "New Music Schedule Week") opens New Week on arrival.
+  const wantsNew = searchParams.get('new') === '1'
+  const open = openManual || wantsNew
+  const setOpen = (next: boolean) => {
+    setOpenManual(next)
+    if (!next && wantsNew)
+      setSearchParams(
+        (p) => {
+          p.delete('new')
+          return p
+        },
+        {replace: true},
+      )
+  }
   const setScanOpen = (open: boolean) => {
     setScanOpenState(open)
     if (!open && searchParams.has('scan')) setSearchParams({}, {replace: true})
@@ -69,9 +100,19 @@ export function MusicSchedulesListPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to create'),
   })
 
+  const removeWeek = useMutation({
+    mutationFn: (id: number) => deleteMusicWeek(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: musicScheduleKeys.all})
+      setDeleteTarget(null)
+      toast.success('Week deleted')
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to delete'),
+  })
+
   if (isLoading) return <PageSpinner />
 
-  const q = search.trim().toLowerCase()
+  const q = debouncedSearch.trim().toLowerCase()
   const filtered = (weeks ?? []).filter(
     (w) =>
       !q ||
@@ -81,6 +122,11 @@ export function MusicSchedulesListPage() {
       `${w.episodeFirst ?? ''} ${w.episodeLast ?? ''}`.includes(q),
   )
 
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // Arriving by link skips openDialog, so fall back to the same default it would have picked.
+  const shownWeek = newWeek || (wantsNew && allWeeks ? nextFreeSunday(new Set(allWeeks.map((w) => w.weekStart))) : '')
+
   const openDialog = () => {
     setNewWeek(nextFreeSunday(new Set((allWeeks ?? []).map((w) => w.weekStart))))
     setOpen(true)
@@ -88,20 +134,11 @@ export function MusicSchedulesListPage() {
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      <div className="mb-6 flex items-center gap-3">
-        <ListMusic className="h-6 w-6" />
-        <h2 className="text-2xl font-bold">Music Schedule</h2>
-        <div className="ml-auto flex gap-2">
-          <Button variant="outline" onClick={() => setScanOpen(true)}>
-            <Camera className="mr-2 h-4 w-4" />
-            From photos
-          </Button>
-          <Button onClick={openDialog}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Week
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Music Schedule"
+        primary={{label: 'New Week', icon: Plus, onClick: openDialog}}
+        secondary={[{label: 'From photos', icon: Camera, onClick: () => setScanOpen(true)}]}
+      />
 
       {scans?.length ? (
         <Card>
@@ -148,106 +185,134 @@ export function MusicSchedulesListPage() {
         and the Sunday and Midweek sheets for the musicians and song leader.
       </p>
 
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="min-w-48 flex-1">
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="Search by date, note or episode number..."
-              />
-            </div>
-            <Select value={year} onValueChange={setYear}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All years</SelectItem>
-                {(years ?? []).map((y) => (
-                  <SelectItem key={y} value={String(y)}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {filtered.length === 0 ? (
-            <div className="text-muted-foreground py-8 text-center text-sm">
-              {weeks?.length ? 'No weeks match that search.' : 'No weeks yet. Click "New Week" to create one.'}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Week of</TableHead>
-                  <TableHead>Note</TableHead>
-                  <TableHead className="hidden sm:table-cell">Services</TableHead>
-                  <TableHead className="w-28">Episodes</TableHead>
-                  <TableHead className="w-24">Status</TableHead>
+      <Card size="sm">
+        <CardContent className="flex flex-wrap items-center gap-2">
+          <SearchInput
+            placeholder="Search by date, note or episode number..."
+            value={search}
+            onChange={(v) => {
+              setSearch(v)
+              setPage(1)
+            }}
+            onClear={() => setPage(1)}
+            containerClassName="sm:max-w-sm"
+          />
+          <Select
+            value={year}
+            onValueChange={(v) => {
+              setYear(v)
+              setPage(1)
+            }}
+          >
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All years</SelectItem>
+              {(years ?? []).map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+        <div className="overflow-x-auto border-t">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Week of</TableHead>
+                <TableHead>Note</TableHead>
+                <TableHead className="hidden sm:table-cell">Services</TableHead>
+                <TableHead>Episodes</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-16" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginated.map((w) => (
+                <TableRow
+                  key={w.id}
+                  className="hover:bg-muted/50 cursor-pointer"
+                  onClick={() => navigate(`/schedules/music/${w.id}`)}
+                >
+                  <TableCell className="font-medium">
+                    <span className="flex items-center gap-1.5">
+                      {w.label.replace('Week of ', '')}
+                      {w.occasions.map((o) => (
+                        <Badge key={o} variant="outline" className="font-normal">
+                          {o}
+                        </Badge>
+                      ))}
+                      {w.warningCount ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {w.warningCount} thing{w.warningCount === 1 ? '' : 's'} to look at — open the week to see
+                            them
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : null}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground max-w-64 truncate">{w.note || '—'}</TableCell>
+                  <TableCell className="text-muted-foreground hidden sm:table-cell">
+                    {w.serviceCount} service{w.serviceCount === 1 ? '' : 's'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {w.episodeFirst == null
+                      ? '—'
+                      : w.episodeFirst === w.episodeLast
+                        ? `#${w.episodeFirst}`
+                        : `#${w.episodeFirst}–${w.episodeLast}`}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={w.status === 'final' ? 'default' : 'secondary'}>
+                      {w.status === 'final' ? 'Final' : 'Draft'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Delete week"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteTarget(w)
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((w) => (
-                  <TableRow
-                    key={w.id}
-                    className="hover:bg-muted/50 cursor-pointer"
-                    onClick={() => navigate(`/schedules/music/${w.id}`)}
-                  >
-                    <TableCell className="font-medium">
-                      <span className="flex items-center gap-1.5">
-                        {w.label.replace('Week of ', '')}
-                        {w.occasions.map((o) => (
-                          <span
-                            key={o}
-                            className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-normal text-amber-900"
-                          >
-                            {o}
-                          </span>
-                        ))}
-                        {w.warningCount ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {w.warningCount} thing{w.warningCount === 1 ? '' : 's'} to look at — open the week to see
-                              them
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : null}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground max-w-64 truncate">{w.note || '—'}</TableCell>
-                    <TableCell className="text-muted-foreground hidden sm:table-cell">
-                      {w.serviceCount} service{w.serviceCount === 1 ? '' : 's'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {w.episodeFirst == null
-                        ? '—'
-                        : w.episodeFirst === w.episodeLast
-                          ? `#${w.episodeFirst}`
-                          : `#${w.episodeFirst}–${w.episodeLast}`}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={
-                          w.status === 'final'
-                            ? 'rounded bg-green-100 px-2 py-0.5 text-xs text-green-800'
-                            : 'bg-muted rounded px-2 py-0.5 text-xs'
-                        }
-                      >
-                        {w.status}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ))}
+              {paginated.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-muted-foreground py-8 text-center">
+                    {weeks?.length ? 'No weeks match your search.' : 'No weeks yet. Click "New Week" to create one.'}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <CardContent>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} noun="weeks" />
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        title="Delete Week"
+        description={`Delete the ${deleteTarget?.label ?? ''} schedule? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => deleteTarget && removeWeek.mutate(deleteTarget.id)}
+        loading={removeWeek.isPending}
+      />
 
       <ScanCaptureDialog open={scanOpen} onOpenChange={setScanOpen} />
 
@@ -262,17 +327,17 @@ export function MusicSchedulesListPage() {
           </DialogHeader>
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">Sunday</Label>
-            <DatePicker value={newWeek} onChange={(v) => setNewWeek(weekStartFor(v || today()))} />
+            <DatePicker value={shownWeek} onChange={(v) => setNewWeek(weekStartFor(v || today()))} />
             <p className="text-muted-foreground text-xs">
-              Any date picks its Sunday. Will cover {weekLabel(newWeek || weekStartFor(today())).toLowerCase()} through
-              the Wednesday after it.
+              Any date picks its Sunday. Will cover {weekLabel(shownWeek || weekStartFor(today())).toLowerCase()}{' '}
+              through the Wednesday after it.
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button disabled={create.isPending || !newWeek} onClick={() => create.mutate(newWeek)}>
+            <Button disabled={create.isPending || !shownWeek} onClick={() => create.mutate(shownWeek)}>
               Create
             </Button>
           </DialogFooter>

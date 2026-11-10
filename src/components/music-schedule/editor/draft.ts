@@ -9,6 +9,8 @@ let counter = 0
 export const newKey = () => `n${Date.now().toString(36)}${(counter++).toString(36)}`
 
 export function emptyLine(kind: OrderLine['kind'], role: MusicLineRole): Draft {
+  // A new note starts on both sheets; switch either off in its row.
+  const note = kind === 'note'
   return {
     id: -1,
     key: newKey(),
@@ -29,9 +31,12 @@ export function emptyLine(kind: OrderLine['kind'], role: MusicLineRole): Draft {
     highlight: false,
     boothHighlight: false,
     sticky: false,
-    booth: 'auto',
+    booth: note ? 'include' : 'auto',
     boothLabel: '',
     boothNote: '',
+    musicSheet: true,
+    noteColumn: 'all',
+    boothOneLine: false,
     sortOrder: 0,
   }
 }
@@ -55,6 +60,9 @@ export function toInput(l: OrderLine): LineInput {
     booth: l.booth,
     boothLabel: l.boothLabel,
     boothNote: l.boothNote,
+    musicSheet: l.musicSheet,
+    noteColumn: l.noteColumn,
+    boothOneLine: l.boothOneLine,
   }
 }
 

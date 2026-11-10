@@ -1,3 +1,4 @@
+import {ScanPhotoViewer} from '@/components/music-schedule/scan-photo-viewer'
 import {
   BoothServiceBlock,
   MusicServiceBlock,
@@ -8,9 +9,8 @@ import {Sheet, type SheetBlock} from '@/components/music-schedule/sheet'
 import {SheetFooter} from '@/components/music-schedule/sheet-footer'
 import {BOOTH_PAGE_PADDING_X_PX} from '@/components/music-schedule/type-scale'
 import {WeekSongsPanel} from '@/components/music-schedule/week-songs-panel'
-import type {ZoomMode} from '@/components/print/scaled-page'
+import {DocumentHeader, SettingsAction} from '@/components/schedule/document-header'
 import {Button} from '@/components/ui/button'
-import {Card, CardContent} from '@/components/ui/card'
 import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
@@ -28,27 +28,21 @@ import {
 } from '@/lib/music-schedule-api'
 import {addDays, weekLabel, weekStartFor, weekWarnings} from '@/lib/music-schedule-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertTriangle, ArrowLeft, Copy, Download, ListMusic, Lock, LockOpen, Trash2} from 'lucide-react'
+import {AlertTriangle, Copy, ListMusic, Trash2} from 'lucide-react'
 import {type ReactElement, useEffect, useMemo, useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 import {ServiceOverlay} from './service-overlay'
 
-const ZOOMS: {value: ZoomMode; label: string}[] = [
-  {value: 'fit', label: 'Fit'},
-  {value: 1, label: '100%'},
-  {value: 1.5, label: '150%'},
-]
-
 export function MusicWeekViewPage() {
   const weekId = Number(useParams<{id: string}>().id)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [zoom, setZoom] = useState<ZoomMode>('fit')
-  const [editMode, setEditMode] = useState(true)
-  const [exporting, setExporting] = useState<'booth' | 'music' | null>(null)
+  const [exporting, setExporting] = useState(false)
   const [overflow, setOverflow] = useState<Record<string, number>>({})
+  // How far the one-page sheets had to shrink to fit.
+  const [fitScales, setFitScales] = useState<{booth?: number; sunday?: number}>({})
   const [copyOpen, setCopyOpen] = useState(false)
   const [copyWeek, setCopyWeek] = useState('')
   const [songsOpen, setSongsOpen] = useState(false)
@@ -125,132 +119,105 @@ export function MusicWeekViewPage() {
       breakAfter: s.lines.some((l) => l.kind === 'page_break'),
     }))
 
+  // Final locks the week: no click-to-edit until it is reopened.
+  const editMode = week.status === 'draft'
   const overlayFor = (_index: number, ref: React.RefObject<HTMLDivElement | null>) =>
     editMode ? <ServiceOverlay pageRef={ref} labels={labels} onOpen={go} deps={week} /> : null
 
-  const runExport = async (which: 'booth' | 'music') => {
-    const nodes = (which === 'booth' ? boothRefs.current : [...sundayRefs.current, ...midweekRefs.current]).filter(
-      (n): n is HTMLDivElement => !!n,
-    )
-    if (!nodes.length) return
-    setExporting(which)
+  const runExport = async (which: ('booth' | 'music')[]) => {
+    setExporting(true)
     try {
-      await exportFixedPagePdf(
-        nodes,
-        which === 'booth' ? `sound-booth-${week.weekStart}` : `music-schedule-${week.weekStart}`,
-      )
+      for (const sheet of which) {
+        const nodes = (sheet === 'booth' ? boothRefs.current : [...sundayRefs.current, ...midweekRefs.current]).filter(
+          (n): n is HTMLDivElement => !!n,
+        )
+        if (!nodes.length) continue
+        await exportFixedPagePdf(
+          nodes,
+          sheet === 'booth' ? `sound-booth-${week.weekStart}` : `music-schedule-${week.weekStart}`,
+        )
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Export failed')
     } finally {
-      setExporting(null)
+      setExporting(false)
     }
   }
 
   const overflowList = Object.entries(overflow).filter(([, px]) => px > 0)
   const cutList = week.services.filter((s) => s.occasion && cutOccasions.has(s.id))
-  const issueCount = warnings.length + overflowList.length + cutList.length
+  // Shrinking is how these sheets fit, so only flag it once the type is getting small.
+  const shrunkList = (['booth', 'sunday'] as const)
+    .map((k) => ({sheet: k, scale: fitScales[k] ?? 1}))
+    .filter((f) => f.scale < 0.85)
+  const issueCount = warnings.length + overflowList.length + cutList.length + shrunkList.length
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/schedules/music')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h2 className="text-2xl font-bold">{week.label}</h2>
-        <span
-          className={
-            week.status === 'final'
-              ? 'rounded bg-green-100 px-2 py-0.5 text-xs text-green-800'
-              : 'bg-muted rounded px-2 py-0.5 text-xs'
-          }
-        >
-          {week.status}
-        </span>
-
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div className="flex gap-1">
-            {ZOOMS.map((z) => (
-              <Button
-                key={String(z.value)}
-                size="sm"
-                variant={zoom === z.value ? 'default' : 'outline'}
-                onClick={() => setZoom(z.value)}
-              >
-                {z.label}
-              </Button>
-            ))}
-          </div>
-          <Button size="sm" variant="outline" disabled={exporting !== null} onClick={() => runExport('booth')}>
-            <Download className="mr-1 h-4 w-4" />
-            {exporting === 'booth' ? 'Exporting…' : 'Sound Booth'}
-          </Button>
-          <Button size="sm" variant="outline" disabled={exporting !== null} onClick={() => runExport('music')}>
-            <Download className="mr-1 h-4 w-4" />
-            {exporting === 'music' ? 'Exporting…' : 'Musicians'}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setSongsOpen(true)}>
+      <DocumentHeader
+        onBack={() => navigate('/schedules/music')}
+        title={week.label}
+        status={week.status}
+        onFinalize={() => patch.mutate({status: 'final'})}
+        onReopen={() => patch.mutate({status: 'draft'})}
+        statusPending={patch.isPending}
+        exporting={exporting}
+        downloads={[
+          {label: 'Both sheets', onSelect: () => runExport(['booth', 'music'])},
+          {label: 'Sound Booth', onSelect: () => runExport(['booth'])},
+          {label: 'Musicians', onSelect: () => runExport(['music'])},
+        ]}
+        actions={
+          <Button size="sm" variant="outline" disabled={!editMode} onClick={() => setSongsOpen(true)}>
             <ListMusic className="mr-1 h-4 w-4" />
             Songs
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setCopyWeek(addDays(week.weekStart, 7))
-              setCopyOpen(true)
-            }}
-          >
-            <Copy className="mr-1 h-4 w-4" />
-            Copy
-          </Button>
-          <Button size="sm" variant={editMode ? 'default' : 'outline'} onClick={() => setEditMode((v) => !v)}>
-            {editMode ? 'Editing' : 'Edit'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => patch.mutate({status: week.status === 'final' ? 'draft' : 'final'})}
-          >
-            {week.status === 'final' ? (
-              <>
-                <LockOpen className="mr-1 h-4 w-4" />
-                Reopen
-              </>
-            ) : (
-              <>
-                <Lock className="mr-1 h-4 w-4" />
-                Finalize
-              </>
-            )}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              if (confirm(`Delete the ${week.label} schedule? This cannot be undone.`)) remove.mutate()
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <Card>
-        <CardContent className="space-y-4 p-4">
-          <div>
-            <Label>Note</Label>
-            <Input
-              key={week.id}
-              defaultValue={week.note}
-              placeholder="e.g. Tyler running services"
-              onBlur={(e) => (e.target.value !== week.note ? patch.mutate({note: e.target.value}) : undefined)}
-            />
-            <p className="text-muted-foreground mt-1 text-xs">
-              Shown and searchable on the week list. Never printed on either sheet.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+        }
+        settings={(close) => (
+          <>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Input
+                key={week.id}
+                defaultValue={week.note}
+                placeholder="e.g. Tyler running services"
+                onBlur={(e) => (e.target.value !== week.note ? patch.mutate({note: e.target.value}) : undefined)}
+              />
+              <p className="text-muted-foreground text-xs">
+                Shown and searchable on the week list. Never printed on either sheet.
+              </p>
+            </div>
+            <div className="space-y-2 border-t pt-4">
+              <SettingsAction
+                icon={<Copy />}
+                onClick={() => {
+                  close()
+                  setCopyWeek(addDays(week.weekStart, 7))
+                  setCopyOpen(true)
+                }}
+              >
+                Copy this week…
+              </SettingsAction>
+              <SettingsAction
+                icon={<Trash2 />}
+                destructive
+                onClick={() => {
+                  if (confirm(`Delete the ${week.label} schedule? This cannot be undone.`)) remove.mutate()
+                }}
+              >
+                Delete this week
+              </SettingsAction>
+            </div>
+            {week.scanPhotos?.length ? (
+              <div className="space-y-2 border-t pt-4">
+                <Label>Scanned pages</Label>
+                <ScanPhotoViewer photos={week.scanPhotos} fitToPhoto />
+                <p className="text-muted-foreground text-xs">Kept for about a month after the scan.</p>
+              </div>
+            ) : null}
+          </>
+        )}
+      />
 
       {issueCount ? (
         <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">
@@ -276,6 +243,11 @@ export function MusicWeekViewPage() {
                 • {overflowLabel(key, labels)} overflows its page by ~{px}px
               </li>
             ))}
+            {shrunkList.map((f) => (
+              <li key={`shrunk-${f.sheet}`}>
+                • {SHEET_NAMES[f.sheet]} is shrunk to {Math.round(f.scale * 100)}% to fit one page
+              </li>
+            ))}
             {cutList.map((s) => (
               <li key={`occasion-${s.id}`}>
                 •{' '}
@@ -289,14 +261,17 @@ export function MusicWeekViewPage() {
         </div>
       ) : null}
 
-      {editMode ? (
-        <p className="text-muted-foreground text-sm">
-          Click a service on any page to edit it. PDF export works in draft — finalizing only locks editing.
-        </p>
-      ) : null}
+      <p className="text-muted-foreground text-sm">
+        {editMode
+          ? 'Click a service on any page to edit it. Finalize locks editing; PDF export works either way.'
+          : 'Final — editing is locked. Reopen to make changes.'}
+      </p>
 
       <SidePanel open={songsOpen} onOpenChange={setSongsOpen}>
-        <SheetContent side="right" className="w-[min(600px,95vw)] overflow-y-auto sm:max-w-[600px]">
+        <SheetContent
+          side="right"
+          className="overflow-y-auto data-[side=right]:w-[70vw] data-[side=right]:sm:max-w-none data-[side=right]:lg:w-[50vw] data-[side=right]:2xl:w-[30vw]"
+        >
           <SheetHeader>
             <SheetTitle>Songs — {week.label}</SheetTitle>
             <SheetDescription>Every song slot this week, in order. Saves as you go.</SheetDescription>
@@ -347,7 +322,9 @@ export function MusicWeekViewPage() {
           <Sheet
             title="SERVICE SCHEDULE"
             subtitle="Sound Booth"
-            zoom={zoom}
+            zoom="fit"
+            fitOnePage
+            onFitScale={(scale) => setFitScales((prev) => ({...prev, booth: scale}))}
             paddingX={BOOTH_PAGE_PADDING_X_PX}
             blocks={blocksFor(meeting, (s, i) => (
               <BoothServiceBlock service={s} showRule={i < meeting.length - 1} />
@@ -365,7 +342,9 @@ export function MusicWeekViewPage() {
           <Sheet
             title="MUSIC SCHEDULE"
             subtitle="Sunday"
-            zoom={zoom}
+            zoom="fit"
+            fitOnePage
+            onFitScale={(scale) => setFitScales((prev) => ({...prev, sunday: scale}))}
             blocks={blocksFor(sunday, (s) => (
               <MusicServiceBlock service={s} />
             ))}
@@ -379,7 +358,7 @@ export function MusicWeekViewPage() {
             <Sheet
               title="MUSIC SCHEDULE"
               subtitle="Midweek"
-              zoom={zoom}
+              zoom="fit"
               blocks={blocksFor(midweek, (s) => (
                 <MusicServiceBlock service={s} />
               ))}
@@ -402,7 +381,11 @@ export function MusicWeekViewPage() {
 }
 
 /** 'sunday:s-12' -> the service's name, for the readiness list. */
+const SHEET_NAMES: Record<string, string> = {booth: 'The Sound Booth sheet', sunday: 'The Musicians Sunday sheet'}
+
 function overflowLabel(key: string, labels: Record<number, string>): string {
+  const [sheet, block] = key.split(':')
+  if (block === 'fit') return `${SHEET_NAMES[sheet] ?? 'The sheet'}, even shrunk as far as it goes,`
   const id = Number(key.split(':s-')[1])
   return labels[id] ?? key
 }

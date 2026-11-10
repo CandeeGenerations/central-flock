@@ -1,0 +1,1 @@
+ALTER TABLE `music_schedule_lines` ADD `music_sheet` integer DEFAULT true NOT NULL;

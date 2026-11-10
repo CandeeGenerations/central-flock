@@ -16,6 +16,7 @@ import {useState} from 'react'
 import {toast} from 'sonner'
 
 import type {Draft} from './draft'
+import {FitWidth} from './preview-panel'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -88,7 +89,7 @@ export function CopyOrderDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[min(72rem,94vw)]">
         <DialogHeader>
           <DialogTitle>Copy order from…</DialogTitle>
           <DialogDescription>
@@ -97,14 +98,14 @@ export function CopyOrderDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-[2fr_3fr]">
           <div className="space-y-2">
             <Input
               placeholder="Search — candlelight, anniversary, a date…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <div className="max-h-80 overflow-y-auto rounded border">
+            <div className="max-h-[60vh] overflow-y-auto rounded border">
               {filtered.map((s) => (
                 <button
                   key={s.id}
@@ -133,13 +134,13 @@ export function CopyOrderDialog({
               ) : null}
             </div>
           </div>
-          <div className="rounded border bg-white p-2 text-black">
+          <div className="max-h-[calc(60vh+3rem)] min-w-0 overflow-y-auto">
             {sourceService ? (
-              <div style={{zoom: 0.55}}>
+              <FitWidth>
                 <MusicServiceBlock service={sourceService} />
-              </div>
+              </FitWidth>
             ) : (
-              <p className="p-3 text-sm text-neutral-500">Choose a service to see its order.</p>
+              <p className="text-muted-foreground rounded border p-3 text-sm">Choose a service to see its order.</p>
             )}
           </div>
         </div>

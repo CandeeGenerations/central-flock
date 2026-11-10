@@ -27,6 +27,9 @@ function toInput(l: OrderLine): LineInput {
     booth: l.booth,
     boothLabel: l.boothLabel,
     boothNote: l.boothNote,
+    musicSheet: l.musicSheet,
+    noteColumn: l.noteColumn,
+    boothOneLine: l.boothOneLine,
   }
 }
 

@@ -97,6 +97,7 @@ export function OrderList({
         <DropdownMenuContent align="start">
           <DropdownMenuItem onSelect={() => add('song')}>Song</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => add('prose')}>Line</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => add('note')}>Note</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => add('page_break')}>Page break</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -123,6 +123,9 @@ export interface LineInput {
   booth: OrderLine['booth']
   boothLabel: string
   boothNote: string
+  musicSheet: boolean
+  noteColumn: OrderLine['noteColumn']
+  boothOneLine: boolean
 }
 
 export const musicScheduleKeys = {

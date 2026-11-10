@@ -1,6 +1,7 @@
 import {SongInput} from '@/components/music-schedule/song-input'
 import {Button} from '@/components/ui/button'
 import {Checkbox} from '@/components/ui/checkbox'
+import {Input} from '@/components/ui/input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {type MusicLineRole, ROLE_DEFAULTS, ROLE_LABELS} from '@/lib/music-schedule-core'
 import {cn} from '@/lib/utils'
@@ -13,12 +14,7 @@ import {type Draft, type LineChange, songValueOf} from './draft'
 
 const ROLES = Object.keys(ROLE_LABELS) as MusicLineRole[]
 
-// Borderless until hovered or focused, so a row reads as the line it prints.
-const QUIET_INPUT =
-  'h-8 min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none hover:border-input focus:border-ring focus:bg-background focus:ring-2 focus:ring-ring/30 pointer-coarse:h-10'
-
-const FIELD_INPUT =
-  'h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 pointer-coarse:h-10'
+const INPUT_SIZE = 'h-8 cursor-text pointer-coarse:h-10'
 
 /**
  * One line of the Service Order. Closed, it shows only what prints — the song
@@ -102,7 +98,7 @@ export function LineRow({
     >
       {/* Tapping the row's empty space selects it; the inputs keep their own taps. */}
       <div
-        className="flex items-center gap-1 px-1 py-0.5"
+        className="flex cursor-pointer items-center gap-1 px-1 py-0.5"
         onClick={(e) => {
           if (!(e.target as HTMLElement).closest('input,button,[role=listbox]')) onSelect(!selected)
         }}
@@ -118,26 +114,48 @@ export function LineRow({
               onPrev={onPrevSong}
               onSuffix={() => document.querySelector<HTMLInputElement>(`[data-suffix-input="${line.key}"]`)?.focus()}
             />
-            <input
+            <Input
               data-suffix-input={line.key}
               aria-label="Suffix"
-              className={cn(QUIET_INPUT, 'text-muted-foreground w-24 shrink-0')}
+              className={cn(INPUT_SIZE, 'text-muted-foreground w-40 shrink-0')}
               placeholder={selected ? '(x2)' : ''}
               value={line.suffix}
               onChange={(e) => onChange({suffix: e.target.value})}
             />
           </>
+        ) : line.kind === 'note' ? (
+          <>
+            <Input
+              aria-label="Note text"
+              className={cn(INPUT_SIZE, 'flex-1 italic')}
+              placeholder="Note — prints in italics on the sheets you pick"
+              value={line.text}
+              onChange={(e) => onChange({text: e.target.value})}
+            />
+            <SheetToggle
+              label="Musicians"
+              short="Mus"
+              on={line.musicSheet}
+              onToggle={() => onChange({musicSheet: !line.musicSheet}, {immediate: true})}
+            />
+            <SheetToggle
+              label="Sound Booth"
+              short="Booth"
+              on={line.booth === 'include'}
+              onToggle={() => onChange({booth: line.booth === 'include' ? 'exclude' : 'include'}, {immediate: true})}
+            />
+          </>
         ) : (
-          <input
+          <Input
             aria-label="Line text"
-            className={cn(QUIET_INPUT, 'flex-1')}
+            className={cn(INPUT_SIZE, 'flex-1')}
             placeholder="text"
             value={line.text}
             onChange={(e) => onChange({text: e.target.value})}
           />
         )}
         <span className="text-muted-foreground hidden w-24 shrink-0 truncate text-right text-[11px] sm:inline">
-          {ROLE_LABELS[line.role]}
+          {line.kind === 'note' ? 'Note' : ROLE_LABELS[line.role]}
         </span>
         <div className={actionsClass}>
           <IconButton
@@ -164,6 +182,58 @@ export function LineRow({
 function LineDetails({line, onChange}: {line: Draft; onChange: LineChange}) {
   const [more, setMore] = useState(line.merged !== null)
   const d = ROLE_DEFAULTS[line.role]
+  if (line.kind === 'note')
+    return (
+      <div className="space-y-2 border-t px-3 py-3 text-sm">
+        <Row label="Column">
+          <Segmented
+            value={line.noteColumn}
+            options={[
+              ['all', 'Full width'],
+              ['first', 'Column 1'],
+              ['second', 'Column 2'],
+            ]}
+            onChange={(noteColumn) => onChange({noteColumn}, {immediate: true})}
+          />
+        </Row>
+        <Row label="Align">
+          <Segmented
+            value={line.align ?? 'center'}
+            options={[
+              ['left', 'Left'],
+              ['center', 'Center'],
+              ['right', 'Right'],
+            ]}
+            onChange={(align) => onChange({align}, {immediate: true})}
+          />
+        </Row>
+        <Row label="Highlight">
+          <div className="flex gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={line.highlight ? 'default' : 'outline'}
+              className="pointer-coarse:h-10"
+              onClick={() => onChange({highlight: !line.highlight}, {immediate: true})}
+            >
+              Musicians
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={line.boothHighlight ? 'default' : 'outline'}
+              className="pointer-coarse:h-10"
+              onClick={() => onChange({boothHighlight: !line.boothHighlight}, {immediate: true})}
+            >
+              Sound Booth
+            </Button>
+          </div>
+        </Row>
+        <p className="text-muted-foreground text-xs">
+          A note prints in italics. Use *bold* or __underline__ in the text.
+        </p>
+      </div>
+    )
   return (
     <div className="space-y-2 border-t px-3 py-3 text-sm">
       <Row label="Role">
@@ -180,6 +250,17 @@ function LineDetails({line, onChange}: {line: Draft; onChange: LineChange}) {
           </SelectContent>
         </Select>
       </Row>
+      {line.kind === 'song' ? (
+        <Row label="Sound Booth">
+          <label className="flex items-center gap-2">
+            <Checkbox
+              checked={line.boothOneLine}
+              onCheckedChange={(v) => onChange({boothOneLine: v === true}, {immediate: true})}
+            />
+            Number and title on one line
+          </label>
+        </Row>
+      ) : null}
       {line.kind === 'song' ? (
         <Row label="Next week">
           <label className="flex items-center gap-2">
@@ -214,16 +295,16 @@ function LineDetails({line, onChange}: {line: Draft; onChange: LineChange}) {
         </div>
       </Row>
       <Row label="Booth note">
-        <input
-          className={FIELD_INPUT}
+        <Input
+          className={INPUT_SIZE}
           placeholder={d.boothNote || '(Choir & Cong.) — blank prints nothing'}
           value={line.boothNote}
           onChange={(e) => onChange({boothNote: e.target.value})}
         />
       </Row>
       <Row label="Left cell">
-        <input
-          className={FIELD_INPUT}
+        <Input
+          className={INPUT_SIZE}
           placeholder={d.leftLabel === null ? 'the song number (automatic)' : d.leftLabel || 'empty (automatic)'}
           value={line.leftText}
           onChange={(e) => onChange({leftText: e.target.value})}
@@ -249,16 +330,16 @@ function LineDetails({line, onChange}: {line: Draft; onChange: LineChange}) {
           {line.kind === 'song' ? (
             <>
               <Row label="Printed as">
-                <input
-                  className={FIELD_INPUT}
+                <Input
+                  className={INPUT_SIZE}
                   placeholder="the hymnal's title"
                   value={line.text}
                   onChange={(e) => onChange({text: e.target.value})}
                 />
               </Row>
               <Row label="Not in a book">
-                <input
-                  className={FIELD_INPUT}
+                <Input
+                  className={INPUT_SIZE}
                   placeholder="a song in neither hymnal — type its title"
                   value={line.freeSongTitle ?? ''}
                   onChange={(e) =>
@@ -289,6 +370,52 @@ function LineDetails({line, onChange}: {line: Draft; onChange: LineChange}) {
         </button>
       )}
     </div>
+  )
+}
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T
+  options: [T, string][]
+  onChange: (v: T) => void
+}) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map(([v, label]) => (
+        <Button
+          key={v}
+          type="button"
+          size="sm"
+          variant={value === v ? 'default' : 'outline'}
+          aria-pressed={value === v}
+          className="pointer-coarse:h-10"
+          onClick={() => onChange(v)}
+        >
+          {label}
+        </Button>
+      ))}
+    </div>
+  )
+}
+
+/** On/off for one sheet, compact in the row. */
+function SheetToggle({label, short, on, onToggle}: {label: string; short: string; on: boolean; onToggle: () => void}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={on ? 'default' : 'outline'}
+      aria-pressed={on}
+      title={`${on ? 'Prints' : 'Hidden'} on the ${label} sheet`}
+      className="h-7 shrink-0 px-2 text-xs pointer-coarse:h-10"
+      onClick={onToggle}
+    >
+      <span className="sm:hidden">{short}</span>
+      <span className="hidden sm:inline">{label}</span>
+    </Button>
   )
 }
 

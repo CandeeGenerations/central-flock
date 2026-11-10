@@ -575,6 +575,14 @@ usually **Standalone** too, but the two are set separately.
 _Avoid_: Heading (the fixed "EVENING SERVICE" wording, overridable but rarely), Theme (the
 **Yearly Theme**), Event (a **Calendar Page** entry).
 
+**Note Line**:
+An **Order Line** that is an aside rather than part of the run of service — "Film it all",
+"Offline for testimonies". Prints full width, centred and in italics, and is switched on for the
+**Music Sheet**, the **Sound Booth Sheet**, or both, independently. Carries forward like any other
+line. A **Schedule Scan** never matches one, so it starts kept.
+_Avoid_: Occasion (the heading-row wording), Booth note (the small note under a song on the Sound
+Booth Sheet).
+
 **Candlelight Service**:
 A regular evening service — usually Wednesday Evening, sometimes Sunday Evening — held by
 candlelight for Thanksgiving Eve, Christmas or New Year's, with its own song order. A **Standalone

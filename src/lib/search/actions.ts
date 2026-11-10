@@ -1,23 +1,28 @@
 import {navGroups} from '@/lib/nav-config'
 import type {ActionsBuildContext, SearchActionContext, SearchItem} from '@/lib/search/registry'
 import {
+  Baby,
   BookOpen,
+  CalendarPlus,
   Camera,
   CheckSquare,
   ClipboardList,
   FileText,
   FolderPlus,
+  GraduationCap,
   HandHeart,
   LayoutDashboard,
+  ListMusic,
   Mail,
+  Megaphone,
   Moon,
   Music,
-  Plus,
   Quote,
   ScanLine,
   SearchX,
   Settings,
   Sparkles,
+  Tent,
   Upload,
   UserPlus,
 } from 'lucide-react'
@@ -55,88 +60,93 @@ export function buildNavigationActions(): SearchItem[] {
     nav('/import', 'Import CSV', Upload, ['upload']),
     nav('/import/contacts', 'Import Mac Contacts', Upload),
     nav('/settings', 'Settings', Settings),
-    // Document Settings sections are routed panes off a left rail, so they are
-    // not sidebar entries and need naming here explicitly.
-    nav('/attendance/settings/times', 'Attendance Settings Service Times', Settings, ['service times', 'attendance']),
-    nav('/attendance/settings/recorders', 'Attendance Settings Recorders', Settings, [
+    // Settings sections are routed panes off a left rail, so they are not
+    // sidebar entries and need naming here explicitly.
+    nav('/attendance/settings/times', 'Ministry Stats Settings Service Times', Settings, [
+      'service times',
+      'attendance',
+    ]),
+    nav('/attendance/settings/recorders', 'Ministry Stats Settings Recorders', Settings, [
       'recorders',
       'attendance',
       'public link',
     ]),
-    nav('/schedules/settings/general', 'Document SettingsGeneral', Settings, ['logo', 'compact logo']),
-    nav('/schedules/settings/nursery/defaults', 'Document SettingsNursery Defaults', Settings, [
-      'nursery',
-      'worker counts',
+    nav('/attendance/settings/departments', 'Ministry Stats Settings Departments', Settings, [
+      'departments',
+      'sunday school',
+      'classes',
     ]),
-    nav('/schedules/settings/nursery/workers', 'Nursery Workers', Settings, ['nursery', 'roster', 'workers']),
-    nav('/schedules/settings/special-music', 'Document SettingsSpecial Music', Settings, ['singers', 'households']),
-    nav('/schedules/settings/fair-booth', 'Document SettingsFair Booth', Settings, ['roster', 'reminders']),
-    nav('/schedules/settings/music', 'Document SettingsMusic Schedule', Settings, [
+    nav('/attendance/settings/households', 'Ministry Stats Settings Households', Settings, [
+      'households',
+      'fill america',
+    ]),
+    nav('/schedules/settings/general', 'Document Settings General', Settings, ['logo', 'compact logo']),
+    nav('/schedules/settings/music', 'Document Settings Music Schedule', Settings, [
       'music schedule',
       'sound booth',
       'service headings',
       'footer',
-    ]),
-    nav('/schedules/settings/sunday-school/defaults', 'Document SettingsSunday School Defaults', Settings, [
-      'workers notes',
-      'bullets',
-      'church name',
-    ]),
-    nav('/schedules/settings/sunday-school/themes', 'Yearly Themes', Settings, [
-      'theme song',
-      'chorus',
-      'growth plan',
-      'sunday school',
-    ]),
-    nav('/schedules/settings/sunday-school/lessons', 'Betty Lukens Lessons', Settings, [
-      'catalogue',
-      'stories',
-      'sunday school',
     ]),
     nav('/schedules/settings/prayer-sheet', 'Document Settings Prayer Sheet', Settings, [
       'prayer',
       'ministry list',
       'color rotation',
     ]),
+    nav('/schedules/settings/nursery/defaults', 'Document Settings Nursery Defaults', Settings, [
+      'nursery',
+      'worker counts',
+    ]),
+    nav('/schedules/settings/nursery/workers', 'Document Settings Nursery Workers', Settings, [
+      'nursery',
+      'roster',
+      'workers',
+    ]),
+    nav('/schedules/settings/special-music', 'Document Settings Special Music', Settings, ['singers', 'households']),
+    nav('/schedules/settings/sunday-school/defaults', 'Document Settings Sunday School Defaults', Settings, [
+      'workers notes',
+      'bullets',
+      'church name',
+    ]),
+    nav('/schedules/settings/sunday-school/themes', 'Document Settings Yearly Themes', Settings, [
+      'theme song',
+      'chorus',
+      'growth plan',
+      'sunday school',
+    ]),
+    nav('/schedules/settings/sunday-school/lessons', 'Document Settings Betty Lukens Lessons', Settings, [
+      'catalogue',
+      'stories',
+      'sunday school',
+    ]),
+    nav('/schedules/settings/sunday-school-roll', 'Document Settings Sunday School Roll', Settings, [
+      'roll',
+      'sunday school',
+      'attendance',
+    ]),
+    nav('/schedules/settings/fair-booth', 'Document Settings Fair Booth', Settings, ['roster', 'reminders']),
   ]
   return [...nonNavRoutes, ...fromSidebar]
 }
 
+function create(id: string, label: string, icon: SearchItem['icon'], to: string, keywords: string[]): SearchItem {
+  return {
+    id: `create-${id}`,
+    label,
+    group: 'Create',
+    icon,
+    keywords: ['new', ...keywords],
+    action: ({navigate, close}) => {
+      navigate(to)
+      close()
+    },
+  }
+}
+
 export function buildCreateActions(ctx: ActionsBuildContext): SearchItem[] {
   return [
-    {
-      id: 'create-person',
-      label: 'New Person',
-      group: 'Create',
-      icon: UserPlus,
-      keywords: ['new', 'add', 'person', 'contact'],
-      action: ({navigate, close}) => {
-        navigate('/people?new=1')
-        close()
-      },
-    },
-    {
-      id: 'create-group',
-      label: 'New Group',
-      group: 'Create',
-      icon: FolderPlus,
-      keywords: ['new', 'add', 'group'],
-      action: ({navigate, close}) => {
-        navigate('/groups?new=1')
-        close()
-      },
-    },
-    {
-      id: 'create-message',
-      label: 'New Message',
-      group: 'Create',
-      icon: Mail,
-      keywords: ['new', 'compose', 'send', 'text', 'sms'],
-      action: ({navigate, close}) => {
-        navigate('/messages/compose')
-        close()
-      },
-    },
+    create('person', 'New Person', UserPlus, '/people?add=1', ['add', 'person', 'contact']),
+    create('group', 'New Group', FolderPlus, '/groups?add=1', ['add', 'group']),
+    create('message', 'New Message', Mail, '/messages/compose', ['compose', 'send', 'text', 'sms']),
     ...(ctx.prayerRequest.ready
       ? [
           {
@@ -152,105 +162,82 @@ export function buildCreateActions(ctx: ActionsBuildContext): SearchItem[] {
           } satisfies SearchItem,
         ]
       : []),
-    {
-      id: 'create-template',
-      label: 'New Template',
-      group: 'Create',
-      icon: FileText,
-      keywords: ['new', 'template'],
-      action: ({navigate, close}) => {
-        navigate('/templates/new')
-        close()
-      },
-    },
-    {
-      id: 'create-rsvp-list',
-      label: 'New RSVP List',
-      group: 'Create',
-      icon: CheckSquare,
-      keywords: ['new', 'rsvp', 'event', 'attendance'],
-      action: ({navigate, close}) => {
-        navigate('/rsvp?new=1')
-        close()
-      },
-    },
-    {
-      id: 'create-sunday-school-roll',
-      label: 'New Sunday School Roll',
-      group: 'Create',
-      icon: ClipboardList,
-      keywords: ['new', 'sunday school', 'roll', 'attendance', 'quarter'],
-      action: ({navigate, close}) => {
-        navigate('/schedules/sunday-school-rolls?new=1')
-        close()
-      },
-    },
-    {
-      id: 'create-devotion',
-      label: 'New Devotion',
-      group: 'Create',
-      icon: BookOpen,
-      keywords: ['new', 'devotion'],
-      action: ({navigate, close}) => {
-        navigate('/devotions?new=1')
-        close()
-      },
-    },
-    {
-      id: 'create-gwendolyn',
-      label: 'New Gwendolyn Devotion',
-      group: 'Create',
-      icon: BookOpen,
-      keywords: ['new', 'gwendolyn', 'devotion'],
-      action: ({navigate, close}) => {
-        navigate('/devotions/gwendolyn/new')
-        close()
-      },
-    },
-    {
-      id: 'create-quote',
-      label: 'New Quote',
-      group: 'Create',
-      icon: Quote,
-      keywords: ['new', 'quote', 'sermon'],
-      action: ({navigate, close}) => {
-        navigate('/sermons/quotes?new=1')
-        close()
-      },
-    },
-    {
-      id: 'create-special',
-      label: 'New Special',
-      group: 'Create',
-      icon: Sparkles,
-      keywords: ['new', 'special', 'music', 'performance', 'solo', 'duet', 'trio'],
-      action: ({navigate, close}) => {
-        navigate('/music/specials/new')
-        close()
-      },
-    },
-    {
-      id: 'create-music-week-from-photos',
-      label: 'New Music Schedule Week from Photos',
-      group: 'Create',
-      icon: Camera,
-      keywords: ['new', 'scan', 'photo', 'music', 'schedule', 'week', 'pastor', 'songs'],
-      action: ({navigate, close}) => {
-        navigate('/schedules/music?scan=1')
-        close()
-      },
-    },
-    {
-      id: 'create-nursery-schedule',
-      label: 'Generate Nursery Schedule',
-      group: 'Create',
-      icon: Plus,
-      keywords: ['new', 'generate', 'nursery', 'schedule'],
-      action: ({navigate, close}) => {
-        navigate('/nursery?generate=1')
-        close()
-      },
-    },
+    create('template', 'New Template', FileText, '/templates/new', ['template']),
+    create('rsvp-list', 'New RSVP List', CheckSquare, '/rsvp?new=1', ['rsvp', 'event', 'attendance']),
+    create('devotion', 'New Devotion', BookOpen, '/devotions/new', ['devotion']),
+    create('devotion-scan', 'Scan Devotion Sheet', ScanLine, '/devotions/scan', ['scan', 'ocr', 'sheet', 'devotion']),
+    create('gwendolyn', 'New Gwendolyn Devotion', BookOpen, '/devotions/gwendolyn/new', ['gwendolyn', 'devotion']),
+    create('quote', 'New Quote', Quote, '/sermons/quotes?new=1', ['quote', 'sermon']),
+    create('special', 'New Special', Sparkles, '/music/specials/new', [
+      'special',
+      'music',
+      'performance',
+      'solo',
+      'duet',
+      'trio',
+    ]),
+    create('music-week', 'New Music Schedule Week', ListMusic, '/schedules/music?new=1', [
+      'music',
+      'schedule',
+      'week',
+      'songs',
+    ]),
+    create('music-week-from-photos', 'New Music Schedule Week from Photos', Camera, '/schedules/music?scan=1', [
+      'scan',
+      'photo',
+      'music',
+      'schedule',
+      'week',
+      'pastor',
+      'songs',
+    ]),
+    create('prayer-sheet', 'New Prayer Sheet Edition', HandHeart, '/prayer-sheet?new=1', [
+      'prayer',
+      'sheet',
+      'edition',
+    ]),
+    create('prayer-sheet-import', 'Import Prayer Sheet Photo', Camera, '/prayer-sheet?import=1', [
+      'prayer',
+      'sheet',
+      'photo',
+      'scan',
+      'import',
+    ]),
+    create('calendar-year-copy', 'Copy Calendar Year…', CalendarPlus, '/calendar/print?yearCopy=1', [
+      'calendar',
+      'print',
+      'year',
+      'copy',
+    ]),
+    create('nursery-schedule', 'Generate Nursery Schedule', Baby, '/nursery?new=1', [
+      'generate',
+      'nursery',
+      'schedule',
+    ]),
+    create('special-music-schedule', 'New Special Music Schedule', Music, '/special-music?new=1', [
+      'special music',
+      'schedule',
+    ]),
+    create('workers-notes', 'New Workers’ Notes Edition', GraduationCap, '/schedules/sunday-school?new=1', [
+      'workers notes',
+      'sunday school',
+      'edition',
+    ]),
+    create('sunday-school-roll', 'New Sunday School Roll', ClipboardList, '/schedules/sunday-school-rolls?new=1', [
+      'sunday school',
+      'roll',
+      'attendance',
+      'quarter',
+    ]),
+    create('fair-booth-schedule', 'New Fair Booth Schedule', Tent, '/schedules/fair-booth?new=1', [
+      'fair',
+      'booth',
+      'schedule',
+    ]),
+    create('fill-america-campaign', 'New Fill America Campaign', Megaphone, '/fill-america?new=1', [
+      'fill america',
+      'campaign',
+    ]),
   ]
 }
 

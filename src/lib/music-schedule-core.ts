@@ -20,10 +20,11 @@ export type MusicLineRole =
   | 'special'
   | 'offering'
 
-export type MusicLineKind = 'song' | 'prose' | 'page_break'
+export type MusicLineKind = 'song' | 'prose' | 'note' | 'page_break'
 export type MusicBoothMode = 'auto' | 'include' | 'exclude'
 export type MusicBoothSlot = 'motto_verse_theme' | 'prayer_announcements'
-export type MusicLineAlign = 'left' | 'center'
+export type MusicLineAlign = 'left' | 'center' | 'right'
+export type MusicNoteColumn = 'all' | 'first' | 'second'
 export type HymnBook = 'burgundy' | 'silver'
 
 export const MONTH_NAMES = [
@@ -312,6 +313,12 @@ export interface OrderLine {
   booth: MusicBoothMode
   boothLabel: string
   boothNote: string
+  /** Prints on the Musicians sheet. A note can be for the sound booth only. */
+  musicSheet: boolean
+  /** Where a note sits: across both columns, or in one. */
+  noteColumn: MusicNoteColumn
+  /** A song on the Sound Booth Sheet prints its number and title on one line. */
+  boothOneLine: boolean
   sortOrder: number
 }
 
@@ -408,17 +415,27 @@ export interface RenderedLine {
   bold: boolean
   italic: boolean
   highlight: boolean
+  /** A note in one column only; the other cell prints empty. */
+  column?: MusicNoteColumn
 }
 
 /**
  * Applies per-line overrides over the role defaults. `isFirst` gives the
  * service's opening line its time in the left cell, whatever its role.
  */
+/** The lines the Musicians sheet prints, in order. */
+export function musicSheetLines<T extends Pick<OrderLine, 'kind' | 'musicSheet' | 'text'>>(lines: T[]): T[] {
+  return lines.filter(
+    (l) => l.kind !== 'page_break' && l.musicSheet !== false && (l.kind !== 'note' || l.text.trim() !== ''),
+  )
+}
+
 export function renderLine(line: OrderLine, service: ServiceInfo, isFirst: boolean): RenderedLine {
   const d = ROLE_DEFAULTS[line.role]
+  const isNote = line.kind === 'note'
   // A song is always a two-cell row unless told otherwise — its reference has to
-  // sit in a column, whatever role it carries.
-  const merged = line.merged ?? (line.kind === 'song' ? false : d.merged)
+  // sit in a column, whatever role it carries. A note is a full-width aside.
+  const merged = isNote ? line.noteColumn === 'all' : (line.merged ?? (line.kind === 'song' ? false : d.merged))
   const ref = lineRef(line)
   const title = songTitle(line)
 
@@ -439,20 +456,25 @@ export function renderLine(line: OrderLine, service: ServiceInfo, isFirst: boole
   } else if (!left && d.leftLabel) {
     left = d.leftLabel
   }
+  if (isNote) {
+    left = line.noteColumn === 'first' ? line.text : ''
+    right = line.noteColumn === 'first' ? '' : line.text
+  }
   if (isFirst && !line.leftText && !merged && line.kind !== 'song') left = formatServiceTime(service.time)
 
   return {
     id: line.id,
     kind: line.kind,
     merged,
-    align: line.align ?? d.align,
+    align: line.align ?? (isNote ? 'center' : d.align),
     left,
     right,
     suffix: line.suffix,
     // Songs print bold on every original, whatever their role.
-    bold: line.bold ?? (line.kind === 'song' ? true : d.bold),
-    italic: line.italic,
+    bold: line.bold ?? (line.kind === 'song' ? true : isNote ? false : d.bold),
+    italic: line.italic || isNote,
     highlight: line.highlight,
+    ...(isNote ? {column: line.noteColumn} : {}),
   }
 }
 
@@ -533,7 +555,7 @@ export function boothLineStale(stored: BoothLine, lines: OrderLine[]): boolean {
 
 export interface BoothRow {
   key: string
-  kind: 'title' | 'scripture' | 'song' | 'condensed'
+  kind: 'title' | 'scripture' | 'song' | 'condensed' | 'note'
   label: string
   /** The episode number beside "Title:", printed bold italic. */
   labelSuffix: string
@@ -547,6 +569,8 @@ export interface BoothRow {
   highlight: boolean
   stale: boolean
   lineId: number | null
+  /** Notes only: across both columns, or in one. */
+  column?: MusicNoteColumn
 }
 
 /**
@@ -596,6 +620,27 @@ export function resolveBoothRows(service: ServiceInfo, lines: OrderLine[], booth
 
   for (const line of lines) {
     if (line.kind === 'page_break') continue
+    if (line.kind === 'note') {
+      // A note prints on the booth sheet only when switched on for it.
+      if (line.booth !== 'include' || !line.text.trim()) continue
+      rows.push({
+        key: `note-${line.id}`,
+        kind: 'note',
+        label: '',
+        labelSuffix: '',
+        note: '',
+        value: line.text,
+        valueSecond: '',
+        suffix: '',
+        merged: line.noteColumn === 'all',
+        align: line.align ?? 'center',
+        column: line.noteColumn,
+        highlight: line.boothHighlight,
+        stale: false,
+        lineId: line.id,
+      })
+      continue
+    }
     const d = ROLE_DEFAULTS[line.role]
     const mode = line.booth === 'auto' ? d.booth : line.booth
 
@@ -650,8 +695,9 @@ export function resolveBoothRows(service: ServiceInfo, lines: OrderLine[], booth
       label,
       labelSuffix: '',
       note,
-      value: lineRef(line),
-      valueSecond: songTitle(line),
+      // One line saves a row: "B #191  Count Your Blessings".
+      value: line.boothOneLine ? [lineRef(line), songTitle(line)].filter(Boolean).join('  ') : lineRef(line),
+      valueSecond: line.boothOneLine ? '' : songTitle(line),
       suffix: line.suffix,
       merged: false,
       align: 'left',

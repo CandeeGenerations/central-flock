@@ -1,5 +1,6 @@
 import {AIProgress} from '@/components/ai-progress'
 import {ConfirmDialog} from '@/components/confirm-dialog'
+import {PageHeader} from '@/components/page-header'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
@@ -136,23 +137,16 @@ export function DevotionPassagesPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Sparkles className="h-6 w-6" />
-          <h2 className="text-2xl font-bold">Passages</h2>
-          <Badge variant="secondary">{availableCount} available</Badge>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setClearOpen(true)}>
-            <Trash2 className="h-4 w-4 mr-1.5" />
-            Clear Unused
-          </Button>
-          <Button size="sm" onClick={() => setGenerateOpen(true)}>
-            <Sparkles className="h-4 w-4 mr-1.5" />
-            Generate
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title={
+          <span className="flex items-center gap-3">
+            Passages
+            <Badge variant="secondary">{availableCount} available</Badge>
+          </span>
+        }
+        primary={{label: 'Generate', icon: Sparkles, onClick: () => setGenerateOpen(true)}}
+        secondary={[{label: 'Clear Unused', icon: Trash2, onClick: () => setClearOpen(true)}]}
+      />
 
       <ConfirmDialog
         open={clearOpen}

@@ -28,7 +28,7 @@ import {
 import {formatDate} from '@/lib/date'
 import {queryKeys} from '@/lib/query-keys'
 import {cn, maskPhoneDisplay, phoneToE164} from '@/lib/utils'
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {keepPreviousData, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {
   ArrowDown,
   ArrowUp,
@@ -110,6 +110,8 @@ export function PeoplePage() {
         sort,
         sortDir,
       }),
+    // Keep the current rows on screen while a new search loads, so the search box stays mounted and focused.
+    placeholderData: keepPreviousData,
   })
 
   const {data: duplicatesData, isLoading: duplicatesLoading} = useQuery({

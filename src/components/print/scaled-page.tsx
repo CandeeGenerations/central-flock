@@ -36,7 +36,9 @@ export function ScaledPage({
   const scale = zoom === 'fit' ? fitScale : zoom
 
   return (
-    <div ref={containerRef} className="flex justify-center overflow-auto">
+    // contain-inline-size: the box takes its width from the layout, never from the page inside,
+    // so "fit" measures the real screen width instead of the 816px page it holds.
+    <div ref={containerRef} className="flex w-full min-w-0 justify-center overflow-auto [contain:inline-size]">
       <div style={{width: width * scale, height: height * scale, flexShrink: 0}}>
         <div style={{transform: `scale(${scale})`, transformOrigin: 'top left', width}}>{children}</div>
       </div>

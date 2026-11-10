@@ -5,6 +5,9 @@ import {type ReactNode, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {TYPE} from './type-scale'
 import {usePagination} from './use-pagination'
 
+/** The least a fit-to-one-page sheet may shrink before it is reported as overflowing instead. */
+export const FIT_SCALE_FLOOR = 0.7
+
 export interface SheetBlock {
   key: string
   node: ReactNode
@@ -30,6 +33,8 @@ export function Sheet({
   overlay,
   zoom,
   paddingX = PAGE_PADDING_X_PX,
+  fitOnePage = false,
+  onFitScale,
 }: {
   title: string
   subtitle: string
@@ -45,6 +50,10 @@ export function Sheet({
   zoom: ZoomMode
   /** Side margin for this sheet's pages. The Sound Booth Sheet runs wider. */
   paddingX?: number
+  /** Print as one page, shrinking the content (never the margins) to fit — see ADR 0021's amendment. */
+  fitOnePage?: boolean
+  /** The shrink applied when fitOnePage is set, 1 when it fits as is. */
+  onFitScale?: (scale: number) => void
 }) {
   const measureRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
@@ -63,13 +72,33 @@ export function Sheet({
   const remeasureKey = useMemo(() => [blocks, paddingX], [blocks, paddingX])
 
   const forced = new Set(blocks.filter((b) => b.breakAfter).map((b) => b.key))
-  const {pages, overflow, heights} = usePagination(
+  const paginated = usePagination(
     blocks.map((b) => b.key),
     measureRef,
     {first: CONTENT_HEIGHT_PX - headerH, rest: CONTENT_HEIGHT_PX},
     forced,
     remeasureKey,
   )
+
+  // Fit to one page: everything goes on page one, scaled by the natural height it
+  // measures at full size. The scaled content reflows at a proportionally wider
+  // width, so it only ever comes out shorter than this estimate, never taller.
+  const natural = headerH + blocks.reduce((sum, b) => sum + (paginated.heights[b.key] ?? 0), 0)
+  const fitScale =
+    fitOnePage && natural > CONTENT_HEIGHT_PX ? Math.max(FIT_SCALE_FLOOR, CONTENT_HEIGHT_PX / natural) : 1
+  const fitOverflow = Math.round(natural * fitScale - CONTENT_HEIGHT_PX)
+  const {pages, overflow, heights} = fitOnePage
+    ? {
+        pages: [blocks.map((b) => b.key)],
+        overflow: fitOverflow > 0 ? [{key: 'fit', px: fitOverflow}] : [],
+        heights: paginated.heights,
+      }
+    : paginated
+
+  useLayoutEffect(() => {
+    if (fitOnePage) onFitScale?.(fitScale)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitOnePage, fitScale])
 
   const overflowKey = overflow.map((o) => `${o.key}:${o.px}`).join(',')
   useLayoutEffect(() => {
@@ -135,11 +164,13 @@ export function Sheet({
                     pageObject.current = el
                   }}
                 >
-                  {i === 0 ? <SheetHeader title={title} subtitle={subtitle} /> : null}
-                  {keys.map((k) => (
-                    <div key={k}>{byKey.get(k)}</div>
-                  ))}
-                  {footer && i === rendered.length - 1 ? footer : null}
+                  <FitScale scale={fitScale}>
+                    {i === 0 ? <SheetHeader title={title} subtitle={subtitle} /> : null}
+                    {keys.map((k) => (
+                      <div key={k}>{byKey.get(k)}</div>
+                    ))}
+                    {footer && i === rendered.length - 1 ? footer : null}
+                  </FitScale>
                 </PrintPage>
                 {overlay?.(i, pageObject)}
               </div>
@@ -148,6 +179,29 @@ export function Sheet({
         )
       })}
     </>
+  )
+}
+
+/**
+ * Shrinks a page's content uniformly inside the fixed page box, so the margins
+ * stay put and the export captures exactly this. The wrapper is the offsetParent
+ * of everything inside it and carries its scale, so the edit overlay can map
+ * untransformed offsets back onto the page.
+ */
+function FitScale({scale, children}: {scale: number; children: ReactNode}) {
+  if (scale === 1) return <>{children}</>
+  return (
+    <div
+      data-fit-scale={scale}
+      style={{
+        position: 'relative',
+        width: `${100 / scale}%`,
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left',
+      }}
+    >
+      {children}
+    </div>
   )
 }
 

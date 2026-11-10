@@ -1,3 +1,4 @@
+import {Input} from '@/components/ui/input'
 import {type HymnOption, musicScheduleKeys, searchMusicHymns} from '@/lib/music-schedule-api'
 import {hymnRef, parseSongEntry, toTitleCase} from '@/lib/music-schedule-core'
 import {cn} from '@/lib/utils'
@@ -105,7 +106,7 @@ export function SongInput({
 
   return (
     <div className={cn('relative flex min-w-0 flex-1 items-center gap-2', className)}>
-      <input
+      <Input
         data-song-input={dataSongInput}
         autoFocus={autoFocus}
         inputMode="text"
@@ -115,9 +116,7 @@ export function SongInput({
         placeholder="Song # or title…"
         aria-label="Song"
         className={cn(
-          'h-8 min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none',
-          'hover:border-input focus:border-ring focus:bg-background focus:ring-ring/30 focus:ring-2',
-          'pointer-coarse:h-10',
+          'h-8 cursor-text pointer-coarse:h-10',
           draft === null ? 'flex-1 truncate font-medium' : 'w-28 shrink-0',
         )}
         value={draft ?? displayFor(value)}

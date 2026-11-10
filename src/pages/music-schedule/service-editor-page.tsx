@@ -325,7 +325,7 @@ function ServiceEditor({week, initial}: {week: MusicWeek; initial: MusicService}
         </p>
       ) : null}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[1fr_460px]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
           <DetailsStrip fields={fields} onChange={changeFields} />
 

@@ -10,6 +10,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/c
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Textarea} from '@/components/ui/textarea'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
+import {ZoomableImage} from '@/components/zoomable-image'
 import {useProgressOperation} from '@/hooks/use-sse'
 import {formatDate} from '@/lib/date'
 import {type PoolPassage, fetchAvailablePassages, pullPassagesForScan} from '@/lib/devotion-api'
@@ -1856,12 +1857,9 @@ export function DevotionScanPage() {
             </svg>
           </button>
           {imagePreview && (
-            <img
-              src={imagePreview}
-              alt="Uploaded sheet"
-              className="max-w-[95vw] max-h-[95vh] object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <div className="h-[95vh] w-[95vw]" onClick={(e) => e.stopPropagation()}>
+              <ZoomableImage src={imagePreview} alt="Uploaded sheet" className="h-full w-full" />
+            </div>
           )}
         </div>
       )}

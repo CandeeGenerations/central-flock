@@ -1,6 +1,7 @@
 import type {SearchProvider} from '@/lib/search/registry'
 
 import {calendarProvider} from './calendar'
+import {calendarPrintMonthsProvider} from './calendar-print-months'
 import {devotionPassagesProvider} from './devotion-passages'
 import {devotionsProvider} from './devotions'
 import {draftsProvider} from './drafts'
@@ -8,11 +9,15 @@ import {fairBoothSchedulesProvider} from './fair-booth-schedules'
 import {fillAmericaCampaignsProvider} from './fill-america-campaigns'
 import {groupsProvider} from './groups'
 import {gwendolynDevotionsProvider} from './gwendolyn-devotions'
+import {hymnSearchesProvider} from './hymn-searches'
 import {hymnsProvider} from './hymns'
 import {messagesProvider} from './messages'
+import {musicScansProvider} from './music-scans'
 import {musicSchedulesProvider} from './music-schedules'
 import {nurserySchedulesProvider} from './nursery-schedules'
 import {peopleProvider} from './people'
+import {prayerSheetsProvider} from './prayer-sheets'
+import {quoteSearchesProvider} from './quote-searches'
 import {quotesProvider} from './quotes'
 import {recentsProvider} from './recents'
 import {recordersProvider} from './recorders'
@@ -53,4 +58,9 @@ export const providers: SearchProvider[] = [
   specialsProvider as SearchProvider,
   sundaySchoolRollsProvider as SearchProvider,
   workersNotesProvider as SearchProvider,
+  prayerSheetsProvider as SearchProvider,
+  musicScansProvider as SearchProvider,
+  hymnSearchesProvider as SearchProvider,
+  quoteSearchesProvider as SearchProvider,
+  calendarPrintMonthsProvider as SearchProvider,
 ]

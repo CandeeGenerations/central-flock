@@ -1,4 +1,4 @@
-import type {HymnBook, OrderLine} from './music-schedule-core'
+import type {BoothLine, HymnBook, OrderLine} from './music-schedule-core'
 
 // The contract between the Schedule Scan server and its review screen.
 // See CONTEXT.md → Schedule Scan.
@@ -18,7 +18,7 @@ export type ScanFlagKind =
 export interface ScanFlag {
   kind: ScanFlagKind
   message: string
-  /** Index into the service's lines (for the active order mode), when the flag is about one line. */
+  /** Index into the service's rows, when the flag is about one line. */
   lineIndex?: number
   /** For song_conflict: the alternatives found on the pages. */
   options?: {book: HymnBook; number: number; hymnId: number | null; title: string | null; page: ScanPageKind}[]
@@ -29,6 +29,26 @@ export type ScanLineStatus = 'unchanged' | 'filled' | 'added'
 
 export type ProposedLine = Omit<OrderLine, 'id' | 'sortOrder' | 'highlight' | 'boothHighlight'> & {
   status: ScanLineStatus
+}
+
+/**
+ * How one row of the review differs from the usual order:
+ * - unchanged: the same line on both.
+ * - filled: a song slot on both; the sheet's song goes in.
+ * - changed: on both, but the sheet changes it (a Motto/Verse value, or a song's role).
+ * - added: only on the sheet.
+ * - removed: only in the usual order.
+ */
+export type ScanRowChange = 'unchanged' | 'filled' | 'changed' | 'added' | 'removed'
+
+export interface ProposedRow {
+  change: ScanRowChange
+  /** For changed, added and removed rows: take the sheet's version. Starts false — the usual order is the default. */
+  accepted: boolean
+  /** The line as the usual order has it, with the sheet's song in a matched slot. Null when added. */
+  usual: ProposedLine | null
+  /** The line as the sheet has it. Null when removed. */
+  sheet: ProposedLine | null
 }
 
 export interface ProposedService {
@@ -43,14 +63,17 @@ export interface ProposedService {
   standalone: boolean
   /** The scanned order differs from the copied-forward one. */
   orderDiffers: boolean
-  /** Which order Create week writes. Defaults to 'scanned' when they differ. */
-  orderMode: 'scanned' | 'usual'
   /** The scanned order; matched lines keep the usual line's settings. */
   scannedLines: ProposedLine[]
   /** The copied-forward order with the scanned songs filled into matching slots. */
   usualLines: ProposedLine[]
-  /** Usual lines with no counterpart on the sheet — dropped when orderMode is 'scanned'. */
-  removedLines: string[]
+  /** Filled in when the scan is read, for the preview: this Service Time's sheet headings, */
+  musicHeading?: string
+  boothHeading?: string
+  /** …and the condensed Sound Booth lines Create week will carry forward (or the existing week's). */
+  boothLines?: BoothLine[]
+  /** Both orders merged in print order, each change accepted or rejected on its own. Create week writes these. */
+  rows: ProposedRow[]
   /** Notes the scan couldn't place — "FILM IT ALL". Never placed automatically. */
   notes: string[]
   flags: ScanFlag[]
@@ -95,11 +118,10 @@ export interface MusicScan {
 /** One service's review choices, sent back with PATCH. Omitted fields are unchanged. */
 export interface ScanServicePatch {
   serviceTimeId: number
-  orderMode?: 'scanned' | 'usual'
   standalone?: boolean
   occasion?: string
   title?: string
   text?: string
-  /** Replaces the active order's lines (after a person fixes a song). */
-  lines?: ProposedLine[]
+  /** Replaces the rows (an accept/reject, or a fixed song). */
+  rows?: ProposedRow[]
 }

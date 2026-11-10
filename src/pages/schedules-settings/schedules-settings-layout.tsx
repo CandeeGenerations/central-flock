@@ -11,13 +11,13 @@ import {NavLink, Outlet} from 'react-router-dom'
 // palette offer "Settings → Sunday School" directly.
 const SECTIONS = [
   {to: 'general', label: 'General', icon: Settings},
+  {to: 'music', label: 'Music Schedule', icon: ListMusic},
+  {to: 'prayer-sheet', label: 'Prayer Sheet', icon: HandHeart},
   {to: 'nursery', label: 'Nursery', icon: Baby},
   {to: 'special-music', label: 'Special Music', icon: Music},
-  {to: 'fair-booth', label: 'Fair Booth', icon: Tent},
-  {to: 'music', label: 'Music Schedule', icon: ListMusic},
   {to: 'sunday-school', label: 'Workers’ Notes', icon: GraduationCap},
   {to: 'sunday-school-roll', label: 'Sunday School Roll', icon: ClipboardList},
-  {to: 'prayer-sheet', label: 'Prayer Sheet', icon: HandHeart},
+  {to: 'fair-booth', label: 'Fair Booth', icon: Tent},
 ]
 
 export function SchedulesSettingsLayout() {

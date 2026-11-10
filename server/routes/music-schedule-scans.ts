@@ -2,26 +2,29 @@ import {and, desc, eq} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'node:fs'
 
-import type {
-  MusicScan,
-  MusicScanListItem,
-  ProposedLine,
-  ScanProposal,
-  ScanServicePatch,
-} from '../../src/lib/music-scan-types.js'
+import {rowsToLines} from '../../src/lib/music-scan-rows.js'
+import type {MusicScan, MusicScanListItem, ScanProposal, ScanServicePatch} from '../../src/lib/music-scan-types.js'
 import {type HymnBook, addDays, serviceDateFor} from '../../src/lib/music-schedule-core.js'
 import {db, schema} from '../db/index.js'
 import {resolveReference} from '../lib/bible-text.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {uploadPath, uploadUrl, urlToDiskPath} from '../lib/uploads.js'
-import {type ScanContext, type UsualLine, buildProposal, weekStartOf} from '../services/music-schedule-scan-process.js'
+import {
+  type ScanContext,
+  type UsualLine,
+  buildProposal,
+  rowsFromSides,
+  weekStartOf,
+} from '../services/music-schedule-scan-process.js'
 import {type ScanPhoto, transcribeSchedulePhotos} from '../services/music-schedule-scan.js'
 import {
   WeekExistsError,
+  boothLinesFor,
   copyForwardSource,
   createWeek,
   linesFor,
   readDefaultOrders,
+  readHeadings,
   replaceLines,
   servicesFor,
 } from '../services/music-schedule-store.js'
@@ -41,13 +44,48 @@ function scanRow(id: number) {
   return db.select().from(schema.musicScheduleScans).where(eq(schema.musicScheduleScans.id, id)).get()
 }
 
+type LegacyService = ScanProposal['services'][number] & {orderMode?: 'scanned' | 'usual'; removedLines?: string[]}
+
+/** Parse a stored proposal, giving one saved before per-row review its rows. */
+function readProposal(result: string): ScanProposal {
+  const proposal = JSON.parse(result) as ScanProposal
+  for (const s of proposal.services as LegacyService[]) {
+    if (s.rows) continue
+    const active = s.orderMode === 'usual' ? s.usualLines : s.scannedLines
+    s.rows = rowsFromSides(s.usualLines, s.scannedLines)
+    // Flags pointed into the order that was active; re-point them at the row holding that line.
+    for (const f of s.flags) {
+      if (f.lineIndex == null) continue
+      const line = active[f.lineIndex]
+      const at = s.rows.findIndex((r) => r.sheet === line || r.usual === line)
+      f.lineIndex = at < 0 ? undefined : at
+    }
+    delete s.orderMode
+    delete s.removedLines
+  }
+  return proposal
+}
+
 function toScan(row: NonNullable<ReturnType<typeof scanRow>>): MusicScan {
+  const proposal = readProposal(row.result)
+  const headings = readHeadings()
+  const existing = proposal.existingWeekId ? servicesFor(proposal.existingWeekId) : []
+  for (const s of proposal.services) {
+    const configured = headings[String(s.serviceTimeId)]
+    s.musicHeading = configured?.music || s.name
+    s.boothHeading = configured?.booth || s.name
+    const inWeek = existing.find((e) => e.serviceTimeId === s.serviceTimeId)
+    const source = inWeek ? null : copyForwardSource(s.serviceTimeId, proposal.weekStart)
+    const fromId = inWeek?.id ?? source?.id
+    // Create week carries these forward with highlights cleared — see createWeek.
+    s.boothLines = fromId ? boothLinesFor(fromId).map((bl) => (inWeek ? bl : {...bl, highlight: false})) : []
+  }
   return {
     id: row.id,
     status: row.status,
     photos: JSON.parse(row.photos) as string[],
     musicScheduleId: row.musicScheduleId,
-    proposal: JSON.parse(row.result) as ScanProposal,
+    proposal,
   }
 }
 
@@ -103,6 +141,9 @@ function usualLinesResolver(weekStart: string, existingWeekId: number | null): S
       booth: (t.booth as UsualLine['booth']) ?? 'auto',
       boothLabel: t.boothLabel ?? '',
       boothNote: t.boothNote ?? '',
+      musicSheet: t.musicSheet ?? true,
+      noteColumn: (t.noteColumn as UsualLine['noteColumn']) ?? 'all',
+      boothOneLine: !!t.boothOneLine,
     }))
   }
 }
@@ -251,19 +292,15 @@ musicScheduleScansRouter.patch(
       res.status(400).json({error: 'services[] is required'})
       return
     }
-    const proposal = JSON.parse(row.result) as ScanProposal
+    const proposal = readProposal(row.result)
     for (const p of patches) {
       const s = proposal.services.find((x) => x.serviceTimeId === Number(p.serviceTimeId))
       if (!s) continue
-      if (p.orderMode === 'scanned' || p.orderMode === 'usual') s.orderMode = p.orderMode
       if (p.standalone !== undefined) s.standalone = Boolean(p.standalone)
       if (p.occasion !== undefined) s.occasion = String(p.occasion)
       if (p.title !== undefined) s.title = String(p.title)
       if (p.text !== undefined) s.text = String(p.text)
-      if (Array.isArray(p.lines)) {
-        if (s.orderMode === 'scanned') s.scannedLines = p.lines
-        else s.usualLines = p.lines
-      }
+      if (Array.isArray(p.rows)) s.rows = p.rows
     }
     proposal.summary.toCheck = proposal.services.reduce((n, s) => n + s.flags.length, 0)
     db.update(schema.musicScheduleScans)
@@ -287,7 +324,7 @@ musicScheduleScansRouter.post(
       res.status(409).json({error: 'This scan has already been applied or discarded', weekId: row.musicScheduleId})
       return
     }
-    const proposal = JSON.parse(row.result) as ScanProposal
+    const proposal = readProposal(row.result)
 
     try {
       const weekId = db.transaction(() => {
@@ -296,10 +333,9 @@ musicScheduleScansRouter.post(
         for (const p of proposal.services) {
           const target = services.find((s) => s.serviceTimeId === p.serviceTimeId)
           if (!target) continue
-          const lines: ProposedLine[] = p.orderMode === 'scanned' ? p.scannedLines : p.usualLines
           replaceLines(
             target.id,
-            lines.map(({status: _status, hymnBook: _b, hymnNumber: _n, hymnTitle: _t, ...l}) => l),
+            rowsToLines(p.rows).map(({status: _status, hymnBook: _b, hymnNumber: _n, hymnTitle: _t, ...l}) => l),
           )
           db.update(schema.musicScheduleServices)
             .set({title: p.title, scripture: p.text, occasion: p.occasion, standalone: p.standalone})

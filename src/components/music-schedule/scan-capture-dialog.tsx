@@ -6,7 +6,7 @@ import {createMusicScan, musicScanKeys, photoToDataUrl} from '@/lib/music-scan-a
 import type {ScanSummary} from '@/lib/music-scan-types'
 import {weekLabel} from '@/lib/music-schedule-core'
 import {useQueryClient} from '@tanstack/react-query'
-import {Camera, Plus, X} from 'lucide-react'
+import {Plus, Upload, X} from 'lucide-react'
 import {useRef, useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -31,6 +31,7 @@ export function ScanCaptureDialog({open, onOpenChange}: {open: boolean; onOpenCh
   const queryClient = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [photos, setPhotos] = useState<string[]>([])
+  const [dragging, setDragging] = useState(false)
   const [done, setDone] = useState<{id: number; weekStart: string | null; summary: ScanSummary} | null>(null)
   const {state, start} = useProgressOperation(STAGES, 4000)
 
@@ -81,7 +82,6 @@ export function ScanCaptureDialog({open, onOpenChange}: {open: boolean; onOpenCh
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           multiple
           className="hidden"
           onChange={(e) => {
@@ -104,32 +104,63 @@ export function ScanCaptureDialog({open, onOpenChange}: {open: boolean; onOpenCh
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              {photos.map((p, i) => (
-                <div key={i} className="relative aspect-[3/4] overflow-hidden rounded border">
-                  <img src={p} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
-                  <button
-                    type="button"
-                    aria-label="Remove photo"
-                    disabled={state.isRunning}
-                    className="absolute top-1 right-1 rounded-full bg-black/60 p-1.5 text-white"
-                    onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+            <div
+              className={`rounded-lg border-2 border-dashed p-4 text-center transition-colors ${
+                dragging ? 'border-primary bg-primary/5' : 'border-border'
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault()
+                if (!state.isRunning) setDragging(true)
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragging(false)
+                if (!state.isRunning) void addFiles(e.dataTransfer.files)
+              }}
+            >
+              {photos.length ? (
+                <div className="grid grid-cols-3 gap-2">
+                  {photos.map((p, i) => (
+                    <div key={i} className="relative aspect-[3/4] overflow-hidden rounded border">
+                      <img src={p} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        aria-label="Remove photo"
+                        disabled={state.isRunning}
+                        className="absolute top-1 right-1 rounded-full bg-black/60 p-1.5 text-white"
+                        onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {photos.length < MAX_PHOTOS ? (
+                    <button
+                      type="button"
+                      disabled={state.isRunning}
+                      onClick={() => inputRef.current?.click()}
+                      className="text-muted-foreground hover:bg-muted flex aspect-[3/4] flex-col items-center justify-center gap-1 rounded border text-sm"
+                    >
+                      <Plus className="h-5 w-5" />
+                      Add photo
+                    </button>
+                  ) : null}
                 </div>
-              ))}
-              {photos.length < MAX_PHOTOS ? (
+              ) : (
                 <button
                   type="button"
                   disabled={state.isRunning}
                   onClick={() => inputRef.current?.click()}
-                  className="text-muted-foreground hover:bg-muted flex aspect-[3/4] flex-col items-center justify-center gap-1 rounded border border-dashed text-sm"
+                  className="w-full cursor-pointer space-y-2 py-8"
                 >
-                  {photos.length ? <Plus className="h-5 w-5" /> : <Camera className="h-5 w-5" />}
-                  {photos.length ? 'Add photo' : 'Take photo'}
+                  <Upload className="text-muted-foreground mx-auto h-8 w-8" />
+                  <p className="text-sm font-medium">Drop photos here or click to browse</p>
+                  <p className="text-muted-foreground text-xs">
+                    Up to {MAX_PHOTOS} — take them with the camera or pick from your library
+                  </p>
                 </button>
-              ) : null}
+              )}
             </div>
             {state.isRunning ? <AIProgress message={state.message} progress={state.progress} /> : null}
           </div>

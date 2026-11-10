@@ -52,15 +52,20 @@ export function ServiceOverlay({
     root.querySelectorAll<HTMLElement>('[data-ms-service]').forEach((el) => {
       const serviceId = Number(el.dataset.msService)
       if (!Number.isFinite(serviceId)) return
-      const offset = offsetWithin(el, root)
-      if (!offset) return
+      // A sheet shrunk to fit one page scales its content inside a wrapper: measure
+      // to the wrapper, scale, then add the wrapper's own (unscaled) offset.
+      const fit = el.closest<HTMLElement>('[data-fit-scale]')
+      const scale = fit && root.contains(fit) ? Number(fit.dataset.fitScale) || 1 : 1
+      const inner = offsetWithin(el, fit && scale !== 1 ? fit : root)
+      const outer = fit && scale !== 1 ? offsetWithin(fit, root) : {top: 0, left: 0}
+      if (!inner || !outer) return
       found.push({
         serviceId,
         label: labels[serviceId] ?? 'Service',
-        top: offset.top,
-        left: offset.left,
-        width: el.offsetWidth,
-        height: el.offsetHeight,
+        top: outer.top + inner.top * scale,
+        left: outer.left + inner.left * scale,
+        width: el.offsetWidth * scale,
+        height: el.offsetHeight * scale,
       })
     })
     setBoxes(found)

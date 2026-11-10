@@ -1,4 +1,5 @@
-import {ScaledPage, type ZoomMode} from '@/components/print/scaled-page'
+import {ScaledPage} from '@/components/print/scaled-page'
+import {DocumentHeader, SettingsAction} from '@/components/schedule/document-header'
 import {RollRowOverlay} from '@/components/sunday-school-roll/roll-row-overlay'
 import {RollSheetPage} from '@/components/sunday-school-roll/roll-sheet-page'
 import {Button} from '@/components/ui/button'
@@ -29,28 +30,10 @@ import {
   sundaysInQuarter,
 } from '@/lib/sunday-school-roll-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {
-  AlertTriangle,
-  ArrowDown,
-  ArrowLeft,
-  ArrowUp,
-  ArrowUpAZ,
-  Download,
-  Lock,
-  LockOpen,
-  Plus,
-  Save,
-  Trash2,
-} from 'lucide-react'
+import {AlertTriangle, ArrowDown, ArrowUp, ArrowUpAZ, Plus, Save, Trash2} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
-
-const ZOOMS: {value: ZoomMode; label: string}[] = [
-  {value: 'fit', label: 'Fit'},
-  {value: 1, label: '100%'},
-  {value: 1.5, label: '150%'},
-]
 
 type SheetDraft = {label: string; scholars: string}
 
@@ -81,8 +64,6 @@ export function RollViewPage() {
   const rollId = Number(id)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [zoom, setZoom] = useState<ZoomMode>('fit')
-  const [editMode, setEditMode] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [drafts, setDrafts] = useState<SheetDraft[] | null>(null)
   const [focus, setFocus] = useState<{sheet: number; row: number} | null>(null)
@@ -133,7 +114,8 @@ export function RollViewPage() {
   const quarter = roll.quarter as Quarter
   const dates = sundaysInQuarter(roll.year, quarter)
   const titlePrefix = settings.sundaySchoolRoll.titlePrefix
-  const locked = roll.status === 'final' || !editMode
+  const locked = roll.status === 'final'
+  const label = quarterTitleLabel(roll.year, quarter)
 
   const patchSheet = (i: number, next: Partial<SheetDraft>) =>
     setDrafts((prev) => prev!.map((s, j) => (j === i ? {...s, ...next} : s)))
@@ -161,43 +143,24 @@ export function RollViewPage() {
     <div className="space-y-6 p-4 md:p-8">
       <UnsavedChangesDialog blocker={blocker} onSave={() => save.mutateAsync(drafts)} what="your edits to this roll" />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/schedules/sunday-school-rolls')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h2 className="text-2xl font-bold">{quarterTitleLabel(roll.year, quarter)}</h2>
-        <span
-          className={
-            roll.status === 'final'
-              ? 'rounded bg-green-100 px-2 py-0.5 text-xs text-green-800'
-              : 'bg-muted rounded px-2 py-0.5 text-xs'
-          }
-        >
-          {roll.status}
-        </span>
-
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div className="flex gap-1">
-            {ZOOMS.map((z) => (
-              <Button
-                key={String(z.value)}
-                size="sm"
-                variant={zoom === z.value ? 'default' : 'outline'}
-                onClick={() => setZoom(z.value)}
-              >
-                {z.label}
-              </Button>
-            ))}
-          </div>
+      <DocumentHeader
+        onBack={() => navigate('/schedules/sunday-school-rolls')}
+        title={label}
+        status={roll.status}
+        onFinalize={() => patch.mutate({status: 'final'})}
+        onReopen={() => patch.mutate({status: 'draft'})}
+        statusPending={patch.isPending}
+        exporting={exporting}
+        actions={
           <Button size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate(drafts)}>
             <Save className="mr-1 h-4 w-4" />
             {save.isPending ? 'Saving…' : 'Save'}
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={exporting}
-            onClick={async () => {
+        }
+        downloads={[
+          {
+            label: 'PDF',
+            onSelect: async () => {
               const nodes = pageRefs.current.slice(0, printedPages.length).filter((n): n is HTMLDivElement => !!n)
               if (nodes.length !== printedPages.length) return
               setExporting(true)
@@ -208,43 +171,21 @@ export function RollViewPage() {
               } finally {
                 setExporting(false)
               }
-            }}
-          >
-            <Download className="mr-1 h-4 w-4" />
-            {exporting ? 'Exporting…' : 'PDF'}
-          </Button>
-          <Button size="sm" variant={editMode ? 'default' : 'outline'} onClick={() => setEditMode((v) => !v)}>
-            {editMode ? 'Editing' : 'Edit'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => patch.mutate({status: roll.status === 'final' ? 'draft' : 'final'})}
-          >
-            {roll.status === 'final' ? (
-              <>
-                <LockOpen className="mr-1 h-4 w-4" />
-                Reopen
-              </>
-            ) : (
-              <>
-                <Lock className="mr-1 h-4 w-4" />
-                Finalize
-              </>
-            )}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
+            },
+          },
+        ]}
+        settings={() => (
+          <SettingsAction
+            icon={<Trash2 />}
+            destructive
             onClick={() => {
-              if (confirm(`Delete the ${quarterTitleLabel(roll.year, quarter)} roll? This cannot be undone.`))
-                remove.mutate()
+              if (confirm(`Delete the ${label} roll? This cannot be undone.`)) remove.mutate()
             }}
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+            Delete this roll
+          </SettingsAction>
+        )}
+      />
 
       {/* Sheet index — jump between the sheets without scrolling five pages. */}
       <div className="bg-background/95 sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b py-3 text-sm backdrop-blur">
@@ -358,7 +299,6 @@ export function RollViewPage() {
                     page={page}
                     dates={dates}
                     logoPath={settings.logoPath}
-                    zoom={zoom}
                     locked={locked}
                     focusRow={focus?.sheet === sheetIndex ? focus.row : null}
                     onFocusRow={(row) => setFocus(row == null ? null : {sheet: sheetIndex, row})}
@@ -386,7 +326,6 @@ function RollPage({
   page,
   dates,
   logoPath,
-  zoom,
   locked,
   focusRow,
   onFocusRow,
@@ -401,7 +340,6 @@ function RollPage({
   page: number
   dates: string[]
   logoPath: string | null
-  zoom: ZoomMode
   locked: boolean
   focusRow: number | null
   onFocusRow: (row: number | null) => void
@@ -410,7 +348,7 @@ function RollPage({
   const localRef = useRef<HTMLDivElement>(null)
 
   return (
-    <ScaledPage zoom={zoom} orientation="landscape">
+    <ScaledPage zoom="fit" orientation="landscape">
       <div className="relative">
         <RollSheetPage
           ref={(node) => {

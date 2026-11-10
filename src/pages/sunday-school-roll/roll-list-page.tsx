@@ -1,12 +1,22 @@
+import {ConfirmDialog} from '@/components/confirm-dialog'
+import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Label} from '@/components/ui/label'
+import {Pagination} from '@/components/ui/pagination'
 import {SearchInput} from '@/components/ui/search-input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {createSundaySchoolRoll, fetchSundaySchoolRolls, sundaySchoolRollKeys} from '@/lib/sunday-school-roll-api'
+import {useDebouncedValue} from '@/hooks/use-debounced-value'
+import {
+  type SundaySchoolRollSummary,
+  createSundaySchoolRoll,
+  deleteSundaySchoolRoll,
+  fetchSundaySchoolRolls,
+  sundaySchoolRollKeys,
+} from '@/lib/sunday-school-roll-api'
 import {
   QUARTERS,
   type Quarter,
@@ -15,10 +25,12 @@ import {
   quarterTitleLabel,
 } from '@/lib/sunday-school-roll-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ClipboardList, Plus} from 'lucide-react'
+import {Plus, Trash2} from 'lucide-react'
 import {useState} from 'react'
 import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
+
+const PAGE_SIZE = 25
 
 export function RollListPage() {
   const navigate = useNavigate()
@@ -28,6 +40,9 @@ export function RollListPage() {
   const [year, setYear] = useState(String(currentYear))
   const [quarter, setQuarter] = useState('1')
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search, 250)
+  const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<SundaySchoolRollSummary | null>(null)
   const [params, setParams] = useSearchParams()
 
   // The command palette's "New Sunday School Roll" lands here with ?new=1.
@@ -55,10 +70,20 @@ export function RollListPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to create roll'),
   })
 
+  const remove = useMutation({
+    mutationFn: (id: number) => deleteSundaySchoolRoll(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: sundaySchoolRollKeys.all})
+      setDeleteTarget(null)
+      toast.success('Roll deleted')
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to delete'),
+  })
+
   if (isLoading) return <PageSpinner />
 
   const latest = (rolls ?? [])[0] ?? null
-  const q = search.trim().toLowerCase()
+  const q = debouncedSearch.trim().toLowerCase()
   const filtered = (rolls ?? []).filter(
     (r) =>
       !q ||
@@ -68,12 +93,13 @@ export function RollListPage() {
         .includes(q),
   )
 
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   return (
     <div className="space-y-4 p-4 md:p-6">
-      <div className="mb-6 flex items-center gap-3">
-        <ClipboardList className="h-6 w-6" />
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-2xl font-bold">Sunday School Roll</h2>
-        <Button className="ml-auto" onClick={() => setOpen(true)}>
+        <Button onClick={() => setOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           New Roll
         </Button>
@@ -84,55 +110,89 @@ export function RollListPage() {
         every Sunday in the quarter across the top. Prints as a single PDF.
       </p>
 
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search by quarter or months..." />
-          {filtered.length === 0 ? (
-            <div className="text-muted-foreground py-8 text-center text-sm">
-              {rolls?.length ? 'No rolls match that search.' : 'No rolls yet. Click "New Roll" to create one.'}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Quarter</TableHead>
-                  <TableHead className="hidden sm:table-cell">Months</TableHead>
-                  <TableHead className="w-24">Sheets</TableHead>
-                  <TableHead className="w-24">Names</TableHead>
-                  <TableHead className="w-24">Status</TableHead>
+      <Card size="sm">
+        <CardContent>
+          <SearchInput
+            placeholder="Search by quarter or months..."
+            value={search}
+            onChange={(v) => {
+              setSearch(v)
+              setPage(1)
+            }}
+            onClear={() => setPage(1)}
+            containerClassName="sm:max-w-sm"
+          />
+        </CardContent>
+        <div className="overflow-x-auto border-t">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Quarter</TableHead>
+                <TableHead className="hidden sm:table-cell">Months</TableHead>
+                <TableHead>Sheets</TableHead>
+                <TableHead>Names</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-16" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginated.map((r) => (
+                <TableRow
+                  key={r.id}
+                  className="hover:bg-muted/50 cursor-pointer"
+                  onClick={() => navigate(`/schedules/sunday-school-rolls/${r.id}`)}
+                >
+                  <TableCell className="font-medium">{quarterTitleLabel(r.year, r.quarter as Quarter)}</TableCell>
+                  <TableCell className="text-muted-foreground hidden sm:table-cell">
+                    {quarterRangeLabel(r.year, r.quarter as Quarter)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{r.sheetCount}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.scholarCount}</TableCell>
+                  <TableCell>
+                    <Badge variant={r.status === 'final' ? 'default' : 'secondary'}>
+                      {r.status === 'final' ? 'Final' : 'Draft'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Delete roll"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteTarget(r)
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((r) => (
-                  <TableRow
-                    key={r.id}
-                    className="hover:bg-muted/50 cursor-pointer"
-                    onClick={() => navigate(`/schedules/sunday-school-rolls/${r.id}`)}
-                  >
-                    <TableCell className="font-medium">{quarterTitleLabel(r.year, r.quarter as Quarter)}</TableCell>
-                    <TableCell className="text-muted-foreground hidden sm:table-cell">
-                      {quarterRangeLabel(r.year, r.quarter as Quarter)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{r.sheetCount}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.scholarCount}</TableCell>
-                    <TableCell>
-                      <span
-                        className={
-                          r.status === 'final'
-                            ? 'rounded bg-green-100 px-2 py-0.5 text-xs text-green-800'
-                            : 'bg-muted rounded px-2 py-0.5 text-xs'
-                        }
-                      >
-                        {r.status}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ))}
+              {paginated.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-muted-foreground py-8 text-center">
+                    {rolls?.length ? 'No rolls match your search.' : 'No rolls yet. Click "New Roll" to create one.'}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <CardContent>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} noun="rolls" />
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        title="Delete Roll"
+        description={`Delete the ${deleteTarget ? quarterTitleLabel(deleteTarget.year, deleteTarget.quarter as Quarter) : ''} roll? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+        loading={remove.isPending}
+      />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

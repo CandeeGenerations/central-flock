@@ -36,6 +36,7 @@ import {musicSchedulesRouter} from './routes/music-schedules.js'
 import {nurserySchedulesRouter} from './routes/nursery-schedules.js'
 import {nurseryRouter} from './routes/nursery.js'
 import {peopleRouter} from './routes/people.js'
+import {prayerSheetRouter} from './routes/prayer-sheet.js'
 import {quotesRouter} from './routes/quotes.js'
 import {rsvpRouter} from './routes/rsvp.js'
 import {schedulesRouter} from './routes/schedules.js'
@@ -77,6 +78,7 @@ app.use('/api', requireAuth)
 
 // API routes
 app.use('/api/people', peopleRouter)
+app.use('/api/prayer-sheet', prayerSheetRouter)
 app.use('/api/groups', groupsRouter)
 app.use('/api/messages', messagesRouter)
 app.use('/api/drafts', draftsRouter)

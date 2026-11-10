@@ -18,40 +18,40 @@ Domain terms are in [CONTEXT.md](../CONTEXT.md) → Music Schedule: **Standalone
 
 ### Standalone Service and Occasion
 
-| # | Decision |
-|---|---|
-| 1 | A Candlelight Service (Thanksgiving Eve, Christmas, New Year's) is the regular Wednesday or Sunday Evening service, never a one-off. Its Service Time, Service Record, Sermon, Episode Number and nursery all stay as normal. No "film it all". |
-| 2 | Standalone is set **per service**. Creating the next week never copies from a Standalone service: it reaches back to the most recent service of that Service Time that isn't Standalone. |
-| 3 | A Standalone order is reused only on purpose: **Copy order from…** for one service, or **Copy week** (unchanged) for a whole week. |
-| 4 | Copy order from… replaces Order Lines (songs, suffixes, left cells, booth notes, sticky), condensed booth lines and heading overrides. It never copies Title, Text, their notes, highlights or the Occasion. |
-| 5 | Copying from a Standalone source makes the target Standalone. The picker lists Standalone services first, newest first, labelled by Occasion/heading and date. |
-| 6 | Save as default order is refused on a Standalone service. |
-| 7 | Marking a service Standalone after the next week exists rewrites nothing. The editor shows a note instead. |
-| 8 | **Occasion** is its own per-service field, separate from the heading. It prints on the heading row: right-aligned italic on the Music Sheet, after the date on the Sound Booth Sheet (`NOVEMBER 25, 2026 · Thanksgiving Eve Candlelight`). It never wraps: it shrinks to a minimum size, then gets cut off with "…" and is reported in the week's "things to fix" list. It clears on copy-forward, like Title. |
-| 9 | Page budget that nothing may break: the **Sound Booth Sheet is one page**, the **Music Sheets are one page for SS + AM + PM and one page for Midweek**. |
+| #   | Decision                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | A Candlelight Service (Thanksgiving Eve, Christmas, New Year's) is the regular Wednesday or Sunday Evening service, never a one-off. Its Service Time, Service Record, Sermon, Episode Number and nursery all stay as normal. No "film it all".                                                                                                                                                                |
+| 2   | Standalone is set **per service**. Creating the next week never copies from a Standalone service: it reaches back to the most recent service of that Service Time that isn't Standalone.                                                                                                                                                                                                                       |
+| 3   | A Standalone order is reused only on purpose: **Copy order from…** for one service, or **Copy week** (unchanged) for a whole week.                                                                                                                                                                                                                                                                             |
+| 4   | Copy order from… replaces Order Lines (songs, suffixes, left cells, booth notes, sticky), condensed booth lines and heading overrides. It never copies Title, Text, their notes, highlights or the Occasion.                                                                                                                                                                                                   |
+| 5   | Copying from a Standalone source makes the target Standalone. The picker lists Standalone services first, newest first, labelled by Occasion/heading and date.                                                                                                                                                                                                                                                 |
+| 6   | Save as default order is refused on a Standalone service.                                                                                                                                                                                                                                                                                                                                                      |
+| 7   | Marking a service Standalone after the next week exists rewrites nothing. The editor shows a note instead.                                                                                                                                                                                                                                                                                                     |
+| 8   | **Occasion** is its own per-service field, separate from the heading. It prints on the heading row: right-aligned italic on the Music Sheet, after the date on the Sound Booth Sheet (`NOVEMBER 25, 2026 · Thanksgiving Eve Candlelight`). It never wraps: it shrinks to a minimum size, then gets cut off with "…" and is reported in the week's "things to fix" list. It clears on copy-forward, like Title. |
+| 9   | Page budget that nothing may break: the **Sound Booth Sheet is one page**, the **Music Sheets are one page for SS + AM + PM and one page for Midweek**.                                                                                                                                                                                                                                                        |
 
 ### Editor
 
-| # | Decision |
-|---|---|
-| 10 | Layout follows the calendar page: the editor is flexible on the left and a sticky ~460px live preview sits on the right (`lg:grid-cols-[1fr_460px]`), with a **Musicians \| Sound Booth \| Photos** switch. Below `lg` (iPad portrait) it's a single column, and the preview opens as a **right-side sheet** that can stay open over part of the order. iPad landscape is the main tablet case; both orientations are supported. |
-| 11 | Rows drag to reorder (no arrows). Collapsed rows show the content, the suffix and a quiet role tag. Opening a row shows the rarer settings. Align, booth include/exclude and booth label are removed from the editor (0 uses in 14 weeks). |
-| 12 | Touch: highlight/delete show on **hover with a mouse, or on the selected row with touch** (`pointer: coarse`). Drag uses a touch sensor with press-and-hold on the grip. Tap targets are at least 40px on coarse pointers. |
-| 13 | Everything autosaves. "Saved" is shown only once the server has confirmed it. One save at a time, newest wins. Failure shows a persistent red **Not saved — Retry**. Leaving the page saves immediately. Delete offers Undo. Server line replaces run in a transaction. |
-| 14 | Songs are typed: `219`/`b219` = Burgundy (212 of 244 songs), `s27` = Silver, words = title search. Enter goes to the next song, Shift+Enter to the previous one. There is also a week-wide **Songs** view. |
+| #   | Decision                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 10  | Layout follows the calendar page: the editor is flexible on the left and a sticky ~460px live preview sits on the right (`lg:grid-cols-[1fr_460px]`), with a **Musicians \| Sound Booth \| Photos** switch. Below `lg` (iPad portrait) it's a single column, and the preview opens as a **right-side sheet** that can stay open over part of the order. iPad landscape is the main tablet case; both orientations are supported. |
+| 11  | Rows drag to reorder (no arrows). Collapsed rows show the content, the suffix and a quiet role tag. Opening a row shows the rarer settings. Align, booth include/exclude and booth label are removed from the editor (0 uses in 14 weeks).                                                                                                                                                                                       |
+| 12  | Touch: highlight/delete show on **hover with a mouse, or on the selected row with touch** (`pointer: coarse`). Drag uses a touch sensor with press-and-hold on the grip. Tap targets are at least 40px on coarse pointers.                                                                                                                                                                                                       |
+| 13  | Everything autosaves. "Saved" is shown only once the server has confirmed it. One save at a time, newest wins. Failure shows a persistent red **Not saved — Retry**. Leaving the page saves immediately. Delete offers Undo. Server line replaces run in a transaction.                                                                                                                                                          |
+| 14  | Songs are typed: `219`/`b219` = Burgundy (212 of 244 songs), `s27` = Silver, words = title search. Enter goes to the next song, Shift+Enter to the previous one. There is also a week-wide **Songs** view.                                                                                                                                                                                                                       |
 
 ### Schedule Scan
 
-| # | Decision |
-|---|---|
-| 15 | Input is the pastor's three weekly pages, as 1–3 photos in any order: the **Sunday sheet** and **Midweek sheet** (his typed template, which is not this app's print, with songs written on) and the **handwritten form** (Title, Text and the songs again for each service). The scan works out which page is which. |
-| 16 | Scanning **creates** the week. It reads the Sunday from the sheets, creates the week by normal copy-forward (Standalone skipped), then fills it in. If the week already exists, the same review runs against it. |
-| 17 | Songs are taken by **book + number only**. The hymnal supplies the title; the written title is ignored. An unreadable or unknown number is left blank and flagged. Different numbers for the same slot on two pages are flagged with both. |
-| 18 | A service whose scanned order matches the copied order just gets its songs filled in. One that differs takes the **scanned order** (lines that still match keep their settings), is labelled "Order differs from usual", and can be switched back to "keep usual order, fill songs only". |
-| 19 | A note beside a service heading ("Thanksgiving Eve Candlelight", "Thanksgiving Testimonies") becomes the **Occasion** and pre-ticks **Standalone**. Notes the scan can't place ("FILM IT ALL", an ambiguous parenthetical) are listed as **Notes from the sheet**, never placed automatically. Handwritten `INV.` sets the invitation role, and `Op.` sets the `(Optional)` suffix. |
-| 20 | Title: every word capitalised, no quote marks, matching the stored titles ("What Is Your Foundation?"). Text: full book names joined by ` & ` ("Psalm 139:17-18 & Psalm 40:5"), each reference checked against the Bible Text, with nonexistent ones flagged. |
-| 21 | Phone, then iPad/laptop: the phone uses the camera and **Scan** stores an **unfinished review** with a short summary. The review is finished on a wider screen (on the phone too if you need to). Nothing is created until **Create week**. |
-| 22 | Photos stay with the week (the **Photos** tab in the editor's preview column) and with unfinished reviews, then are deleted **30 days after the week's Wednesday** by a daily job. The week itself is never touched by the clean-up. |
+| #   | Decision                                                                                                                                                                                                                                                                                                                                                                            |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 15  | Input is the pastor's three weekly pages, as 1–3 photos in any order: the **Sunday sheet** and **Midweek sheet** (his typed template, which is not this app's print, with songs written on) and the **handwritten form** (Title, Text and the songs again for each service). The scan works out which page is which.                                                                |
+| 16  | Scanning **creates** the week. It reads the Sunday from the sheets, creates the week by normal copy-forward (Standalone skipped), then fills it in. If the week already exists, the same review runs against it.                                                                                                                                                                    |
+| 17  | Songs are taken by **book + number only**. The hymnal supplies the title; the written title is ignored. An unreadable or unknown number is left blank and flagged. Different numbers for the same slot on two pages are flagged with both.                                                                                                                                          |
+| 18  | A service whose scanned order matches the copied order just gets its songs filled in. One that differs takes the **scanned order** (lines that still match keep their settings), is labelled "Order differs from usual", and can be switched back to "keep usual order, fill songs only".                                                                                           |
+| 19  | A note beside a service heading ("Thanksgiving Eve Candlelight", "Thanksgiving Testimonies") becomes the **Occasion** and pre-ticks **Standalone**. Notes the scan can't place ("FILM IT ALL", an ambiguous parenthetical) are listed as **Notes from the sheet**, never placed automatically. Handwritten `INV.` sets the invitation role, and `Op.` sets the `(Optional)` suffix. |
+| 20  | Title: every word capitalised, no quote marks, matching the stored titles ("What Is Your Foundation?"). Text: full book names joined by `&` ("Psalm 139:17-18 & Psalm 40:5"), each reference checked against the Bible Text, with nonexistent ones flagged.                                                                                                                         |
+| 21  | Phone, then iPad/laptop: the phone uses the camera and **Scan** stores an **unfinished review** with a short summary. The review is finished on a wider screen (on the phone too if you need to). Nothing is created until **Create week**.                                                                                                                                         |
+| 22  | Photos stay with the week (the **Photos** tab in the editor's preview column) and with unfinished reviews, then are deleted **30 days after the week's Wednesday** by a daily job. The week itself is never touched by the clean-up.                                                                                                                                                |
 
 ### Usage data behind the decisions (14 weeks, 573 lines)
 
@@ -181,15 +181,15 @@ Burgundy 212 vs Silver 32 songs. All 16 songs on the Nov 22 sheets resolve by bo
   page kinds and asks for **transcription only**, returning JSON:
   - `pages[]`: `kind` (`sunday_sheet` | `midweek_sheet` | `form`).
   - `services[]`: `{which: sunday_school|sunday_morning|sunday_evening|midweek, date, occasion|null,
-    title|null, text|null, lines: [{kind: song|prose, book: B|S|null, number|null, writtenSuffix,
-    marker: INV|Op|null, text, struckOut: bool}], notes: string[]}`.
+title|null, text|null, lines: [{kind: song|prose, book: B|S|null, number|null, writtenSuffix,
+marker: INV|Op|null, text, struckOut: bool}], notes: string[]}`.
   - The model never resolves titles, never reorders, and never invents lines.
 - **Deterministic post-processing, unit-tested without the model:**
   - `which` → Service Time: match by day of week and time among the active Service Times.
   - Songs: book + number → `hymns` row. Missing/unknown → flag `song_unresolved`. Form vs sheet
     number mismatch for the same slot → flag `song_conflict` with both.
   - Title → capitalise every word, strip quote marks. Text → `parseReference` + full book names,
-    joined ` & `, each verse checked with `bible-text.ts` → flag `text_invalid`.
+    joined `&`, each verse checked with `bible-text.ts` → flag `text_invalid`.
   - Markers: `INV` → role `invitation`; `Op` → suffix `(Optional)`; a written `(x2)`/`(2x & tag)` →
     suffix.
   - **Order alignment** per service: an LCS over keys (prose → normalised text, song → `song`) between
@@ -219,14 +219,14 @@ Burgundy 212 vs Silver 32 songs. All 16 songs on the Nov 22 sheets resolve by bo
 ### 11. Schedule Scan — UI
 
 - **Music Schedules list:** a **New week from photos** button (`<input type="file" accept="image/*"
-  capture="environment" multiple>`, plus "add another photo" so three can be taken in a row on the
+capture="environment" multiple>`, plus "add another photo" so three can be taken in a row on the
   phone). Thumbnails, then **Scan** with the existing `AIProgress` component. The result is a
   summary card ("Week of Nov 22 · 16 songs · 3 to check · Open review"). Unfinished reviews are
   listed at the top of the page.
 - **Review page** `/schedules/music/scans/:id`, using the editor's grid: the proposal on the left,
   photos on the right (or a side sheet below `lg`), zoomable, one tab per page.
   - Per service: Title, Text, Occasion and Standalone (editable), the order with each line marked
-    *filled / added / removed / unchanged*, and an **Order: scanned | usual** toggle when they
+    _filled / added / removed / unchanged_, and an **Order: scanned | usual** toggle when they
     differ. Flags sit inline on their line, with the counts summed in the header ("16 of 16 songs
     found · 1 to check").
   - Song fixes use the typed song input from step 7.

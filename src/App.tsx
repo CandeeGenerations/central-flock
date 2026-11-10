@@ -258,6 +258,15 @@ const TemplatesPage = lazy(() => import('@/pages/templates-page').then((m) => ({
 const VerseStripsPage = lazy(() =>
   import('@/pages/sermons/verse-strips-page').then((m) => ({default: m.VerseStripsPage})),
 )
+const PrayerSheetListPage = lazy(() =>
+  import('@/pages/prayer-sheet/prayer-sheet-list-page').then((m) => ({default: m.PrayerSheetListPage})),
+)
+const PrayerSheetEditorPage = lazy(() =>
+  import('@/pages/prayer-sheet/prayer-sheet-editor-page').then((m) => ({default: m.PrayerSheetEditorPage})),
+)
+const PrayerSheetSettingsSection = lazy(() =>
+  import('@/pages/schedules-settings/prayer-sheet-section').then((m) => ({default: m.PrayerSheetSettingsSection})),
+)
 const WorkersNotesBlocksPage = lazy(() =>
   import('@/pages/sunday-school/workers-notes-blocks-page').then((m) => ({default: m.WorkersNotesBlocksPage})),
 )
@@ -762,6 +771,7 @@ function AppLayoutInner({
                     <Route path="fair-booth" element={<FairBoothSettingsSection />} />
                     <Route path="music" element={<MusicScheduleSettingsSection />} />
                     <Route path="sunday-school-roll" element={<SundaySchoolRollSettingsSection />} />
+                    <Route path="prayer-sheet" element={<PrayerSheetSettingsSection />} />
                     <Route path="sunday-school" element={<SundaySchoolSettingsSection />}>
                       <Route index element={<Navigate to="defaults" replace />} />
                       <Route path="defaults" element={<SundaySchoolDefaultsPane />} />
@@ -806,6 +816,12 @@ function AppLayoutInner({
                   <Route path="/sunday-school/stats" element={<SundaySchoolStatsPage />} />
                   <Route path="/fill-america" element={<FillAmericaCampaignListPage />} />
                   <Route path="/fill-america/:id" element={<FillAmericaCampaignViewPage />} />
+                  <Route path="/prayer-sheet" element={<PrayerSheetListPage />} />
+                  <Route
+                    path="/prayer-sheet/settings"
+                    element={<Navigate to="/schedules/settings/prayer-sheet" replace />}
+                  />
+                  <Route path="/prayer-sheet/:id" element={<PrayerSheetEditorPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Routes>
               </Suspense>

@@ -931,3 +931,63 @@ wednesday_evening` enum, special music's `sunday_am|sunday_pm|wednesday_pm|other
   devotion-passage generator says KJV. Resolved: the church's version is the **AKJV**, and the
   **Bible Text** holds it. The two differ in little more than spelling, which the Scripture Check
   ignores anyway; the generator's prompt wording is the stray.
+
+## Prayer Sheet
+
+**Prayer Sheet**:
+The weekly half-sheet (5.5×8.5") printed front and back and handed to congregation members.
+Front: rolling window of prayer requests grouped by Sunday. Back: the **Ministry List**.
+Two copies print side-by-side on one landscape letter page (two-page PDF: page 1 = two fronts,
+page 2 = two backs). Not to be confused with a **Prayer Request** (an SMS sent to the Prayer Warriors).
+
+**Edition**:
+One versioned print run of the **Prayer Sheet**, covering the most recent N Sundays (default 4,
+flexible). Each Edition is a self-contained artifact: it owns its own copies of the **Sunday
+Groupings** and **Prayer Entries**, its own **Theme Color**, and its **Column Split**. Editions
+are always editable, even after a newer one exists. When a new Edition is created, it auto-copies
+all Sundays from the previous Edition and appends one new empty Sunday for the current week.
+_Avoid_: Version, Issue, Print run.
+
+**Sunday Grouping**:
+One dated section within an **Edition** — a Sunday date heading ("Sunday, October 11") plus its
+ordered list of **Prayer Entries**. An Edition holds its own copies of Sunday Groupings; the same
+Sunday may appear (with different entry text) in consecutive Editions as entries get updated each
+week.
+_Avoid_: Week, Section.
+
+**Prayer Entry**:
+A single line within a **Sunday Grouping** — a free-text string like "Linda H – lung cancer
+surgery". Owned by the Sunday Grouping (not shared across Editions). Edited inline in the editor.
+_Avoid_: Request (overloaded with the SMS Prayer Request concept), Item.
+
+**Theme Color**:
+The accent color for a given **Edition** — applied to the title, date-range heading, and Ministry
+List heading. Auto-assigned from the Edition's Sunday-of-month position (1st–5th Sunday → one of
+five configurable colors from the **Color Rotation**). Overridable per Edition from the preset
+palette.
+
+**Color Rotation**:
+The five-slot mapping stored in **Prayer Sheet Settings** that assigns a color to each Sunday
+position in the month (1st through 5th). Each slot picks from the preset palette; a color chosen
+in one slot is removed from the other slots' dropdowns (no duplicates). Black is always available.
+
+**Column Split**:
+An integer stored on an **Edition** that says "put the first N Sunday Groupings in the left
+column, the rest in the right." Null means auto (split at the midpoint). Overridable per Edition
+via nudge arrows in the editor.
+
+**Ministry List**:
+The global ordered bullet list on the back side of every **Prayer Sheet** (~35 ministry areas).
+Shared across all Editions — not snapshotted per Edition. Edited in Prayer Sheet Settings.
+_Avoid_: Back side (the physical side), Ministries (the items themselves).
+
+**Prayer Sheet Settings**:
+A singleton settings record holding the title ("CBC PRAYER SHEET"), the scripture text and
+reference (Isaiah 65:24), the **Color Rotation**, and the **Ministry List**. One record, shared
+across all Editions. Edited at `/prayer-sheet/settings`.
+
+**Documents** (nav group):
+The sidebar nav group for features that produce a printed or published artifact handed to people.
+Replaces the former "Schedules" label. Contains: Special Music, Nursery, Music Schedule, Workers'
+Notes, Sunday School Roll, Fair Booth, Calendar Print, Verse Strips, and Prayer Sheet.
+_Avoid_: Schedules (the former label).

@@ -55,7 +55,7 @@ export function buildNavigationActions(): SearchItem[] {
     nav('/import', 'Import CSV', Upload, ['upload']),
     nav('/import/contacts', 'Import Mac Contacts', Upload),
     nav('/settings', 'Settings', Settings),
-    // Schedule Settings sections are routed panes off a left rail, so they are
+    // Document Settings sections are routed panes off a left rail, so they are
     // not sidebar entries and need naming here explicitly.
     nav('/attendance/settings/times', 'Attendance Settings Service Times', Settings, ['service times', 'attendance']),
     nav('/attendance/settings/recorders', 'Attendance Settings Recorders', Settings, [
@@ -63,21 +63,21 @@ export function buildNavigationActions(): SearchItem[] {
       'attendance',
       'public link',
     ]),
-    nav('/schedules/settings/general', 'Schedule Settings General', Settings, ['logo', 'compact logo']),
-    nav('/schedules/settings/nursery/defaults', 'Schedule Settings Nursery Defaults', Settings, [
+    nav('/schedules/settings/general', 'Document SettingsGeneral', Settings, ['logo', 'compact logo']),
+    nav('/schedules/settings/nursery/defaults', 'Document SettingsNursery Defaults', Settings, [
       'nursery',
       'worker counts',
     ]),
     nav('/schedules/settings/nursery/workers', 'Nursery Workers', Settings, ['nursery', 'roster', 'workers']),
-    nav('/schedules/settings/special-music', 'Schedule Settings Special Music', Settings, ['singers', 'households']),
-    nav('/schedules/settings/fair-booth', 'Schedule Settings Fair Booth', Settings, ['roster', 'reminders']),
-    nav('/schedules/settings/music', 'Schedule Settings Music Schedule', Settings, [
+    nav('/schedules/settings/special-music', 'Document SettingsSpecial Music', Settings, ['singers', 'households']),
+    nav('/schedules/settings/fair-booth', 'Document SettingsFair Booth', Settings, ['roster', 'reminders']),
+    nav('/schedules/settings/music', 'Document SettingsMusic Schedule', Settings, [
       'music schedule',
       'sound booth',
       'service headings',
       'footer',
     ]),
-    nav('/schedules/settings/sunday-school/defaults', 'Schedule Settings Sunday School Defaults', Settings, [
+    nav('/schedules/settings/sunday-school/defaults', 'Document SettingsSunday School Defaults', Settings, [
       'workers notes',
       'bullets',
       'church name',
@@ -92,6 +92,11 @@ export function buildNavigationActions(): SearchItem[] {
       'catalogue',
       'stories',
       'sunday school',
+    ]),
+    nav('/schedules/settings/prayer-sheet', 'Document Settings Prayer Sheet', Settings, [
+      'prayer',
+      'ministry list',
+      'color rotation',
     ]),
   ]
   return [...nonNavRoutes, ...fromSidebar]

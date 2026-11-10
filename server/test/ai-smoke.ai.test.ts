@@ -14,6 +14,7 @@ import {runHymnSuggestion} from '../services/hymn-suggestion.js'
 import {buildProposal, weekStartOf} from '../services/music-schedule-scan-process.js'
 import {transcribeSchedulePhotos} from '../services/music-schedule-scan.js'
 import {runMusicSearch} from '../services/music-search.js'
+import {parsePrayerSheetPhoto} from '../services/prayer-sheet-ocr.js'
 import {computeQuoteResearch} from '../services/quote-research.js'
 import {generateQuoteTags} from '../services/quote-tags.js'
 import {checkBlock, explainNotFound} from '../services/scripture-check.js'
@@ -27,6 +28,7 @@ import {extractFieldsViaClaude} from '../services/youtube-extract.js'
 const FIXTURES = path.join(import.meta.dirname, 'fixtures')
 const OCR_IMAGE = path.join(FIXTURES, 'devotion-sheet.jpg')
 const MUSIC_SCAN_IMAGE = path.join(FIXTURES, 'music-scan-midweek.jpg')
+const PRAYER_SHEET_IMAGE = path.join(FIXTURES, 'prayer-sheet.jpg')
 const RUN_ALL = Boolean(process.env.AI_TEST_ALL)
 const RECORD = Boolean(process.env.AI_TEST_RECORD)
 
@@ -164,6 +166,13 @@ describe('features', () => {
     expect(parsed.month).toBeTruthy()
     expect(parsed.year).toBeGreaterThan(2000)
     expect(parsed.devotions.length).toBeGreaterThan(0)
+  })
+
+  it.skipIf(!fs.existsSync(PRAYER_SHEET_IMAGE))('prayer sheet whole-photo import (vision)', async () => {
+    const image = fs.readFileSync(PRAYER_SHEET_IMAGE).toString('base64')
+    const result = await tracked(() => parsePrayerSheetPhoto(image, 'image/jpeg', '2026-11-10'))
+    expect(result.sundays.length).toBeGreaterThan(0)
+    for (const s of result.sundays) expect(s.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
   it('gwendolyn hashtags', async () => {

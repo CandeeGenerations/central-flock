@@ -43,7 +43,7 @@ Status: implemented 2026-10-19 (migration 0054 applied to prod; boot backfill ra
    - An ordinary Sun/Wed/Sat (no copied Event) takes the most common override for that weekday on
      ordinary days in the same source month. If that month had none, it gets no override, i.e. the
      "Normal Schedule" label, as in Jan–Apr 2026.
-   - Two copied Events with different *real* overrides on one day: the post-copy summary lists the
+   - Two copied Events with different _real_ overrides on one day: the post-copy summary lists the
      day. A real choice beats "no override" silently (Thursday Bible Study + Veterans Day).
    - One-off choices on ordinary days (No Kaya on Sep 6, Dec 20 and Dec 27, 2026) don't carry.
 10. **First rules are guessed deterministically**: title match first, then the date fallback (see
@@ -72,30 +72,30 @@ Status: implemented 2026-10-19 (migration 0054 applied to prod; boot backfill ra
 
 Computed for any year. Weekday rules are US-standard.
 
-| Anchor | Rule | Synonyms matched in titles |
-|---|---|---|
-| Easter | Computus (Gregorian) | Easter, Resurrection Sunday |
-| Palm Sunday | Easter − 7 | Palm Sunday |
-| Good Friday | Easter − 2 | Good Friday |
-| New Year's Day | Jan 1 | New Year's Day |
-| MLK Day | 3rd Mon Jan | MLK, Martin Luther King |
-| Presidents' Day | 3rd Mon Feb | Presidents |
-| DST start | 2nd Sun Mar | Time Change (Mar), Daylight Saving (Mar) |
-| National Day of Prayer | 1st Thu May | National Day of Prayer |
-| Mother's Day | 2nd Sun May | Mother's Day |
-| Armed Forces Day | 3rd Sat May | Armed Forces |
-| Memorial Day | last Mon May | Memorial Day |
-| Father's Day | 3rd Sun Jun | Father's Day |
-| Independence Day | Jul 4 | Independence Day, July 4th, God & Country |
-| Labor Day | 1st Mon Sep | Labor Day |
-| Grandparents Day | Sun after Labor Day | Grandparents |
-| Columbus Day | 2nd Mon Oct | Columbus, Indigenous Peoples |
-| DST end | 1st Sun Nov | Time Change (Nov), Daylight Saving (Nov) |
-| Veterans Day | Nov 11 | Veterans |
-| Thanksgiving | 4th Thu Nov | Thanksgiving |
-| Christmas Eve | Dec 24 | Christmas Eve |
-| Christmas Day | Dec 25 | Christmas Day |
-| New Year's Eve | Dec 31 | New Year's Eve, New Years |
+| Anchor                 | Rule                 | Synonyms matched in titles                |
+| ---------------------- | -------------------- | ----------------------------------------- |
+| Easter                 | Computus (Gregorian) | Easter, Resurrection Sunday               |
+| Palm Sunday            | Easter − 7           | Palm Sunday                               |
+| Good Friday            | Easter − 2           | Good Friday                               |
+| New Year's Day         | Jan 1                | New Year's Day                            |
+| MLK Day                | 3rd Mon Jan          | MLK, Martin Luther King                   |
+| Presidents' Day        | 3rd Mon Feb          | Presidents                                |
+| DST start              | 2nd Sun Mar          | Time Change (Mar), Daylight Saving (Mar)  |
+| National Day of Prayer | 1st Thu May          | National Day of Prayer                    |
+| Mother's Day           | 2nd Sun May          | Mother's Day                              |
+| Armed Forces Day       | 3rd Sat May          | Armed Forces                              |
+| Memorial Day           | last Mon May         | Memorial Day                              |
+| Father's Day           | 3rd Sun Jun          | Father's Day                              |
+| Independence Day       | Jul 4                | Independence Day, July 4th, God & Country |
+| Labor Day              | 1st Mon Sep          | Labor Day                                 |
+| Grandparents Day       | Sun after Labor Day  | Grandparents                              |
+| Columbus Day           | 2nd Mon Oct          | Columbus, Indigenous Peoples              |
+| DST end                | 1st Sun Nov          | Time Change (Nov), Daylight Saving (Nov)  |
+| Veterans Day           | Nov 11               | Veterans                                  |
+| Thanksgiving           | 4th Thu Nov          | Thanksgiving                              |
+| Christmas Eve          | Dec 24               | Christmas Eve                             |
+| Christmas Day          | Dec 25               | Christmas Day                             |
+| New Year's Eve         | Dec 31               | New Year's Eve, New Years                 |
 
 ## Guesser
 
@@ -123,43 +123,43 @@ Applied in order; the first match wins.
 
 Computed with the rules above. "Fix" rows are guesses to correct by hand before the first copy.
 
-| 2026 Event | Guessed rule | 2026 | 2027 |
-|---|---|---|---|
-| Fellowship House Bible Study (Jan 8; each 2nd/4th Thu likewise) | 2nd Thu of Jan | Thu Jan 8 | Thu Jan 14 |
-| Holiday (Jan 19) | MLK Day | Mon Jan 19 | Mon Jan 18 |
-| Holiday (Feb 16) | Presidents' Day | Mon Feb 16 | Mon Feb 15 |
-| AGM National Conference (Span ×3) | 1st Mon of Feb | Mon Feb 2 | Mon Feb 1 – Wed Feb 3 |
-| Time Change Sunday | DST start | Sun Mar 8 | Sun Mar 14 |
-| Palm Sunday | Easter − 7 | Sun Mar 29 | Sun Mar 21 |
-| The Lord's Supper ⚠️ **fix** → Easter − 5 | guessed last Tue of Mar | Tue Mar 31 | Mar 30 → **Tue Mar 23** |
-| Resurrection Sunday | Easter | Sun Apr 5 | Sun Mar 28 |
-| National Day of Prayer | 1st Thu May | Thu May 7 | Thu May 6 |
-| Mother's Day | 2nd Sun May | Sun May 10 | Sun May 9 |
-| Armed Forces Sunday | Sunday nearest Armed Forces Day | Sun May 17 | Sun May 16 |
-| Memorial Day Sunday | Sunday nearest Memorial Day | Sun May 24 | Sun May 30 |
-| Memorial Day | last Mon of May | Mon May 25 | Mon May 31 |
-| Father's Day | 3rd Sun Jun | Sun Jun 21 | Sun Jun 20 |
-| Fran Fraley's Funeral | doesn't repeat (keyword) | Sat Jun 13 | — |
-| Baby Sprinkle for Carissa Candee | doesn't repeat (keyword) | Tue Jun 9 | — |
-| Church Picnic ⚠️ **fix** → Saturday nearest Jul 4 | guessed 1st Sat of Jul | Sat Jul 4 | Sat Jul 3 (same in 2027; differs in later years) |
-| God & Country Sunday | Sunday nearest Jul 4 | Sun Jul 5 | Sun Jul 4 |
-| PWC Fair (Span ×9) | last Fri of Jul | Fri Jul 31 | Fri Jul 30 – Sat Aug 7 |
-| Labor Day | 1st Mon Sep | Mon Sep 7 | Mon Sep 6 |
-| Grandparents Sunday | Grandparents Day | Sun Sep 13 | Sun Sep 12 |
-| Holiday (Oct 12) | Columbus Day | Mon Oct 12 | Mon Oct 11 |
-| Visiting Missionary ⚠️ **fix** → doesn't repeat | guessed 2nd Sun of Oct | Sun Oct 11 | — |
-| 63rd Church Anniversary (title fixed by hand) | 4th Sun of Oct | Sun Oct 25 | Sun Oct 24 |
-| Daylight Saving Sunday | DST end | Sun Nov 1 | Sun Nov 7 |
-| Veterans Sunday ⚠️ check: maybe "Sunday before Veterans Day" | Sunday nearest Veterans Day | Sun Nov 8 | Sun Nov 14 |
-| Veterans Day | Nov 11 | Wed Nov 11 | Thu Nov 11 |
-| Church Family Thanksgiving Dinner | Saturday before Thanksgiving | Sat Nov 21 | Sat Nov 20 |
-| Praise & Testimony Service ⚠️ **fix** → Sunday before Thanksgiving | guessed 4th Sun of Nov | Sun Nov 22 | Nov 28 (after Thanksgiving) → **Sun Nov 21** |
-| All Church Candlelight Service | Wed of Thanksgiving's week | Wed Nov 25 | Wed Nov 24 |
-| Thanksgiving Day | Thanksgiving | Thu Nov 26 | Thu Nov 25 |
-| Christmas Musicale | 2nd Sun of Dec | Sun Dec 13 | Sun Dec 12 |
-| Christmas Candlelight Service | Wed of Dec 25's week | Wed Dec 23 | Wed Dec 22 |
-| Christmas Day | Dec 25 | Fri Dec 25 | Sat Dec 25 |
-| New Years Candlelight Service | Wed of Dec 31's week | Wed Dec 30 | Wed Dec 29 |
+| 2026 Event                                                         | Guessed rule                    | 2026       | 2027                                             |
+| ------------------------------------------------------------------ | ------------------------------- | ---------- | ------------------------------------------------ |
+| Fellowship House Bible Study (Jan 8; each 2nd/4th Thu likewise)    | 2nd Thu of Jan                  | Thu Jan 8  | Thu Jan 14                                       |
+| Holiday (Jan 19)                                                   | MLK Day                         | Mon Jan 19 | Mon Jan 18                                       |
+| Holiday (Feb 16)                                                   | Presidents' Day                 | Mon Feb 16 | Mon Feb 15                                       |
+| AGM National Conference (Span ×3)                                  | 1st Mon of Feb                  | Mon Feb 2  | Mon Feb 1 – Wed Feb 3                            |
+| Time Change Sunday                                                 | DST start                       | Sun Mar 8  | Sun Mar 14                                       |
+| Palm Sunday                                                        | Easter − 7                      | Sun Mar 29 | Sun Mar 21                                       |
+| The Lord's Supper ⚠️ **fix** → Easter − 5                          | guessed last Tue of Mar         | Tue Mar 31 | Mar 30 → **Tue Mar 23**                          |
+| Resurrection Sunday                                                | Easter                          | Sun Apr 5  | Sun Mar 28                                       |
+| National Day of Prayer                                             | 1st Thu May                     | Thu May 7  | Thu May 6                                        |
+| Mother's Day                                                       | 2nd Sun May                     | Sun May 10 | Sun May 9                                        |
+| Armed Forces Sunday                                                | Sunday nearest Armed Forces Day | Sun May 17 | Sun May 16                                       |
+| Memorial Day Sunday                                                | Sunday nearest Memorial Day     | Sun May 24 | Sun May 30                                       |
+| Memorial Day                                                       | last Mon of May                 | Mon May 25 | Mon May 31                                       |
+| Father's Day                                                       | 3rd Sun Jun                     | Sun Jun 21 | Sun Jun 20                                       |
+| Fran Fraley's Funeral                                              | doesn't repeat (keyword)        | Sat Jun 13 | —                                                |
+| Baby Sprinkle for Carissa Candee                                   | doesn't repeat (keyword)        | Tue Jun 9  | —                                                |
+| Church Picnic ⚠️ **fix** → Saturday nearest Jul 4                  | guessed 1st Sat of Jul          | Sat Jul 4  | Sat Jul 3 (same in 2027; differs in later years) |
+| God & Country Sunday                                               | Sunday nearest Jul 4            | Sun Jul 5  | Sun Jul 4                                        |
+| PWC Fair (Span ×9)                                                 | last Fri of Jul                 | Fri Jul 31 | Fri Jul 30 – Sat Aug 7                           |
+| Labor Day                                                          | 1st Mon Sep                     | Mon Sep 7  | Mon Sep 6                                        |
+| Grandparents Sunday                                                | Grandparents Day                | Sun Sep 13 | Sun Sep 12                                       |
+| Holiday (Oct 12)                                                   | Columbus Day                    | Mon Oct 12 | Mon Oct 11                                       |
+| Visiting Missionary ⚠️ **fix** → doesn't repeat                    | guessed 2nd Sun of Oct          | Sun Oct 11 | —                                                |
+| 63rd Church Anniversary (title fixed by hand)                      | 4th Sun of Oct                  | Sun Oct 25 | Sun Oct 24                                       |
+| Daylight Saving Sunday                                             | DST end                         | Sun Nov 1  | Sun Nov 7                                        |
+| Veterans Sunday ⚠️ check: maybe "Sunday before Veterans Day"       | Sunday nearest Veterans Day     | Sun Nov 8  | Sun Nov 14                                       |
+| Veterans Day                                                       | Nov 11                          | Wed Nov 11 | Thu Nov 11                                       |
+| Church Family Thanksgiving Dinner                                  | Saturday before Thanksgiving    | Sat Nov 21 | Sat Nov 20                                       |
+| Praise & Testimony Service ⚠️ **fix** → Sunday before Thanksgiving | guessed 4th Sun of Nov          | Sun Nov 22 | Nov 28 (after Thanksgiving) → **Sun Nov 21**     |
+| All Church Candlelight Service                                     | Wed of Thanksgiving's week      | Wed Nov 25 | Wed Nov 24                                       |
+| Thanksgiving Day                                                   | Thanksgiving                    | Thu Nov 26 | Thu Nov 25                                       |
+| Christmas Musicale                                                 | 2nd Sun of Dec                  | Sun Dec 13 | Sun Dec 12                                       |
+| Christmas Candlelight Service                                      | Wed of Dec 25's week            | Wed Dec 23 | Wed Dec 22                                       |
+| Christmas Day                                                      | Dec 25                          | Fri Dec 25 | Sat Dec 25                                       |
+| New Years Candlelight Service                                      | Wed of Dec 31's week            | Wed Dec 30 | Wed Dec 29                                       |
 
 The other Events (Bible Institute, Youth Saturation, Loyal Ladies, Faithful Men's Meeting, Kids &
 Youth Extravaganza, etc.) fall back to Nth weekday, which keeps them in the same week of the month.

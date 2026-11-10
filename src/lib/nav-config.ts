@@ -9,11 +9,11 @@ import {
   CheckSquare,
   Church,
   ClipboardList,
-  Clock,
   Contact,
   FileText,
   FolderOpen,
   GraduationCap,
+  HandHeart,
   LayoutDashboard,
   List,
   ListMusic,
@@ -100,8 +100,8 @@ export const navGroups: NavGroup[] = [
   },
   {
     id: 'schedules',
-    label: 'Schedules',
-    icon: Clock,
+    label: 'Documents',
+    icon: FileText,
     children: [
       {to: '/special-music', label: 'Special Music', icon: Music, end: true},
       {to: '/nursery', label: 'Nursery', icon: Baby, end: true},
@@ -109,6 +109,9 @@ export const navGroups: NavGroup[] = [
       {to: '/schedules/music', label: 'Music Schedule', icon: ListMusic},
       {to: '/schedules/sunday-school', label: 'Workers’ Notes', icon: GraduationCap},
       {to: '/schedules/sunday-school-rolls', label: 'Sunday School Roll', icon: ClipboardList},
+      {to: '/calendar/print', label: 'Calendar Print', icon: Printer},
+      {to: '/sermons/verse-strips', label: 'Verse Strips', icon: Scissors},
+      {to: '/prayer-sheet', label: 'Prayer Sheet', icon: HandHeart},
       {
         to: '/schedules/settings',
         label: 'Settings',
@@ -139,10 +142,7 @@ export const navGroups: NavGroup[] = [
     id: 'calendar',
     label: 'Calendar',
     icon: Calendar,
-    children: [
-      {to: '/calendar', label: 'Upcoming', icon: CalendarDays, end: true},
-      {to: '/calendar/print', label: 'Print', icon: Printer},
-    ],
+    children: [{to: '/calendar', label: 'Upcoming', icon: CalendarDays, end: true}],
   },
   {
     id: 'sermons',
@@ -152,7 +152,6 @@ export const navGroups: NavGroup[] = [
       {to: '/sermons/quotes', label: 'Quotes', icon: Quote, end: true},
       {to: '/sermons/searches', label: 'Quote Searches', icon: Sparkles, matchPaths: ['/sermons/research']},
       {to: '/sermons/social', label: 'Social Content', icon: Share2},
-      {to: '/sermons/verse-strips', label: 'Verse Strips', icon: Scissors},
     ],
   },
   {

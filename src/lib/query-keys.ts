@@ -75,4 +75,10 @@ export const queryKeys = {
   fillAmericaSummary: (householdId: string) => ['fillAmericaSummary', householdId] as const,
   fillAmericaLeaderboard: (scope: string, season: string, from?: string, to?: string) =>
     ['fillAmericaLeaderboard', scope, season, from ?? '', to ?? ''] as const,
+  prayerSheetEditions: (page?: number, year?: number, search?: string) =>
+    ['prayerSheetEditions', page ?? 1, year ?? 0, search ?? ''] as const,
+  prayerSheetEditionYears: ['prayerSheetEditionYears'] as const,
+  prayerSheetEdition: (id: number) => ['prayerSheetEdition', id] as const,
+  prayerSheetSettings: ['prayerSheetSettings'] as const,
+  prayerSheetMinistryItems: ['prayerSheetMinistryItems'] as const,
 }

@@ -1,4 +1,6 @@
+import {PageSpinner} from '@/components/ui/spinner'
 import {cn} from '@/lib/utils'
+import {Suspense} from 'react'
 import {NavLink, Outlet} from 'react-router-dom'
 
 // Nursery settings carry two unrelated jobs — the print defaults plus service
@@ -30,7 +32,9 @@ export function NurserySettingsSection() {
           </NavLink>
         ))}
       </div>
-      <Outlet />
+      <Suspense fallback={<PageSpinner />}>
+        <Outlet />
+      </Suspense>
     </div>
   )
 }

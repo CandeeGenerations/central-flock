@@ -1059,3 +1059,169 @@ export function runYearCopy(from: number, to: number) {
     body: JSON.stringify({from, to}),
   })
 }
+
+// ─── Prayer Sheet ──────────────────────────────────────────────────────────────
+
+export interface PrayerSheetEntry {
+  id: number
+  sundayId: number
+  text: string
+  sortOrder: number
+  createdAt: string
+}
+
+export interface PrayerSheetSunday {
+  id: number
+  editionId: number
+  sundayDate: string
+  sortOrder: number
+  createdAt: string
+  entries: PrayerSheetEntry[]
+}
+
+export interface PrayerSheetEdition {
+  id: number
+  themeColor: string
+  columnSplit: number | null
+  sourcePhotoPath: string | null
+  createdAt: string
+  updatedAt: string
+  sundays: PrayerSheetSunday[]
+}
+
+export interface PrayerSheetEditionSummary {
+  id: number
+  themeColor: string
+  columnSplit: number | null
+  createdAt: string
+  updatedAt: string
+  latestDate: string | null
+  sundayCount: number
+  entryCount: number
+}
+
+export interface PrayerSheetEditionList {
+  items: PrayerSheetEditionSummary[]
+  total: number
+  page: number
+  limit: number
+}
+
+export interface PrayerSheetSettings {
+  id: number
+  title: string
+  scriptureText: string
+  scriptureReference: string
+  colorSunday1: string
+  colorSunday2: string
+  colorSunday3: string
+  colorSunday4: string
+  colorSunday5: string
+  updatedAt: string
+}
+
+export interface PrayerSheetMinistryItem {
+  id: number
+  text: string
+  bold: boolean
+  sortOrder: number
+}
+
+export function fetchPrayerSheetEditions(params?: {page?: number; year?: number; search?: string}) {
+  const q = new URLSearchParams()
+  if (params?.page) q.set('page', String(params.page))
+  if (params?.year) q.set('year', String(params.year))
+  if (params?.search) q.set('search', params.search)
+  return request<PrayerSheetEditionList>(`/prayer-sheet/editions?${q}`)
+}
+
+export function fetchPrayerSheetEditionYears() {
+  return request<string[]>('/prayer-sheet/editions/years')
+}
+
+export function createPrayerSheetEdition(newSundayDate: string) {
+  return request<PrayerSheetEdition>('/prayer-sheet/editions', {
+    method: 'POST',
+    body: JSON.stringify({newSundayDate}),
+  })
+}
+
+export function importPrayerSheetPhoto(imageData: string, mediaType: string) {
+  return request<PrayerSheetEdition>('/prayer-sheet/editions/import-photo', {
+    method: 'POST',
+    body: JSON.stringify({imageData, mediaType}),
+  })
+}
+
+export function fetchPrayerSheetEdition(id: number) {
+  return request<PrayerSheetEdition>(`/prayer-sheet/editions/${id}`)
+}
+
+export function updatePrayerSheetEdition(id: number, data: {themeColor?: string; columnSplit?: number | null}) {
+  return request<PrayerSheetEdition>(`/prayer-sheet/editions/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deletePrayerSheetEdition(id: number) {
+  return request<{ok: boolean}>(`/prayer-sheet/editions/${id}`, {method: 'DELETE'})
+}
+
+export function addPrayerSheetSunday(editionId: number, sundayDate: string) {
+  return request<PrayerSheetSunday>(`/prayer-sheet/editions/${editionId}/sundays`, {
+    method: 'POST',
+    body: JSON.stringify({sundayDate}),
+  })
+}
+
+export function reorderPrayerSheetSundays(editionId: number, orderedIds: number[]) {
+  return request<PrayerSheetEdition>(`/prayer-sheet/editions/${editionId}/sundays/reorder`, {
+    method: 'PATCH',
+    body: JSON.stringify({orderedIds}),
+  })
+}
+
+export function deletePrayerSheetSunday(id: number) {
+  return request<{ok: boolean}>(`/prayer-sheet/sundays/${id}`, {method: 'DELETE'})
+}
+
+export function addPrayerSheetEntry(sundayId: number, text: string) {
+  return request<PrayerSheetEntry>(`/prayer-sheet/sundays/${sundayId}/entries`, {
+    method: 'POST',
+    body: JSON.stringify({text}),
+  })
+}
+
+export function updatePrayerSheetEntry(id: number, data: {text?: string; sortOrder?: number}) {
+  return request<PrayerSheetEntry>(`/prayer-sheet/entries/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deletePrayerSheetEntry(id: number) {
+  return request<{ok: boolean}>(`/prayer-sheet/entries/${id}`, {method: 'DELETE'})
+}
+
+export function fetchPrayerSheetSettings() {
+  return request<PrayerSheetSettings>('/prayer-sheet/settings')
+}
+
+export function updatePrayerSheetSettings(data: Partial<Omit<PrayerSheetSettings, 'id' | 'updatedAt'>>) {
+  return request<PrayerSheetSettings>('/prayer-sheet/settings', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export function fetchPrayerSheetMinistryItems() {
+  return request<PrayerSheetMinistryItem[]>('/prayer-sheet/ministry-items')
+}
+
+export function updatePrayerSheetMinistryItems(items: Array<{text: string; bold: boolean; sortOrder: number}>) {
+  return request<PrayerSheetMinistryItem[]>('/prayer-sheet/ministry-items', {
+    method: 'PUT',
+    body: JSON.stringify(items),
+  })
+}

@@ -35,6 +35,7 @@ import {musicSchedulesRouter} from './routes/music-schedules.js'
 import {nurserySchedulesRouter} from './routes/nursery-schedules.js'
 import {nurseryRouter} from './routes/nursery.js'
 import {peopleRouter} from './routes/people.js'
+import {prayerSheetRouter} from './routes/prayer-sheet.js'
 import {quotesRouter} from './routes/quotes.js'
 import {rsvpRouter} from './routes/rsvp.js'
 import {schedulesRouter} from './routes/schedules.js'
@@ -50,6 +51,7 @@ import {usageRouter} from './routes/usage.js'
 import {webhooksRouter} from './routes/webhooks.js'
 import {workersNotesRouter} from './routes/workers-notes.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
+import {backfillRepeatRules} from './services/calendar-print-year-copy.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
 import {startFairBoothReminderScheduler} from './services/fair-booth-reminders.js'
 import {startScheduler} from './services/scheduler.js'
@@ -74,6 +76,7 @@ app.use('/api', requireAuth)
 
 // API routes
 app.use('/api/people', peopleRouter)
+app.use('/api/prayer-sheet', prayerSheetRouter)
 app.use('/api/groups', groupsRouter)
 app.use('/api/messages', messagesRouter)
 app.use('/api/drafts', draftsRouter)
@@ -148,6 +151,15 @@ sqlite
     `UPDATE nursery_settings SET value = '/uploads/' || substr(value, length('/data/') + 1) WHERE key = 'logoPath' AND value LIKE '/data/%'`,
   )
   .run()
+
+// Idempotent boot-time backfill: guess a Repeat Rule for every Calendar Print Event that predates
+// Repeat Rules. Recorded as one History Change so it can be undone (docs/adr/0040, 0041).
+try {
+  const guessed = backfillRepeatRules()
+  if (guessed) console.log(`Calendar Print: guessed Repeat Rules for ${guessed} Events`)
+} catch (err) {
+  console.error('Calendar Print Repeat Rule backfill failed:', err)
+}
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)

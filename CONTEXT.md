@@ -210,6 +210,83 @@ booked, and neither can a **Guest Performer**, who is a loose name rather than a
 _Avoid_: Conflict (too generic), Overlap (means the nursery's cross-month carryover — see
 docs/adr/0003-nursery-cross-month-overlap.md), Clash, Collision.
 
+### Calendar Print
+
+**Calendar Page**:
+One month of the printed church calendar — a grid of the month's days carrying its **Events**, plus
+the month's theme, verse and colour. One per (year, month). The planning surface for the church
+year; it is never synced to or from Apple Calendar.
+_Avoid_: Calendar (ambiguous with the read-only Apple Calendar viewer), Month Sheet.
+
+**Event**:
+One dated entry on a **Calendar Page** — a title (any time is part of the title text, e.g. "Fellowship
+House Bible Study / 10:30 am") and a bold-or-regular style. A multi-day happening such as the PWC
+Fair is one Event per day, not a span.
+_Avoid_: Appointment, Entry.
+
+**Repeat Rule**:
+How an **Event** lands in the following year — e.g. "4th Thursday of November", "December 25",
+"Easter − 7 days". Stored on the Event, not re-guessed: one year's date can't tell "4th Thursday"
+from "last Thursday" (Thanksgiving 2026 is both), so the rule is guessed once from the date, shown
+in plain words on the Event's form (where it can be changed, or re-guessed when the date is moved),
+and then copied forward with the Event so later years need no re-correction. One of:
+fixed date · Nth weekday of month · last weekday of month · offset from an **Anchor** ·
+doesn't repeat.
+_Avoid_: Recurrence (implies Calendar.app-style repeating series; an Event is still one dated
+entry), Pattern.
+
+**Anchor**:
+A named date from a built-in list that the app computes for any year — Easter, Thanksgiving,
+Memorial Day, Labor Day, Christmas and the like — or any fixed month/day (Dec 25, Jul 4). A
+**Repeat Rule** can be "Anchor ± N days", "the <weekday> before/after/nearest Anchor" or "the
+<weekday> of Anchor's week" (Sun–Sat; Christmas Candlelight = the Wednesday of Dec 25's week, so
+a Monday Christmas puts it on the Wednesday after) (Candlelight Service = Thanksgiving − 1; Grandparents Sunday =
+the Sunday after Labor Day). Anchors are never other Events, so deleting or renaming an Event can't
+strand a rule. Easter is the reason the list exists: it can't be expressed as any other rule kind.
+_Avoid_: Holiday (several Events are literally titled "Holiday"), Reference Event.
+
+**Span**:
+A run of **Events** on consecutive days with the same title — the PWC Fair's nine days, the AGM
+Conference's three. Not stored: it is recognised whenever a year is copied, and moves as one block,
+so only its first day has a **Repeat Rule** and the rest keep their offsets. Without it, per-day
+rules scatter the days (Fair 2026 → 2027 would lose a Saturday and gain a stray one a week later).
+A Span may cross from one **Calendar Page** into the next.
+_Avoid_: Multi-day Event (there is no such record — each day is its own Event), Range.
+
+**Year Copy**:
+The one action that builds next year's calendar from this year's: every **Event** whose **Repeat
+Rule** repeats is placed on its new date, its **Day Override** travels with it, and ordinary
+Sun/Wed/Sat cells get the month's usual Day Override. Destructive for the target year's Events and
+Day Overrides — they are deleted first, so re-running it gives a clean result. Page details
+(theme, verse, colour, page schedule lines) are left alone where already filled in; colour and the
+page's schedule setup copy only into blank pages, and theme and verse never copy. Titles copy
+verbatim ("63rd Church Anniversary" is fixed by hand). There is no separate review step — the
+copied calendar is reviewed and corrected in the normal editor.
+_Avoid_: Rollover, Import, Duplicate Year.
+
+**Change**:
+One saved edit to the printed calendar, written in plain words — "Moved Kids & Youth Extravaganza
+from Sat Jan 16 to Sat Jan 9", "Year Copy 2026 → 2027". One user action is one Change, however
+many rows it touches, so a whole Year Copy is a single Change.
+_Avoid_: Edit (too loose), Revision, Version.
+
+**History**:
+The ordered list of **Changes** — one for all of Calendar Print (every year, plus the shared Normal
+Schedule lines), like a single document's history. Undo reverses only the latest Change (redo re-applies the last
+undo); **Restore to here** on any older Change rolls back every Change after it. Never "revert
+this one Change" out of the middle — that is what makes later Changes ambiguous. Fixing an older
+mistake is just a new Change.
+_Avoid_: Audit Log (that is the read-only **Record Edit** kind of trail), Undo Stack.
+
+**Day Override**:
+A choice for what one Sun/Wed/Sat cell shows beneath its Events — a subset of the Normal Schedule
+lines inline, nothing, or the "Normal Schedule" label — plus the No Kaya flag. Stored per date, but
+it really belongs either to the **Event** on that day (Youth Saturation keeps the Saturday times;
+Mother's Day gets a short list + No Kaya) or to an ordinary weekday of that month (August Sundays
+drop KAYA and Choir). That is how it carries into a new year: with its Event, or as the month's
+usual choice for that weekday. One-off choices on ordinary days don't carry.
+_Avoid_: Inline Schedule (that is only the items part), Cell Settings.
+
 ### Nursery & Special Music Printing
 
 **Nursery Schedule**:
@@ -455,6 +532,55 @@ Year's numbers its Sunday from the old year and its Wednesday from the new. Assi
 when a week is created and adjustable per service; Sunday School has none, because it is not
 uploaded.
 _Avoid_: Number (bare — a **Devotion** has one too), Sermon Number.
+
+**Standalone Service**:
+A service in a **Music Schedule** whose **Service Order** belongs to its own week — a **Candlelight
+Service**, Thanksgiving testimonies, the church anniversary, a week Tyler runs. Marked per service,
+not per week. Creating
+the next week never copies from it: that week's service reaches back to the most recent service of
+the same **Service Time** that is not Standalone. It is reused only on purpose: _Copy order from…_
+on one service replaces its **Order Lines** (songs included) and heading with an earlier service's
+— never the title, text or highlights, which belong to that year's sermon — and _Copy week_ still
+copies a whole week verbatim. Copying an order from a Standalone service makes the target Standalone
+too, so next year's copy doesn't leak into the week after it. A Standalone order is never saved as a
+Service Time's default order. Marking a service Standalone after the next week already exists
+rewrites nothing there — that week may have been edited since; it is pointed out instead.
+Still its **Service Time** on its usual date, so its
+**Service Record**, **Sermon**, **Episode Number** and nursery line up as for any other week.
+_Avoid_: One-off (that is a service with no **Service Time**), Special (that is a **Line Role**),
+Exception.
+
+**Schedule Scan**:
+Creating a **Music Schedule** week from photos of the pastor's sheets — the typed Sunday and
+Midweek sheets he writes the songs onto, and the handwritten form that carries each service's
+Title and Text. The week is created the normal way (copied forward from the last week) and the
+scan then fills it in: songs and suffixes into their lines, Title and Text onto each service. A
+song is taken by its book and number alone — the hymnal supplies the title, and the title written
+beside it is ignored; a number that can't be read or isn't in the book is left for a person. A
+service whose sheet shows a different order takes the scanned order — lines that still match keep
+their settings — and a note written beside a service's heading becomes its **Occasion** and
+suggests **Standalone**. Nothing is saved until the result is reviewed; a review left unfinished
+is kept to resume. The photos stay with the week, to check against while reviewing and editing,
+for about a month after the week, and are then removed.
+_Avoid_: OCR, Import (that is CSV import of contacts), Upload.
+
+**Occasion**:
+A few words naming what makes one week's service unusual — "Thanksgiving Eve Candlelight",
+"Thanksgiving Testimonies". Printed on the service's heading line on both sheets (right of the
+heading on the **Music Sheet**, after the date on the **Sound Booth Sheet**) and never on a line of
+its own, because neither sheet may grow: the Sound Booth Sheet is one page, and the Music Sheets are
+one page for Sunday School through Sunday Evening and one for Midweek. Belongs to that week only —
+it clears when the next week is created, like the Title and Text. A service with an Occasion is
+usually **Standalone** too, but the two are set separately.
+_Avoid_: Heading (the fixed "EVENING SERVICE" wording, overridable but rarely), Theme (the
+**Yearly Theme**), Event (a **Calendar Page** entry).
+
+**Candlelight Service**:
+A regular evening service — usually Wednesday Evening, sometimes Sunday Evening — held by
+candlelight for Thanksgiving Eve, Christmas or New Year's, with its own song order. A **Standalone
+Service** with an **Occasion** ("Thanksgiving Eve Candlelight"); the app has no separate notion of
+it.
+_Avoid_: Special Service, One-off.
 
 ### Service Stats
 
@@ -805,3 +931,63 @@ wednesday_evening` enum, special music's `sunday_am|sunday_pm|wednesday_pm|other
   devotion-passage generator says KJV. Resolved: the church's version is the **AKJV**, and the
   **Bible Text** holds it. The two differ in little more than spelling, which the Scripture Check
   ignores anyway; the generator's prompt wording is the stray.
+
+## Prayer Sheet
+
+**Prayer Sheet**:
+The weekly half-sheet (5.5×8.5") printed front and back and handed to congregation members.
+Front: rolling window of prayer requests grouped by Sunday. Back: the **Ministry List**.
+Two copies print side-by-side on one landscape letter page (two-page PDF: page 1 = two fronts,
+page 2 = two backs). Not to be confused with a **Prayer Request** (an SMS sent to the Prayer Warriors).
+
+**Edition**:
+One versioned print run of the **Prayer Sheet**, covering the most recent N Sundays (default 4,
+flexible). Each Edition is a self-contained artifact: it owns its own copies of the **Sunday
+Groupings** and **Prayer Entries**, its own **Theme Color**, and its **Column Split**. Editions
+are always editable, even after a newer one exists. When a new Edition is created, it auto-copies
+all Sundays from the previous Edition and appends one new empty Sunday for the current week.
+_Avoid_: Version, Issue, Print run.
+
+**Sunday Grouping**:
+One dated section within an **Edition** — a Sunday date heading ("Sunday, October 11") plus its
+ordered list of **Prayer Entries**. An Edition holds its own copies of Sunday Groupings; the same
+Sunday may appear (with different entry text) in consecutive Editions as entries get updated each
+week.
+_Avoid_: Week, Section.
+
+**Prayer Entry**:
+A single line within a **Sunday Grouping** — a free-text string like "Linda H – lung cancer
+surgery". Owned by the Sunday Grouping (not shared across Editions). Edited inline in the editor.
+_Avoid_: Request (overloaded with the SMS Prayer Request concept), Item.
+
+**Theme Color**:
+The accent color for a given **Edition** — applied to the title, date-range heading, and Ministry
+List heading. Auto-assigned from the Edition's Sunday-of-month position (1st–5th Sunday → one of
+five configurable colors from the **Color Rotation**). Overridable per Edition from the preset
+palette.
+
+**Color Rotation**:
+The five-slot mapping stored in **Prayer Sheet Settings** that assigns a color to each Sunday
+position in the month (1st through 5th). Each slot picks from the preset palette; a color chosen
+in one slot is removed from the other slots' dropdowns (no duplicates). Black is always available.
+
+**Column Split**:
+An integer stored on an **Edition** that says "put the first N Sunday Groupings in the left
+column, the rest in the right." Null means auto (split at the midpoint). Overridable per Edition
+via nudge arrows in the editor.
+
+**Ministry List**:
+The global ordered bullet list on the back side of every **Prayer Sheet** (~35 ministry areas).
+Shared across all Editions — not snapshotted per Edition. Edited in Prayer Sheet Settings.
+_Avoid_: Back side (the physical side), Ministries (the items themselves).
+
+**Prayer Sheet Settings**:
+A singleton settings record holding the title ("CBC PRAYER SHEET"), the scripture text and
+reference (Isaiah 65:24), the **Color Rotation**, and the **Ministry List**. One record, shared
+across all Editions. Edited at `/prayer-sheet/settings`.
+
+**Documents** (nav group):
+The sidebar nav group for features that produce a printed or published artifact handed to people.
+Replaces the former "Schedules" label. Contains: Special Music, Nursery, Music Schedule, Workers'
+Notes, Sunday School Roll, Fair Booth, Calendar Print, Verse Strips, and Prayer Sheet.
+_Avoid_: Schedules (the former label).

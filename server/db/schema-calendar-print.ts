@@ -1,5 +1,5 @@
 import {sql} from 'drizzle-orm'
-import {index, integer, sqliteTable, text, unique} from 'drizzle-orm/sqlite-core'
+import {blob, index, integer, sqliteTable, text, unique} from 'drizzle-orm/sqlite-core'
 
 export const calendarPrintEventStyles = ['bold', 'regular'] as const
 export type CalendarPrintEventStyle = (typeof calendarPrintEventStyles)[number]
@@ -20,6 +20,7 @@ export const calendarPrintPages = sqliteTable(
     themeColor: text('theme_color'),
     themePlacement: text('theme_placement'),
     versePlacement: text('verse_placement'),
+    schedulePlacement: text('schedule_placement'),
     verseText: text('verse_text'),
     verseReference: text('verse_reference'),
     hideNormalScheduleFooter: integer('hide_normal_schedule_footer', {mode: 'boolean'}).notNull().default(false),
@@ -42,6 +43,9 @@ export const calendarPrintEvents = sqliteTable('calendar_print_events', {
   title: text('title').notNull(),
   style: text('style', {enum: calendarPrintEventStyles}).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
+  // JSON RepeatRule (server/lib/repeat-rules.ts). Null only on rows written before Repeat
+  // Rules existed; the boot-time backfill fills those. See docs/adr/0040.
+  repeatRule: text('repeat_rule'),
   createdAt: text('created_at')
     .default(sql`(datetime('now'))`)
     .notNull(),
@@ -87,3 +91,17 @@ export const calendarPrintDayOverrides = sqliteTable(
   },
   (t) => [unique().on(t.pageId, t.date)],
 )
+
+// Calendar Print History: one linear timeline of Changes (docs/adr/0041). Each row holds a
+// gzipped JSON snapshot of every Calendar Print table *after* the Change. The first row is the
+// baseline taken before history began. Undo marks the latest Change `undone` and restores the
+// previous snapshot; a new Change discards undone rows (redo is truncated).
+export const calendarPrintChanges = sqliteTable('calendar_print_changes', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  description: text('description').notNull(),
+  snapshot: blob('snapshot', {mode: 'buffer'}).notNull(),
+  undone: integer('undone', {mode: 'boolean'}).notNull().default(false),
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})

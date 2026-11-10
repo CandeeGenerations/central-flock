@@ -10,12 +10,13 @@ import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {PersonPicker} from '@/components/ui/person-picker'
+import {SearchableSelect} from '@/components/ui/searchable-select'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
 import {useProgressOperation} from '@/hooks/use-sse'
 import {fetchServiceTimes} from '@/lib/attendance-api'
-import {getSermon, regenerateSermon, updateSermon} from '@/lib/sermons-api'
+import {getSermon, listSermonSeries, regenerateSermon, updateSermon} from '@/lib/sermons-api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ArrowLeft, Pencil, RefreshCw} from 'lucide-react'
 import {useState} from 'react'
@@ -57,6 +58,12 @@ export function SermonDetailPage() {
   const {data: serviceTimes} = useQuery({
     queryKey: ['service-times'],
     queryFn: () => fetchServiceTimes(),
+    enabled: editOpen,
+  })
+
+  const {data: seriesOptions} = useQuery({
+    queryKey: ['sermons', 'series'],
+    queryFn: () => listSermonSeries(),
     enabled: editOpen,
   })
 
@@ -245,11 +252,17 @@ export function SermonDetailPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-series">Series</Label>
-              <Input
-                id="edit-series"
+              <Label>Series</Label>
+              <SearchableSelect
                 value={form.series}
-                onChange={(e) => setForm((f) => ({...f, series: e.target.value}))}
+                onValueChange={(series) => setForm((f) => ({...f, series}))}
+                options={[
+                  {value: '', label: 'No series'},
+                  ...(seriesOptions ?? []).map((name) => ({value: name, label: name})),
+                ]}
+                placeholder="Select or add a series…"
+                creatable
+                className="w-full"
               />
             </div>
             <div className="space-y-2 sm:col-span-2">

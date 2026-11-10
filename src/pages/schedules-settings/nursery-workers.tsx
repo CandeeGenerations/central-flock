@@ -18,6 +18,7 @@ import {
   updateWorkerServices,
 } from '@/lib/nursery-api'
 import {nurseryKeys} from '@/lib/nursery-query-keys'
+import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Pencil, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
@@ -162,7 +163,10 @@ export function NurseryWorkersPane() {
             </TableHeader>
             <TableBody>
               {paginated.map((worker) => (
-                <TableRow key={worker.id} className={`hover:bg-muted/50${!worker.isActive ? ' opacity-50' : ''}`}>
+                <TableRow
+                  key={worker.id}
+                  className={cn('hover:bg-muted/50', !worker.isActive && 'text-muted-foreground')}
+                >
                   <TableCell className="font-medium">{worker.displayName}</TableCell>
                   <TableCell>
                     <div className="flex gap-1 flex-wrap">
@@ -177,13 +181,20 @@ export function NurseryWorkersPane() {
                   <TableCell className="text-center">{worker.maxPerMonth}</TableCell>
                   <TableCell className="text-center">{worker.allowMultiplePerDay ? 'Yes' : 'No'}</TableCell>
                   <TableCell className="text-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <button
+                      type="button"
+                      aria-pressed={worker.isActive}
+                      title={worker.isActive ? 'Click to mark inactive' : 'Click to mark active'}
+                      className={cn(
+                        'rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+                        worker.isActive
+                          ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/60 dark:text-green-200 dark:hover:bg-green-900'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                      )}
                       onClick={() => toggleActiveMutation.mutate({id: worker.id, isActive: !worker.isActive})}
                     >
                       {worker.isActive ? 'Active' : 'Inactive'}
-                    </Button>
+                    </button>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -197,7 +208,7 @@ export function NurseryWorkersPane() {
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(worker)}>
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </TableCell>

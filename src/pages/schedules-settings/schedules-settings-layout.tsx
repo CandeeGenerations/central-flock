@@ -1,5 +1,9 @@
+import {PageSpinner} from '@/components/ui/spinner'
+import {fetchSchedulesSettings, schedulesKeys} from '@/lib/schedules-api'
 import {cn} from '@/lib/utils'
-import {Baby, ClipboardList, GraduationCap, ListMusic, Music, Settings, Tent} from 'lucide-react'
+import {useQuery} from '@tanstack/react-query'
+import {Baby, ClipboardList, GraduationCap, HandHeart, ListMusic, Music, Settings, Tent} from 'lucide-react'
+import {Suspense} from 'react'
 import {NavLink, Outlet} from 'react-router-dom'
 
 // A left rail of routed sections. Each pane is a URL, so sections are
@@ -13,14 +17,19 @@ const SECTIONS = [
   {to: 'music', label: 'Music Schedule', icon: ListMusic},
   {to: 'sunday-school', label: 'Workers’ Notes', icon: GraduationCap},
   {to: 'sunday-school-roll', label: 'Sunday School Roll', icon: ClipboardList},
+  {to: 'prayer-sheet', label: 'Prayer Sheet', icon: HandHeart},
 ]
 
 export function SchedulesSettingsLayout() {
+  // Warm the cache here so every section child skips its own spinner on first mount.
+  const {data: settings} = useQuery({queryKey: schedulesKeys.settings, queryFn: fetchSchedulesSettings})
+  if (!settings) return <PageSpinner />
+
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div className="mb-6 flex items-center gap-3">
         <Settings className="h-6 w-6" />
-        <h2 className="text-2xl font-bold">Schedule Settings</h2>
+        <h2 className="text-2xl font-bold">Document Settings</h2>
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">
@@ -43,7 +52,10 @@ export function SchedulesSettingsLayout() {
         </nav>
 
         <div className="min-w-0 flex-1">
-          <Outlet />
+          {/* Sections are lazy chunks; a local boundary keeps the rail mounted while one loads. */}
+          <Suspense fallback={<PageSpinner />}>
+            <Outlet />
+          </Suspense>
         </div>
       </div>
     </div>

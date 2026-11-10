@@ -1,0 +1,1 @@
+ALTER TABLE `calendar_print_pages` ADD `schedule_placement` text;

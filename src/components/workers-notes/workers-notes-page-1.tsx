@@ -108,7 +108,7 @@ export const WorkersNotesPage1 = forwardRef<HTMLDivElement, Page1Props>(function
         </div>
       ) : (
         <div style={{fontSize: '11pt', fontStyle: 'italic', marginBottom: 14}}>
-          No {year} theme yet — add one in Schedule Settings.
+          No {year} theme yet — add one in Document Settings.
         </div>
       )}
 

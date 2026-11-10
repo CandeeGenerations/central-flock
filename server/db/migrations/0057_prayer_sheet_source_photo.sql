@@ -1,0 +1,1 @@
+ALTER TABLE `prayer_sheet_editions` ADD `source_photo_path` text;

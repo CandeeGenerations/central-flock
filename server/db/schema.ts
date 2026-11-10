@@ -1,5 +1,6 @@
 export * from './schema-attendance.js'
 export * from './schema-calendar-print.js'
+export * from './schema-prayer-sheet.js'
 export * from './schema-core.js'
 export * from './schema-devotions.js'
 export * from './schema-fair-booth.js'

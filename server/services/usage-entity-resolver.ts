@@ -270,6 +270,21 @@ const RESOLVERS: Record<string, ResolverDef> = {
       get(db.select({name: schema.rsvpLists.name}).from(schema.rsvpLists).where(eq(schema.rsvpLists.id, id)).get())
         ?.name ?? null,
   },
+  '/prayer-sheet': {
+    entityType: 'prayer_sheet_edition',
+    typeLabel: 'Prayer Sheet',
+    resolveLabel: (id) => {
+      const r = get(
+        db
+          .select({createdAt: schema.prayerSheetEditions.createdAt})
+          .from(schema.prayerSheetEditions)
+          .where(eq(schema.prayerSheetEditions.id, id))
+          .get(),
+      )
+      if (!r) return null
+      return `Prayer Sheet #${id}`
+    },
+  },
 }
 
 function resolveScheduleLabel(id: number): string | null {

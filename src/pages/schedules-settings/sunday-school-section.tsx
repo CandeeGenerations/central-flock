@@ -1,4 +1,6 @@
+import {PageSpinner} from '@/components/ui/spinner'
 import {cn} from '@/lib/utils'
+import {Suspense} from 'react'
 import {NavLink, Outlet} from 'react-router-dom'
 
 // Sunday School holds three unrelated jobs — the defaults a first edition is
@@ -32,7 +34,9 @@ export function SundaySchoolSettingsSection() {
           </NavLink>
         ))}
       </div>
-      <Outlet />
+      <Suspense fallback={<PageSpinner />}>
+        <Outlet />
+      </Suspense>
     </div>
   )
 }

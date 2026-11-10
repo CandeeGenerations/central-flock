@@ -8,7 +8,7 @@ import {
   resolveBoothRows,
 } from '@/lib/music-schedule-core'
 import {renderInline} from '@/lib/render-inline-markup'
-import type {CSSProperties} from 'react'
+import {type CSSProperties, useLayoutEffect, useRef, useState} from 'react'
 
 import {
   BOOTH_COL_GAP_PX,
@@ -27,8 +27,71 @@ import {
 const HEADING_STYLE: CSSProperties = {
   fontSize: `${TYPE.serviceHeading}pt`,
   fontWeight: 700,
-  textDecoration: 'underline',
   marginBottom: 4,
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 12,
+}
+
+/** How far an Occasion may shrink before it is cut short instead. */
+const OCCASION_MIN_SCALE = 0.75
+
+/** Fired whenever an Occasion is laid out, so a page can list the ones cut short. */
+export const OCCASION_FIT_EVENT = 'ms-occasion-fit'
+export interface OccasionFitDetail {
+  serviceId: number
+  cut: boolean
+}
+
+/**
+ * The Occasion on a heading row. It may never wrap — a second line would grow
+ * the page, and the sheets have a fixed page budget — so it shrinks to a floor
+ * and is then cut with an ellipsis, which the week view reports.
+ */
+function FitOccasion({
+  text,
+  serviceId,
+  basePt,
+  align,
+}: {
+  text: string
+  serviceId: number
+  basePt: number
+  align: 'left' | 'right'
+}) {
+  const ref = useRef<HTMLSpanElement>(null)
+  // Keyed by its text at the call site, so a new Occasion starts again at full size.
+  const [scale, setScale] = useState(1)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const over = el.scrollWidth > el.clientWidth + 0.5
+    if (over && scale > OCCASION_MIN_SCALE) {
+      setScale((s) => Math.max(OCCASION_MIN_SCALE, Math.round((s - 0.05) * 100) / 100))
+      return
+    }
+    window.dispatchEvent(new CustomEvent<OccasionFitDetail>(OCCASION_FIT_EVENT, {detail: {serviceId, cut: over}}))
+  }, [scale, text, serviceId])
+
+  return (
+    <span
+      ref={ref}
+      style={{
+        flex: '1 1 0',
+        minWidth: 0,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        textAlign: align,
+        fontSize: `${basePt * scale}pt`,
+        fontStyle: 'italic',
+        fontWeight: 400,
+      }}
+    >
+      {text}
+    </span>
+  )
 }
 
 function rowStyle(row: {bold: boolean; italic: boolean; highlight: boolean}, opts?: {dense?: boolean}): CSSProperties {
@@ -60,7 +123,20 @@ export function MusicServiceBlock({service}: {service: MusicService}) {
           data-ms-service sits here, not on the padded wrapper, so the edit
           overlay traces the printed block rather than the gap after it. */}
       <div data-ms-service={service.id} style={{width: MUSIC_BLOCK_WIDTH_PX, margin: '0 auto'}}>
-        <div style={HEADING_STYLE}>{renderInline(buildMusicHeading(service.date, service.musicHeading))}</div>
+        <div style={HEADING_STYLE}>
+          <span style={{textDecoration: 'underline', whiteSpace: 'nowrap'}}>
+            {renderInline(buildMusicHeading(service.date, service.musicHeading))}
+          </span>
+          {service.occasion ? (
+            <FitOccasion
+              key={service.occasion}
+              text={service.occasion}
+              serviceId={service.id}
+              basePt={TYPE.serviceHeading}
+              align="right"
+            />
+          ) : null}
+        </div>
         <div
           style={{
             display: 'grid',
@@ -134,8 +210,20 @@ export function BoothServiceBlock({service, showRule = true}: {service: MusicSer
         <div style={rowStyle({bold: true, italic: false, highlight: false})}>
           <span style={{textDecoration: 'underline'}}>{renderInline(service.boothHeading.toUpperCase())}:</span>
         </div>
-        <div style={rowStyle({bold: true, italic: false, highlight: false})}>
-          <span style={{textDecoration: 'underline'}}>{boothHeading(service.date)}</span>
+        <div style={{...rowStyle({bold: true, italic: false, highlight: false}), display: 'flex', minWidth: 0}}>
+          <span style={{textDecoration: 'underline', whiteSpace: 'nowrap'}}>{boothHeading(service.date)}</span>
+          {service.occasion ? (
+            <>
+              <span style={{whiteSpace: 'pre', fontWeight: 400}}> · </span>
+              <FitOccasion
+                key={service.occasion}
+                text={service.occasion}
+                serviceId={service.id}
+                basePt={TYPE.body}
+                align="left"
+              />
+            </>
+          ) : null}
         </div>
 
         {rows.map((r) =>

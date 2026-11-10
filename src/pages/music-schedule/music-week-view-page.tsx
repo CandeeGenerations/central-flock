@@ -1,7 +1,13 @@
-import {BoothServiceBlock, MusicServiceBlock} from '@/components/music-schedule/service-block'
+import {
+  BoothServiceBlock,
+  MusicServiceBlock,
+  OCCASION_FIT_EVENT,
+  type OccasionFitDetail,
+} from '@/components/music-schedule/service-block'
 import {Sheet, type SheetBlock} from '@/components/music-schedule/sheet'
 import {SheetFooter} from '@/components/music-schedule/sheet-footer'
 import {BOOTH_PAGE_PADDING_X_PX} from '@/components/music-schedule/type-scale'
+import {WeekSongsPanel} from '@/components/music-schedule/week-songs-panel'
 import type {ZoomMode} from '@/components/print/scaled-page'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
@@ -9,6 +15,7 @@ import {DatePicker} from '@/components/ui/date-time-picker'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {SheetContent, SheetDescription, SheetHeader, SheetTitle, Sheet as SidePanel} from '@/components/ui/sheet'
 import {PageSpinner} from '@/components/ui/spinner'
 import {exportFixedPagePdf} from '@/lib/fixed-page-pdf'
 import {
@@ -21,8 +28,8 @@ import {
 } from '@/lib/music-schedule-api'
 import {addDays, weekLabel, weekStartFor, weekWarnings} from '@/lib/music-schedule-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertTriangle, ArrowLeft, Copy, Download, Lock, LockOpen, Trash2} from 'lucide-react'
-import {type ReactElement, useMemo, useRef, useState} from 'react'
+import {AlertTriangle, ArrowLeft, Copy, Download, ListMusic, Lock, LockOpen, Trash2} from 'lucide-react'
+import {type ReactElement, useEffect, useMemo, useRef, useState} from 'react'
 import {useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -44,6 +51,24 @@ export function MusicWeekViewPage() {
   const [overflow, setOverflow] = useState<Record<string, number>>({})
   const [copyOpen, setCopyOpen] = useState(false)
   const [copyWeek, setCopyWeek] = useState('')
+  const [songsOpen, setSongsOpen] = useState(false)
+  // Service ids whose Occasion had to be cut short on some sheet.
+  const [cutOccasions, setCutOccasions] = useState<Set<number>>(new Set())
+
+  useEffect(() => {
+    const onFit = (e: Event) => {
+      const {serviceId, cut} = (e as CustomEvent<OccasionFitDetail>).detail
+      setCutOccasions((prev) => {
+        if (prev.has(serviceId) === cut) return prev
+        const next = new Set(prev)
+        if (cut) next.add(serviceId)
+        else next.delete(serviceId)
+        return next
+      })
+    }
+    window.addEventListener(OCCASION_FIT_EVENT, onFit)
+    return () => window.removeEventListener(OCCASION_FIT_EVENT, onFit)
+  }, [])
 
   const boothRefs = useRef<HTMLDivElement[]>([])
   const sundayRefs = useRef<HTMLDivElement[]>([])
@@ -122,6 +147,8 @@ export function MusicWeekViewPage() {
   }
 
   const overflowList = Object.entries(overflow).filter(([, px]) => px > 0)
+  const cutList = week.services.filter((s) => s.occasion && cutOccasions.has(s.id))
+  const issueCount = warnings.length + overflowList.length + cutList.length
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -160,6 +187,10 @@ export function MusicWeekViewPage() {
           <Button size="sm" variant="outline" disabled={exporting !== null} onClick={() => runExport('music')}>
             <Download className="mr-1 h-4 w-4" />
             {exporting === 'music' ? 'Exporting…' : 'Musicians'}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setSongsOpen(true)}>
+            <ListMusic className="mr-1 h-4 w-4" />
+            Songs
           </Button>
           <Button
             size="sm"
@@ -221,12 +252,11 @@ export function MusicWeekViewPage() {
         </CardContent>
       </Card>
 
-      {warnings.length || overflowList.length ? (
+      {issueCount ? (
         <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">
           <div className="mb-1 flex items-center gap-2 font-medium text-amber-900">
             <AlertTriangle className="h-4 w-4" />
-            {warnings.length + overflowList.length} thing{warnings.length + overflowList.length === 1 ? '' : 's'} to
-            look at
+            {issueCount} thing{issueCount === 1 ? '' : 's'} to look at
           </div>
           <ul className="text-amber-900">
             {warnings.map((w) => (
@@ -246,6 +276,14 @@ export function MusicWeekViewPage() {
                 • {overflowLabel(key, labels)} overflows its page by ~{px}px
               </li>
             ))}
+            {cutList.map((s) => (
+              <li key={`occasion-${s.id}`}>
+                •{' '}
+                <button className="underline underline-offset-2" onClick={() => go(s.id)}>
+                  {labels[s.id]}: Occasion “{s.occasion}” is too long for its heading row and is cut short
+                </button>
+              </li>
+            ))}
           </ul>
           <p className="mt-1 text-xs text-amber-800">Warnings only — export and finalize still work.</p>
         </div>
@@ -256,6 +294,24 @@ export function MusicWeekViewPage() {
           Click a service on any page to edit it. PDF export works in draft — finalizing only locks editing.
         </p>
       ) : null}
+
+      <SidePanel open={songsOpen} onOpenChange={setSongsOpen}>
+        <SheetContent side="right" className="w-[min(600px,95vw)] overflow-y-auto sm:max-w-[600px]">
+          <SheetHeader>
+            <SheetTitle>Songs — {week.label}</SheetTitle>
+            <SheetDescription>Every song slot this week, in order. Saves as you go.</SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-6">
+            {songsOpen ? (
+              <WeekSongsPanel
+                weekId={week.id}
+                services={week.services}
+                onSaved={() => queryClient.invalidateQueries({queryKey: musicScheduleKeys.detail(weekId)})}
+              />
+            ) : null}
+          </div>
+        </SheetContent>
+      </SidePanel>
 
       <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
         <DialogContent>

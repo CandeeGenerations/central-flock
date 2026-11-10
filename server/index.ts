@@ -31,6 +31,7 @@ import {homeRouter} from './routes/home.js'
 import {hymnsRouter} from './routes/hymns.js'
 import {importRouter} from './routes/import.js'
 import {messagesRouter, processSendJob} from './routes/messages.js'
+import {musicScheduleScansRouter} from './routes/music-schedule-scans.js'
 import {musicSchedulesRouter} from './routes/music-schedules.js'
 import {nurserySchedulesRouter} from './routes/nursery-schedules.js'
 import {nurseryRouter} from './routes/nursery.js'
@@ -50,8 +51,10 @@ import {usageRouter} from './routes/usage.js'
 import {webhooksRouter} from './routes/webhooks.js'
 import {workersNotesRouter} from './routes/workers-notes.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
+import {backfillRepeatRules} from './services/calendar-print-year-copy.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
 import {startFairBoothReminderScheduler} from './services/fair-booth-reminders.js'
+import {startMusicScanCleanup} from './services/music-scan-cleanup.js'
 import {startScheduler} from './services/scheduler.js'
 import {startSpecialsScheduler} from './services/specials-scheduler.js'
 
@@ -88,6 +91,8 @@ app.use('/api/home', homeRouter)
 app.use('/api/devotions', devotionsRouter)
 app.use('/api/gwendolyn-devotions', gwendolynDevotionsRouter)
 app.use('/api/schedules/fair-booth', fairBoothRouter)
+// Before the music-schedules router, whose GET '/:id' would otherwise take '/scans'.
+app.use('/api/schedules/music/scans', musicScheduleScansRouter)
 app.use('/api/schedules/music', musicSchedulesRouter)
 app.use('/api/schedules/workers-notes', workersNotesRouter)
 app.use('/api/schedules/sunday-school-rolls', sundaySchoolRollsRouter)
@@ -149,13 +154,28 @@ sqlite
   )
   .run()
 
+// Idempotent boot-time backfill: guess a Repeat Rule for every Calendar Print Event that predates
+// Repeat Rules. Recorded as one History Change so it can be undone (docs/adr/0040, 0041).
+try {
+  const guessed = backfillRepeatRules()
+  if (guessed) console.log(`Calendar Print: guessed Repeat Rules for ${guessed} Events`)
+} catch (err) {
+  console.error('Calendar Print Repeat Rule backfill failed:', err)
+}
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
+  // A sandbox runs against a DB copy: no texts, calendar writes or AI calls may leave it.
+  if (process.env.CENTRAL_FLOCK_SANDBOX === '1') {
+    console.log('Sandbox: background jobs disabled')
+    return
+  }
   startScheduler(processSendJob)
   startBirthdayScheduler()
   startFairBoothReminderScheduler(processSendJob)
   startCalendarSyncScheduler()
   startSpecialsScheduler()
   cleanupOrphanedScanImages()
+  startMusicScanCleanup()
   recoverUngeneratedSermons().catch((err) => console.error('[sermons-webhook] boot recovery failed:', err))
 })

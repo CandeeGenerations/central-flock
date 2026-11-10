@@ -379,6 +379,27 @@
       "when": 1789603200000,
       "tag": "0053_prayer_request_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1792366264933,
+      "tag": "0054_calendar_print_history_repeat_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "6",
+      "when": 1793126726283,
+      "tag": "0055_calendar_print_schedule_placement",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "6",
+      "when": 1794151735691,
+      "tag": "0056_music_standalone_occasion_scans",
+      "breakpoints": true
     }
   ]
 }

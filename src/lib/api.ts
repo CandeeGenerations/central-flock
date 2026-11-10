@@ -1,3 +1,4 @@
+import type {RepeatRule} from '@/lib/repeat-rules'
 import {saveExportedFile} from '@/lib/save-exported-file'
 
 const BASE_URL = '/api'
@@ -824,6 +825,7 @@ export interface CalendarPrintPage {
   themeColor: string | null
   themePlacement: string | null
   versePlacement: string | null
+  schedulePlacement: string | null
   verseText: string | null
   verseReference: string | null
   hideNormalScheduleFooter: boolean
@@ -838,6 +840,7 @@ export interface CalendarPrintEvent {
   title: string
   style: CalendarPrintEventStyle
   sortOrder: number
+  repeatRule: string | null // JSON RepeatRule — parse with parseRule from '@/lib/repeat-rules'
   createdAt: string
 }
 
@@ -899,6 +902,7 @@ export function updateCalendarPrintPage(
     themeColor?: string | null
     themePlacement?: string | null
     versePlacement?: string | null
+    schedulePlacement?: string | null
     verseText?: string | null
     verseReference?: string | null
     hideNormalScheduleFooter?: boolean
@@ -919,6 +923,7 @@ export function createCalendarPrintEvent(
     title: string
     style: CalendarPrintEventStyle
     sortOrder?: number
+    repeatRule?: RepeatRule
   },
 ) {
   return request<CalendarPrintEvent>(`/calendar-print/${year}/${month}/events`, {
@@ -934,6 +939,7 @@ export function updateCalendarPrintEvent(
     title?: string
     style?: CalendarPrintEventStyle
     sortOrder?: number
+    repeatRule?: RepeatRule
   },
 ) {
   return request<CalendarPrintEvent>(`/calendar-print/events/${id}`, {
@@ -970,4 +976,86 @@ export function upsertCalendarPrintDayOverride(
 
 export function deleteCalendarPrintDayOverride(id: number) {
   return request<{success: boolean}>(`/calendar-print/day-overrides/${id}`, {method: 'DELETE'})
+}
+
+// One Change for "Apply to all Sundays in May".
+export function applyCalendarPrintDayOverride(
+  year: number,
+  month: number,
+  data: {
+    sourceDate: string
+    dates: string[]
+    inlineItemIds: number[]
+    showNoKaya: boolean
+    showNormalScheduleLabel: boolean
+  },
+) {
+  return request<{success: boolean; count: number}>(`/calendar-print/${year}/${month}/day-overrides/apply`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+// Calendar Print History (docs/adr/0041)
+export interface CalendarPrintHistoryEntry {
+  id: number
+  description: string
+  createdAt: string // UTC 'YYYY-MM-DD HH:MM:SS'
+  undone: boolean
+  isBaseline: boolean
+}
+
+export interface CalendarPrintHistory {
+  entries: CalendarPrintHistoryEntry[]
+  canUndo: boolean
+  canRedo: boolean
+}
+
+export function fetchCalendarPrintHistory() {
+  return request<CalendarPrintHistory>('/calendar-print/history')
+}
+
+export function undoCalendarPrint() {
+  return request<{description: string}>('/calendar-print/history/undo', {method: 'POST'})
+}
+
+export function redoCalendarPrint() {
+  return request<{description: string}>('/calendar-print/history/redo', {method: 'POST'})
+}
+
+export function restoreCalendarPrint(id: number) {
+  return request<{description: string}>(`/calendar-print/history/${id}/restore`, {method: 'POST'})
+}
+
+// Year Copy (CONTEXT.md → Year Copy)
+export interface YearCopyPreview {
+  fromYear: number
+  toYear: number
+  sourceEvents: number
+  toCopy: number
+  skipped: string[]
+  outOfYear: {title: string; date: string}[]
+  existingEvents: number
+  existingOverrides: number
+}
+
+export interface YearCopyResult {
+  copied: number
+  overrides: number
+  deletedEvents: number
+  deletedOverrides: number
+  skipped: string[]
+  outOfYear: {title: string; date: string}[]
+  conflicts: {date: string; titles: string[]}[]
+}
+
+export function fetchYearCopyPreview(from: number, to: number) {
+  return request<YearCopyPreview>(`/calendar-print/year-copy/preview?from=${from}&to=${to}`)
+}
+
+export function runYearCopy(from: number, to: number) {
+  return request<YearCopyResult>('/calendar-print/year-copy', {
+    method: 'POST',
+    body: JSON.stringify({from, to}),
+  })
 }

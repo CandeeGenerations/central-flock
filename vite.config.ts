@@ -58,9 +58,10 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: ['flock.cgen.cc'],
+    // API_TARGET points a sandbox front end at a sandbox server.
     proxy: {
-      '/api': 'http://localhost:5172',
-      '/uploads': 'http://localhost:5172',
+      '/api': process.env.API_TARGET ?? 'http://localhost:5172',
+      '/uploads': process.env.API_TARGET ?? 'http://localhost:5172',
     },
   },
 })

@@ -75,6 +75,9 @@ otherwise be retyped weekly:
 - **Copy-forward has to be selective.** Structure, prose, roles, booth toggles and condensed-line
   edits carry forward; songs, highlights, titles, texts and speaker notes clear. A highlight means
   "different this week", so carrying one forward would assert something false. See the plan.
+  The Occasion clears too. A **Standalone Service** is never the source: each Service Time copies
+  from its most recent earlier service that is not Standalone, so a candlelight order never leaks
+  into the following week (plans/music-schedule-standalone-and-editor.md).
 - **Roles are load-bearing, not decorative.** Mis-tagging a line changes what the sound booth
   receives. The editor shows the booth consequence in the same table as the role, so the two are
   never looked at separately.

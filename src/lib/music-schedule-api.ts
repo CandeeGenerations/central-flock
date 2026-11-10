@@ -38,6 +38,8 @@ export interface MusicWeekSummary {
   status: 'draft' | 'final'
   scopeLabel: string
   serviceCount: number
+  /** Occasions on this week's meeting services, for the list. */
+  occasions: string[]
   episodeFirst: number | null
   episodeLast: number | null
   updatedAt: string
@@ -61,6 +63,10 @@ export interface MusicService {
   scripture: string
   scriptureNote: string
   scriptureHighlight: boolean
+  /** This week's order is its own; creating the next week never copies from it. */
+  standalone: boolean
+  /** Printed on the heading row; this week only. */
+  occasion: string
   sortOrder: number
   /** What is stored on the row — blank means "use the Service Time's value". */
   nameOverride: string
@@ -90,6 +96,10 @@ export interface MusicWeek {
   status: 'draft' | 'final'
   scopeLabel: string
   updatedAt: string
+  /** A later week already exists — marking Standalone now won't change it. */
+  laterWeekExists: boolean
+  /** Photos from the Schedule Scan this week was created from, while they are kept. */
+  scanPhotos: string[]
   services: MusicService[]
   footer: {blocks: MusicFooterBlock[]; imagePath: string | null; placement: 'last' | 'every' | 'never'}
 }
@@ -173,6 +183,29 @@ export const rewriteBoothLine = (id: number, serviceId: number, slot: MusicBooth
 
 export const saveServiceAsDefault = (id: number, serviceId: number) =>
   request<{serviceTimeId: number; lines: number}>(`/${id}/services/${serviceId}/save-as-default`, {method: 'POST'})
+
+export interface CopySource {
+  id: number
+  weekId: number
+  weekStart: string
+  date: string
+  name: string
+  serviceTimeId: number | null
+  occasion: string
+  musicHeading: string
+  standalone: boolean
+  title: string
+  lineCount: number
+}
+
+export const fetchCopySources = (excludeServiceId: number) =>
+  request<CopySource[]>(`/copy-sources?exclude=${excludeServiceId}`)
+
+export const copyServiceOrder = (id: number, serviceId: number, fromServiceId: number) =>
+  request<{ok: true}>(`/${id}/services/${serviceId}/copy-order`, {
+    method: 'POST',
+    body: JSON.stringify({fromServiceId}),
+  })
 
 export const searchMusicHymns = (q: string) => request<HymnOption[]>(`/hymns?q=${encodeURIComponent(q)}`)
 

@@ -91,10 +91,35 @@ export const musicScheduleServices = sqliteTable(
     scripture: text('scripture').notNull().default(''), // the 'Text:' line
     scriptureNote: text('scripture_note').notNull().default(''),
     scriptureHighlight: integer('scripture_highlight', {mode: 'boolean'}).notNull().default(false),
+    // This week's order is its own — creating the next week never copies from it.
+    standalone: integer('standalone', {mode: 'boolean'}).notNull().default(false),
+    // Prints on the heading row, never its own line; clears on copy-forward.
+    occasion: text('occasion').notNull().default(''),
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (t) => [index('music_schedule_services_week_idx').on(t.musicScheduleId, t.sortOrder)],
 )
+
+export const musicScanStatuses = ['unfinished', 'applied', 'discarded'] as const
+export type MusicScanStatus = (typeof musicScanStatuses)[number]
+
+// A Schedule Scan: photos of the pastor's weekly pages and the proposal read from
+// them. The week is created only when the review is applied.
+export const musicScheduleScans = sqliteTable('music_schedule_scans', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  weekStart: text('week_start'),
+  musicScheduleId: integer('music_schedule_id').references(() => musicSchedules.id, {onDelete: 'set null'}),
+  status: text('status', {enum: musicScanStatuses}).notNull().default('unfinished'),
+  photos: text('photos').notNull().default('[]'), // JSON string[] of upload URLs
+  result: text('result').notNull().default('{}'), // JSON ScanProposal
+  photosExpireOn: text('photos_expire_on'), // 'YYYY-MM-DD'
+  createdAt: text('created_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+  updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+})
 
 // One row of a Service Order, printed as a row of a two-column table. A split
 // row fills both cells; a merged row spans the width. Both the split/merge

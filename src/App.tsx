@@ -157,6 +157,9 @@ const MusicSchedulesListPage = lazy(() =>
 const MusicServiceEditorPage = lazy(() =>
   import('@/pages/music-schedule/service-editor-page').then((m) => ({default: m.MusicServiceEditorPage})),
 )
+const MusicScanReviewPage = lazy(() =>
+  import('@/pages/music-schedule/music-scan-review-page').then((m) => ({default: m.MusicScanReviewPage})),
+)
 const MusicWeekViewPage = lazy(() =>
   import('@/pages/music-schedule/music-week-view-page').then((m) => ({default: m.MusicWeekViewPage})),
 )
@@ -736,6 +739,7 @@ function AppLayoutInner({
                   <Route path="/special-music" element={<SpecialMusicSchedulesPage />} />
                   <Route path="/special-music/:id" element={<SpecialMusicScheduleViewPage />} />
                   <Route path="/schedules/music" element={<MusicSchedulesListPage />} />
+                  <Route path="/schedules/music/scans/:id" element={<MusicScanReviewPage />} />
                   <Route path="/schedules/music/:id" element={<MusicWeekViewPage />} />
                   <Route path="/schedules/music/:id/service/:serviceId" element={<MusicServiceEditorPage />} />
                   <Route path="/schedules/sunday-school-rolls" element={<RollListPage />} />

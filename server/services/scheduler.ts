@@ -51,6 +51,10 @@ function checkScheduledMessages(processSendJob: ProcessSendJobFn) {
     // so any event-loop jitter during heavy sends gets flagged as missed. 2 min absorbs the
     // intentional offset; a truly stuck scheduler still misses by minutes.
     checkinMargin: 2,
+    // The network drops for ~90s every Sunday at 05:00 UTC (scheduled router reboot — see
+    // cloudflared.log), swallowing exactly one check-in. Two misses in a row (~10 min of
+    // silence) is a real outage; one is that blip.
+    failureIssueThreshold: 2,
   })
 }
 

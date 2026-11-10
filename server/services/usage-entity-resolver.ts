@@ -249,6 +249,21 @@ const RESOLVERS: Record<string, ResolverDef> = {
           .get(),
       )?.label ?? null,
   },
+  // A Schedule Scan review — labelled by the week it was read as.
+  '/schedules/music/scans': {
+    entityType: 'music_schedule_scan',
+    typeLabel: 'Schedule Scan',
+    resolveLabel: (id) => {
+      const row = get(
+        db
+          .select({weekStart: schema.musicScheduleScans.weekStart})
+          .from(schema.musicScheduleScans)
+          .where(eq(schema.musicScheduleScans.id, id))
+          .get(),
+      )
+      return row ? `Scan — week of ${row.weekStart ?? 'unknown'}` : null
+    },
+  },
   // Same shape again: the route id is the roll, not the schedule envelope.
   '/schedules/sunday-school-rolls': {
     entityType: 'sunday_school_roll',

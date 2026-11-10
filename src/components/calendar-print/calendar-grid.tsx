@@ -33,6 +33,8 @@ interface CalendarGridProps {
   themeColor: string | null
   themePlacement: string | null
   versePlacement: string | null
+  // null = in the footer, like before placement existed.
+  schedulePlacement?: string | null
   verseText: string | null
   verseReference: string | null
   scheduleItems: NormalScheduleItem[]
@@ -47,6 +49,8 @@ export const FOOTER_CENTER_PLACEMENT = 'footer-center'
 export const FOOTER_LEFT_PLACEMENT = 'footer-left'
 export const FOOTER_RIGHT_PLACEMENT = 'footer-right'
 export const DEFAULT_PLACEMENT = FOOTER_CENTER_PLACEMENT
+// The schedule has no left/center/right variants — in the footer it always fills the left columns.
+export const DEFAULT_SCHEDULE_PLACEMENT = 'footer'
 
 export function isFooterPlacement(id: string | null | undefined): boolean {
   return (
@@ -107,6 +111,14 @@ export function getAvailablePlacements(year: number, month: number): PlacementOp
     }
   }
   return options
+}
+
+// Normal Schedule placement: the footer, or any of the same open cells theme and verse can use.
+export function getSchedulePlacements(year: number, month: number): PlacementOption[] {
+  return [
+    {id: DEFAULT_SCHEDULE_PLACEMENT, label: 'Default — footer'},
+    ...getAvailablePlacements(year, month).filter((opt) => !isFooterPlacement(opt.id)),
+  ]
 }
 
 interface CellMeta {
@@ -703,6 +715,7 @@ export function CalendarGrid({
   themeColor,
   themePlacement,
   versePlacement,
+  schedulePlacement,
   verseText,
   verseReference,
   scheduleItems,
@@ -755,6 +768,9 @@ export function CalendarGrid({
   // Resolve placements; null falls back to default.
   const effThemePlacement = themePlacement || DEFAULT_PLACEMENT
   const effVersePlacement = versePlacement || DEFAULT_PLACEMENT
+  const effSchedulePlacement = schedulePlacement || DEFAULT_SCHEDULE_PLACEMENT
+  const scheduleInFooter = isFooterPlacement(effSchedulePlacement)
+  const hasSchedule = !hideNormalScheduleFooter && scheduleItems.some((it) => !it.hidden && it.type !== 'spacer')
 
   // Footer placement
   const footerNode = (
@@ -768,15 +784,14 @@ export function CalendarGrid({
       showVerseInFooter={isFooterPlacement(effVersePlacement)}
       themeAlign={footerAlignment(effThemePlacement)}
       verseAlign={footerAlignment(effVersePlacement)}
-      hideSchedule={hideNormalScheduleFooter}
+      hideSchedule={hideNormalScheduleFooter || !scheduleInFooter}
     />
   )
   const footerWrapper = <div style={{position: 'absolute', inset: 0, zIndex: 2, display: 'flex'}}>{footerNode}</div>
 
   // If the footer would render nothing (schedule hidden/empty and no theme or verse
   // placed in it), drop it entirely rather than leaving a blank strip at the bottom.
-  const footerShowsSchedule =
-    !hideNormalScheduleFooter && scheduleItems.some((it) => !it.hidden && it.type !== 'spacer')
+  const footerShowsSchedule = scheduleInFooter && hasSchedule
   const footerShowsTheme = isFooterPlacement(effThemePlacement) && !!theme
   const footerShowsVerse = isFooterPlacement(effVersePlacement) && !!(verseText || verseReference)
   const footerHasContent = footerShowsSchedule || footerShowsTheme || footerShowsVerse
@@ -854,6 +869,47 @@ export function CalendarGrid({
       </div>
     ) : null
 
+  // The schedule in a cell: same heading and columns as the footer, left-aligned, side by side
+  // when the cell spans 2+ days, stacked in a single-day cell.
+  const {col1: scheduleCol1, col2: scheduleCol2} = buildFooterFromItems(scheduleItems)
+  const scheduleNode = (span: number) => (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: span >= 2 ? 'auto auto' : 'auto',
+        columnGap: '24px',
+        // The cell centers its content; the schedule sits on the left edge like it does in the footer.
+        alignSelf: 'flex-start',
+        paddingLeft: '4px',
+        fontFamily: 'Montserrat, sans-serif',
+        fontSize: '10px',
+        color: '#000',
+        textAlign: 'left',
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontWeight: 700,
+            fontSize: '11px',
+            marginBottom: '4px',
+            display: 'inline-block',
+            borderBottom: '1.5px solid #000',
+            paddingBottom: '1px',
+          }}
+        >
+          Normal Schedule:
+        </div>
+        <ScheduleColumn lines={scheduleCol1} />
+      </div>
+      {scheduleCol2.length > 0 && (
+        <div style={{paddingTop: span >= 2 ? '20px' : '6px'}}>
+          <ScheduleColumn lines={scheduleCol2} />
+        </div>
+      )}
+    </div>
+  )
+
   // For each merged_out cell, pre-compute whether it hosts the title and/or theme/verse content.
   const buildCellContent = (rc: RenderCell): ReactNode | null => {
     const id = cellPlacementId(rc)
@@ -861,7 +917,8 @@ export function CalendarGrid({
     const titleHere = isLeading && (titleHorizontal || titleStacked)
     const themeHere = effThemePlacement === id && !!themeNode
     const verseHere = effVersePlacement === id && !!verseNode
-    if (!titleHere && !themeHere && !verseHere) return null
+    const scheduleHere = effSchedulePlacement === id && hasSchedule
+    if (!titleHere && !themeHere && !verseHere && !scheduleHere) return null
     return (
       <div
         style={{
@@ -881,6 +938,7 @@ export function CalendarGrid({
         {titleHere && (titleStacked ? titleStackedInline : titleHorizontalInline)}
         {themeHere && themeNode}
         {verseHere && verseNode}
+        {scheduleHere && scheduleNode(rc.span)}
       </div>
     )
   }

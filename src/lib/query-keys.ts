@@ -42,6 +42,8 @@ export const queryKeys = {
   gwendolynDevotional: (id: number) => ['gwendolynDevotional', id] as const,
   calendarPrintPage: (year: number, month: number) => ['calendarPrintPage', year, month] as const,
   calendarPrintDefaultSchedule: ['calendarPrintDefaultSchedule'] as const,
+  calendarPrintHistory: ['calendarPrintHistory'] as const,
+  calendarPrintYearCopyPreview: (from: number, to: number) => ['calendarPrintYearCopyPreview', from, to] as const,
   rsvpLists: (archived: boolean) => ['rsvpLists', archived] as const,
   rsvpList: (id: number | string) => ['rsvpList', String(id)] as const,
   rsvpCalendarEvents: ['rsvpCalendarEvents'] as const,

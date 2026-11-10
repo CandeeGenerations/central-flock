@@ -2,6 +2,7 @@ import {navGroups} from '@/lib/nav-config'
 import type {ActionsBuildContext, SearchActionContext, SearchItem} from '@/lib/search/registry'
 import {
   BookOpen,
+  Camera,
   CheckSquare,
   ClipboardList,
   FileText,
@@ -220,6 +221,17 @@ export function buildCreateActions(ctx: ActionsBuildContext): SearchItem[] {
       keywords: ['new', 'special', 'music', 'performance', 'solo', 'duet', 'trio'],
       action: ({navigate, close}) => {
         navigate('/music/specials/new')
+        close()
+      },
+    },
+    {
+      id: 'create-music-week-from-photos',
+      label: 'New Music Schedule Week from Photos',
+      group: 'Create',
+      icon: Camera,
+      keywords: ['new', 'scan', 'photo', 'music', 'schedule', 'week', 'pastor', 'songs'],
+      action: ({navigate, close}) => {
+        navigate('/schedules/music?scan=1')
         close()
       },
     },

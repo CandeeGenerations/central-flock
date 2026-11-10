@@ -1,3 +1,4 @@
+import {ScanCaptureDialog} from '@/components/music-schedule/scan-capture-dialog'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent} from '@/components/ui/card'
 import {DatePicker} from '@/components/ui/date-time-picker'
@@ -8,12 +9,13 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/c
 import {PageSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip'
+import {discardMusicScan, fetchMusicScans, musicScanKeys} from '@/lib/music-scan-api'
 import {createMusicWeek, fetchMusicWeekYears, fetchMusicWeeks, musicScheduleKeys} from '@/lib/music-schedule-api'
 import {addDays, toIso, weekLabel, weekStartFor} from '@/lib/music-schedule-core'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertTriangle, ListMusic, Plus} from 'lucide-react'
+import {AlertTriangle, Camera, ListMusic, Plus, ScanLine, Trash2} from 'lucide-react'
 import {useState} from 'react'
-import {useNavigate} from 'react-router-dom'
+import {useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 /** Today's date as YYYY-MM-DD, local. */
@@ -36,6 +38,19 @@ export function MusicSchedulesListPage() {
   const [year, setYear] = useState(String(new Date().getFullYear()))
   const [newWeek, setNewWeek] = useState('')
   const [search, setSearch] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  // ?scan=1 (the command palette's "from photos" action) opens the capture dialog.
+  const [scanOpen, setScanOpenState] = useState(searchParams.get('scan') === '1')
+  const setScanOpen = (open: boolean) => {
+    setScanOpenState(open)
+    if (!open && searchParams.has('scan')) setSearchParams({}, {replace: true})
+  }
+  const {data: scans} = useQuery({queryKey: musicScanKeys.list, queryFn: fetchMusicScans})
+  const discard = useMutation({
+    mutationFn: (id: number) => discardMusicScan(id),
+    onSuccess: () => queryClient.invalidateQueries({queryKey: musicScanKeys.all}),
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to discard'),
+  })
 
   const {data: years} = useQuery({queryKey: musicScheduleKeys.years, queryFn: fetchMusicWeekYears})
   const {data: weeks, isLoading} = useQuery({
@@ -76,11 +91,57 @@ export function MusicSchedulesListPage() {
       <div className="mb-6 flex items-center gap-3">
         <ListMusic className="h-6 w-6" />
         <h2 className="text-2xl font-bold">Music Schedule</h2>
-        <Button className="ml-auto" onClick={openDialog}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Week
-        </Button>
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" onClick={() => setScanOpen(true)}>
+            <Camera className="mr-2 h-4 w-4" />
+            From photos
+          </Button>
+          <Button onClick={openDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Week
+          </Button>
+        </div>
       </div>
+
+      {scans?.length ? (
+        <Card>
+          <CardContent className="space-y-2 p-4">
+            <h3 className="flex items-center gap-2 text-sm font-medium">
+              <ScanLine className="h-4 w-4" />
+              Unfinished reviews
+            </h3>
+            {scans.map((sc) => (
+              <div key={sc.id} className="flex items-center gap-3 rounded border p-2">
+                {sc.photos[0] ? (
+                  <img src={sc.photos[0]} alt="" className="h-12 w-9 shrink-0 rounded border object-cover" />
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">{sc.weekStart ? weekLabel(sc.weekStart) : 'Week not read'}</div>
+                  <div className="text-muted-foreground text-xs">
+                    {sc.summary
+                      ? `${sc.summary.resolved} of ${sc.summary.songs} songs found` +
+                        (sc.summary.toCheck ? ` · ${sc.summary.toCheck} to check` : '')
+                      : 'Not read'}
+                  </div>
+                </div>
+                <Button size="sm" onClick={() => navigate(`/schedules/music/scans/${sc.id}`)}>
+                  Review
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Discard review"
+                  onClick={() => {
+                    if (confirm('Discard this scan? Its photos are deleted.')) discard.mutate(sc.id)
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <p className="text-muted-foreground max-w-2xl text-sm">
         One week of services — the Sunday and the Wednesday after it. Prints the Sound Booth sheet for the sound team
@@ -137,6 +198,14 @@ export function MusicSchedulesListPage() {
                     <TableCell className="font-medium">
                       <span className="flex items-center gap-1.5">
                         {w.label.replace('Week of ', '')}
+                        {w.occasions.map((o) => (
+                          <span
+                            key={o}
+                            className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-normal text-amber-900"
+                          >
+                            {o}
+                          </span>
+                        ))}
                         {w.warningCount ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -179,6 +248,8 @@ export function MusicSchedulesListPage() {
           )}
         </CardContent>
       </Card>
+
+      <ScanCaptureDialog open={scanOpen} onOpenChange={setScanOpen} />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

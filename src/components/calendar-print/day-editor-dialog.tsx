@@ -3,6 +3,7 @@ import {Button} from '@/components/ui/button'
 import {Checkbox} from '@/components/ui/checkbox'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import type {CalendarPrintEvent, NormalScheduleItem} from '@/lib/api'
+import {describeRule, guessRule, parseRule} from '@/lib/repeat-rules'
 import {Copy, Pencil, Plus, Trash2} from 'lucide-react'
 import {useMemo, useState} from 'react'
 
@@ -203,6 +204,9 @@ function DayEditorBody({
                 </span>
                 <span className="flex-1 break-words">
                   {event.title || <span className="italic text-muted-foreground">NO KAYA or Choir</span>}
+                  <span className="block text-xs text-muted-foreground">
+                    Repeats: {describeRule(parseRule(event.repeatRule) ?? guessRule(event.title, event.date))}
+                  </span>
                 </span>
                 <button
                   type="button"

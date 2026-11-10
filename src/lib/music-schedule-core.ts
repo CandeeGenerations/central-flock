@@ -728,3 +728,42 @@ export function weekWarnings(
 
   return out
 }
+
+/* ------------------------------------------------------------- song entry */
+
+export type SongEntry = {kind: 'empty'} | {kind: 'number'; book: HymnBook; number: number} | {kind: 'search'; q: string}
+
+/**
+ * What was typed into a song cell, read the way the paper writes it: `219`,
+ * `b219`, `B#219`, `B-219` are Burgundy (a bare number is Burgundy — most songs
+ * are); `s27`, `S#27` are Silver; anything else is a title search.
+ */
+export function parseSongEntry(raw: string): SongEntry {
+  const s = raw.trim()
+  if (!s) return {kind: 'empty'}
+  const m = s.match(/^([bs])?\s*[#-]?\s*(\d+)$/i)
+  if (m) return {kind: 'number', book: m[1]?.toLowerCase() === 's' ? 'silver' : 'burgundy', number: Number(m[2])}
+  return {kind: 'search', q: s}
+}
+
+/** The index of the next (dir 1) or previous (dir -1) song line from `from`, or -1. */
+export function neighbourSongIndex(lines: {kind: MusicLineKind}[], from: number, dir: 1 | -1): number {
+  for (let i = from + dir; i >= 0 && i < lines.length; i += dir) if (lines[i].kind === 'song') return i
+  return -1
+}
+
+/**
+ * The role a newly added line most likely has, from where it lands: the first
+ * song of a service opens it, a song after the message is the invitation, any
+ * other song is congregational, and prose is plain.
+ */
+export function guessRole(
+  kind: MusicLineKind,
+  before: {kind: MusicLineKind; role: MusicLineRole; text: string}[],
+): MusicLineRole {
+  if (kind !== 'song') return 'plain'
+  if (!before.some((l) => l.kind === 'song')) return 'opening'
+  const prev = before[before.length - 1]
+  if (prev && (prev.role === 'message' || /invitation/i.test(prev.text))) return 'invitation'
+  return 'congregational'
+}

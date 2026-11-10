@@ -1,7 +1,9 @@
+import {and, eq} from 'drizzle-orm'
 import fs from 'fs'
 import path from 'path'
 import {afterAll, beforeAll, describe, expect, it} from 'vitest'
 
+import {db, schema} from '../db/index.js'
 import {AI_MODELS, AI_MODEL_KEYS, effortConfig} from '../lib/ai-models.js'
 import {type AiResponseInfo, createMessage, onAiResponse} from '../lib/anthropic-client.js'
 import {findBibleVerses} from '../services/bible-verses.js'
@@ -9,6 +11,8 @@ import {generateDevotionPassage} from '../services/devotion-generation.js'
 import {parseDevotionImage} from '../services/devotion-ocr.js'
 import {generateHashtags} from '../services/gwendolyn-hashtags.js'
 import {runHymnSuggestion} from '../services/hymn-suggestion.js'
+import {buildProposal, weekStartOf} from '../services/music-schedule-scan-process.js'
+import {transcribeSchedulePhotos} from '../services/music-schedule-scan.js'
 import {runMusicSearch} from '../services/music-search.js'
 import {computeQuoteResearch} from '../services/quote-research.js'
 import {generateQuoteTags} from '../services/quote-tags.js'
@@ -22,6 +26,7 @@ import {extractFieldsViaClaude} from '../services/youtube-extract.js'
 
 const FIXTURES = path.join(import.meta.dirname, 'fixtures')
 const OCR_IMAGE = path.join(FIXTURES, 'devotion-sheet.jpg')
+const MUSIC_SCAN_IMAGE = path.join(FIXTURES, 'music-scan-midweek.jpg')
 const RUN_ALL = Boolean(process.env.AI_TEST_ALL)
 const RECORD = Boolean(process.env.AI_TEST_RECORD)
 
@@ -127,6 +132,30 @@ describe('features', () => {
     expect(passage.title.length).toBeGreaterThan(0)
     expect(passage.bibleReference).toMatch(/\d+:\d+/)
     expect(passage.talkingPoints.length).toBeGreaterThan(0)
+  })
+
+  it.skipIf(!fs.existsSync(MUSIC_SCAN_IMAGE))('music schedule scan (vision)', async () => {
+    const data = fs.readFileSync(MUSIC_SCAN_IMAGE).toString('base64')
+    const raw = await tracked(() => transcribeSchedulePhotos([{data, mediaType: 'image/jpeg'}], '2026-11-08'))
+    const weekStart = weekStartOf(raw)
+    expect(weekStart).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    const proposal = buildProposal(
+      raw,
+      {
+        serviceTimes: db.select().from(schema.serviceTimes).where(eq(schema.serviceTimes.active, true)).all(),
+        usualLinesFor: () => [],
+        lookupHymn: (book, number) =>
+          db
+            .select({id: schema.hymns.id, title: schema.hymns.title})
+            .from(schema.hymns)
+            .where(and(eq(schema.hymns.book, book), eq(schema.hymns.number, number)))
+            .get() ?? null,
+        checkReference: () => ({ok: false}),
+        existingWeekId: null,
+      },
+      weekStart!,
+    )
+    expect(proposal.summary.resolved).toBeGreaterThan(0)
   })
 
   it.skipIf(!fs.existsSync(OCR_IMAGE))('devotion sheet OCR (vision)', async () => {

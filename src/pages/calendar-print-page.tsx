@@ -1,14 +1,18 @@
 import {
   CalendarGrid,
   DEFAULT_PLACEMENT,
+  DEFAULT_SCHEDULE_PLACEMENT,
   PAGE_HEIGHT,
   PAGE_WIDTH,
   getAvailablePlacements,
+  getSchedulePlacements,
   parseInlineItemIds,
 } from '@/components/calendar-print/calendar-grid'
 import {CalendarGridEditor} from '@/components/calendar-print/calendar-grid-editor'
 import {DayEditorDialog} from '@/components/calendar-print/day-editor-dialog'
+import {HistoryControls, invalidateCalendarPrint} from '@/components/calendar-print/history-controls'
 import {ScheduleEditorDialog} from '@/components/calendar-print/schedule-editor-dialog'
+import {YearCopyDialog} from '@/components/calendar-print/year-copy-dialog'
 import {ConfirmDialog} from '@/components/confirm-dialog'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -17,6 +21,7 @@ import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {PageSpinner} from '@/components/ui/spinner'
 import {Textarea} from '@/components/ui/textarea'
@@ -29,6 +34,7 @@ import type {
   NormalScheduleItemInput,
 } from '@/lib/api'
 import {
+  applyCalendarPrintDayOverride,
   createCalendarPrintEvent,
   deleteCalendarPrintDayOverride,
   deleteCalendarPrintEvent,
@@ -41,8 +47,9 @@ import {
 } from '@/lib/api'
 import {type CalendarExportFormat, generateCalendarExport} from '@/lib/calendar-pdf'
 import {queryKeys} from '@/lib/query-keys'
+import {type RepeatRule, describeRule, guessRule, parseRule, ruleAlternatives, sameRule} from '@/lib/repeat-rules'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ChevronDown, ChevronLeft, ChevronRight, Download} from 'lucide-react'
+import {CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Download} from 'lucide-react'
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {toast} from 'sonner'
 
@@ -66,6 +73,17 @@ interface EventFormState {
   date: string
   title: string
   style: CalendarPrintEventStyle
+  repeatRule: RepeatRule
+  // Once picked by hand, a title edit no longer re-guesses the rule (a date change still does).
+  ruleTouched: boolean
+}
+
+function eventRule(event: CalendarPrintEvent): RepeatRule {
+  return parseRule(event.repeatRule) ?? guessRule(event.title, event.date)
+}
+
+function eventRuleLabel(event: CalendarPrintEvent): string {
+  return describeRule(eventRule(event))
 }
 
 const styleOptions: {value: CalendarPrintEventStyle; label: string; description: string}[] = [
@@ -209,6 +227,10 @@ export function CalendarPrintPage() {
   const today = new Date()
   const [year, setYear] = useState<number>(today.getFullYear())
   const [month, setMonth] = useState<number>(today.getMonth() + 1)
+  const [yearCopyOpen, setYearCopyOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  // The year shown in the month picker; browsing it doesn't move the page until a month is clicked.
+  const [pickerYear, setPickerYear] = useState(year)
 
   const pageQuery = useQuery({
     queryKey: queryKeys.calendarPrintPage(year, month),
@@ -243,9 +265,56 @@ export function CalendarPrintPage() {
           <Button variant="outline" size="icon" onClick={() => navigateMonth(-1)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="text-2xl font-heading min-w-[200px] text-center">
-            {MONTH_NAMES[month - 1]} {year}
-          </div>
+          <Popover
+            open={pickerOpen}
+            onOpenChange={(open) => {
+              if (open) setPickerYear(year)
+              setPickerOpen(open)
+            }}
+          >
+            <PopoverTrigger asChild>
+              <Button variant="ghost" className="text-2xl font-heading h-auto py-1">
+                {/* Sized by an invisible "September" label so the button (and Today beside it)
+                    doesn't shift as the month name changes. */}
+                <span className="grid text-center">
+                  <span className="col-start-1 row-start-1">
+                    {MONTH_NAMES[month - 1]} {year}
+                  </span>
+                  <span className="invisible col-start-1 row-start-1" aria-hidden>
+                    September {year}
+                  </span>
+                </span>
+                <ChevronDown className="h-4 w-4 opacity-60" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72">
+              <div className="flex items-center justify-between">
+                <Button variant="ghost" size="icon" onClick={() => setPickerYear(pickerYear - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="font-heading text-lg">{pickerYear}</div>
+                <Button variant="ghost" size="icon" onClick={() => setPickerYear(pickerYear + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {MONTH_NAMES.map((name, i) => (
+                  <Button
+                    key={name}
+                    size="sm"
+                    variant={pickerYear === year && i + 1 === month ? 'default' : 'outline'}
+                    onClick={() => {
+                      setYear(pickerYear)
+                      setMonth(i + 1)
+                      setPickerOpen(false)
+                    }}
+                  >
+                    {name.slice(0, 3)}
+                  </Button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button variant="outline" size="icon" onClick={() => navigateMonth(1)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -253,7 +322,15 @@ export function CalendarPrintPage() {
             Today
           </Button>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <HistoryControls />
+          <Button variant="outline" size="sm" onClick={() => setYearCopyOpen(true)}>
+            <CalendarPlus className="h-4 w-4 mr-1.5" /> Copy {year - 1} into {year}…
+          </Button>
+        </div>
       </header>
+
+      <YearCopyDialog open={yearCopyOpen} onOpenChange={setYearCopyOpen} toYear={year} />
 
       {pageQuery.isLoading ? (
         <PageSpinner />
@@ -261,7 +338,9 @@ export function CalendarPrintPage() {
         <div className="p-6">Failed to load.</div>
       ) : (
         <CalendarPrintEditor
-          key={`${year}-${month}`}
+          // updatedAt is in the key so an undo / Restore that puts back older page details
+          // re-seeds the form fields below instead of leaving them showing the newer text.
+          key={`${year}-${month}-${pageQuery.data.page.id}-${pageQuery.data.page.updatedAt}`}
           year={year}
           month={month}
           page={pageQuery.data.page}
@@ -295,11 +374,13 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
   const [themeColor, setThemeColor] = useState(page.themeColor ?? '')
   const [themePlacement, setThemePlacement] = useState(page.themePlacement ?? DEFAULT_PLACEMENT)
   const [versePlacement, setVersePlacement] = useState(page.versePlacement ?? DEFAULT_PLACEMENT)
+  const [schedulePlacement, setSchedulePlacement] = useState(page.schedulePlacement ?? DEFAULT_SCHEDULE_PLACEMENT)
   const [verseText, setVerseText] = useState(page.verseText ?? '')
   const [verseReference, setVerseReference] = useState(page.verseReference ?? '')
   const [hideNormalScheduleFooter, setHideNormalScheduleFooter] = useState(page.hideNormalScheduleFooter)
 
   const placementOptions = useMemo(() => getAvailablePlacements(year, month), [year, month])
+  const schedulePlacementOptions = useMemo(() => getSchedulePlacements(year, month), [year, month])
 
   const [eventForm, setEventForm] = useState<EventFormState | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<CalendarPrintEvent | null>(null)
@@ -354,31 +435,40 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
         themeColor: themeColor || null,
         themePlacement: themePlacement === DEFAULT_PLACEMENT ? null : themePlacement,
         versePlacement: versePlacement === DEFAULT_PLACEMENT ? null : versePlacement,
+        schedulePlacement: schedulePlacement === DEFAULT_SCHEDULE_PLACEMENT ? null : schedulePlacement,
         verseText: verseText || null,
         verseReference: verseReference || null,
         hideNormalScheduleFooter,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+      invalidateCalendarPrint(queryClient)
       toast.success('Saved')
     },
     onError: (err: Error) => toast.error(err.message),
   })
 
   const createEventMutation = useMutation({
-    mutationFn: (data: {date: string; title: string; style: CalendarPrintEventStyle}) =>
-      createCalendarPrintEvent(year, month, data),
+    mutationFn: (data: {date: string; title: string; style: CalendarPrintEventStyle; repeatRule: RepeatRule}) => {
+      // The Event goes on its own date's page, which isn't always the month being viewed.
+      const [y, m] = data.date.split('-').map(Number)
+      return createCalendarPrintEvent(y, m, data)
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+      invalidateCalendarPrint(queryClient)
     },
     onError: (err: Error) => toast.error(err.message),
   })
 
   const updateEventMutation = useMutation({
-    mutationFn: ({id, data}: {id: number; data: {date: string; title: string; style: CalendarPrintEventStyle}}) =>
-      updateCalendarPrintEvent(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number
+      data: {date: string; title: string; style: CalendarPrintEventStyle; repeatRule: RepeatRule}
+    }) => updateCalendarPrintEvent(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+      invalidateCalendarPrint(queryClient)
     },
     onError: (err: Error) => toast.error(err.message),
   })
@@ -386,7 +476,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
   const deleteEventMutation = useMutation({
     mutationFn: (id: number) => deleteCalendarPrintEvent(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+      invalidateCalendarPrint(queryClient)
     },
     onError: (err: Error) => toast.error(err.message),
   })
@@ -394,8 +484,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
   const updateDefaultScheduleMutation = useMutation({
     mutationFn: (items: NormalScheduleItemInput[]) => updateCalendarPrintDefaultSchedule(items),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintDefaultSchedule})
-      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+      invalidateCalendarPrint(queryClient)
       setDefaultScheduleOpen(false)
       toast.success('Default schedule saved')
     },
@@ -406,7 +495,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
     mutationFn: (items: NormalScheduleItemInput[] | null) =>
       updateCalendarPrintPage(year, month, {scheduleItems: items}),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+      invalidateCalendarPrint(queryClient)
       setOverrideOpen(false)
       setPendingOverrideSave(null)
       setPendingRevert(false)
@@ -440,7 +529,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
       showNormalScheduleLabel?: boolean
     }) => upsertCalendarPrintDayOverride(year, month, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+      invalidateCalendarPrint(queryClient)
     },
     onError: (err: Error) => toast.error(err.message),
   })
@@ -448,7 +537,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
   const deleteOverrideMutation = useMutation({
     mutationFn: (id: number) => deleteCalendarPrintDayOverride(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+      invalidateCalendarPrint(queryClient)
     },
     onError: (err: Error) => toast.error(err.message),
   })
@@ -476,23 +565,15 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
       const iso = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
       targets.push(iso)
     }
-    Promise.all(
-      targets.map((iso) =>
-        ids.length === 0 && !showNoKaya
-          ? (() => {
-              const existing = dayOverrides.find((ov) => ov.date === iso)
-              return existing ? deleteCalendarPrintDayOverride(existing.id) : Promise.resolve()
-            })()
-          : upsertCalendarPrintDayOverride(year, month, {
-              date: iso,
-              inlineItemIds: ids,
-              showNoKaya,
-              showNormalScheduleLabel,
-            }),
-      ),
-    )
+    applyCalendarPrintDayOverride(year, month, {
+      sourceDate,
+      dates: targets,
+      inlineItemIds: ids,
+      showNoKaya,
+      showNormalScheduleLabel,
+    })
       .then(() => {
-        queryClient.invalidateQueries({queryKey: queryKeys.calendarPrintPage(year, month)})
+        invalidateCalendarPrint(queryClient)
         setDayEditorDate(null)
         toast.success(`Applied to ${targets.length} day(s)`)
       })
@@ -518,6 +599,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
       date: eventForm.date,
       title: eventForm.title.trim(),
       style: eventForm.style,
+      repeatRule: eventForm.repeatRule,
     }
     if (eventForm.id == null) {
       createEventMutation.mutate(data, {onSuccess: () => setEventForm(null)})
@@ -663,6 +745,21 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label>Normal Schedule placement</Label>
+                <Select value={schedulePlacement} onValueChange={setSchedulePlacement}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {schedulePlacementOptions.map((opt) => (
+                      <SelectItem key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span>
                   Schedule:{' '}
@@ -687,7 +784,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
                   checked={hideNormalScheduleFooter}
                   onChange={(e) => setHideNormalScheduleFooter(e.target.checked)}
                 />
-                <span>Hide Normal Schedule block in footer (this month)</span>
+                <span>Hide Normal Schedule block (this month)</span>
               </label>
               <Button onClick={() => updatePageMutation.mutate()} disabled={updatePageMutation.isPending}>
                 Save Page Details
@@ -727,6 +824,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
                           </span>
                           <span className="flex-1 break-words text-left">
                             {event.title || <span className="italic text-muted-foreground">NO KAYA or Choir</span>}
+                            <span className="block text-xs text-muted-foreground">{eventRuleLabel(event)}</span>
                           </span>
                         </div>
                       ))}
@@ -754,6 +852,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
                 themeColor={themeColor || null}
                 themePlacement={themePlacement}
                 versePlacement={versePlacement}
+                schedulePlacement={schedulePlacement}
                 verseText={verseText || null}
                 verseReference={verseReference || null}
                 scheduleItems={scheduleItems}
@@ -780,6 +879,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
                 themeColor={themeColor || null}
                 themePlacement={themePlacement}
                 versePlacement={versePlacement}
+                schedulePlacement={schedulePlacement}
                 verseText={verseText || null}
                 verseReference={verseReference || null}
                 scheduleItems={scheduleItems}
@@ -829,6 +929,7 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
             themeColor={themeColor || null}
             themePlacement={themePlacement}
             versePlacement={versePlacement}
+            schedulePlacement={schedulePlacement}
             verseText={verseText || null}
             verseReference={verseReference || null}
             scheduleItems={scheduleItems}
@@ -850,7 +951,15 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
                 <Label htmlFor="event-date">Date</Label>
                 <DatePicker
                   value={eventForm.date}
-                  onChange={(date) => setEventForm({...eventForm, date})}
+                  onChange={(date) =>
+                    setEventForm({
+                      ...eventForm,
+                      date,
+                      // Moving an Event re-guesses its rule; the Repeats field shows what it picked.
+                      repeatRule: date ? guessRule(eventForm.title, date) : eventForm.repeatRule,
+                      ruleTouched: false,
+                    })
+                  }
                   placeholder="Pick a date..."
                 />
               </div>
@@ -860,12 +969,29 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
                   id="event-title"
                   rows={2}
                   value={eventForm.title}
-                  onChange={(e) => setEventForm({...eventForm, title: e.target.value})}
+                  onChange={(e) =>
+                    setEventForm({
+                      ...eventForm,
+                      title: e.target.value,
+                      repeatRule:
+                        eventForm.ruleTouched || !eventForm.date
+                          ? eventForm.repeatRule
+                          : guessRule(e.target.value, eventForm.date),
+                    })
+                  }
                   placeholder="Mother's Day"
                   autoFocus
                 />
                 <p className="text-xs text-muted-foreground">Press Enter to add a line break.</p>
               </div>
+              {eventForm.date && (
+                <RepeatsField
+                  date={eventForm.date}
+                  title={eventForm.title}
+                  rule={eventForm.repeatRule}
+                  onChange={(repeatRule) => setEventForm({...eventForm, repeatRule, ruleTouched: true})}
+                />
+              )}
               <div className="space-y-1.5">
                 <Label>Style</Label>
                 <div className="space-y-1.5">
@@ -935,6 +1061,8 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
             date: dayEditorDate,
             title: '',
             style: 'regular',
+            repeatRule: guessRule('', dayEditorDate),
+            ruleTouched: false,
           })
         }}
         onEditEvent={(event) =>
@@ -943,6 +1071,8 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
             date: event.date,
             title: event.title,
             style: event.style,
+            repeatRule: eventRule(event),
+            ruleTouched: true,
           })
         }
         onDuplicateEvent={(event) =>
@@ -951,6 +1081,8 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
             date: event.date,
             title: event.title,
             style: event.style,
+            repeatRule: eventRule(event),
+            ruleTouched: true,
           })
         }
         onDeleteEvent={(event) => setDeleteTarget(event)}
@@ -1006,5 +1138,52 @@ function CalendarPrintEditor({year, month, page, events, scheduleItems, dayOverr
         onConfirm={() => saveOverrideMutation.mutate(null)}
       />
     </>
+  )
+}
+
+// The Event form's Repeats field (plans/calendar-year-copy.md, decision 6): the rule in plain
+// words, with every alternative that gives this date. What it says is what the Year Copy does.
+function RepeatsField({
+  date,
+  title,
+  rule,
+  onChange,
+}: {
+  date: string
+  title: string
+  rule: RepeatRule
+  onChange: (rule: RepeatRule) => void
+}) {
+  const options = useMemo(() => {
+    const opts = ruleAlternatives(date, title)
+    // A stored rule that no longer gives this date (e.g. a later day of a multi-day run) still shows.
+    if (!opts.some((o) => sameRule(o.rule, rule))) opts.unshift({rule, label: describeRule(rule)})
+    return opts
+  }, [date, title, rule])
+  return (
+    <div className="space-y-1.5">
+      <Label>Repeats</Label>
+      <Select
+        value={JSON.stringify(rule)}
+        onValueChange={(v) => {
+          const next = parseRule(v)
+          if (next) onChange(next)
+        }}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((o) => (
+            <SelectItem key={JSON.stringify(o.rule)} value={JSON.stringify(o.rule)}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">
+        Where Copy into next year puts it. Days in a row with the same title move together with the first day.
+      </p>
+    </div>
   )
 }

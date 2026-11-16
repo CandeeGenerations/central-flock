@@ -14,6 +14,7 @@ import {
   FolderOpen,
   GraduationCap,
   HandHeart,
+  Images,
   LayoutDashboard,
   List,
   ListMusic,
@@ -142,7 +143,10 @@ export const navGroups: NavGroup[] = [
     id: 'calendar',
     label: 'Calendar',
     icon: Calendar,
-    children: [{to: '/calendar', label: 'Upcoming', icon: CalendarDays, end: true}],
+    children: [
+      {to: '/calendar', label: 'Upcoming', icon: CalendarDays, end: true},
+      {to: '/calendar/events-story', label: 'Events Story', icon: Images},
+    ],
   },
   {
     id: 'sermons',

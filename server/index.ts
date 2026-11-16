@@ -23,6 +23,7 @@ import {connectionsCallbackRouter, connectionsRouter} from './routes/connections
 import {contactsRouter} from './routes/contacts.js'
 import {cleanupOrphanedScanImages, devotionsRouter} from './routes/devotions.js'
 import {draftsRouter} from './routes/drafts.js'
+import {eventsStoryRouter} from './routes/events-story.js'
 import {fairBoothRouter} from './routes/fair-booth.js'
 import {fillAmericaRouter} from './routes/fill-america.js'
 import {globalVariablesRouter} from './routes/global-variables.js'
@@ -55,6 +56,7 @@ import {workersNotesRouter} from './routes/workers-notes.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
 import {backfillRepeatRules} from './services/calendar-print-year-copy.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
+import {recoverInterruptedRuns} from './services/events-story/run.js'
 import {startFairBoothReminderScheduler} from './services/fair-booth-reminders.js'
 import {startMusicScanCleanup} from './services/music-scan-cleanup.js'
 import {startScheduler} from './services/scheduler.js'
@@ -114,6 +116,7 @@ app.use('/api/sunday-school-stats', sundaySchoolStatsRouter)
 app.use('/api/fill-america', fillAmericaRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/connections', connectionsRouter)
+app.use('/api/events-story', eventsStoryRouter)
 app.use('/api/specials', specialsRouter)
 app.use('/api/usage', usageRouter)
 
@@ -168,6 +171,14 @@ try {
   if (guessed) console.log(`Calendar Print: guessed Repeat Rules for ${guessed} Events`)
 } catch (err) {
   console.error('Calendar Print Repeat Rule backfill failed:', err)
+}
+
+// A Story Run left mid-step by a restart can never finish; mark it failed so it can be retried.
+try {
+  const interrupted = recoverInterruptedRuns()
+  if (interrupted) console.log(`Events Story: marked ${interrupted} interrupted run(s) failed`)
+} catch (err) {
+  console.error('Events Story run recovery failed:', err)
 }
 
 app.listen(PORT, () => {

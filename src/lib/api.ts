@@ -668,6 +668,101 @@ export function disconnectConnection(provider: ConnectionProvider) {
   return request<{ok: boolean}>(`/connections/${provider}`, {method: 'DELETE'})
 }
 
+// Events Story (weekly "Upcoming events" Instagram/Facebook Story — server/services/events-story)
+export interface StoryLineDraft {
+  eventIds: number[]
+  date: string
+  endDate: string | null
+  dayNumber: string
+  month: string
+  dayTimeLine: string
+  line1: string
+  line2: string | null
+}
+
+export interface StoryCandidate extends StoryLineDraft {
+  title: string
+  warnings: string[]
+}
+
+export interface RankedHour {
+  hour: number
+  score: number
+}
+
+export type EventsStoryRunStatus =
+  'drafting' | 'awaiting_approval' | 'scheduling' | 'scheduled' | 'failed' | 'discarded'
+
+export interface EventsStoryRun {
+  id: number
+  status: EventsStoryRunStatus
+  failedStep: string | null
+  error: string | null
+  progressMessage: string | null
+  progressPct: number
+  postDate: string
+  postMinute: number
+  lines: StoryLineDraft[]
+  canvaTransactionId: string | null
+  previewPath: string | null
+  exportPath: string | null
+  metricoolPostId: string | null
+  metricoolPlannerUrl: string | null
+  stale: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ConnectionCheck {
+  ok: boolean
+  reason?: 'not_connected' | 'needs_reconnect' | 'not_configured' | 'error'
+  message?: string
+}
+
+export interface EventsStoryDay {
+  postDate: string
+  hours: RankedHour[]
+  hoursSource: 'metricool' | 'fallback'
+  candidates: StoryCandidate[]
+  scheduledThatWeek: EventsStoryRun[]
+}
+
+export interface EventsStoryPrepare extends EventsStoryDay {
+  connections: Record<ConnectionProvider, ConnectionCheck>
+  ready: boolean
+  today: string
+  maxDate: string
+  openRun: EventsStoryRun | null
+}
+
+export function prepareEventsStory() {
+  return request<EventsStoryPrepare>('/events-story/prepare')
+}
+
+export function fetchEventsStoryDay(date: string) {
+  return request<EventsStoryDay>(`/events-story/day?date=${encodeURIComponent(date)}`)
+}
+
+export function fetchEventsStoryRuns() {
+  return request<EventsStoryRun[]>('/events-story/runs')
+}
+
+export function fetchEventsStoryRun(id: number) {
+  return request<EventsStoryRun>(`/events-story/runs/${id}`)
+}
+
+export function createEventsStoryRun(input: {postDate: string; postMinute: number; lines: StoryLineDraft[]}) {
+  return request<EventsStoryRun>('/events-story/runs', {method: 'POST', body: JSON.stringify(input)})
+}
+
+export function discardEventsStoryRun(id: number) {
+  return request<EventsStoryRun>(`/events-story/runs/${id}/discard`, {method: 'POST'})
+}
+
+export function redraftEventsStoryRun(id: number) {
+  return request<EventsStoryRun>(`/events-story/runs/${id}/redraft`, {method: 'POST'})
+}
+
 // Stats
 export interface StatsResponse {
   people: {total: number; active: number; inactive: number; doNotContact: number}

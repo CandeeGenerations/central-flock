@@ -11,33 +11,33 @@ are in [CONTEXT.md](../CONTEXT.md). The architecture decision is
 
 ## Decisions
 
-| #   | Decision         | Choice                                                                                                                                                                                                                               |
-| --- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Who edits Canva  | Central Flock is the MCP client and calls the Canva tools directly. No Claude, no Anthropic MCP connector (ADR 0042).                                                                                                                |
-| 2   | Reuse            | A general MCP+OAuth client module (`server/lib/mcp-client/`) shared by Canva, Metricool and future features. Design-specific knowledge stays with the feature.                                                                       |
-| 3   | Canva sign-in    | Developer Portal app with Canva MCP turned on. Redirect `https://flock.cgen.cc/api/connections/canva/callback` (tunnel), with `http://127.0.0.1:5172/...` registered as a fallback.                                                  |
-| 4   | Metricool        | Metricool's remote MCP server `https://ai.metricool.com/mcp` with OAuth 2.1, not the REST API. Brand `blogId` 2350437, America/New_York.                                                                                             |
-| 5   | Sign-in check    | Every Story Run checks **both** Connections before the picker unlocks. A failure blocks the run and offers Reconnect.                                                                                                                |
-| 6   | Event source     | `calendar_print_events`, never Apple Calendar.                                                                                                                                                                                       |
-| 7   | Picker list      | The next 10 Events from the post date (inclusive). **Unconfirmed Events** (`* ` prefix) are excluded. A **Span** counts once, by its first day. Nothing else is filtered. The first 5 are pre-selected and exactly 5 must be chosen. |
-| 8   | Default post day | Mon–Wed: today if a good hour remains, otherwise roll one day forward. Thu–Sun, or a roll that reaches Thursday: next Monday. Never skip a week of events.                                                                           |
-| 9   | Best time        | `get_best_time_to_post` for Facebook and Instagram on the post day. Add the two scores per hour and pick the best hour that is at least 30 min from now and before 9 pm. If the call fails, use 10 am.                               |
-| 10  | Overrides        | Any date up to 4 weeks ahead, which works out that day's best hour again. The next two best hours are quick chips, and there is a manual time picker. Events count from the chosen date.                                             |
-| 11  | Late approval    | If the chosen time has passed when Approve is pressed, suggest the next good hour and confirm.                                                                                                                                       |
-| 12  | Title parsing    | Deterministic. A line that starts with a time is the time; the first one goes on the day/time line (`Saturday @ 1 pm`, `Saturday @ 10 am - 2 pm`) and labels after it are dropped. No time gives just `Thursday`.                    |
-| 13  | Title lines      | Two lines whenever the name has 2+ words. 2 lines are kept as-is, 1 line is split at the space nearest the middle, 3+ lines keep the first two and get ⚠. Single words stay on one line. Every field is editable in the picker.      |
-| 14  | Divider          | Every run resets all 5 dividers to their fixed grid position after the text edits. Canva shifts a divider by ±54 px when its title switches between one and two lines, and the position is the same either way (see Spike findings). |
-| 15  | Month            | Always 3-letter uppercase (`NOV`), written on every Story Line every run.                                                                                                                                                            |
-| 16  | Lifecycle        | Drafting → Awaiting Approval → Scheduling → Scheduled, plus Failed (Retry from the failed step). Discarding cancels the Canva transaction.                                                                                           |
-| 17  | Expired draft    | Approve re-applies the same edits, shows the **new** preview, and waits for one more tap.                                                                                                                                            |
-| 18  | Concurrency      | One open draft at a time, because there is one design. A new run asks Resume or Discard. A second run in a week that already has a Scheduled one gets a warning.                                                                     |
-| 19  | After Scheduled  | No "Posted" tracking; Metricool publishes the post. Store the post ID, the time and the exported PNG.                                                                                                                                |
-| 20  | Calendar changes | A Calendar Print save that changes the Events shown in a Scheduled Story Run flags that run and offers to redo it.                                                                                                                   |
-| 21  | Placement        | `/calendar/events-story`, "Events Story" under the **Calendar** nav group. Home **Needs Attention** on Mon–Wed when this week has no Scheduled run, and for a flagged run.                                                           |
-| 22  | Connections UI   | **Settings → Connections**: Canva and Metricool, each with Connected as … or Reconnect.                                                                                                                                              |
-| 23  | Progress         | `AIProgress` driven by real server steps (polled every 1 s), not timed fake messages.                                                                                                                                                |
-| 24  | Secrets          | Plist: `CANVA_CLIENT_ID`, `CANVA_CLIENT_SECRET`, `CONNECTIONS_KEY`. Tokens are stored AES-256-GCM encrypted in the `connections` table. Each provider refreshes under its own lock and the new token is saved before it is used.     |
-| 25  | Metricool post   | One post with both networks, `facebookData.type` and `instagramData.type` = `STORY`, no text, `autoPublish: true`, alt text listing the 5 events, media = the Canva export URL.                                                      |
+| #   | Decision         | Choice                                                                                                                                                                                                                                                                                                                                                                |
+| --- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Who edits Canva  | Central Flock is the MCP client and calls the Canva tools directly. No Claude, no Anthropic MCP connector (ADR 0042).                                                                                                                                                                                                                                                 |
+| 2   | Reuse            | A general MCP+OAuth client module (`server/lib/mcp-client/`) shared by Canva, Metricool and future features. Design-specific knowledge stays with the feature.                                                                                                                                                                                                        |
+| 3   | Canva sign-in    | Developer Portal app with Canva MCP turned on. Redirect `https://flock.cgen.cc/api/connections/canva/callback` (tunnel), with `http://127.0.0.1:5172/...` registered as a fallback.                                                                                                                                                                                   |
+| 4   | Metricool        | Metricool's remote MCP server `https://ai.metricool.com/mcp` with OAuth 2.1, not the REST API. Brand `blogId` 2350437, America/New_York.                                                                                                                                                                                                                              |
+| 5   | Sign-in check    | Every Story Run checks **both** Connections before the picker unlocks. A failure blocks the run and offers Reconnect.                                                                                                                                                                                                                                                 |
+| 6   | Event source     | `calendar_print_events`, never Apple Calendar.                                                                                                                                                                                                                                                                                                                        |
+| 7   | Picker list      | The next 10 Events from the post date (inclusive). **Unconfirmed Events** (`* ` prefix) are excluded. A **Span** counts once, by its first day. Nothing else is filtered. The first 5 are pre-selected and exactly 5 must be chosen.                                                                                                                                  |
+| 8   | Default post day | Mon–Wed: today if a good hour remains, otherwise roll one day forward. Thu–Sun, or a roll that reaches Thursday: next Monday. Never skip a week of events.                                                                                                                                                                                                            |
+| 9   | Best time        | `getBestTimeToPostByNetwork` for Facebook and Instagram on the post day. Add the two scores per hour and pick the best hour that is at least 30 min from now and before 9 pm. If the call fails, use 10 am.                                                                                                                                                           |
+| 10  | Overrides        | Any date up to 4 weeks ahead, which works out that day's best hour again. The next two best hours are quick chips, and there is a manual time picker. Events count from the chosen date.                                                                                                                                                                              |
+| 11  | Late approval    | If the chosen time has passed when Approve is pressed, suggest the next good hour and confirm.                                                                                                                                                                                                                                                                        |
+| 12  | Title parsing    | Deterministic. A line that starts with a time is the time; the first one goes on the day/time line (`Saturday @ 1 pm`, `Saturday @ 10 am - 2 pm`) and labels after it are dropped. No time gives just `Thursday`.                                                                                                                                                     |
+| 13  | Title lines      | Two lines whenever the name has 2+ words. 2 lines are kept as-is, 1 line is split at the space nearest the middle, 3+ lines keep the first two and get ⚠. Single words stay on one line. Every field is editable in the picker.                                                                                                                                       |
+| 14  | Divider          | Every title box stays **two lines tall**: a one-line name gets a non-breaking-space second line. Canva's Connect MCP has no `update_line_properties`, so a divider that moves can't be put back. Keeping the box height fixed means the divider never moves. Before editing, the run checks every title box is two lines tall (`checkTitleBoxes`) and refuses if not. |
+| 15  | Month            | Always 3-letter uppercase (`NOV`), written on every Story Line every run.                                                                                                                                                                                                                                                                                             |
+| 16  | Lifecycle        | Drafting → Awaiting Approval → Scheduling → Scheduled, plus Failed (Retry from the failed step). Discarding cancels the Canva transaction.                                                                                                                                                                                                                            |
+| 17  | Expired draft    | Approve re-applies the same edits, shows the **new** preview, and waits for one more tap.                                                                                                                                                                                                                                                                             |
+| 18  | Concurrency      | One open draft at a time, because there is one design. A new run asks Resume or Discard. A second run in a week that already has a Scheduled one gets a warning.                                                                                                                                                                                                      |
+| 19  | After Scheduled  | No "Posted" tracking; Metricool publishes the post. Store the post ID, the time and the exported PNG.                                                                                                                                                                                                                                                                 |
+| 20  | Calendar changes | A Calendar Print save that changes the Events shown in a Scheduled Story Run flags that run and offers to redo it.                                                                                                                                                                                                                                                    |
+| 21  | Placement        | `/calendar/events-story`, "Events Story" under the **Calendar** nav group. Home **Needs Attention** on Mon–Wed when this week has no Scheduled run, and for a flagged run.                                                                                                                                                                                            |
+| 22  | Connections UI   | **Settings → Connections**: Canva and Metricool, each with Connected as … or Reconnect.                                                                                                                                                                                                                                                                               |
+| 23  | Progress         | `AIProgress` driven by real server steps (polled every 1 s), not timed fake messages.                                                                                                                                                                                                                                                                                 |
+| 24  | Secrets          | Plist: `CANVA_CLIENT_ID`, `CANVA_CLIENT_SECRET`, `CONNECTIONS_KEY`. Tokens are stored AES-256-GCM encrypted in the `connections` table. Each provider refreshes under its own lock and the new token is saved before it is used.                                                                                                                                      |
+| 25  | Metricool post   | One post with both networks, `facebookData.type` and `instagramData.type` = `STORY`, no text, `autoPublish: true`, alt text listing the 5 events, media = the Canva export URL.                                                                                                                                                                                       |
 
 ## Step 0: Spike (before building)
 
@@ -79,13 +79,57 @@ Tested in an editing transaction on `DAHXGTKcnks`, then **cancelled**; nothing w
 - Scopes needed for edit and export via MCP are not documented. Find out from the first consent
   screen or a `401`/`403`.
 
+### Sign-in results (2026-11-16, deployed in `3169fbd`)
+
+- **Canva connected.** The SDK found Canva's OAuth endpoints itself (`www.canva.com/api/oauth/authorize`)
+  and asked for every scope the server lists, which the Developer Portal app accepted. The access token
+  lasts **4 h** and the refresh token rotates. `tools/list` returns 50 tools.
+- **Metricool connected** through dynamic client registration (no Developer Portal app). The access
+  token lasts **1 h**. 9 tools.
+- **Canva's Connect MCP server names its tools differently from the claude.ai Canva connector** used
+  by hand. Use these:
+  - `start-editing-transaction(design_id)` → `perform-editing-operations(transaction_id, operations,
+page_index)` → `get-design-thumbnail(transaction_id, page_index)` →
+    `commit-editing-transaction` or `cancel-editing-transaction`.
+  - `export-design(design_id, format)` for the PNG.
+  - `get-logged-in-account-details` for the "Connected as …" name.
+  - The operation shapes (`replace_text`, `update_line_properties`) still need checking against
+    `perform-editing-operations`' input schema.
+- **Metricool tools:**
+  - `getBestTimeToPostByNetwork(brandId, fromDate, toDate, timezone, socialNetwork)`, called once
+    each for `facebook` and `instagram`, with dates in ISO 8601 with an offset.
+  - `createScheduledPost(date, blogId, info, mediaFiles)`, where `info` is a JSON string
+    (`autoPublish`, `media` as public URLs, `mediaAltText`, `providers: [{network}]`, plus
+    per-network data). The date can't be in the past. The response includes a `plannerUrl`.
+  - `getScheduledPosts` lists posts, for example to look for another Story already scheduled that
+    week.
+  - `getBrandSettings` returns the timezone.
+
+### Story sharing by other accounts (resolved)
+
+Who may share the Story is an Instagram account setting, and Tyler turned it on in Instagram.
+Metricool has no per-post resharing option, so the post itself needs nothing.
+
+### Draft flow verified live (2026-11-16)
+
+Tested against Canva Connect, with the transaction cancelled afterwards:
+`start-editing-transaction` → `perform-editing-operations` (20 `replace_text` with `element_id` =
+full locator) → `get-design-thumbnail` (`thumbnails[0].url`) → `cancel-editing-transaction`.
+`start-editing-transaction` returns `richtexts[]` with `element_id` and
+`containerElement.dimension.height`, which the two-line check reads. Padding a one-line name with a
+non-breaking space keeps the box 100 px tall and the divider in place, and the padding doesn't
+show. (U+2800 does show.)
+
+**One-time fix (done 2026-11-16, approved by Tyler):** the saved design has Story Line 5 as a one-line box ("Thanksgiving Day")
+with its divider moved by hand. A run would push that divider down onto `@cbcwoodbridge`. Fix:
+give it a non-breaking-space second line and reset its divider to `top` 1751.148768496615. The
+result looks identical. After saving, the Connect-side check (`checkTitleBoxes`) passes for all 5.
+
 ### Still to do
 
-1. **Tyler:** create the Developer Portal app and register both redirect URLs.
-2. Confirm the first sign-in works end to end, and record the scopes and `expires_in`.
-3. Find out how long a Canva editing transaction stays open (leave a test one open and retry).
-4. Metricool: client registration (DCR or CIMD), and the real tool names and Story fields from
-   `tools/list`.
+1. Find out how long a Canva editing transaction stays open (leave a test one open and retry).
+2. Read the full `info` schema for `createScheduledPost` (the Story fields for `facebookData` and
+   `instagramData`) and the `perform-editing-operations` operation schema before building the run.
 
 ## Server
 
@@ -108,7 +152,7 @@ Tested in an editing transaction on `DAHXGTKcnks`, then **cancelled**; nothing w
 - `post-time.ts`: default post day (Decision 8) plus best hour (Decision 9). Pure, with the
   best-time scores injected.
 - `canva-design.ts`: design ID, page ID, the Story Line locator table, divider tops, and
-  `buildEdits(lines)` that returns the `edit-design` operations.
+  `buildEdits(lines)` that returns the `perform-editing-operations` operations.
 - `run.ts`: the Story Run state machine. Step progress is written to the run row and polled by the UI.
 - `stale-check.ts`: called from the Calendar Print save path. It re-picks the Events for each
   Scheduled run and flags the run if they differ.

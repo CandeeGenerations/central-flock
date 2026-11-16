@@ -1,0 +1,98 @@
+import {describe, expect, it} from 'vitest'
+
+import {
+  STORY_LINE_LOCATORS,
+  type StoryLineFields,
+  TITLE_PAD,
+  altText,
+  buildOperations,
+  titleText,
+} from './canva-design.js'
+
+const line = (n: number, line2: string | null = 'Dinner'): StoryLineFields => ({
+  dayNumber: String(20 + n),
+  month: 'Nov',
+  dayTimeLine: 'Saturday @ 4 pm',
+  line1: `Event ${n}`,
+  line2,
+})
+
+describe('buildOperations', () => {
+  it('writes day, month, day/time and title for all five Story Lines', () => {
+    const ops = buildOperations([1, 2, 3, 4, 5].map((n) => line(n)))
+    expect(ops).toHaveLength(20)
+    expect(ops[0]).toEqual({type: 'replace_text', element_id: STORY_LINE_LOCATORS[0].dayNumber, text: '21'})
+    expect(ops[19]).toEqual({type: 'replace_text', element_id: STORY_LINE_LOCATORS[4].title, text: 'Event 5\nDinner'})
+    expect(new Set(ops.map((o) => o.element_id)).size).toBe(20)
+    expect(ops.every((o) => o.element_id.startsWith('PBxpttyc19vjDJRB-'))).toBe(true)
+  })
+
+  it('refuses anything but five', () => {
+    expect(() => buildOperations([line(1)])).toThrow(/exactly 5/)
+  })
+})
+
+describe('titleText', () => {
+  it('pads a one-line name so the title box stays two lines tall', () => {
+    expect(titleText({line1: 'Holiday', line2: null})).toBe(`Holiday\n${TITLE_PAD}`)
+    expect(titleText({line1: 'Holiday', line2: '  '})).toBe(`Holiday\n${TITLE_PAD}`)
+    expect(titleText({line1: ' Church Family ', line2: 'Thanksgiving Dinner'})).toBe(
+      'Church Family\nThanksgiving Dinner',
+    )
+  })
+})
+
+describe('altText', () => {
+  it('lists the events', () => {
+    expect(altText([line(1), line(2, null)])).toBe(
+      'Upcoming events at Central Baptist Church. Saturday @ 4 pm, Nov 21: Event 1 Dinner. Saturday @ 4 pm, Nov 22: Event 2.',
+    )
+  })
+})
+
+describe('parseBestTimes', async () => {
+  const {parseBestTimes} = await import('./metricool.js')
+  const json = {
+    data: [
+      {dayOfWeek: 7, bestTimesByHour: [{hourOfDay: 18, value: 45}]},
+      {
+        dayOfWeek: 1,
+        bestTimesByHour: [
+          {hourOfDay: 10, value: 50},
+          {hourOfDay: 13, value: 48},
+        ],
+      },
+    ],
+  }
+  it('keeps only the requested weekday (2026-11-23 is a Monday)', () => {
+    expect([...parseBestTimes(json, '2026-11-23')]).toEqual([
+      [10, 50],
+      [13, 48],
+    ])
+    expect([...parseBestTimes(json, '2026-11-22')]).toEqual([[18, 45]])
+  })
+  it('tolerates junk', () => {
+    expect(parseBestTimes(null, '2026-11-23').size).toBe(0)
+  })
+})
+
+describe('checkTitleBoxes', async () => {
+  const {checkTitleBoxes, describeTitleProblems} = await import('./canva-design.js')
+  const entry = (i: number, height: number) => ({
+    element_id: STORY_LINE_LOCATORS[i].title,
+    containerElement: {dimension: {height}},
+  })
+  it('passes when every title box is two lines tall', () => {
+    const check = checkTitleBoxes({richtexts: [0, 1, 2, 3, 4].map((i) => entry(i, 100.27))})
+    expect(check).toEqual({oneLine: [], missing: []})
+    expect(describeTitleProblems(check)).toBeNull()
+  })
+  it('flags one-line boxes (the Nov 16 design has one on Story Line 5)', () => {
+    const check = checkTitleBoxes({richtexts: [0, 1, 2, 3].map((i) => entry(i, 100.27)).concat(entry(4, 46.27))})
+    expect(check.oneLine).toEqual([5])
+    expect(describeTitleProblems(check)).toMatch(/Story Line 5 has a one-line/)
+  })
+  it('flags missing elements', () => {
+    expect(checkTitleBoxes({richtexts: []}).missing).toEqual([1, 2, 3, 4, 5])
+  })
+})

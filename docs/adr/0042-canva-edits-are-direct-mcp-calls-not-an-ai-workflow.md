@@ -2,7 +2,7 @@
 
 The weekly upcoming-events Story graphic is edited by Central Flock acting as an MCP client of
 Canva's remote MCP server (`https://api.canva.com/connect/v1/mcp`). The server code calls the tools
-itself: `read-design` with an open transaction, then `edit-design` with `replace_text` on the
+itself: `start-editing-transaction`, then `perform-editing-operations` with `replace_text` on the
 design's fixed slot locators, then commit and export once Tyler approves. Claude is not in that loop.
 
 The first handoff described it as an AI workflow: Claude, given the Canva server through

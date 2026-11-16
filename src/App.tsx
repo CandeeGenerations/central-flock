@@ -73,6 +73,7 @@ const AttendanceSettingsLayout = lazy(() =>
   import('@/pages/attendance-settings/attendance-settings-layout').then((m) => ({default: m.AttendanceSettingsLayout})),
 )
 const CalendarPage = lazy(() => import('@/pages/calendar-page').then((m) => ({default: m.CalendarPage})))
+const EventsStoryPage = lazy(() => import('@/pages/events-story-page').then((m) => ({default: m.EventsStoryPage})))
 const CalendarPrintPage = lazy(() =>
   import('@/pages/calendar-print-page').then((m) => ({default: m.CalendarPrintPage})),
 )
@@ -798,6 +799,7 @@ function AppLayoutInner({
                   <Route path="/music/specials/:id" element={<SpecialDetailPage />} />
                   <Route path="/calendar" element={<CalendarPage />} />
                   <Route path="/calendar/print" element={<CalendarPrintPage />} />
+                  <Route path="/calendar/events-story" element={<EventsStoryPage />} />
                   <Route path="/rsvp" element={<RsvpListPage />} />
                   <Route path="/rsvp/:id" element={<RsvpDetailPage />} />
                   <Route path="/attendance" element={<AttendanceDashboardPage />} />

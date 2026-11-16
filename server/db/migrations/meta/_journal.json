@@ -435,6 +435,13 @@
       "when": 1794340512505,
       "tag": "0061_music_line_booth_one_line",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "6",
+      "when": 1794861126194,
+      "tag": "0062_connections",
+      "breakpoints": true
     }
   ]
 }

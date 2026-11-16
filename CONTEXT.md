@@ -224,6 +224,11 @@ House Bible Study / 10:30 am") and a bold-or-regular style. A multi-day happenin
 Fair is one Event per day, not a span.
 _Avoid_: Appointment, Entry.
 
+**Unconfirmed Event**:
+An **Event** whose title starts with `* `, e.g. `* Youth Saturation`. It is on the calendar but not
+yet confirmed. Left out of public-facing outputs such as the **Events Story**.
+_Avoid_: Tentative, Draft (a Messaging term).
+
 **Repeat Rule**:
 How an **Event** lands in the following year — e.g. "4th Thursday of November", "December 25",
 "Easter − 7 days". Stored on the Event, not re-guessed: one year's date can't tell "4th Thursday"
@@ -823,6 +828,31 @@ the Life". Typed by the preacher, not inferred. A Sermon with no Series is norma
 The few sentences on either side of a **Social Quote** in the transcript, shown so the preacher can
 widen or narrow the cut to find the right line. Derived from the stored span offsets at render
 time — never stored.
+
+**Events Story**:
+The weekly "Upcoming events" graphic: one 1080×1920 Canva design showing the next five chosen
+**Events** from the printed calendar. Posted as a Facebook and Instagram Story. The same design is
+edited each week rather than a new one being made. Nothing in it is saved in Canva until Tyler
+approves the draft.
+_Avoid_: Graphic, Flyer, **Shifts Card** (another 1080×1920 image).
+
+**Story Line**:
+One of the five fixed positions on an **Events Story**: a date block (day number, month) beside a
+day/time line ("Saturday @ 4 pm", or just "Thursday" when there is no time) and a two-line title.
+Filled top to bottom in date order.
+_Avoid_: Slot (a Fair Booth and Devotion term), Row.
+
+**Story Run**:
+One pass through the weekly workflow: choose five **Events**, draft the **Events Story** in Canva,
+approve the preview, and schedule it as a Story at the chosen post time. Stored, so an unapproved
+draft can be picked up again and past weeks can be looked back on.
+_Avoid_: Job, Batch.
+
+**Connection**:
+A saved sign-in to an outside service that Central Flock acts through, currently Canva and
+Metricool. Checked at the start of every **Story Run**. A failed Connection stops the run before
+anything is edited and offers Reconnect.
+_Avoid_: Integration, Account.
 
 ## Relationships
 

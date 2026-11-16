@@ -19,6 +19,7 @@ import {attendanceRouter} from './routes/attendance.js'
 import {authRouter} from './routes/auth.js'
 import {calendarPrintRouter} from './routes/calendar-print.js'
 import {calendarRouter} from './routes/calendar.js'
+import {connectionsCallbackRouter, connectionsRouter} from './routes/connections.js'
 import {contactsRouter} from './routes/contacts.js'
 import {cleanupOrphanedScanImages, devotionsRouter} from './routes/devotions.js'
 import {draftsRouter} from './routes/drafts.js'
@@ -73,6 +74,9 @@ app.use('/api/auth', authRouter)
 // Internal webhooks (unprotected by session auth; gated by X-Internal-Secret)
 app.use('/webhooks', webhooksRouter)
 
+// OAuth redirects for Connections (unprotected; authenticated by single-use `state`)
+app.use('/api/connections', connectionsCallbackRouter)
+
 // Auth middleware — before all other /api routes
 app.use('/api', requireAuth)
 
@@ -109,6 +113,7 @@ app.use('/api/attendance', attendanceRouter)
 app.use('/api/sunday-school-stats', sundaySchoolStatsRouter)
 app.use('/api/fill-america', fillAmericaRouter)
 app.use('/api/settings', settingsRouter)
+app.use('/api/connections', connectionsRouter)
 app.use('/api/specials', specialsRouter)
 app.use('/api/usage', usageRouter)
 

@@ -627,6 +627,47 @@ export function updateSetting(key: string, value: string) {
   })
 }
 
+// Connections (saved sign-ins to Canva, Metricool, … — see server/lib/mcp-client)
+export type ConnectionProvider = 'canva' | 'metricool'
+
+export interface ConnectionSummary {
+  provider: ConnectionProvider
+  label: string
+  configured: boolean
+  missingEnv: string[]
+  status: 'not_connected' | 'connected' | 'needs_reconnect'
+  expiresAt: string | null
+  lastCheckedAt: string | null
+  lastError: string | null
+}
+
+export interface ConnectionCheckResult {
+  ok: boolean
+  reason?: 'not_connected' | 'needs_reconnect' | 'not_configured' | 'error'
+  message?: string
+  toolCount?: number
+  connection: ConnectionSummary
+}
+
+export function fetchConnections() {
+  return request<ConnectionSummary[]>('/connections')
+}
+
+// Uses the 127.0.0.1 redirect when the app is open on the Mac itself, otherwise the public tunnel.
+export function startConnection(provider: ConnectionProvider) {
+  const host = window.location.hostname
+  const target = host === '127.0.0.1' || host === 'localhost' ? 'local' : 'public'
+  return request<{url: string}>(`/connections/${provider}/start`, {method: 'POST', body: JSON.stringify({target})})
+}
+
+export function checkConnection(provider: ConnectionProvider) {
+  return request<ConnectionCheckResult>(`/connections/${provider}/check`, {method: 'POST'})
+}
+
+export function disconnectConnection(provider: ConnectionProvider) {
+  return request<{ok: boolean}>(`/connections/${provider}`, {method: 'DELETE'})
+}
+
 // Stats
 export interface StatsResponse {
   people: {total: number; active: number; inactive: number; doNotContact: number}

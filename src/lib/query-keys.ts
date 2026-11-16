@@ -29,6 +29,7 @@ export const queryKeys = {
   },
   globalVariable: (id: number) => ['globalVariable', id] as const,
   settings: ['settings'] as const,
+  connections: ['connections'] as const,
   nonMembers: (groupId: string | number, search?: string) => {
     if (search !== undefined) return ['nonMembers', String(groupId), search] as const
     return ['nonMembers', String(groupId)] as const

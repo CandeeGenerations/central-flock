@@ -1,4 +1,4 @@
-import {asc, desc, eq, ne, sql} from 'drizzle-orm'
+import {and, asc, desc, eq, ne, sql} from 'drizzle-orm'
 import {Router} from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -432,6 +432,29 @@ prayerSheetRouter.patch(
         .run()
     }
     res.json(getFullEdition(editionId))
+  }),
+)
+
+// ─── Reorder entries within a Sunday (e.g. "Sort A–Z") ───────────────────────
+
+prayerSheetRouter.patch(
+  '/sundays/:id/entries/reorder',
+  asyncHandler(async (req, res) => {
+    const sundayId = Number(req.params.id)
+    const {orderedIds} = req.body as {orderedIds: number[]}
+    if (!Array.isArray(orderedIds) || !orderedIds.every(Number.isInteger)) {
+      res.status(400).json({error: 'orderedIds must be a list of entry ids'})
+      return
+    }
+    db.transaction((tx) => {
+      orderedIds.forEach((id, i) => {
+        tx.update(schema.prayerSheetEntries)
+          .set({sortOrder: i})
+          .where(and(eq(schema.prayerSheetEntries.id, id), eq(schema.prayerSheetEntries.sundayId, sundayId)))
+          .run()
+      })
+    })
+    res.json({ok: true})
   }),
 )
 

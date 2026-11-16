@@ -1,7 +1,7 @@
 import type {Client} from '@modelcontextprotocol/sdk/client/index.js'
 
 import {withMcpClient} from '../../lib/mcp-client/client.js'
-import {toolJson} from '../../lib/mcp-client/tool-result.js'
+import {findKey, toolJson} from '../../lib/mcp-client/tool-result.js'
 import {addDays, weekdayOf} from '../../lib/repeat-rules.js'
 import {type HourScores, STORY_TIMEZONE, zonedIso} from './post-time.js'
 
@@ -47,5 +47,57 @@ export function fetchBestTimes(date: string): Promise<HourScores[]> {
     const out: HourScores[] = []
     for (const network of STORY_NETWORKS) out.push(await bestTimesFor(client, date, network))
     return out
+  })
+}
+
+// Wall-clock "YYYY-MM-DDTHH:mm:ss" for Metricool's publicationDate.
+function localDateTime(date: string, minute: number): string {
+  const hh = String(Math.floor(minute / 60)).padStart(2, '0')
+  const mm = String(minute % 60).padStart(2, '0')
+  return `${date}T${hh}:${mm}:00`
+}
+
+// The `info` payload for one Facebook + Instagram Story post. Stories carry no caption.
+export function storyPostInfo(imageUrl: string, altText: string, date: string, minute: number) {
+  return {
+    autoPublish: true,
+    draft: false,
+    descendants: [],
+    firstCommentText: '',
+    hasNotReadNotes: false,
+    media: [imageUrl],
+    mediaAltText: [altText],
+    providers: STORY_NETWORKS.map((network) => ({network})),
+    publicationDate: {dateTime: localDateTime(date, minute), timezone: STORY_TIMEZONE},
+    shortener: false,
+    smartLinkData: {ids: []},
+    text: '',
+    facebookData: {type: 'STORY'},
+    instagramData: {type: 'STORY'},
+  }
+}
+
+export interface ScheduledPost {
+  id: string | null
+  plannerUrl: string | null
+}
+
+// Schedules the exported PNG as a Facebook + Instagram Story. Metricool keeps its own copy of the
+// image, so the short-lived Canva export URL is fine to hand over.
+export function scheduleStory(imageUrl: string, altText: string, date: string, minute: number): Promise<ScheduledPost> {
+  return withMcpClient('metricool', async (client) => {
+    const result = toolJson(
+      await client.callTool({
+        name: 'createScheduledPost',
+        arguments: {
+          date: zonedIso(date, Math.floor(minute / 60), minute % 60),
+          blogId: METRICOOL_BRAND_ID,
+          info: JSON.stringify(storyPostInfo(imageUrl, altText, date, minute)),
+        },
+      }),
+    )
+    const id = findKey<string | number>(result, 'id')
+    const plannerUrl = findKey<string>(result, 'plannerUrl')
+    return {id: id === undefined ? null : String(id), plannerUrl: plannerUrl ?? null}
   })
 }

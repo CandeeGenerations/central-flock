@@ -23,14 +23,27 @@ import {
   fetchPrayerSheetEdition,
   fetchPrayerSheetMinistryItems,
   fetchPrayerSheetSettings,
+  reorderPrayerSheetEntries,
   updatePrayerSheetEdition,
   updatePrayerSheetEntry,
 } from '@/lib/api'
+import {type RepeatFlag, alphabeticalIds, repeatedFromEarlierSundays} from '@/lib/prayer-sheet-entries'
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {ArrowLeft, ChevronLeft, ChevronRight, Columns2, Download, Eye, Plus, Trash2} from 'lucide-react'
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {
+  AlertTriangle,
+  ArrowDownAZ,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Columns2,
+  Download,
+  Eye,
+  Plus,
+  Trash2,
+} from 'lucide-react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Link, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
@@ -62,6 +75,13 @@ interface EntryListProps {
   onAdd: (sundayId: number) => Promise<number | undefined>
   onUpdate: (id: number, text: string) => void
   onDelete: (id: number) => void
+  /** Entry id → how it repeats an earlier Sunday (same text, or same name). */
+  repeats: Map<number, RepeatFlag>
+}
+
+function shortSunday(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  return `${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getDate()}`
 }
 
 function focusAtEnd(el: HTMLInputElement) {
@@ -69,7 +89,7 @@ function focusAtEnd(el: HTMLInputElement) {
   el.setSelectionRange(el.value.length, el.value.length)
 }
 
-function EntryList({sunday, onAdd, onUpdate, onDelete}: EntryListProps) {
+function EntryList({sunday, onAdd, onUpdate, onDelete, repeats}: EntryListProps) {
   const inputRefs = useRef<Map<number, HTMLInputElement>>(new Map())
   // A new entry's field may mount after its add resolves (the refetch renders later),
   // so its id waits here and the field focuses itself when it mounts.
@@ -103,36 +123,45 @@ function EntryList({sunday, onAdd, onUpdate, onDelete}: EntryListProps) {
   return (
     <div className="space-y-1.5">
       {sunday.entries.map((entry, idx) => (
-        <div key={entry.id} className="flex items-center gap-1">
-          <Input
-            ref={(el) => {
-              if (!el) {
-                inputRefs.current.delete(entry.id)
-                return
-              }
-              inputRefs.current.set(entry.id, el)
-              if (focusOnMount.current === entry.id) {
-                focusOnMount.current = null
-                focusAtEnd(el)
-              }
-            }}
-            className="h-8 flex-1"
-            // Uncontrolled: the query cache notifies after the keystroke, and a controlled
-            // value arriving that late resets the caret to the end of the field.
-            defaultValue={entry.text}
-            onChange={(e) => onUpdate(entry.id, e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, entry, idx)}
-            placeholder="Name – description"
-          />
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className="text-muted-foreground hover:text-destructive shrink-0"
-            onClick={() => onDelete(entry.id)}
-            title="Remove entry"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+        <div key={entry.id}>
+          <div className="flex items-center gap-1">
+            <Input
+              ref={(el) => {
+                if (!el) {
+                  inputRefs.current.delete(entry.id)
+                  return
+                }
+                inputRefs.current.set(entry.id, el)
+                if (focusOnMount.current === entry.id) {
+                  focusOnMount.current = null
+                  focusAtEnd(el)
+                }
+              }}
+              className="h-8 flex-1"
+              // Uncontrolled: the query cache notifies after the keystroke, and a controlled
+              // value arriving that late resets the caret to the end of the field.
+              defaultValue={entry.text}
+              onChange={(e) => onUpdate(entry.id, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, entry, idx)}
+              placeholder="Name – description"
+            />
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground hover:text-destructive shrink-0"
+              onClick={() => onDelete(entry.id)}
+              title="Remove entry"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          {repeats.has(entry.id) && (
+            <p className="mt-0.5 flex items-center gap-1 pl-1 text-xs text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              {repeats.get(entry.id)!.kind === 'text' ? 'Also on' : 'Same name on'}{' '}
+              {repeats.get(entry.id)!.dates.map(shortSunday).join(', ')}
+            </p>
+          )}
         </div>
       ))}
       <div className="flex gap-2 pt-1">
@@ -282,6 +311,23 @@ export function PrayerSheetEditorPage() {
     onSuccess: () => invalidate(),
   })
 
+  // "A–Z": saves the Sunday's entries in alphabetical order (the printed sheet follows it).
+  const sortEntries = useMutation({
+    mutationFn: async (sunday: PrayerSheetSunday) => {
+      await flushEntrySaves()
+      return reorderPrayerSheetEntries(sunday.id, alphabeticalIds(sunday.entries))
+    },
+    onSuccess: () => invalidate(),
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to sort entries'),
+  })
+
+  const repeats = useMemo(() => repeatedFromEarlierSundays(edition?.sundays ?? []), [edition?.sundays])
+  // The editor lists the newest Sunday first; the printed sheet keeps oldest → newest.
+  const sundaysNewestFirst = useMemo(
+    () => [...(edition?.sundays ?? [])].sort((a, b) => b.sundayDate.localeCompare(a.sundayDate)),
+    [edition?.sundays],
+  )
+
   async function handleExportPdf() {
     if (!edition || !settings) return
     const {toCanvas} = await import('html-to-image')
@@ -401,20 +447,35 @@ export function PrayerSheetEditorPage() {
 
         {/* Sunday groupings */}
         <div className="flex-1 px-4 py-3 space-y-4">
-          {edition.sundays.map((sunday) => (
+          <Button variant="outline" size="sm" className="w-full" onClick={() => setAddSundayOpen(true)}>
+            <Plus className="w-4 h-4 mr-1" />
+            Add Sunday
+          </Button>
+
+          {sundaysNewestFirst.map((sunday) => (
             <div key={sunday.id} className="space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold underline">{formatSundayHeading(sunday.sundayDate)}</span>
-                <button
-                  className="text-xs text-muted-foreground hover:text-destructive"
-                  onClick={() => {
-                    if (confirm(`Remove ${formatSundayHeading(sunday.sundayDate)}?`)) {
-                      removeSunday.mutate(sunday.id)
-                    }
-                  }}
-                >
-                  Remove
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    disabled={sunday.entries.length < 2 || sortEntries.isPending}
+                    onClick={() => sortEntries.mutate(sunday)}
+                    title="Sort this Sunday's entries alphabetically"
+                  >
+                    <ArrowDownAZ className="h-3.5 w-3.5" /> A–Z
+                  </button>
+                  <button
+                    className="text-xs text-muted-foreground hover:text-destructive"
+                    onClick={() => {
+                      if (confirm(`Remove ${formatSundayHeading(sunday.sundayDate)}?`)) {
+                        removeSunday.mutate(sunday.id)
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
               <EntryList
                 sunday={sunday}
@@ -429,14 +490,10 @@ export function PrayerSheetEditorPage() {
                 }
                 onUpdate={editEntryText}
                 onDelete={(entryId) => deleteEntry.mutate(entryId)}
+                repeats={repeats}
               />
             </div>
           ))}
-
-          <Button variant="outline" size="sm" className="w-full" onClick={() => setAddSundayOpen(true)}>
-            <Plus className="w-4 h-4 mr-1" />
-            Add Sunday
-          </Button>
         </div>
       </div>
 

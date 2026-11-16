@@ -96,3 +96,21 @@ describe('checkTitleBoxes', async () => {
     expect(checkTitleBoxes({richtexts: []}).missing).toEqual([1, 2, 3, 4, 5])
   })
 })
+
+describe('storyPostInfo', async () => {
+  const {storyPostInfo} = await import('./metricool.js')
+  it('posts one Facebook + Instagram Story with no caption at the wall-clock time', () => {
+    const info = storyPostInfo('https://x/story.png', 'alt', '2026-11-23', 10 * 60)
+    expect(info).toMatchObject({
+      autoPublish: true,
+      draft: false,
+      media: ['https://x/story.png'],
+      mediaAltText: ['alt'],
+      providers: [{network: 'facebook'}, {network: 'instagram'}],
+      publicationDate: {dateTime: '2026-11-23T10:00:00', timezone: 'America/New_York'},
+      text: '',
+      facebookData: {type: 'STORY'},
+      instagramData: {type: 'STORY'},
+    })
+  })
+})

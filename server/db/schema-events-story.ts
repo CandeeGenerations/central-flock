@@ -4,6 +4,8 @@ import {index, integer, sqliteTable, text} from 'drizzle-orm/sqlite-core'
 // One Story Run: a pass through the weekly Events Story workflow (CONTEXT.md). Rows are kept so an
 // unapproved draft can be resumed and past weeks looked back on.
 export const eventsStoryRunStatuses = [
+  // Picker open: chosen events and post time autosave here so a refresh resumes where Tyler left off.
+  'editing',
   'drafting',
   'awaiting_approval',
   'scheduling',

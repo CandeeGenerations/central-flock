@@ -2,6 +2,7 @@ import {AIProgress} from '@/components/ai-progress'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Checkbox} from '@/components/ui/checkbox'
+import {DateTimePicker} from '@/components/ui/date-time-picker'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {
@@ -12,10 +13,12 @@ import {
   type EventsStoryRun,
   type StoryCandidate,
   type StoryLineDraft,
-  createEventsStoryRun,
+  draftEventsStoryRun,
   fetchEventsStoryDay,
   prepareEventsStory,
+  saveEventsStoryRun,
   startConnection,
+  startEventsStoryRun,
 } from '@/lib/api'
 import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
@@ -52,26 +55,29 @@ function PrepareProgress() {
 }
 
 export function NewStoryFlow({
-  initialLines,
-  onCreated,
+  run,
+  onDrafted,
   onCancel,
 }: {
-  // When editing a previous draft: its five lines, re-selected and pre-filled.
-  initialLines?: StoryLineDraft[]
-  onCreated: (run: EventsStoryRun) => void
-  onCancel: () => void
+  // The saved 'editing' Story Run being resumed, if any (e.g. after a refresh).
+  run?: EventsStoryRun
+  onDrafted: (run: EventsStoryRun) => void
+  onCancel: (runId: number | null) => void
 }) {
+  // The 'editing' run the picker autosaves into; created on the first save.
+  const [runId, setRunId] = useState<number | null>(run?.id ?? null)
+
   const prepare = useQuery({
-    queryKey: queryKeys.eventsStoryPrepare,
-    queryFn: prepareEventsStory,
+    queryKey: [...queryKeys.eventsStoryPrepare, run?.postDate ?? 'default'],
+    queryFn: () => prepareEventsStory(run?.postDate),
     staleTime: 0,
     gcTime: 0,
     retry: false,
   })
 
-  const [postDate, setPostDate] = useState<string | null>(null)
+  const [postDate, setPostDate] = useState<string | null>(run?.postDate ?? null)
   const effectiveDate = postDate ?? prepare.data?.postDate ?? null
-  const overridden = Boolean(postDate && postDate !== prepare.data?.postDate)
+  const overridden = Boolean(effectiveDate && effectiveDate !== prepare.data?.postDate)
 
   const day = useQuery({
     queryKey: queryKeys.eventsStoryDay(effectiveDate ?? ''),
@@ -97,7 +103,7 @@ export function NewStoryFlow({
           <p className="text-sm text-destructive">{prepare.error?.message ?? "Couldn't start a new Story"}</p>
           <div className="flex gap-2">
             <Button onClick={() => prepare.refetch()}>Try again</Button>
-            <Button variant="ghost" onClick={onCancel}>
+            <Button variant="ghost" onClick={() => onCancel(runId)}>
               Cancel
             </Button>
           </div>
@@ -106,8 +112,11 @@ export function NewStoryFlow({
     )
   }
   if (!prepare.data.ready) {
-    return <ConnectionsBlocker prep={prepare.data} onRetry={() => prepare.refetch()} onCancel={onCancel} />
+    return <ConnectionsBlocker prep={prepare.data} onRetry={() => prepare.refetch()} onCancel={() => onCancel(runId)} />
   }
+
+  // Resuming: keep the saved time only on the saved day; a new day starts at its best hour.
+  const savedMinute = run && run.postDate === effectiveDate ? run.postMinute : undefined
 
   return (
     <StoryForm
@@ -118,9 +127,12 @@ export function NewStoryFlow({
       dayError={overridden ? day.error?.message : undefined}
       postDate={effectiveDate!}
       onPostDate={(d) => setPostDate(d)}
-      initialLines={initialLines}
-      onCreated={onCreated}
-      onCancel={onCancel}
+      savedLines={run?.lines}
+      savedMinute={savedMinute}
+      runId={runId}
+      onRunId={setRunId}
+      onDrafted={onDrafted}
+      onCancel={() => onCancel(runId)}
     />
   )
 }
@@ -216,8 +228,11 @@ function StoryForm({
   dayError,
   postDate,
   onPostDate,
-  initialLines,
-  onCreated,
+  savedLines,
+  savedMinute,
+  runId,
+  onRunId,
+  onDrafted,
   onCancel,
 }: {
   prep: EventsStoryPrepare
@@ -226,24 +241,29 @@ function StoryForm({
   dayError?: string
   postDate: string
   onPostDate: (date: string) => void
-  initialLines?: StoryLineDraft[]
-  onCreated: (run: EventsStoryRun) => void
+  savedLines?: StoryLineDraft[]
+  savedMinute?: number
+  runId: number | null
+  onRunId: (id: number) => void
+  onDrafted: (run: EventsStoryRun) => void
   onCancel: () => void
 }) {
   const candidates = useMemo(() => day?.candidates ?? [], [day])
   const hours = useMemo(() => day?.hours ?? [], [day])
 
-  // Keyed on the day (see NewStoryFlow), so these start from that day's data: the best hour, and
-  // the first five events — or a previous draft's events when editing it.
-  const [postMinute, setPostMinute] = useState<number | null>(() => (hours.length > 0 ? hours[0].hour * 60 : null))
+  // Keyed on the day (see NewStoryFlow), so these start from that day's data: the saved time or the
+  // best hour, and the saved selection or the first five events.
+  const [postMinute, setPostMinute] = useState<number | null>(() =>
+    savedMinute !== undefined ? savedMinute : hours.length > 0 ? hours[0].hour * 60 : null,
+  )
   const [selected, setSelected] = useState<string[]>(() => {
     const keys = new Set(candidates.map(keyOf))
-    const fromDraft = (initialLines ?? []).map(keyOf).filter((k) => keys.has(k))
-    return fromDraft.length > 0 ? fromDraft : candidates.slice(0, STORY_SIZE).map(keyOf)
+    const fromSaved = (savedLines ?? []).map(keyOf).filter((k) => keys.has(k))
+    return fromSaved.length > 0 ? fromSaved : candidates.slice(0, STORY_SIZE).map(keyOf)
   })
   const [edits, setEdits] = useState<Record<string, LineEdits>>(() =>
     Object.fromEntries(
-      (initialLines ?? []).map((l) => [keyOf(l), {dayTimeLine: l.dayTimeLine, line1: l.line1, line2: l.line2}]),
+      (savedLines ?? []).map((l) => [keyOf(l), {dayTimeLine: l.dayTimeLine, line1: l.line1, line2: l.line2}]),
     ),
   )
 
@@ -273,44 +293,73 @@ function StoryForm({
   }
 
   const chosen = candidates.filter((c) => selected.includes(keyOf(c)))
+  const input = {postDate, postMinute: postMinute ?? 0, lines: chosen.map(lineFor)}
+  const inputJson = JSON.stringify(input)
 
-  const create = useMutation({
-    mutationFn: createEventsStoryRun,
-    onSuccess: onCreated,
+  const draft = useMutation({
+    mutationFn: () => draftEventsStoryRun(runId!, input),
+    onSuccess: onDrafted,
     onError: (error) => toast.error(error.message),
   })
 
-  const canDraft = chosen.length === STORY_SIZE && postMinute !== null && chosen.every((c) => lineFor(c).line1.trim())
+  // Autosave (debounced) into the 'editing' run so a refresh — or another device — resumes here.
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  useEffect(() => {
+    if (!day || postMinute === null || draft.isPending) return
+    const handle = setTimeout(async () => {
+      setSaveState('saving')
+      try {
+        const body = JSON.parse(inputJson) as typeof input
+        if (runId) await saveEventsStoryRun(runId, body)
+        else onRunId((await startEventsStoryRun(body)).id)
+        setSaveState('saved')
+      } catch (error) {
+        setSaveState('error')
+        toast.error(error instanceof Error ? error.message : "Couldn't save")
+      }
+    }, 600)
+    return () => clearTimeout(handle)
+    // `input` is captured via inputJson; runId changes only after the first save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputJson, runId, day, postMinute, draft.isPending])
+
+  const canDraft =
+    runId !== null &&
+    chosen.length === STORY_SIZE &&
+    postMinute !== null &&
+    chosen.every((c) => lineFor(c).line1.trim())
+  const pickerValue = postMinute !== null ? `${postDate}T${minuteToTimeInput(postMinute)}` : `${postDate}T10:00`
 
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">When to post</CardTitle>
+          <span className="text-xs text-muted-foreground">
+            {saveState === 'saving'
+              ? 'Saving…'
+              : saveState === 'saved'
+                ? 'Saved'
+                : saveState === 'error'
+                  ? 'Not saved'
+                  : ''}
+          </span>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="post-date">Day</Label>
-              <Input
-                id="post-date"
-                type="date"
-                value={postDate}
-                min={prep.today}
-                max={prep.maxDate}
-                onChange={(e) => e.target.value && onPostDate(e.target.value)}
-                className="w-44"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="post-time">Time</Label>
-              <Input
-                id="post-time"
-                type="time"
-                step={900}
-                value={postMinute !== null ? minuteToTimeInput(postMinute) : ''}
-                onChange={(e) => setPostMinute(timeInputToMinute(e.target.value))}
-                className="w-36"
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-full max-w-xs">
+              <DateTimePicker
+                value={pickerValue}
+                onChange={(value) => {
+                  if (!value) return
+                  const [date, time] = value.split('T')
+                  if (date < prep.today || date > prep.maxDate) {
+                    toast.info(`Pick a day between today and ${formatDate(prep.maxDate)}`)
+                    return
+                  }
+                  if (date !== postDate) onPostDate(date)
+                  else setPostMinute(timeInputToMinute(time))
+                }}
               />
             </div>
             {postDate !== prep.postDate && (
@@ -419,15 +468,12 @@ function StoryForm({
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          disabled={!canDraft || create.isPending}
-          onClick={() => create.mutate({postDate, postMinute: postMinute!, lines: chosen.map(lineFor)})}
-        >
-          Make draft
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel} disabled={draft.isPending}>
+          Discard
         </Button>
-        <Button variant="ghost" onClick={onCancel} disabled={create.isPending}>
-          Cancel
+        <Button disabled={!canDraft || draft.isPending} onClick={() => draft.mutate()}>
+          Make draft
         </Button>
       </div>
     </div>

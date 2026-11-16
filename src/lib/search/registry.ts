@@ -37,6 +37,14 @@ export interface SearchProvider<Row = unknown> {
   fetch: () => Promise<Row[]>
   toItems: (rows: Row[]) => SearchItem[]
   staleTime?: number
+  /**
+   * For providers that hide past periods (see current-period.ts): matches paths belonging to this
+   * provider's entities, with group 1 capturing the entity's own path (so sub-pages such as
+   * `/schedules/music/18/service/70` count as week 18). A Recent entry on a matching path is shown
+   * only if this provider still lists that entity, so a past week/month/term doesn't come back
+   * through Recents.
+   */
+  ownsPath?: RegExp
 }
 
 export interface ActionsProvider {

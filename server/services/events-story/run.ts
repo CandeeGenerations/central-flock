@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node'
-import {and, desc, eq, gte, inArray, lte, sql} from 'drizzle-orm'
+import {and, count, desc, eq, gte, inArray, lte, notInArray, sql} from 'drizzle-orm'
 import {mkdir, writeFile} from 'node:fs/promises'
 
 import {db, schema} from '../../db/index.js'
@@ -12,11 +12,12 @@ import {
   DESIGN_ID,
   STORY_LINE_COUNT,
   type StoryLineFields,
+  altText,
   buildOperations,
   checkTitleBoxes,
   describeTitleProblems,
 } from './canva-design.js'
-import {fetchBestTimes} from './metricool.js'
+import {fetchBestTimes, scheduleStory} from './metricool.js'
 import {SPAN_LOOKBACK_DAYS, type StoryCandidate, pickEvents} from './pick-events.js'
 import {
   MAX_DAYS_AHEAD,
@@ -43,7 +44,7 @@ export interface StoryLineInput extends StoryLineFields {
 
 export interface Candidate extends StoryCandidate, StoryLineText {}
 
-const OPEN_STATUSES: EventsStoryRunStatus[] = ['drafting', 'awaiting_approval', 'scheduling']
+const OPEN_STATUSES: EventsStoryRunStatus[] = ['editing', 'drafting', 'awaiting_approval', 'scheduling', 'failed']
 const PREVIEW_DIR = 'events-story'
 
 // ---------- picker data ----------
@@ -140,8 +141,20 @@ export function getRun(id: number): RunRow | undefined {
   return db.select().from(schema.eventsStoryRuns).where(eq(schema.eventsStoryRuns.id, id)).get()
 }
 
-export function listRuns(limit = 30): RunRow[] {
-  return db.select().from(schema.eventsStoryRuns).orderBy(desc(schema.eventsStoryRuns.id)).limit(limit).all()
+// Past Stories: every run that is neither open (it has its own card) nor discarded — in practice
+// the scheduled ones — latest post date first.
+export function listPastRuns(page: number, pageSize: number): {runs: RunRow[]; total: number} {
+  const where = notInArray(schema.eventsStoryRuns.status, [...OPEN_STATUSES, 'discarded'])
+  const total = db.select({n: count()}).from(schema.eventsStoryRuns).where(where).get()?.n ?? 0
+  const runs = db
+    .select()
+    .from(schema.eventsStoryRuns)
+    .where(where)
+    .orderBy(desc(schema.eventsStoryRuns.postDate), desc(schema.eventsStoryRuns.id))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize)
+    .all()
+  return {runs, total}
 }
 
 export function findOpenRun(): RunRow | undefined {
@@ -186,23 +199,34 @@ export function runLines(run: RunRow): StoryLineInput[] {
 
 export class RunInputError extends Error {}
 
+function normalizeLine(l: unknown): StoryLineInput {
+  const line = (l ?? {}) as Partial<StoryLineInput>
+  const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+  return {
+    eventIds: Array.isArray(line.eventIds) ? line.eventIds.filter(Number.isInteger) : [],
+    date: text(line.date),
+    endDate: line.endDate ? text(line.endDate) : null,
+    dayNumber: text(line.dayNumber),
+    month: text(line.month),
+    dayTimeLine: text(line.dayTimeLine),
+    line1: text(line.line1),
+    line2: text(line.line2) || null,
+  }
+}
+
+// While editing: any 0–5 lines, saved as they are.
+function editingLines(lines: unknown): StoryLineInput[] {
+  if (!Array.isArray(lines)) return []
+  return lines.slice(0, STORY_LINE_COUNT).map(normalizeLine)
+}
+
+// Before drafting: exactly five, each complete.
 function validateLines(lines: unknown): StoryLineInput[] {
   if (!Array.isArray(lines) || lines.length !== STORY_LINE_COUNT) {
     throw new RunInputError(`Choose exactly ${STORY_LINE_COUNT} events`)
   }
   return lines.map((l, i) => {
-    const line = l as Partial<StoryLineInput>
-    const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
-    const out: StoryLineInput = {
-      eventIds: Array.isArray(line.eventIds) ? line.eventIds.filter(Number.isInteger) : [],
-      date: text(line.date),
-      endDate: line.endDate ? text(line.endDate) : null,
-      dayNumber: text(line.dayNumber),
-      month: text(line.month),
-      dayTimeLine: text(line.dayTimeLine),
-      line1: text(line.line1),
-      line2: text(line.line2) || null,
-    }
+    const out = normalizeLine(l)
     if (!out.dayNumber || !out.month || !out.dayTimeLine || !out.line1) {
       throw new RunInputError(`Story Line ${i + 1} is missing its day, month, day/time line or title`)
     }
@@ -210,32 +234,83 @@ function validateLines(lines: unknown): StoryLineInput[] {
   })
 }
 
-// ---------- drafting ----------
+interface PostTimeInput {
+  postDate?: unknown
+  postMinute?: unknown
+}
 
-export function createRun(input: {postDate: unknown; postMinute: unknown; lines: unknown}): RunRow {
-  const lines = validateLines(input.lines)
+function postTime(input: PostTimeInput): {postDate: string; postMinute: number} {
   const postDate = typeof input.postDate === 'string' ? input.postDate : ''
   const postMinute = Number(input.postMinute)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(postDate)) throw new RunInputError('Pick a post date')
-  if (!Number.isInteger(postMinute) || postMinute < 0 || postMinute >= 24 * 60)
+  if (!Number.isInteger(postMinute) || postMinute < 0 || postMinute >= 24 * 60) {
     throw new RunInputError('Pick a post time')
+  }
+  return {postDate, postMinute}
+}
+
+function requireRun(id: number, statuses: EventsStoryRunStatus[], action: string): RunRow {
+  const run = getRun(id)
+  if (!run) throw new RunInputError('Story Run not found')
+  if (!statuses.includes(run.status)) {
+    throw new RunInputError(`A ${run.status.replace('_', ' ')} Story Run can't be ${action}`)
+  }
+  return run
+}
+
+// ---------- editing (the picker) ----------
+
+// Opens a Story Run in 'editing' the moment the picker has data, so every change can autosave.
+export function startEditing(input: PostTimeInput & {lines?: unknown}): RunRow {
   const open = findOpenRun()
   if (open) throw new RunInputError(`Story Run #${open.id} is still open — resume or discard it first`)
-
-  const run = db
+  return db
     .insert(schema.eventsStoryRuns)
-    .values({
-      status: 'drafting',
-      postDate,
-      postMinute,
-      linesJson: JSON.stringify(lines),
-      progressPct: 0,
-      progressMessage: 'Starting…',
-    })
+    .values({status: 'editing', ...postTime(input), linesJson: JSON.stringify(editingLines(input.lines))})
     .returning()
     .get()
-  void draftRun(run.id)
-  return run
+}
+
+export function saveEditing(id: number, input: PostTimeInput & {lines?: unknown}): RunRow {
+  requireRun(id, ['editing'], 'edited')
+  update(id, {...postTime(input), linesJson: JSON.stringify(editingLines(input.lines))})
+  return getRun(id)!
+}
+
+// "Make draft": final save, then Canva.
+export function draftFromEditing(id: number, input: PostTimeInput & {lines?: unknown}): RunRow {
+  requireRun(id, ['editing'], 'drafted')
+  const lines = validateLines(input.lines)
+  update(id, {
+    ...postTime(input),
+    linesJson: JSON.stringify(lines),
+    status: 'drafting',
+    failedStep: null,
+    error: null,
+    progressPct: 0,
+    progressMessage: 'Starting…',
+  })
+  void draftRun(id)
+  return getRun(id)!
+}
+
+// Back to the picker from a draft: its Canva changes are discarded, its lines kept.
+export async function reopenEditing(id: number): Promise<RunRow> {
+  const run = requireRun(id, ['awaiting_approval', 'failed'], 'edited')
+  if (run.failedStep && run.failedStep !== 'draft' && run.failedStep !== 'commit') {
+    throw new RunInputError('This Story is already saved in Canva — retry scheduling instead')
+  }
+  if (run.canvaTransactionId) await cancelTransaction(run.canvaTransactionId)
+  update(id, {
+    status: 'editing',
+    canvaTransactionId: null,
+    previewPath: null,
+    failedStep: null,
+    error: null,
+    progressMessage: null,
+    progressPct: 0,
+  })
+  return getRun(id)!
 }
 
 async function downloadPreview(runId: number, url: string): Promise<string> {
@@ -323,6 +398,9 @@ export async function discardRun(id: number): Promise<RunRow> {
   if (run.status === 'scheduling' || run.status === 'scheduled' || run.status === 'drafting') {
     throw new RunInputError(`A ${run.status.replace('_', ' ')} Story Run can't be discarded`)
   }
+  if (run.failedStep === 'export' || run.failedStep === 'schedule') {
+    throw new RunInputError('This Story is already saved in Canva — retry scheduling instead')
+  }
   if (run.canvaTransactionId) await cancelTransaction(run.canvaTransactionId)
   update(id, {status: 'discarded', canvaTransactionId: null, progressMessage: null})
   return getRun(id)!
@@ -358,4 +436,161 @@ export function recoverInterruptedRuns(): number {
     .where(inArray(schema.eventsStoryRuns.status, ['drafting', 'scheduling']))
     .run()
   return result.changes
+}
+
+// ---------- approval & scheduling ----------
+
+export class LateApprovalError extends Error {
+  constructor(readonly suggestion: {postDate: string; postMinute: number} | null) {
+    super('The chosen post time has passed')
+  }
+}
+
+// Approve: save the Canva draft, export the PNG, schedule the Story. If the chosen time is now
+// too close (Decision 11) the caller gets a suggestion to confirm instead. `postDate`/`postMinute`
+// let the client confirm a new time in the same call.
+export async function approveRun(id: number, input: PostTimeInput): Promise<RunRow> {
+  const run = requireRun(id, ['awaiting_approval'], 'approved')
+  const time = input.postDate !== undefined ? postTime(input) : {postDate: run.postDate, postMinute: run.postMinute}
+  const now = zonedNow(new Date())
+  if (time.postMinute < earliestMinute(time.postDate, now)) {
+    const today = await hoursFor(time.postDate, now)
+    const next = today.hours[0]
+      ? {postDate: time.postDate, postMinute: today.hours[0].hour * 60}
+      : await nextGoodTime(addDays(time.postDate, 1), now)
+    throw new LateApprovalError(next)
+  }
+  update(id, {
+    ...time,
+    status: 'scheduling',
+    failedStep: null,
+    error: null,
+    progressPct: 0,
+    progressMessage: 'Saving in Canva…',
+  })
+  void scheduleRun(id, 'commit')
+  return getRun(id)!
+}
+
+async function nextGoodTime(from: string, now: ZonedNow): Promise<{postDate: string; postMinute: number} | null> {
+  for (let i = 0, d = from; i < 7; i++, d = addDays(d, 1)) {
+    const {hours} = await hoursFor(d, now)
+    if (hours[0]) return {postDate: d, postMinute: hours[0].hour * 60}
+  }
+  return null
+}
+
+export function retryRun(id: number): RunRow {
+  const run = requireRun(id, ['failed'], 'retried')
+  if (run.failedStep === 'export' || run.failedStep === 'schedule') {
+    // Already saved in Canva: export again (the previous export URL has expired) and schedule.
+    update(id, {status: 'scheduling', error: null, progressPct: 0, progressMessage: 'Retrying…'})
+    void scheduleRun(id, 'export')
+    return getRun(id)!
+  }
+  return redraftRun(id)
+}
+
+type ScheduleStep = 'commit' | 'export' | 'schedule'
+
+async function downloadExport(runId: number, url: string): Promise<string> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Couldn't download the Canva export (${res.status})`)
+  const file = `run-${runId}-story-${Date.now()}.png`
+  await mkdir(uploadPath(PREVIEW_DIR), {recursive: true})
+  await writeFile(uploadPath(PREVIEW_DIR, file), Buffer.from(await res.arrayBuffer()))
+  return uploadUrl(PREVIEW_DIR, file)
+}
+
+async function scheduleRun(id: number, from: ScheduleStep): Promise<void> {
+  let step: ScheduleStep = from
+  // failedStep doubles as "step in progress" while scheduling, so a restart knows where it stopped.
+  const enter = (s: ScheduleStep, pct: number, message: string) => {
+    step = s
+    update(id, {failedStep: s, progressPct: pct, progressMessage: message})
+  }
+  try {
+    const run = getRun(id)!
+    const lines = runLines(run)
+
+    if (step === 'commit') {
+      enter('commit', 10, 'Saving in Canva…')
+      try {
+        if (!run.canvaTransactionId) throw new Error('No open Canva draft')
+        await withMcpClient('canva', async (client) =>
+          toolJson(
+            await client.callTool({
+              name: 'commit-editing-transaction',
+              arguments: {
+                transaction_id: run.canvaTransactionId,
+                user_intent: 'Central Flock: save the Events Story Tyler approved',
+              },
+            }),
+          ),
+        )
+      } catch (error) {
+        // Decision 17: the Canva draft expired (or was closed). Redraft the same lines and ask again —
+        // never save something Tyler hasn't seen.
+        const message = error instanceof Error ? error.message : String(error)
+        console.warn(`[events-story] run ${id} commit failed, redrafting:`, message)
+        update(id, {
+          status: 'drafting',
+          canvaTransactionId: null,
+          failedStep: null,
+          error: 'The Canva draft had expired, so it was redrafted. Check the new preview and approve again.',
+          progressPct: 0,
+          progressMessage: 'Redrafting…',
+        })
+        await draftRun(id) // keeps the note in `error` for the new preview
+        return
+      }
+      update(id, {canvaTransactionId: null})
+      step = 'export'
+    }
+
+    let imageUrl: string | undefined
+    if (step === 'export' || step === 'schedule') {
+      enter('export', 40, 'Exporting PNG…')
+      const exported = await withMcpClient('canva', async (client) =>
+        toolJson(
+          await client.callTool({
+            name: 'export-design',
+            arguments: {
+              design_id: DESIGN_ID,
+              format: {type: 'png'},
+              user_intent: 'Central Flock: export the approved Events Story',
+            },
+          }),
+        ),
+      )
+      const status = findKey<string>(exported, 'status')
+      imageUrl = findKey<string[]>(exported, 'urls')?.[0]
+      if (status && status !== 'success') throw new Error(`Canva export ${status}`)
+      if (!imageUrl) throw new Error('Canva did not return an export URL')
+      update(id, {exportPath: await downloadExport(id, imageUrl)})
+    }
+
+    enter('schedule', 75, 'Scheduling in Metricool…')
+    const fresh = getRun(id)!
+    const post = await scheduleStory(imageUrl!, altText(lines), fresh.postDate, fresh.postMinute)
+    update(id, {
+      status: 'scheduled',
+      failedStep: null,
+      metricoolPostId: post.id,
+      metricoolPlannerUrl: post.plannerUrl,
+      progressPct: 100,
+      progressMessage: 'Scheduled',
+    })
+  } catch (error) {
+    Sentry.captureException(error)
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`[events-story] run ${id} failed at ${step}:`, error)
+    // A failed schedule restarts from export: the Canva export URL from this attempt is gone.
+    update(id, {
+      status: 'failed',
+      failedStep: step === 'schedule' ? 'export' : step,
+      error: message,
+      progressMessage: null,
+    })
+  }
 }

@@ -11,6 +11,7 @@ const STATUS: Record<
   EventsStoryRunStatus,
   {label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'}
 > = {
+  editing: {label: 'Choosing events', variant: 'secondary'},
   drafting: {label: 'Drafting', variant: 'secondary'},
   awaiting_approval: {label: 'Awaiting approval', variant: 'default'},
   scheduling: {label: 'Scheduling', variant: 'secondary'},
@@ -24,21 +25,45 @@ export function RunStatusBadge({status}: {status: EventsStoryRunStatus}) {
   return <Badge variant={s.variant}>{s.label}</Badge>
 }
 
-// The open Story Run: progress while Canva works, then the draft preview and its actions.
+const FAILED_AT: Record<string, string> = {
+  draft: 'Drafting failed',
+  commit: 'Saving in Canva failed',
+  export: 'Exporting or scheduling failed (already saved in Canva)',
+  schedule: 'Scheduling failed (already saved in Canva)',
+}
+
+export interface LateSuggestion {
+  postDate: string
+  postMinute: number
+}
+
+// The open Story Run after the picker: progress while working, then the preview and its actions.
 export function OpenRunCard({
   run,
   busy,
+  late,
+  onApprove,
+  onApproveAt,
+  onDismissLate,
+  onRetry,
   onDiscard,
   onRedraft,
   onEdit,
 }: {
   run: EventsStoryRun
   busy: boolean
+  // Set when Approve found the chosen time had passed: undefined = not late, null = no good time found.
+  late: LateSuggestion | null | undefined
+  onApprove: () => void
+  onApproveAt: (time: LateSuggestion) => void
+  onDismissLate: () => void
+  onRetry: () => void
   onDiscard: () => void
   onRedraft: () => void
   onEdit: () => void
 }) {
   const working = run.status === 'drafting' || run.status === 'scheduling'
+  const savedInCanva = run.failedStep === 'export' || run.failedStep === 'schedule'
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
@@ -50,15 +75,17 @@ export function OpenRunCard({
 
         {run.status === 'failed' && (
           <p className="text-sm text-destructive break-words">
-            {run.failedStep === 'draft' ? 'Drafting failed: ' : 'Failed: '}
-            {run.error}
+            {FAILED_AT[run.failedStep ?? 'draft'] ?? 'Failed'}: {run.error}
           </p>
+        )}
+        {run.status === 'awaiting_approval' && run.error && (
+          <p className="text-sm text-amber-700 dark:text-amber-400">{run.error}</p>
         )}
 
         {run.previewPath && run.status !== 'drafting' && (
           <div className="flex justify-center">
             <img
-              src={run.previewPath}
+              src={run.exportPath ?? run.previewPath}
               alt="Draft of the Events Story"
               className="w-full max-w-[320px] rounded-md border shadow-sm"
             />
@@ -79,29 +106,63 @@ export function OpenRunCard({
           ))}
         </ol>
 
-        {run.status === 'awaiting_approval' && (
+        {late !== undefined && (
+          <div className="space-y-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+            <p>
+              {formatPostTime(run.postDate, run.postMinute)} has passed or is too close.
+              {late ? ` Post ${formatPostTime(late.postDate, late.postMinute)} instead?` : ' Choose a new time.'}
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={onDismissLate} disabled={busy}>
+                Cancel
+              </Button>
+              {late && (
+                <Button size="sm" onClick={() => onApproveAt(late)} disabled={busy}>
+                  Approve for {formatPostTime(late.postDate, late.postMinute)}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {run.status === 'awaiting_approval' && late === undefined && (
           <p className="text-xs text-muted-foreground">
-            Nothing is saved in Canva yet. Approving (save, export and schedule in Metricool) is the next piece to be
-            built.
+            Nothing is saved in Canva yet. Approve saves the design, exports it, and schedules it in Metricool as a
+            Facebook and Instagram Story.
           </p>
         )}
 
         {!working && (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={onEdit} disabled={busy}>
-              Edit events
-            </Button>
-            <Button variant="outline" onClick={onRedraft} disabled={busy}>
-              Redraft
-            </Button>
-            <Button variant="ghost" onClick={onDiscard} disabled={busy}>
-              Discard
-            </Button>
+          // Secondary actions first, the primary one last and right-aligned.
+          <div className="flex flex-wrap justify-end gap-2">
             {run.metricoolPlannerUrl && (
               <Button variant="ghost" asChild>
                 <a href={run.metricoolPlannerUrl} target="_blank" rel="noreferrer">
                   Open in Metricool <ExternalLink className="ml-1 h-4 w-4" />
                 </a>
+              </Button>
+            )}
+            {(run.status === 'awaiting_approval' || (run.status === 'failed' && !savedInCanva)) && (
+              <>
+                <Button variant="ghost" onClick={onDiscard} disabled={busy}>
+                  Discard
+                </Button>
+                <Button variant="outline" onClick={onRedraft} disabled={busy}>
+                  Redraft
+                </Button>
+                <Button variant="outline" onClick={onEdit} disabled={busy}>
+                  Edit events
+                </Button>
+              </>
+            )}
+            {run.status === 'failed' && (
+              <Button onClick={onRetry} disabled={busy}>
+                {savedInCanva ? 'Retry scheduling' : 'Retry'}
+              </Button>
+            )}
+            {run.status === 'awaiting_approval' && late === undefined && (
+              <Button onClick={onApprove} disabled={busy}>
+                Approve & schedule
               </Button>
             )}
           </div>

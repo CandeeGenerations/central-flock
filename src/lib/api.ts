@@ -691,7 +691,7 @@ export interface RankedHour {
 }
 
 export type EventsStoryRunStatus =
-  'drafting' | 'awaiting_approval' | 'scheduling' | 'scheduled' | 'failed' | 'discarded'
+  'editing' | 'drafting' | 'awaiting_approval' | 'scheduling' | 'scheduled' | 'failed' | 'discarded'
 
 export interface EventsStoryRun {
   id: number
@@ -735,24 +735,84 @@ export interface EventsStoryPrepare extends EventsStoryDay {
   openRun: EventsStoryRun | null
 }
 
-export function prepareEventsStory() {
-  return request<EventsStoryPrepare>('/events-story/prepare')
+export function prepareEventsStory(date?: string) {
+  return request<EventsStoryPrepare>(`/events-story/prepare${date ? `?date=${encodeURIComponent(date)}` : ''}`)
 }
 
 export function fetchEventsStoryDay(date: string) {
   return request<EventsStoryDay>(`/events-story/day?date=${encodeURIComponent(date)}`)
 }
 
-export function fetchEventsStoryRuns() {
-  return request<EventsStoryRun[]>('/events-story/runs')
+export function fetchOpenEventsStoryRun() {
+  return request<EventsStoryRun | null>('/events-story/runs/open')
+}
+
+export interface EventsStoryRunPage {
+  runs: EventsStoryRun[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export function fetchEventsStoryRuns(page: number, pageSize: number) {
+  return request<EventsStoryRunPage>(`/events-story/runs?page=${page}&pageSize=${pageSize}`)
 }
 
 export function fetchEventsStoryRun(id: number) {
   return request<EventsStoryRun>(`/events-story/runs/${id}`)
 }
 
-export function createEventsStoryRun(input: {postDate: string; postMinute: number; lines: StoryLineDraft[]}) {
+export interface StoryRunInput {
+  postDate: string
+  postMinute: number
+  lines: StoryLineDraft[]
+}
+
+// Opens the 'editing' run the picker autosaves into.
+export function startEventsStoryRun(input: StoryRunInput) {
   return request<EventsStoryRun>('/events-story/runs', {method: 'POST', body: JSON.stringify(input)})
+}
+
+export function saveEventsStoryRun(id: number, input: StoryRunInput) {
+  return request<EventsStoryRun>(`/events-story/runs/${id}`, {method: 'PUT', body: JSON.stringify(input)})
+}
+
+export function draftEventsStoryRun(id: number, input: StoryRunInput) {
+  return request<EventsStoryRun>(`/events-story/runs/${id}/draft`, {method: 'POST', body: JSON.stringify(input)})
+}
+
+export function reopenEventsStoryRun(id: number) {
+  return request<EventsStoryRun>(`/events-story/runs/${id}/edit`, {method: 'POST'})
+}
+
+export function retryEventsStoryRun(id: number) {
+  return request<EventsStoryRun>(`/events-story/runs/${id}/retry`, {method: 'POST'})
+}
+
+export type ApproveResult =
+  {ok: true; run: EventsStoryRun} | {ok: false; late: true; suggestion: {postDate: string; postMinute: number} | null}
+
+// Approve. When the chosen time has passed the server answers 409 with a suggested new time,
+// which is resent here as `time` once Tyler confirms it.
+export async function approveEventsStoryRun(
+  id: number,
+  time?: {postDate: string; postMinute: number},
+): Promise<ApproveResult> {
+  const res = await fetchOrUnreachable(`${BASE_URL}/events-story/runs/${id}/approve`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(time ?? {}),
+  })
+  if (res.status === 409) {
+    const body = (await readJson(res)) as {suggestion: {postDate: string; postMinute: number} | null}
+    return {ok: false, late: true, suggestion: body.suggestion}
+  }
+  if (!res.ok) {
+    const body = (await readJson(res).catch(() => ({}))) as {error?: string}
+    throw new Error(res.status >= 500 ? 'Server unreachable' : body.error || `Request failed: ${res.status}`)
+  }
+  return {ok: true, run: (await readJson(res)) as EventsStoryRun}
 }
 
 export function discardEventsStoryRun(id: number) {
@@ -1313,6 +1373,13 @@ export function addPrayerSheetSunday(editionId: number, sundayDate: string) {
 
 export function reorderPrayerSheetSundays(editionId: number, orderedIds: number[]) {
   return request<PrayerSheetEdition>(`/prayer-sheet/editions/${editionId}/sundays/reorder`, {
+    method: 'PATCH',
+    body: JSON.stringify({orderedIds}),
+  })
+}
+
+export function reorderPrayerSheetEntries(sundayId: number, orderedIds: number[]) {
+  return request<{ok: boolean}>(`/prayer-sheet/sundays/${sundayId}/entries/reorder`, {
     method: 'PATCH',
     body: JSON.stringify({orderedIds}),
   })

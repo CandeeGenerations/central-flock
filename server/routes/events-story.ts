@@ -4,18 +4,25 @@ import {addDays} from '../lib/repeat-rules.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {MAX_DAYS_AHEAD, earliestMinute, zonedNow} from '../services/events-story/post-time.js'
 import {
+  LateApprovalError,
   RunInputError,
   type RunRow,
-  createRun,
+  approveRun,
   discardRun,
+  draftFromEditing,
+  findOpenRun,
   getRun,
   hoursFor,
-  listRuns,
+  listPastRuns,
   loadCandidates,
   prepareRun,
   redraftRun,
+  reopenEditing,
+  retryRun,
   runLines,
+  saveEditing,
   scheduledInWeekOf,
+  startEditing,
 } from '../services/events-story/run.js'
 
 export const eventsStoryRouter = Router()
@@ -66,8 +73,17 @@ eventsStoryRouter.get(
   }),
 )
 
-eventsStoryRouter.get('/runs', (_req, res) => {
-  res.json(listRuns().map(present))
+// The one open run (editing → failed), or null.
+eventsStoryRouter.get('/runs/open', (_req, res) => {
+  const run = findOpenRun()
+  res.json(run ? present(run) : null)
+})
+
+eventsStoryRouter.get('/runs', (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1)
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10))
+  const {runs, total} = listPastRuns(page, pageSize)
+  res.json({runs: runs.map(present), total, page, pageSize})
 })
 
 eventsStoryRouter.get('/runs/:id', (req, res) => {
@@ -79,9 +95,64 @@ eventsStoryRouter.get('/runs/:id', (req, res) => {
   res.json(present(run))
 })
 
+// Picker opened: create the 'editing' run that autosaves it.
 eventsStoryRouter.post('/runs', (req, res) => {
   try {
-    res.status(201).json(present(createRun(req.body ?? {})))
+    res.status(201).json(present(startEditing(req.body ?? {})))
+  } catch (error) {
+    if (!sendInputError(res, error)) throw error
+  }
+})
+
+// Autosave while editing.
+eventsStoryRouter.put('/runs/:id', (req, res) => {
+  try {
+    res.json(present(saveEditing(Number(req.params.id), req.body ?? {})))
+  } catch (error) {
+    if (!sendInputError(res, error)) throw error
+  }
+})
+
+// "Make draft".
+eventsStoryRouter.post('/runs/:id/draft', (req, res) => {
+  try {
+    res.json(present(draftFromEditing(Number(req.params.id), req.body ?? {})))
+  } catch (error) {
+    if (!sendInputError(res, error)) throw error
+  }
+})
+
+// "Edit events" from a draft: discard its Canva changes, back to the picker.
+eventsStoryRouter.post(
+  '/runs/:id/edit',
+  asyncHandler(async (req, res) => {
+    try {
+      res.json(present(await reopenEditing(Number(req.params.id))))
+    } catch (error) {
+      if (!sendInputError(res, error)) throw error
+    }
+  }),
+)
+
+// Approve. 409 + suggestion when the chosen time has passed (resend with the new postDate/postMinute).
+eventsStoryRouter.post(
+  '/runs/:id/approve',
+  asyncHandler(async (req, res) => {
+    try {
+      res.json(present(await approveRun(Number(req.params.id), req.body ?? {})))
+    } catch (error) {
+      if (error instanceof LateApprovalError) {
+        res.status(409).json({error: error.message, late: true, suggestion: error.suggestion})
+        return
+      }
+      if (!sendInputError(res, error)) throw error
+    }
+  }),
+)
+
+eventsStoryRouter.post('/runs/:id/retry', (req, res) => {
+  try {
+    res.json(present(retryRun(Number(req.params.id))))
   } catch (error) {
     if (!sendInputError(res, error)) throw error
   }

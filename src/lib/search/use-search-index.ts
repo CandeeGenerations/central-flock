@@ -1,13 +1,32 @@
 import {usePrayerRequest} from '@/hooks/use-prayer-request'
 import {buildAllActions} from '@/lib/search/actions'
 import {providers} from '@/lib/search/providers'
-import type {SearchItem} from '@/lib/search/registry'
+import type {SearchItem, SearchProvider} from '@/lib/search/registry'
 import {useTheme} from '@/lib/theme-context'
 import {fetchSectionScores} from '@/lib/usage-api'
 import {useQueries, useQuery} from '@tanstack/react-query'
 import {useMemo, useState} from 'react'
 
 const DEFAULT_STALE_TIME = 5 * 60 * 1000
+
+// Recents must not resurrect a past period a dated provider hides: on a path that provider owns
+// (`ownsPath`), keep the Recent only if the provider — once loaded — still lists that entity.
+export function recentFilter(
+  provs: Pick<SearchProvider, 'ownsPath'>[],
+  perProvider: (SearchItem[] | null)[],
+): (item: SearchItem) => boolean {
+  const owners = provs
+    .map((p, i) => ({pattern: p.ownsPath, items: perProvider[i]}))
+    .filter((o): o is {pattern: RegExp; items: SearchItem[]} => Boolean(o.pattern && o.items))
+    .map((o) => ({pattern: o.pattern, paths: new Set(o.items.map((it) => it.navPath))}))
+  return (item) => {
+    if (item.group !== 'Recent' || !item.navPath) return true
+    return owners.every((o) => {
+      const owned = o.pattern.exec(item.navPath!)?.[1]
+      return !owned || o.paths.has(owned)
+    })
+  }
+}
 
 export interface SearchIndex {
   items: SearchItem[]
@@ -77,11 +96,13 @@ export function useSearchIndex(enabled: boolean): SearchIndex {
       .sort((a, b) => (scores[b.navPath ?? ''] ?? 0) - (scores[a.navPath ?? ''] ?? 0))
     const otherActions = actions.filter((a) => a.group !== 'Navigation')
     for (const a of [...navItems, ...otherActions]) push(a)
-    for (let i = 0; i < providers.length; i++) {
-      const rows = dataDeps[i]
-      if (!rows) continue
-      const searchItems = providers[i].toItems(rows as never)
-      for (const item of searchItems) push(item)
+    const perProvider = providers.map((p, i) => (dataDeps[i] ? p.toItems(dataDeps[i] as never) : null))
+
+    const keepRecent = recentFilter(providers, perProvider)
+
+    for (const searchItems of perProvider) {
+      if (!searchItems) continue
+      for (const item of searchItems) if (keepRecent(item)) push(item)
     }
 
     return {items: all, itemsByGroup: byGroup}

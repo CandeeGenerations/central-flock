@@ -21,16 +21,22 @@ interface PrintMonth {
   month: number
 }
 
-// Static: this year and next, so "calendar print march" jumps straight to that month.
+// Static: this month through the end of next year, so "calendar print march" jumps straight to
+// that month. Past months are left out (see current-period.ts).
 export const calendarPrintMonthsProvider: SearchProvider<PrintMonth> = {
   id: 'calendar-print-months',
   label: 'Calendar Print',
   icon: Printer,
   priority: 70,
-  queryKey: ['calendar-print-months', new Date().getFullYear()] as const,
+  // Keyed by month so the list rolls forward when the month changes.
+  queryKey: ['calendar-print-months', new Date().getFullYear(), new Date().getMonth()] as const,
   fetch: async () => {
-    const year = new Date().getFullYear()
-    return [year, year + 1].flatMap((y) => MONTHS.map((_, i) => ({year: y, month: i + 1})))
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    return [year, year + 1]
+      .flatMap((y) => MONTHS.map((_, i) => ({year: y, month: i + 1})))
+      .filter((m) => m.year > year || m.month >= month)
   },
   staleTime: Infinity,
   toItems: (rows) =>

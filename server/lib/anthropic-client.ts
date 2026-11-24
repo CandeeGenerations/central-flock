@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 
+import {assertOutboundAllowed} from './sandbox.js'
+
 // Every Claude call goes through createMessage so the AI smoke tests (server/test/) can see each
 // response's model, stop_reason and usage — services only return parsed results. No listeners in prod.
 
@@ -40,6 +42,7 @@ export async function createMessage(
   label: string,
   params: Anthropic.MessageCreateParamsNonStreaming,
 ): Promise<Anthropic.Message> {
+  assertOutboundAllowed('anthropic', `AI (${label})`)
   const message = await getAnthropic().messages.create(params)
   if (listeners.size > 0) {
     const info: AiResponseInfo = {

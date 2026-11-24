@@ -1,6 +1,7 @@
 import {Client} from '@modelcontextprotocol/sdk/client/index.js'
 import {StreamableHTTPClientTransport, StreamableHTTPError} from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 
+import {assertOutboundAllowed} from '../sandbox.js'
 import {withLock} from './mutex.js'
 import {ConnectionError, refreshTokens} from './oauth.js'
 import {PROVIDERS, type ProviderId, missingEnv} from './providers.js'
@@ -68,6 +69,7 @@ async function connect(providerId: ProviderId, accessToken: string): Promise<Cli
 }
 
 export async function withMcpClient<T>(providerId: ProviderId, fn: (client: Client) => Promise<T>): Promise<T> {
+  assertOutboundAllowed('mcp', `${PROVIDERS[providerId].label} connection`)
   let token = await getAccessToken(providerId)
   for (let attempt = 0; ; attempt++) {
     let client: Client | undefined

@@ -1,7 +1,12 @@
+import {isSandbox} from '../lib/sandbox.js'
 import {getSetting} from '../routes/settings.js'
 
 /** Resolves true only when the webhook accepted the message; never throws. */
 export async function sendNotifyMeText(message: string): Promise<boolean> {
+  if (isSandbox()) {
+    console.log('notify-me: sandbox mode, not sending:', message)
+    return false
+  }
   const url = getSetting('webhookUrl')
   if (!url) {
     console.log('notify-me: webhookUrl not set, skipping')
@@ -32,6 +37,8 @@ const RETRY_DELAYS_MS = [60_000, 3 * 60_000, 6 * 60_000]
  * not depend on n8n or Vonage. Run it in the background — it can take minutes. Never throws.
  */
 export async function sendNotifyMeTextWithFallback(message: string): Promise<boolean> {
+  // Without this the retries below would wait ~10 minutes before reaching the fallback check.
+  if (isSandbox()) return sendNotifyMeText(message)
   if (await sendNotifyMeText(message)) return true
   for (const delay of RETRY_DELAYS_MS) {
     await new Promise((r) => setTimeout(r, delay))

@@ -5,6 +5,7 @@ import {Router} from 'express'
 import {db, schema} from '../db/index.js'
 import {AI_MODEL_KEYS, DEFAULT_AI_MODEL_KEY, LEGACY_MODEL_TO_KEY} from '../lib/ai-models.js'
 import {asyncHandler} from '../lib/route-helpers.js'
+import {isSandbox} from '../lib/sandbox.js'
 import {syncCalendarEvents} from '../services/calendar-sync.js'
 
 export const settingsRouter = Router()
@@ -48,6 +49,10 @@ settingsRouter.get(
 settingsRouter.post(
   '/test-webhook',
   asyncHandler(async (_req, res) => {
+    if (isSandbox()) {
+      res.status(409).json({error: 'Sandbox mode: webhooks are disabled in this copy of Central Flock'})
+      return
+    }
     const webhookUrl = getSetting('webhookUrl')
     if (!webhookUrl) {
       res.status(400).json({error: 'Webhook URL is not configured'})

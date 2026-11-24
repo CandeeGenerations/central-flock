@@ -13,6 +13,7 @@ import path from 'path'
 import {fileURLToPath} from 'url'
 
 import {sqlite} from './db/index.js'
+import {SandboxBlockedError, isSandbox} from './lib/sandbox.js'
 import {UPLOADS_DIR} from './lib/uploads.js'
 import {requireAuth} from './middleware/auth.js'
 import {webhooksRateLimit} from './middleware/require-internal-secret.js'
@@ -134,6 +135,13 @@ app.get('{*path}', (_req, res) => {
 
 // Sentry error handler — must come after all route registrations.
 // Captures any error passed via next(err) or thrown in an async route that propagates.
+// A sandbox refusing an outbound call is expected, not a bug: answer it here, before Sentry's
+// handler, so it is never reported.
+app.use((err: Error, _req: Request, res: Response, next: NextFunction) => {
+  if (!(err instanceof SandboxBlockedError)) return next(err)
+  res.status(409).json({error: err.message})
+})
+
 Sentry.setupExpressErrorHandler(app)
 
 // Final JSON error responder — replaces Express's default HTML error page.
@@ -185,7 +193,7 @@ try {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
   // A sandbox runs against a DB copy: no texts, calendar writes or AI calls may leave it.
-  if (process.env.CENTRAL_FLOCK_SANDBOX === '1') {
+  if (isSandbox()) {
     console.log('Sandbox: background jobs disabled')
     return
   }

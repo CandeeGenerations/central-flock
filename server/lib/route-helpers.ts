@@ -3,12 +3,17 @@ import {eq, inArray} from 'drizzle-orm'
 import type {Request, Response} from 'express'
 
 import {db, schema} from '../db/index.js'
+import {SandboxBlockedError} from './sandbox.js'
 
 export function asyncHandler(
   fn: (req: Request, res: Response) => Promise<void>,
 ): (req: Request, res: Response) => void {
   return (req, res) => {
     fn(req, res).catch((error) => {
+      if (error instanceof SandboxBlockedError) {
+        res.status(409).json({error: error.message})
+        return
+      }
       Sentry.captureException(error)
       console.error('Unhandled route error:', error)
       const message = parseErrorMessage(error)

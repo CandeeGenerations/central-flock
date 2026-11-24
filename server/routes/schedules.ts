@@ -6,9 +6,9 @@ import os from 'os'
 import path from 'path'
 
 import {db, schema} from '../db/index.js'
+import {sendImage} from '../lib/mac-bridge.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {uploadPath, uploadUrl} from '../lib/uploads.js'
-import {sendImageViaUI} from '../services/applescript.js'
 import {findForSpecialMusic} from '../services/double-booking.js'
 import {
   DEFAULT_REMINDER_SEND_TIME,
@@ -905,7 +905,7 @@ schedulesRouter.post(
           continue
         }
         try {
-          await sendImageViaUI(r.phoneNumber, tmpPath, caption)
+          await sendImage(r.phoneNumber, tmpPath, caption)
           results.push({id: r.id, name: r.firstName || 'Unknown', success: true})
         } catch (err) {
           console.error(`[schedules/send-image] send to ${r.phoneNumber} failed:`, err)

@@ -1,8 +1,8 @@
 import * as Sentry from '@sentry/node'
 
 import {db, schema, sqlite} from '../db/index.js'
+import {fetchAvailableCalendars, fetchUpcomingEvents} from '../lib/mac-bridge.js'
 import {getSetting, setSetting} from '../routes/settings.js'
-import {fetchAvailableCalendars, fetchUpcomingEvents} from './calendar.js'
 
 const SYNC_WINDOW_DAYS = 180
 

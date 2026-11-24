@@ -13,8 +13,10 @@ import path from 'path'
 import {fileURLToPath} from 'url'
 
 import {sqlite} from './db/index.js'
+import {SandboxBlockedError, isSandbox} from './lib/sandbox.js'
 import {UPLOADS_DIR} from './lib/uploads.js'
 import {requireAuth} from './middleware/auth.js'
+import {webhooksRateLimit} from './middleware/require-internal-secret.js'
 import {attendanceRouter} from './routes/attendance.js'
 import {authRouter} from './routes/auth.js'
 import {calendarPrintRouter} from './routes/calendar-print.js'
@@ -56,6 +58,7 @@ import {workersNotesRouter} from './routes/workers-notes.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
 import {backfillRepeatRules} from './services/calendar-print-year-copy.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
+import {startSnapshotScheduler} from './services/db-snapshot.js'
 import {recoverInterruptedRuns} from './services/events-story/run.js'
 import {startFairBoothReminderScheduler} from './services/fair-booth-reminders.js'
 import {startMusicScanCleanup} from './services/music-scan-cleanup.js'
@@ -74,7 +77,7 @@ app.use(cookieParser())
 app.use('/api/auth', authRouter)
 
 // Internal webhooks (unprotected by session auth; gated by X-Internal-Secret)
-app.use('/webhooks', webhooksRouter)
+app.use('/webhooks', webhooksRateLimit, webhooksRouter)
 
 // OAuth redirects for Connections (unprotected; authenticated by single-use `state`)
 app.use('/api/connections', connectionsCallbackRouter)
@@ -133,6 +136,13 @@ app.get('{*path}', (_req, res) => {
 
 // Sentry error handler — must come after all route registrations.
 // Captures any error passed via next(err) or thrown in an async route that propagates.
+// A sandbox refusing an outbound call is expected, not a bug: answer it here, before Sentry's
+// handler, so it is never reported.
+app.use((err: Error, _req: Request, res: Response, next: NextFunction) => {
+  if (!(err instanceof SandboxBlockedError)) return next(err)
+  res.status(409).json({error: err.message})
+})
+
 Sentry.setupExpressErrorHandler(app)
 
 // Final JSON error responder — replaces Express's default HTML error page.
@@ -184,7 +194,7 @@ try {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
   // A sandbox runs against a DB copy: no texts, calendar writes or AI calls may leave it.
-  if (process.env.CENTRAL_FLOCK_SANDBOX === '1') {
+  if (isSandbox()) {
     console.log('Sandbox: background jobs disabled')
     return
   }
@@ -195,5 +205,6 @@ app.listen(PORT, () => {
   startSpecialsScheduler()
   cleanupOrphanedScanImages()
   startMusicScanCleanup()
+  if (process.env.SNAPSHOT_DIR) startSnapshotScheduler(sqlite, process.env.SNAPSHOT_DIR, UPLOADS_DIR)
   recoverUngeneratedSermons().catch((err) => console.error('[sermons-webhook] boot recovery failed:', err))
 })

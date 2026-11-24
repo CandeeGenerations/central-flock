@@ -2,7 +2,7 @@ import {eq, inArray} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
-import {createContact, fetchContacts} from '../services/applescript.js'
+import {createContact, fetchContacts} from '../lib/mac-bridge.js'
 import {e164ToDisplay, normalizePhoneNumber} from '../services/csv-parser.js'
 
 export const contactsRouter = Router()

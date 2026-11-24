@@ -7,6 +7,7 @@ import type {
 } from '@modelcontextprotocol/sdk/shared/auth.js'
 import {randomBytes} from 'node:crypto'
 
+import {assertOutboundAllowed} from '../sandbox.js'
 import {type McpProvider, PROVIDERS, type ProviderId} from './providers.js'
 import {loadSecrets, markConnection, saveSecrets} from './store.js'
 
@@ -157,6 +158,7 @@ class StoredOAuthProvider implements OAuthClientProvider {
 // first — otherwise auth() would just refresh them instead of asking the user to sign in.
 export async function startSignIn(providerId: ProviderId, target: RedirectTarget): Promise<string> {
   const provider = PROVIDERS[providerId]
+  assertOutboundAllowed('mcp', `${provider.label} sign-in`)
   const oauth = new StoredOAuthProvider(provider, target)
   const secrets = loadSecrets(providerId)
   delete secrets.tokens
@@ -179,6 +181,7 @@ export async function startSignIn(providerId: ProviderId, target: RedirectTarget
 // Exchanges the authorization code from the callback for tokens.
 export async function finishSignIn(p: PendingAuthorization, authorizationCode: string): Promise<void> {
   const provider = PROVIDERS[p.provider]
+  assertOutboundAllowed('mcp', `${provider.label} sign-in`)
   const oauth = new StoredOAuthProvider(provider, p.target, p.codeVerifier)
   const result = await auth(oauth, {serverUrl: provider.serverUrl, authorizationCode})
   if (result !== 'AUTHORIZED') throw new Error(`${provider.label} sign-in was not completed`)
@@ -198,6 +201,7 @@ export class ConnectionError extends Error {
 // (expired/revoked/already-used token) marks the Connection as needing a fresh sign-in.
 export async function refreshTokens(providerId: ProviderId): Promise<void> {
   const provider = PROVIDERS[providerId]
+  assertOutboundAllowed('mcp', `${provider.label} token refresh`)
   if (!loadSecrets(providerId).tokens?.refresh_token) {
     markConnection(providerId, {status: 'needs_reconnect', lastError: 'No refresh token stored'})
     throw new ConnectionError(providerId, 'needs_reconnect', `${provider.label} needs to be reconnected`)

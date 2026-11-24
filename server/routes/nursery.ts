@@ -6,8 +6,8 @@ import os from 'os'
 import path from 'path'
 
 import {db, schema} from '../db/index.js'
+import {sendImage} from '../lib/mac-bridge.js'
 import {asyncHandler} from '../lib/route-helpers.js'
-import {sendImageViaUI} from '../services/applescript.js'
 import {workerDisplayName} from '../services/nursery-workers.js'
 
 export const nurseryRouter = Router()
@@ -290,7 +290,7 @@ nurseryRouter.post(
           continue
         }
         try {
-          await sendImageViaUI(r.phoneNumber, tmpPath, caption)
+          await sendImage(r.phoneNumber, tmpPath, caption)
           results.push({id: r.id, name: r.firstName || 'Unknown', success: true})
         } catch (err) {
           console.error(`[nursery/send-image] send to ${r.phoneNumber} failed:`, err)

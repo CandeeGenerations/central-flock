@@ -48,8 +48,16 @@ INSERT INTO migration_guard (label, n)
 SELECT 'nursery_workers not resolving to a person', COUNT(*) FROM worker_person_map WHERE person_id IS NULL;
 --> statement-breakpoint
 
+-- On a fresh database there is no nursery data and no service_times yet (they are seeded at boot),
+-- so the four-service check only applies when there is nursery data to map.
 INSERT INTO migration_guard (label, n)
-SELECT 'nursery service_times missing', 4 - COUNT(*) FROM nursery_service_map;
+SELECT 'nursery service_times missing',
+  CASE
+    WHEN EXISTS (SELECT 1 FROM nursery_workers) OR EXISTS (SELECT 1 FROM nursery_assignments)
+      OR EXISTS (SELECT 1 FROM nursery_service_config) OR EXISTS (SELECT 1 FROM nursery_worker_services)
+    THEN 4 - COUNT(*) ELSE 0
+  END
+FROM nursery_service_map;
 --> statement-breakpoint
 
 INSERT INTO migration_guard (label, n)
@@ -85,8 +93,11 @@ CREATE TEMP TABLE old_service_config AS SELECT * FROM nursery_service_config;
 CREATE TEMP TABLE old_workers AS SELECT * FROM nursery_workers;
 --> statement-breakpoint
 
+-- Production had exactly 11 eligibility rows; a fresh database has none to lose.
 INSERT INTO migration_guard (label, n)
-SELECT 'worker_services lost before snapshot', 11 - COUNT(*) FROM old_worker_services;
+SELECT 'worker_services lost before snapshot',
+  CASE WHEN EXISTS (SELECT 1 FROM old_workers) THEN 11 - COUNT(*) ELSE 0 END
+FROM old_worker_services;
 --> statement-breakpoint
 
 INSERT INTO migration_guard (label, n)
@@ -235,7 +246,9 @@ SELECT
 FROM (
   SELECT id FROM service_times WHERE name IN ('Sunday Morning', 'Sunday Evening') ORDER BY sort_order
 )
-WHERE NOT EXISTS (SELECT 1 FROM settings WHERE `key` = 'schedules.specialMusic.serviceTimeIds');
+WHERE NOT EXISTS (SELECT 1 FROM settings WHERE `key` = 'schedules.specialMusic.serviceTimeIds')
+-- With no matching service times (a fresh database) the aggregate still yields one NULL row; skip it.
+HAVING COUNT(*) > 0;
 --> statement-breakpoint
 
 DROP TABLE worker_person_map;--> statement-breakpoint

@@ -4,8 +4,8 @@ import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
 import {renderTemplate} from '../lib/format.js'
+import {sendText} from '../lib/mac-bridge.js'
 import {asyncHandler, getGroupNames, getMessageGroupIds} from '../lib/route-helpers.js'
-import {sendMessageViaUI} from '../services/applescript.js'
 import {type SendJob, cancelJob, createJob, getJob} from '../services/message-queue.js'
 import {buildRsvpLinkMap, rsvpLinkFor} from '../services/rsvp-link.js'
 
@@ -648,7 +648,7 @@ export async function processSendJob(job: SendJob) {
     }
 
     try {
-      await sendMessageViaUI(recipient.phoneNumber, recipient.renderedContent || '')
+      await sendText(recipient.phoneNumber, recipient.renderedContent || '')
 
       db.update(schema.messageRecipients)
         .set({

@@ -15,6 +15,7 @@ import {fileURLToPath} from 'url'
 import {sqlite} from './db/index.js'
 import {UPLOADS_DIR} from './lib/uploads.js'
 import {requireAuth} from './middleware/auth.js'
+import {webhooksRateLimit} from './middleware/require-internal-secret.js'
 import {attendanceRouter} from './routes/attendance.js'
 import {authRouter} from './routes/auth.js'
 import {calendarPrintRouter} from './routes/calendar-print.js'
@@ -74,7 +75,7 @@ app.use(cookieParser())
 app.use('/api/auth', authRouter)
 
 // Internal webhooks (unprotected by session auth; gated by X-Internal-Secret)
-app.use('/webhooks', webhooksRouter)
+app.use('/webhooks', webhooksRateLimit, webhooksRouter)
 
 // OAuth redirects for Connections (unprotected; authenticated by single-use `state`)
 app.use('/api/connections', connectionsCallbackRouter)

@@ -1,13 +1,37 @@
 # Switching Central Flock from the Mac mini to Railway
 
-Status: **draft guide, written 2026-11-24, before any of it exists.** This moves **today's Express +
-Vite app** — the TanStack Start rewrite happens afterwards, on Railway (plan decision 18). Commands
-that depend on code not written yet (the sandbox hard stop, the cgen-api bridge, the snapshot job)
-are marked _(once built)_.
+Status: **Phase 0 done and deployed (2026-11-24); Phases 1–4 not started.** This moves **today's
+Express + Vite app** — the TanStack Start rewrite happens afterwards, on Railway (plan decision 18).
+The two Mac scripts for Phases 2–4 (`push-rehearsal-copy.sh` and the pull version of
+`backup-dbs.sh`) are still marked _(once built)_.
 
 After the switch the **Mac mini stays on**: it runs cgen-api, the tunnel for `api.cgen.cc`, and the
-iCloud backup pull. Only the `cc.cgen.central-flock` service is retired. Re-read this guide against the real code before cut-over day, and update
-it as each piece lands.
+iCloud backup pull. Only the `cc.cgen.central-flock` service is retired. Re-read this guide against
+the real code before cut-over day.
+
+### Where things stand on the Mac (since 2026-11-24)
+
+- **Central Flock on the Mac already sends through cgen-api** (`MAC_BRIDGE=cgen-api`,
+  `CGEN_API_URL=http://localhost:5180`, `CGEN_API_KEY` in `cc.cgen.central-flock.plist`). A real
+  text and a nursery schedule image went out and were delivered, and the calendar sync read 131
+  events through the bridge. Railway will use the same bridge, only through `https://api.cgen.cc`.
+- **cgen-api** serves `/api/mac/*` behind `MAC_BRIDGE_API_KEY` (in `cc.cgen.api.plist`, same value
+  as Central Flock's `CGEN_API_KEY`), and keeps each send's idempotency key on disk under
+  `~/Library/Application Support/cgen-api/mac-bridge-requests` for 24 hours.
+- **To undo the bridge on the Mac:** remove `MAC_BRIDGE` from `cc.cgen.central-flock.plist` and
+  reload (below). It falls back to AppleScript on the Mac.
+
+### Reloading a launchd service after a plist change
+
+`launchctl kickstart -k` restarts a service but keeps the environment launchd already loaded, so a
+changed plist variable is ignored. After any plist edit, reload it fully:
+
+```bash
+launchctl bootout "gui/$(id -u)/<label>"
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/<label>.plist
+```
+
+(Central Flock's `scripts/deploy.sh` already does this; cgen-api's `pnpm deploy` only kickstarts.)
 
 Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-behind-cgen-api.md) and
 [tanstack-migration.md](./tanstack-migration.md) → "Cloud split" (decisions 3–18).
@@ -35,30 +59,42 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
 | Mac uploads today         | `~/Library/Mobile Documents/com~apple~CloudDocs/Backups/central-flock/` subfolders (`UPLOADS_DIR`) |
 | Tunnel                    | `cgen-tunnel`, config `~/.cloudflared/config.yml`                                                  |
 | cgen-api                  | `cc.cgen.api`, `api.cgen.cc` → `localhost:5180`                                                    |
+| Bridge key                | `MAC_BRIDGE_API_KEY` in cgen-api = `CGEN_API_KEY` in Central Flock (one shared value)              |
 
-## Phase 0 — Gates (all must be true before Phase 1 starts on real data)
+## Phase 0 — Gates (done 2026-11-24, merged and deployed at `9340358`)
 
-- [ ] The app runs as a production build locally — `pnpm build`, then
-      `CENTRAL_FLOCK_SANDBOX=1 tsx --import ./server/lib/sentry.ts server/index.ts` against a seeded
-      database — with Express serving `dist/` and every section of the parity checklist (Phase 3) passing.
-- [ ] Seed script _(once built)_ fills an empty database with fake data (555-0100–0199 numbers).
-- [ ] `vite:preloadError` reloads the page once, so a deploy doesn't strand open tabs.
-- [ ] **Sandbox hard stop** implemented and tested: with `CENTRAL_FLOCK_SANDBOX=1`, a unit test per
-      outbound client (cgen-api bridge, `createMessage`, MCP, Notion, webhook sender) proves nothing
-      leaves the process, and the send flow still records a fake success.
-- [ ] **cgen-api Mac bridge** endpoints exist and are tested from the Mac: send text, send image,
-      read contacts, create contact, list calendars, fetch calendar events.
-- [ ] **Send allow-list** implemented: `SEND_ALLOWLIST` (comma-separated E.164 numbers). When set,
-      the bridge client refuses any recipient not on it, even with sandbox off. Used once in Phase 3
-      to prove a real send through cgen-api to your own phone.
-- [ ] `/webhooks/*` hardened: constant-time secret compare and rate limiting.
-- [ ] Nightly snapshot job _(once built)_ writes `/data/backups/nightly.db` (via `db.backup()`) and
-      `/data/backups/uploads.tar.gz`.
-- [ ] Boot-time import _(once built)_: **only when `CENTRAL_FLOCK_SANDBOX=1`**, if
-      `/data/incoming/central-flock.db` exists, the server moves it over `/data/central-flock.db`
-      (and unpacks `/data/incoming/uploads.tar.gz` into `/data/uploads`) before opening the
-      database, then deletes the incoming files. With sandbox off it refuses and logs loudly, so a
-      stray upload can never overwrite live data.
+- [x] **Production build runs locally:** `pnpm db:migrate`, `pnpm db:seed`, `pnpm build`, then
+      `CENTRAL_FLOCK_SANDBOX=1 pnpm start`, all against a throwaway database. Pages and the API
+      served seed data, and a 12-recipient send completed with every send faked.
+      **Still to check on Railway:** a deep link such as `/people` returned 500 locally only because
+      the test folder path contained `.claude`, and Express won't serve files under a dot-folder.
+      Confirm deep links work on `flock-next.cgen.cc`.
+- [x] **Migrations build a fresh database.** 0022, 0024, 0042 and 0063 got fresh-database fixes
+      (production never re-runs them; migrate on a production copy applied nothing).
+      `server/db/migrations.test.ts` keeps it that way.
+- [x] **Seed:** `pnpm db:seed` (`server/db/seed.ts`) fills an empty database with fake data
+      (555-0100–0199 numbers). It does nothing unless `CENTRAL_FLOCK_SANDBOX=1` and the database
+      is empty.
+- [x] **`vite:preloadError`** reloads the page once, so a deploy doesn't strand open tabs.
+- [x] **Sandbox hard stop** (`server/lib/sandbox.ts`): Claude, MCP connect/sign-in/refresh, the
+      notify-me webhook and Mattermost fallback, and the test-webhook button all refuse, with 409s
+      that stay out of Sentry. The Mac bridge reports success and returns empty reads. (Notion is
+      not used by the server, so there is nothing to block.)
+- [x] **Mac bridge** (`server/lib/mac-bridge.ts` + cgen-api `/api/mac/*`): send text, send image,
+      read and create contacts, list calendars, fetch events. It retries only when the request
+      never got through; cgen-api replays or refuses repeats from its on-disk record; and after an
+      outage, calls fail at once for two minutes instead of each waiting through the retries.
+      **Tested live on the Mac:** text, image and calendar.
+- [x] **Send allow-list:** `SEND_ALLOWLIST` (comma-separated numbers) refuses anyone not listed,
+      even with sandbox off.
+- [x] **`/webhooks/*` hardened:** constant-time secret compare, and 120 requests a minute.
+- [x] **Nightly snapshot:** when `SNAPSHOT_DIR` is set, the server writes `nightly.db` (via
+      `db.backup()`) and `uploads.tar.gz` there at 03:00 server time.
+- [x] **Boot-time import, sandbox only:** a copy at `<db dir>/incoming/central-flock.db` (or
+      `INCOMING_DIR`), plus an optional `uploads.tar.gz`, is integrity-checked, swapped in, migrated
+      and unpacked into `UPLOADS_DIR`. With sandbox off it refuses and logs loudly.
+- [x] **`drizzle.config.ts`** migrates `CENTRAL_FLOCK_DB_PATH`, so Railway's pre-deploy migrate hits
+      the volume.
 
 ## Phase 1 — Set up Railway (no real data yet)
 
@@ -66,10 +102,10 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
    `main`. Pushes to `main` now deploy to both the Mac (post-commit hook) and Railway — fine while
    Railway is in sandbox.
 2. Add a volume mounted at `/data`.
-3. Build command `pnpm build`; pre-deploy command `pnpm db:migrate`; start command
-   `pnpm exec tsx --import ./server/lib/sentry.ts server/index.ts` (no `watch`). Replicas: **1**.
-   (These change again when the Start rewrite lands.) `tsx` is a devDependency today, so either
-   move it to `dependencies` or make sure Railway's build keeps dev dependencies installed.
+3. Build command `pnpm build`; pre-deploy command `pnpm db:migrate && pnpm db:seed`; start command
+   `pnpm start`. Replicas: **1**. (`db:seed` does nothing outside a sandbox or on a database that
+   already has data, so it is safe on every deploy. `tsx` is already a regular dependency. These
+   commands change again when the Start rewrite lands.)
 4. Variables:
 
    | Variable                                                                                             | Value now                                                      | At the switch                                 |
@@ -80,7 +116,11 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
    | `AUTH_PASSWORD_HASH`, `JWT_SECRET`, `JWT_EXPIRY`                                                     | **set from day one** — this environment will hold real data    | same                                          |
    | `SENTRY_*`, `VITE_SENTRY_DSN`                                                                        | set, `SENTRY_ENVIRONMENT=railway-rehearsal`                    | `production`                                  |
    | `FLOCK_PUBLIC_URL`, `CENTRAL_FLOCK_PUBLIC_URL`, `RSVP_PUBLIC_URL_BASE`, `ATTENDANCE_PUBLIC_URL_BASE` | production values                                              | same                                          |
-   | `CGEN_API_URL`, `CGEN_API_KEY` _(bridge)_                                                            | **not set**                                                    | set, **sealed**                               |
+   | `TZ`                                                                                                 | `America/New_York` (schedulers and the 03:00 snapshot)         | same                                          |
+   | `SNAPSHOT_DIR`                                                                                       | `/data/backups` (ignored while sandbox is on)                  | same                                          |
+   | `MAC_BRIDGE`                                                                                         | `cgen-api` (sandbox fakes every call anyway)                   | same                                          |
+   | `CGEN_API_URL`                                                                                       | `https://api.cgen.cc`                                          | same                                          |
+   | `CGEN_API_KEY`                                                                                       | **not set**                                                    | the Mac's bridge key, **sealed**              |
    | `ANTHROPIC_API_KEY`                                                                                  | **not set**                                                    | set, **sealed**                               |
    | `CENTRAL_FLOCK_INTERNAL_SECRET`                                                                      | a new random value, **sealed**                                 | rotated again, **sealed**                     |
    | `CONNECTIONS_KEY`                                                                                    | same as the Mac (so saved Canva/Metricool connections decrypt) | same                                          |
@@ -93,8 +133,9 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
 7. **Leave PR environments off.** Railway's docs don't say whether a PR environment gets a copy of
    the base environment's volume, and this one will hold real data. Turn them on only after
    checking (see "After the switch").
-8. Deploy. With an empty volume the server should migrate, seed nothing, start in sandbox mode and
-   log `Sandbox: background jobs disabled`. Log in at `https://flock-next.cgen.cc`.
+8. Deploy. With an empty volume the pre-deploy builds the schema from migrations and seeds fake data;
+   the server starts in sandbox mode and logs `Sandbox: background jobs disabled`. Log in at
+   `https://flock-next.cgen.cc` and check a deep link (e.g. `/people`) loads.
 
 ## Phase 2 — Nightly sandbox copy of the live data
 
@@ -139,12 +180,13 @@ Settings, command palette, Recents, login and logout, iPhone and iPad home-scree
 
 Then the rehearsals that prove the parts sandbox mode blocks:
 
-1. **Real send through the bridge, to yourself only.** Set `SEND_ALLOWLIST` to your own number,
-   `CGEN_API_URL` and `CGEN_API_KEY` (sealed), and remove `CENTRAL_FLOCK_SANDBOX` for this test only.
+1. **Real send through the bridge from Railway, to yourself only.** The bridge itself is already
+   proven on the Mac; this checks the path through `https://api.cgen.cc`. Set `SEND_ALLOWLIST` to
+   your own number and `CGEN_API_KEY` (sealed), and remove `CENTRAL_FLOCK_SANDBOX` for this test only.
    Before removing it, **pause the nightly push job and confirm no scheduled message, birthday or
    fair-booth reminder is due in the next hour** — schedulers start when sandbox is off. Send one
    text and one image to yourself. Then put `CENTRAL_FLOCK_SANDBOX=1` back, remove `SEND_ALLOWLIST`
-   and the bridge variables, redeploy, and resume the nightly push.
+   and `CGEN_API_KEY`, redeploy, and resume the nightly push.
 2. **Contacts and calendar through the bridge:** in the same window, open the Contacts import
    preview and the calendar page; both should show Mac data.
 3. **Webhooks:** from the Mac, call each `/webhooks/*` endpoint on `flock-next.cgen.cc` with the
@@ -186,7 +228,7 @@ anything due in the next 2 hours and move it if needed.
 5. **Check the import** on `flock-next.cgen.cc`: people count, newest message in history, newest
    RSVP and attendance entries match the Mac's last state.
 6. **Turn Railway into production.** In Railway variables: remove `CENTRAL_FLOCK_SANDBOX`; set and
-   seal `CGEN_API_URL`, `CGEN_API_KEY` and `ANTHROPIC_API_KEY`; generate a new
+   seal `CGEN_API_KEY` (the Mac's bridge key) and `ANTHROPIC_API_KEY`; generate a new
    `CENTRAL_FLOCK_INTERNAL_SECRET` (sealed); set `SENTRY_ENVIRONMENT=production`. Deploy. The log
    should **not** say `Sandbox: background jobs disabled`.
 7. **Move the hostname.**

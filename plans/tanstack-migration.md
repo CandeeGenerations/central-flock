@@ -22,6 +22,9 @@ phase before it is done, except where noted.
 
 ### Phase 1 — Get ready for Railway (Express, on the Mac, normal PRs)
 
+**Done 2026-11-24** (merged at `9340358`; cgen-api at `3ef05c0`). The Mac already sends through the
+cgen-api bridge. Details and what is left to check: [railway-cutover.md](./railway-cutover.md) Phase 0.
+
 Everything [railway-cutover.md](./railway-cutover.md) Phase 0 lists as a gate, built in today's
 Express app. Independent pieces, so they can be built in parallel:
 

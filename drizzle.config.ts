@@ -5,7 +5,9 @@ export default defineConfig({
   out: './server/db/migrations',
   dialect: 'sqlite',
   dbCredentials: {
-    url: './central-flock.db',
+    // Railway keeps the DB on its volume (CENTRAL_FLOCK_DB_PATH=/data/central-flock.db); the
+    // pre-deploy `pnpm db:migrate` must migrate that file, not a stray one in the app folder.
+    url: process.env.CENTRAL_FLOCK_DB_PATH || './central-flock.db',
   },
   // FTS5 virtual tables and their shadow tables are created at runtime in
   // server/db/index.ts. Drizzle has no schema for them — exclude so push/pull

@@ -2,9 +2,9 @@ import {and, gte, inArray, lte} from 'drizzle-orm'
 import {Router} from 'express'
 
 import {db, schema} from '../db/index.js'
+import {fetchAvailableCalendars} from '../lib/mac-bridge.js'
 import {asyncHandler} from '../lib/route-helpers.js'
 import {syncCalendarEvents} from '../services/calendar-sync.js'
-import {fetchAvailableCalendars} from '../services/calendar.js'
 import {getSetting} from './settings.js'
 
 export const calendarRouter = Router()

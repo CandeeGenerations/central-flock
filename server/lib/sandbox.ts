@@ -4,7 +4,9 @@
 // See ADR 0043 and docs/conventions (outbound calls).
 //
 // Each outbound client calls assertOutboundAllowed() itself, so a feature built on those clients
-// is covered automatically. A new kind of outbound call must add its own check.
+// is covered automatically. A new kind of outbound call must add its own check. The Mac bridge
+// (lib/mac-bridge.ts) is the exception: it reports success for sends and returns empty reads, so
+// send flows still work in a copy.
 
 export type OutboundKind = 'mac-bridge' | 'anthropic' | 'mcp' | 'webhook'
 

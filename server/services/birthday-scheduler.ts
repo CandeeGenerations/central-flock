@@ -2,8 +2,8 @@ import * as Sentry from '@sentry/node'
 import {and, eq, sql} from 'drizzle-orm'
 
 import {db, schema} from '../db/index.js'
+import {sendText} from '../lib/mac-bridge.js'
 import {getSetting, setSetting} from '../routes/settings.js'
-import {sendMessageViaUI} from './applescript.js'
 import {sendNotifyMeText} from './notify-me.js'
 import {
   type DigestItem,
@@ -113,7 +113,7 @@ async function deliverDigest(digest: string): Promise<boolean> {
     return false
   }
   try {
-    await sendMessageViaUI(me.phoneNumber, digest)
+    await sendText(me.phoneNumber, digest)
     console.log('Birthday scheduler: webhook failed, sent digest via Messages instead')
     return true
   } catch (err) {
@@ -156,7 +156,7 @@ export async function checkOccasions(now = new Date()) {
 
     const message = greeting(occasion)
     try {
-      await sendMessageViaUI(occasion.person.phoneNumber, message)
+      await sendText(occasion.person.phoneNumber, message)
       recordSent(occasion.person.id, occasion.kind, year)
       recordMessageInHistory(occasion.person.id, message)
       console.log(`Birthday scheduler: sent ${occasion.kind} message to ${name}`)

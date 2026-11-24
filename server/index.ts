@@ -58,6 +58,7 @@ import {workersNotesRouter} from './routes/workers-notes.js'
 import {startBirthdayScheduler} from './services/birthday-scheduler.js'
 import {backfillRepeatRules} from './services/calendar-print-year-copy.js'
 import {startCalendarSyncScheduler} from './services/calendar-sync.js'
+import {startSnapshotScheduler} from './services/db-snapshot.js'
 import {recoverInterruptedRuns} from './services/events-story/run.js'
 import {startFairBoothReminderScheduler} from './services/fair-booth-reminders.js'
 import {startMusicScanCleanup} from './services/music-scan-cleanup.js'
@@ -204,5 +205,6 @@ app.listen(PORT, () => {
   startSpecialsScheduler()
   cleanupOrphanedScanImages()
   startMusicScanCleanup()
+  if (process.env.SNAPSHOT_DIR) startSnapshotScheduler(sqlite, process.env.SNAPSHOT_DIR, UPLOADS_DIR)
   recoverUngeneratedSermons().catch((err) => console.error('[sermons-webhook] boot recovery failed:', err))
 })

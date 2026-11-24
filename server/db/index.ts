@@ -3,11 +3,22 @@ import {drizzle} from 'drizzle-orm/better-sqlite3'
 import path from 'path'
 import {fileURLToPath} from 'url'
 
+import {isSandbox} from '../lib/sandbox.js'
+import {UPLOADS_DIR} from '../lib/uploads.js'
+import {importIncomingCopy} from './incoming-import.js'
 import * as schema from './schema.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // CENTRAL_FLOCK_DB_PATH lets the AI smoke tests run against a throwaway copy of the DB.
 const dbPath = process.env.CENTRAL_FLOCK_DB_PATH || path.join(__dirname, '..', '..', 'central-flock.db')
+
+// A sandbox may be handed a fresh copy of production to load before the DB opens.
+importIncomingCopy({
+  dbPath,
+  incomingDir: process.env.INCOMING_DIR || path.join(path.dirname(dbPath), 'incoming'),
+  uploadsDir: UPLOADS_DIR,
+  sandbox: isSandbox(),
+})
 
 const sqlite = new Database(dbPath)
 sqlite.pragma('journal_mode = WAL')

@@ -52,6 +52,12 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+// What undici's fetch throws: a TypeError whose cause carries the socket error code.
+function networkError(code: string) {
+  return new TypeError('fetch failed', {cause: Object.assign(new Error(code), {code})})
+}
+const refused = () => networkError('ECONNREFUSED')
+
 function useCgenApi() {
   process.env.MAC_BRIDGE = 'cgen-api'
   process.env.CGEN_API_URL = 'https://api.example.test/'
@@ -147,7 +153,7 @@ describe('cgen-api mode', () => {
 
   it('retries when cgen-api was not reached, reusing the same idempotency key', async () => {
     fetchSpy
-      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockRejectedValueOnce(refused())
       .mockResolvedValueOnce(json(502, {}))
       .mockResolvedValueOnce(json(200, {ok: true}))
     await sendText('+15555550100', 'hello')
@@ -173,6 +179,40 @@ describe('cgen-api mode', () => {
     fetchSpy.mockResolvedValueOnce(json(500, {error: 'Messages did not send'}))
     await expect(sendText('+15555550100', 'x')).rejects.toThrow('Messages did not send')
     expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not retry a connection that dropped mid-request', async () => {
+    fetchSpy.mockRejectedValueOnce(networkError('ECONNRESET'))
+    await expect(sendText('+15555550100', 'x')).rejects.toThrow(/dropped mid-request.*check Messages/)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    // ...and that is not an outage, so the next call goes straight through.
+    fetchSpy.mockResolvedValueOnce(json(200, {ok: true}))
+    await sendText('+15555550100', 'x')
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('after giving up, fails later calls at once instead of retrying each one', async () => {
+    fetchSpy.mockRejectedValue(refused())
+    await expect(sendText('+15555550100', 'a')).rejects.toThrow(/Could not reach the Mac/)
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
+    await expect(sendText('+15555550101', 'b')).rejects.toThrow(/unreachable a moment ago/)
+    await expect(sendText('+15555550102', 'c')).rejects.toThrow(/unreachable a moment ago/)
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
+  })
+
+  it('tries again once the down window has passed', async () => {
+    vi.useFakeTimers({toFake: ['Date']})
+    try {
+      fetchSpy.mockRejectedValue(refused())
+      await expect(sendText('+15555550100', 'a')).rejects.toThrow(/Could not reach the Mac/)
+      vi.setSystemTime(Date.now() + 121_000)
+      fetchSpy.mockReset()
+      fetchSpy.mockResolvedValueOnce(json(200, {ok: true}))
+      await sendText('+15555550100', 'b')
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('reads contacts and sorts calendar events', async () => {

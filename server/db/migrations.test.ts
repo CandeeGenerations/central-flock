@@ -29,6 +29,8 @@ describe('migrations on an empty database', () => {
     expect(columns(db, 'calendar_print_pages')).toContain('hide_normal_schedule_footer')
     expect(columns(db, 'normal_schedule_items')).toContain('hidden')
     expect(columns(db, 'calendar_print_day_overrides')).toContain('show_normal_schedule_label')
+    expect(columns(db, 'people')).toContain('display_first_name_only')
+    expect(columns(db, 'special_music_performers')).toContain('display_first_name_only')
     db.close()
   })
 })

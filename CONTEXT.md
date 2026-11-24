@@ -51,6 +51,19 @@ Exchanging the **Devotion Content** of two devotions while each keeps its **Devo
 are left pointing at the number/box and are only warned about, not rewritten.
 _Avoid_: Reorder, Reschedule (those move the slot, not the content).
 
+**Passage**:
+A ready-to-record idea for one of Tyler's own **Devotions** — a title, one KJV reference, three or
+four talking points, and optional notes. Waits in the **Passage Pool** until it is given to a
+Devotion; its title, reference and points then become that Devotion's content, and it is marked
+used. _Recorded_ means the video was already made from it ahead of time.
+_Avoid_: Scripture Block (a quotation in a **Gwendolyn Devotional**), Verse, Topic.
+
+**Passage Pool**:
+Every **Passage** not yet given to a **Devotion**. When a month's schedule is scanned in, each of
+Tyler's Devotions that has no content takes the next Passage from the pool — recorded ones first,
+then oldest first — or one picked by hand.
+_Avoid_: Backlog, Queue.
+
 **Gwendolyn Devotional**:
 A short devotional Gwendolyn writes and texts in — a title, a date, and an ordered run of 📚
 points and **Scripture Blocks** — which the church produces into a reel. Her own work, in her own

@@ -78,6 +78,12 @@ Decisions 11, 12, 15, 16, 20–23 and ADR 0044. `main` takes fixes only from the
 rules that ban `react-router-dom` and Express imports, and write the routes, data-loading and
 server-functions conventions files.
 
+### Alongside Phase 5 — Central Flock MCP server
+
+Built Start-first once the rewrite has merged: one general MCP server at `flock.cgen.cc/mcp` with
+OAuth via Central Flock's login, starting with devotion Passage tools for the Grok bot and nursery
+tools. Design: [central-flock-mcp.md](./central-flock-mcp.md).
+
 ### Phases 5–8 — Library phases on `main` (decision 24)
 
 Ordinary PRs, one section per PR where it splits that way. Each phase finishes by writing its
@@ -389,7 +395,7 @@ What changes:
 
 ### Decided: cgen-api stays the front door; `flock.cgen.cc` leaves the tunnel
 
-8. **Every outside caller goes through cgen-api.** The public apps (attendance, RSVP, nursery,
+8. **Every outside caller goes through cgen-api.** _(Narrowed by [ADR 0045](../docs/adr/0045-signed-in-agents-connect-to-central-flock-directly.md): public, unauthenticated callers only; signed-in AI assistants connect directly.)_ The public apps (attendance, RSVP, nursery,
    sermons, quotes) keep posting to `api.cgen.cc`, which forwards to Central Flock with the internal
    secret. No public, unauthenticated routes are added to Central Flock; ADR 0014 stands. Accepted
    cost: when the Mac mini is off, the public apps are down, as they are today.

@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 
 import {sendNotifyMeText, sendNotifyMeTextWithFallback} from '../services/notify-me.js'
-import {createMessage} from './anthropic-client.js'
+import {createMessage, hasAnthropicKey, requireAnthropicKey} from './anthropic-client.js'
 import {withMcpClient} from './mcp-client/client.js'
 import {finishSignIn, refreshTokens, startSignIn} from './mcp-client/oauth.js'
 import {SandboxBlockedError, assertOutboundAllowed, isSandbox} from './sandbox.js'
@@ -57,6 +57,12 @@ describe('outbound clients in sandbox mode', () => {
       createMessage('test', {model: 'x', max_tokens: 1, messages: [{role: 'user', content: 'hi'}]}),
     ).rejects.toBeInstanceOf(SandboxBlockedError)
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('the Claude key checks report AI as off', () => {
+    process.env.ANTHROPIC_API_KEY ??= 'sk-test'
+    expect(hasAnthropicKey()).toBe(false)
+    expect(() => requireAnthropicKey()).toThrow(SandboxBlockedError)
   })
 
   it('MCP connect, sign-in and token refresh refuse', async () => {

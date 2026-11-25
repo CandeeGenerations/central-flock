@@ -341,6 +341,9 @@ export function PrayerSheetEditorPage() {
 
     // 11" × 8.5" landscape in mm
     const doc = new jsPDF({orientation: 'landscape', unit: 'mm', format: 'letter'})
+    // "Fit to page" shrinks the sheet toward the center, which pulls each half toward the
+    // fold, so the halves no longer match once the page is cut. Ask viewers for 100%.
+    doc.viewerPreferences({PrintScaling: 'None'})
     const pageW = 279.4
     const halfW = pageW / 2
     const pageH = 215.9
@@ -360,6 +363,9 @@ export function PrayerSheetEditorPage() {
 
     const latestDate = edition.sundays[edition.sundays.length - 1]?.sundayDate ?? 'unknown'
     doc.save(`prayer-sheet-${latestDate}.pdf`)
+    toast.success('PDF saved. Print at Actual Size (100%), not Scale to Fit, so both halves cut evenly.', {
+      duration: 10000,
+    })
   }
 
   if (isLoading || !edition || !settings) return <PageSpinner />

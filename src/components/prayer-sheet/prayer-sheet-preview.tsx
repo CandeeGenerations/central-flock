@@ -35,6 +35,15 @@ function getDateRangeLabel(sundays: PrayerSheetSunday[]): string {
     : `${MONTH_NAMES[first.getMonth()]} – ${MONTH_NAMES[last.getMonth()]} ${last.getFullYear()}`
 }
 
+// The stored verse is typed with straight quotes; the printed sheet uses curly ones.
+function smartQuotes(text: string): string {
+  return text
+    .replace(/(^|[\s([{])"/g, '$1“')
+    .replace(/"/g, '”')
+    .replace(/(^|[\s([{])'/g, '$1‘')
+    .replace(/'/g, '’')
+}
+
 function splitSundays(
   sundays: PrayerSheetSunday[],
   columnSplit: number | null,
@@ -43,48 +52,37 @@ function splitSundays(
   return [sundays.slice(0, splitAt), sundays.slice(splitAt)]
 }
 
-interface SundayColumnProps {
-  sundays: PrayerSheetSunday[]
-  fontSize: number
-}
-
-const ENTRY_LINE_HEIGHT = 1.35
+// Sundays, requests and the back-side list match the original sheet's narrow sans.
+// Arial Narrow ships with macOS; elsewhere it falls back to the wider Arial.
+const LIST_FONT_FAMILY = "'Arial Narrow', Arial, Helvetica, sans-serif"
+const LIST_FONT_SIZE = 13
+const LIST_LINE_HEIGHT = 1.15
 // Blank lines left between Sundays for requests written in by hand after printing.
 const WRITE_IN_LINES = 2
 
-function SundayColumn({sundays, fontSize}: SundayColumnProps) {
-  const writeInSpace = Math.round((fontSize - 1) * ENTRY_LINE_HEIGHT * WRITE_IN_LINES)
+function SundayColumn({sundays}: {sundays: PrayerSheetSunday[]}) {
+  const writeInSpace = Math.round(LIST_FONT_SIZE * LIST_LINE_HEIGHT * WRITE_IN_LINES)
   return (
-    <div style={{flex: 1, minWidth: 0}}>
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        fontFamily: LIST_FONT_FAMILY,
+        fontSize: LIST_FONT_SIZE,
+        lineHeight: LIST_LINE_HEIGHT,
+      }}
+    >
       {sundays.map((sunday, idx) => (
         <div key={sunday.id} style={{marginBottom: idx < sundays.length - 1 ? writeInSpace : 0}}>
-          <div
-            style={{
-              fontWeight: 'bold',
-              textDecoration: 'underline',
-              fontSize: fontSize,
-              marginBottom: 2,
-              color: '#000',
-            }}
-          >
+          <div style={{fontWeight: 'bold', textDecoration: 'underline', color: '#000'}}>
             {formatSundayHeading(sunday.sundayDate)}
           </div>
           {sunday.entries.map((entry) => (
-            <div
-              key={entry.id}
-              style={{
-                fontSize: fontSize - 1,
-                lineHeight: ENTRY_LINE_HEIGHT,
-                paddingLeft: 2,
-                color: '#111',
-              }}
-            >
+            <div key={entry.id} style={{color: '#111'}}>
               {entry.text}
             </div>
           ))}
-          {sunday.entries.length === 0 && (
-            <div style={{fontSize: fontSize - 2, color: '#aaa', fontStyle: 'italic'}}>No entries yet</div>
-          )}
+          {sunday.entries.length === 0 && <div style={{color: '#aaa', fontStyle: 'italic'}}>No entries yet</div>}
         </div>
       ))}
     </div>
@@ -100,7 +98,6 @@ export function PrayerSheetFront({edition, settings}: PrayerSheetFrontProps) {
   const color = edition.themeColor
   const [leftCol, rightCol] = splitSundays(edition.sundays, edition.columnSplit)
   const dateRange = getDateRangeLabel(edition.sundays)
-  const fontSize = 12
 
   return (
     <div
@@ -109,7 +106,9 @@ export function PrayerSheetFront({edition, settings}: PrayerSheetFrontProps) {
         height: HALF_SHEET_HEIGHT,
         backgroundColor: '#fff',
         fontFamily: 'Georgia, serif',
-        padding: '28px 32px 24px',
+        // One ½" side margin shared by title, verse and both columns, so the left and
+        // right edges run in a straight line down the page.
+        padding: '28px 48px 24px',
         boxSizing: 'border-box',
         overflow: 'hidden',
         position: 'relative',
@@ -118,7 +117,8 @@ export function PrayerSheetFront({edition, settings}: PrayerSheetFrontProps) {
       {/* Title */}
       <div
         style={{
-          fontSize: 30,
+          // Spans nearly the full content width, as on the original.
+          fontSize: 38,
           fontWeight: 'bold',
           color,
           textAlign: 'center',
@@ -131,20 +131,20 @@ export function PrayerSheetFront({edition, settings}: PrayerSheetFrontProps) {
         {settings.title}
       </div>
 
-      {/* Scripture */}
+      {/* Scripture — calligraphic like the original; at this size the first line ends at
+          "I will" and spans the content width, justified to square off the right edge. */}
       <div
         style={{
-          fontSize: 16,
-          fontStyle: 'italic',
+          fontSize: 19.5,
           color: '#222',
-          lineHeight: 1.45,
+          lineHeight: 1.3,
           marginBottom: 8,
-          fontFamily: 'Georgia, serif',
+          fontFamily: "'Apple Chancery', 'Monotype Corsiva', 'URW Chancery L', Georgia, serif",
+          fontStyle: 'italic',
         }}
       >
-        {settings.scriptureText}
-        <br />
-        {settings.scriptureReference}
+        <div style={{textAlign: 'justify'}}>{smartQuotes(settings.scriptureText)}</div>
+        <div>{settings.scriptureReference}</div>
       </div>
 
       {/* Date range */}
@@ -163,10 +163,10 @@ export function PrayerSheetFront({edition, settings}: PrayerSheetFrontProps) {
         </div>
       )}
 
-      {/* Two-column Sunday groupings */}
-      <div style={{display: 'flex', gap: 20, alignItems: 'flex-start'}}>
-        <SundayColumn sundays={leftCol} fontSize={fontSize} />
-        <SundayColumn sundays={rightCol} fontSize={fontSize} />
+      {/* Two-column Sunday groupings; the right column starts just past center. */}
+      <div style={{display: 'flex', gap: 34, alignItems: 'flex-start'}}>
+        <SundayColumn sundays={leftCol} />
+        <SundayColumn sundays={rightCol} />
       </div>
     </div>
   )
@@ -210,13 +210,20 @@ export function PrayerSheetBack({ministryItems, themeColor}: PrayerSheetBackProp
         </div>
 
         {/* Ministry list */}
-        <ul style={{margin: 0, padding: '0 0 0 18px', listStyleType: 'square'}}>
+        <ul
+          style={{
+            margin: 0,
+            padding: '0 0 0 18px',
+            listStyleType: 'square',
+            fontFamily: LIST_FONT_FAMILY,
+            fontSize: LIST_FONT_SIZE,
+            lineHeight: LIST_LINE_HEIGHT,
+          }}
+        >
           {ministryItems.map((item) => (
             <li
               key={item.id}
               style={{
-                fontSize: 11,
-                lineHeight: 1.4,
                 color: item.bold ? themeColor : '#111',
                 fontWeight: item.bold ? 'bold' : 'normal',
                 marginBottom: 1,

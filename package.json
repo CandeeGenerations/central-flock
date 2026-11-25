@@ -23,7 +23,7 @@
     "preview": "vite preview",
     "release": "standard-version -a -- --release-as minor",
     "snapshot:now": "tsx server/scripts/snapshot-now.ts",
-    "start": "tsx --import ./server/lib/sentry.ts server/index.ts",
+    "start": "pnpm db:migrate && pnpm db:seed && tsx --import ./server/lib/sentry.ts server/index.ts",
     "test": "vitest run",
     "test:ai": "vitest run -c vitest.ai.config.ts"
   },

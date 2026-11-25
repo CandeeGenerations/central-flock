@@ -96,8 +96,8 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
 - [x] **Boot-time import, sandbox only:** a copy at `<db dir>/incoming/central-flock.db` (or
       `INCOMING_DIR`), plus an optional `uploads.tar.gz`, is integrity-checked, swapped in, migrated
       and unpacked into `UPLOADS_DIR`. With sandbox off it refuses and logs loudly.
-- [x] **`drizzle.config.ts`** migrates `CENTRAL_FLOCK_DB_PATH`, so Railway's pre-deploy migrate hits
-      the volume.
+- [x] **`drizzle.config.ts`** migrates `CENTRAL_FLOCK_DB_PATH`, so the migrate at start-up hits the
+      volume.
 
 ## Phase 1 — Set up Railway (no real data yet)
 
@@ -105,10 +105,12 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
    `main`. Pushes to `main` now deploy to both the Mac (post-commit hook) and Railway — fine while
    Railway is in sandbox.
 2. Add a volume mounted at `/data`.
-3. Build command `pnpm build`; pre-deploy command `pnpm db:migrate && pnpm db:seed`; start command
-   `pnpm start`. Replicas: **1**. (`db:seed` does nothing outside a sandbox or on a database that
-   already has data, so it is safe on every deploy. `tsx` is already a regular dependency. These
-   commands change again when the Start rewrite lands.)
+3. Build command `pnpm build`; **no pre-deploy command**; start command `pnpm start`. Replicas:
+   **1**. `pnpm start` runs `db:migrate`, then `db:seed`, then the server. They can't be a
+   pre-deploy command: Railway doesn't mount the volume for pre-deploy, so `/data` doesn't exist
+   there (the first deploy failed with "Cannot open database because the directory does not
+   exist"). `db:seed` does nothing outside a sandbox or on a database that already has data, so it
+   is safe on every start. These commands change again when the Start rewrite lands.
 4. Variables:
 
    | Variable                                                                                             | Value now                                                      | At the switch                                 |
@@ -137,7 +139,7 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
 7. **Leave PR environments off.** Railway's docs don't say whether a PR environment gets a copy of
    the base environment's volume, and this one will hold real data. Turn them on only after
    checking (see "After the switch").
-8. Deploy. With an empty volume the pre-deploy builds the schema from migrations and seeds fake data;
+8. Deploy. With an empty volume, start-up builds the schema from migrations and seeds fake data;
    the server starts in sandbox mode and logs `Sandbox: background jobs disabled`. Log in at
    `https://flock-next.cgen.cc` and check a deep link (e.g. `/people`) loads.
 

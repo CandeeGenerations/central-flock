@@ -2,8 +2,8 @@
 
 Status: **Phases 0–2 done (2026-11-24): Railway runs in sandbox at `flock-next.cgen.cc` with a
 nightly copy of the live data. Phase 3 under way (2026-11-25): bridge, webhooks, restore and the
-iCloud pull are proven and the dry run is timed (10–15 min outage); the parity checklist, the
-move to Hobby and automatic deploys are left. Phase 4 not started.** This moves **today's
+iCloud pull are proven, the dry run is timed (10–15 min outage), the parity checklist is done,
+the account is on Hobby and pushes to `main` auto-deploy. Phase 3 is done; Phase 4 not started.** This moves **today's
 Express + Vite app** — the TanStack Start rewrite happens afterwards, on Railway (plan decision 18).
 `push-rehearsal-copy.sh` (Phase 2) runs nightly; `backup-dbs-pull.sh`, the iCloud backup for after
 the switch (Phase 4 step 9), is built and tested.
@@ -105,7 +105,9 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
 ## Phase 1 — Set up Railway (no real data yet)
 
 1. Create the project and connect the GitHub repo `CandeeGenerations/central-flock`, deploying from
-   `main`. Pushes to `main` now deploy to both the Mac (post-commit hook) and Railway — fine while
+   `main`. **The Railway GitHub app must be installed on the CandeeGenerations org with access to
+   this repo**, or Railway shows "Could not load branches" and pushes don't deploy; then click
+   Enable for auto deploy in the service's Source settings (done 2026-11-25). Pushes to `main` now deploy to both the Mac (post-commit hook) and Railway — fine while
    Railway is in sandbox.
 2. Add a volume mounted at `/data`.
 3. Build command `pnpm build`; **no pre-deploy command**; start command `pnpm start`. Replicas:
@@ -175,7 +177,9 @@ upload ... --overwrite`;
 Work through each section on `flock-next.cgen.cc` with the real (copied) data, side by side with
 `flock.cgen.cc`. Tick each line only when it behaves the same.
 
-**Parity checklist** — one line per sidebar section and standalone route in `src/lib/nav-config.ts`
+**Parity checklist** — [x] done 2026-11-25 (clicked through side by side; the only differences were
+per-site browser settings such as column choices, and data changed after the 3:00 copy, which a
+fresh push fixed). One line per sidebar section and standalone route in `src/lib/nav-config.ts`
 and `src/App.tsx` (expand before starting): Home, People, Groups, Messages (compose, history,
 detail, drafts, templates, global variables, scheduled), Prayer Request, Calendar and calendar
 print, Events Story, Devotions (incl. Gwendolyn), Sermons, Music and music schedule, Special
@@ -233,11 +237,10 @@ Then the rehearsals that prove the parts sandbox mode blocks:
    "Checking the import" below; staging the variables early (Phase 4 step 6) cuts most of the
    hand work.
 
-   **Found: the plan limits custom domains.** Railway refused a second custom domain on this
-   service ("You have reached the limit for custom domains per service on your plan"), and the
-   deploy metadata says the account is on `trial`, not Hobby. Before switch-over day: move the
-   account to Hobby, and either check that Hobby allows two custom domains per service or plan to
-   delete `flock-next.cgen.cc` right before adding `flock.cgen.cc` in step 7.
+   **Found: the trial plan allowed one custom domain.** Railway refused a second custom domain
+   on this service while the account was on the trial. **Resolved 2026-11-25:** the account is on
+   Hobby now, and a second test domain (`flock-dryrun.cgen.cc`) was accepted and then deleted, so
+   `flock.cgen.cc` can be added in step 7 while `flock-next.cgen.cc` stays.
 
 ## Phase 4 — Switch-over day
 
@@ -313,7 +316,7 @@ anything due in the next 2 hours and move it if needed.
 - [ ] Sentry shows events tagged `production` from Railway.
 - [ ] The home-screen app on iPhone and iPad opens and stays logged in (log in again if needed).
 - [ ] The next morning: `~/Library/Logs/central-flock-backup.log` shows `[backup-pull ...] Pulled
-  <today>` (the first launchd run of the pull script), the new dated iCloud folder's `.db` passes
+<today>` (the first launchd run of the pull script), the new dated iCloud folder's `.db` passes
       `integrity_check`, and `/data/backups/<today>` exists on Railway (`railway ssh -- ls /data/backups`).
 
 ## Checking the import

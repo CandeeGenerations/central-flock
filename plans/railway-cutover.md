@@ -1,9 +1,8 @@
 # Switching Central Flock from the Mac mini to Railway
 
-Status: **Phases 0–2 done (2026-11-24): Railway runs in sandbox at `flock-next.cgen.cc` with a
-nightly copy of the live data. Phase 3 under way (2026-11-25): bridge, webhooks, restore and the
-iCloud pull are proven, the dry run is timed (10–15 min outage), the parity checklist is done,
-the account is on Hobby and pushes to `main` auto-deploy. Phase 3 is done; Phase 4 not started.** This moves **today's
+Status: **Switched 2026-11-25. Production is Railway at `flock.cgen.cc`; the Mac app is stopped
+and retired. `flock.cgen.cc` was down about 9 minutes (16:22–16:31). The "Verify" list below
+still has hand checks open, and "After the switch" starts on day 14.** This moves **today's
 Express + Vite app** — the TanStack Start rewrite happens afterwards, on Railway (plan decision 18).
 `push-rehearsal-copy.sh` (Phase 2) runs nightly; `backup-dbs-pull.sh`, the iCloud backup for after
 the switch (Phase 4 step 9), is built and tested.
@@ -254,7 +253,9 @@ anything due in the next 2 hours and move it if needed.
    ```bash
    launchctl bootout "gui/$(id -u)/cc.cgen.central-flock-backup"
    ```
-3. **Stop the Mac app** (the site shows the tunnel's error page from here on):
+3. **Stop the Mac app** (the site shows the tunnel's error page from here on), then move its plist
+   to `~/Library/LaunchAgents/retired/`. It has `RunAtLoad` + `KeepAlive`, so left in place a
+   reboot would start it again; the post-commit hook also skips the Mac deploy once it's gone:
    ```bash
    launchctl bootout "gui/$(id -u)/cc.cgen.central-flock"
    launchctl print "gui/$(id -u)/cc.cgen.central-flock" >/dev/null 2>&1 && echo "STILL RUNNING" || echo "STOPPED"
@@ -288,13 +289,10 @@ anything due in the next 2 hours and move it if needed.
    - In Cloudflare, delete the tunnel's DNS record for `flock.cgen.cc`.
    - In Railway, add the custom domain `flock.cgen.cc` and create the CNAME/TXT records it shows.
    - Wait for Railway to show the domain as active and the certificate issued.
-8. **Point cgen-api at Railway.** In `~/Library/LaunchAgents/cc.cgen.api.plist`, set
-   `CENTRAL_FLOCK_BASE_URL=https://flock.cgen.cc` and `CENTRAL_FLOCK_INTERNAL_SECRET` to the new value
-   from step 6, then:
-   ```bash
-   launchctl bootout "gui/$(id -u)/cc.cgen.api"
-   launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/cc.cgen.api.plist
-   ```
+8. **Point cgen-api at Railway.** cgen-api reads these from **`cgen-api/.env`** (dotenv), not its
+   plist: set `CENTRAL_FLOCK_BASE_URL=https://flock.cgen.cc` and `CENTRAL_FLOCK_INTERNAL_SECRET` to
+   the new value from step 6, then `launchctl kickstart -k "gui/$(id -u)/cc.cgen.api"` and check
+   `https://api.cgen.cc/health` shows `centralFlock: up`.
 9. **Switch the iCloud backup to pull mode.** Point the backup job at `backup-dbs-pull.sh` (it
    pulls Railway's snapshot instead of copying the Mac's DB, so the rehearsal push stops with it)
    and load the job again:
@@ -303,16 +301,37 @@ anything due in the next 2 hours and move it if needed.
    launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/cc.cgen.central-flock-backup.plist
    ```
 
+### How it went (2026-11-25)
+
+Started 16:22:31 (Mac app stopped); `flock.cgen.cc` served by Railway with a valid certificate by
+about 16:31. Deviations from the steps above:
+
+- **Staged first, with the Mac still up:** `CGEN_API_KEY`, `ANTHROPIC_API_KEY`, **`API_KEY`** (the
+  `x-api-key` bypass for `/api` that outside tools such as n8n use; it was missing from the
+  variables table) and a new `CENTRAL_FLOCK_INTERNAL_SECRET` were set with `--skip-deploys`, and
+  `flock.cgen.cc` was added in Railway so its TXT record could go in early.
+- **Plist retired at the switch, not on day 14** (see step 3), and `.husky/post-commit` got a guard
+  that skips the Mac deploy while the plist is absent (`60db373`).
+- **cgen-api's settings are in `.env`** (step 8 is corrected).
+- Step 5: all 83 tables matched. Step 6: the boot log showed every scheduler starting and the
+  calendar sync read 131 events through the bridge.
+- Railway's certificate took about a minute to reach all of its edge servers after showing VALID;
+  waiting for 10 clean HTTPS checks in a row before step 8 avoided cgen-api hitting the old one.
+- `pnpm snapshot:now` right after the switch replaced the day's rehearsal snapshot with
+  production data.
+- An attendance link through `https://api.cgen.cc/attendance-public/<token>` returned real data
+  from Railway (session and week view).
+
 ### Verify (before calling it done)
 
-- [ ] `https://flock.cgen.cc` loads from Railway (check response headers or the Railway logs) and login works.
+- [x] `https://flock.cgen.cc` loads from Railway (`server: railway-hikari`, `/api/*` returns 401 signed out). Login: _you to confirm_.
 - [ ] Send one text and one image to yourself from Messages compose; both arrive.
-- [ ] Contacts import preview and the calendar page show Mac data.
+- [ ] Contacts import preview and the calendar page show Mac data. (Calendar sync read 131 events at boot.)
 - [ ] Public apps through cgen-api: open an RSVP link, record a test attendance tally on a test
       service (or check the GET only), load the nursery day page.
 - [ ] Sermons and quotes intake: trigger one from the sermon pipeline or wait for the next run, and
       check it lands.
-- [ ] Logs show all six schedulers started; the next scheduled send goes out on time.
+- [x] Logs show the schedulers started (scheduler, birthday, fair booth, calendar sync, specials). The next scheduled send (Sunday 2026-11-29, 08:00) going out on time: _to check_.
 - [ ] Sentry shows events tagged `production` from Railway.
 - [ ] The home-screen app on iPhone and iPad opens and stays logged in (log in again if needed).
 - [ ] The next morning: `~/Library/Logs/central-flock-backup.log` shows `[backup-pull ...] Pulled

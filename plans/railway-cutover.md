@@ -2,7 +2,8 @@
 
 Status: **Phases 0–2 done (2026-11-24): Railway runs in sandbox at `flock-next.cgen.cc` with a
 nightly copy of the live data. Phase 3 under way (2026-11-25): bridge, webhooks, restore and the
-iCloud pull are proven; the parity checklist and the timed dry run are left. Phase 4 not started.** This moves **today's
+iCloud pull are proven and the dry run is timed (10–15 min outage); the parity checklist, the
+move to Hobby and automatic deploys are left. Phase 4 not started.** This moves **today's
 Express + Vite app** — the TanStack Start rewrite happens afterwards, on Railway (plan decision 18).
 `push-rehearsal-copy.sh` (Phase 2) runs nightly; `backup-dbs-pull.sh`, the iCloud backup for after
 the switch (Phase 4 step 9), is built and tested.
@@ -216,8 +217,27 @@ Then the rehearsals that prove the parts sandbox mode blocks:
        exited 1. **Not run from launchd yet:** running it for real now would put Railway's sandbox
        copy over today's real iCloud backup. The same job already runs the Railway CLI (the nightly
        push) and writes to iCloud, so the first night after the switch is the launchd check (Verify).
-6. **Time the dry run:** run Phase 4 steps 3–7 against `flock-next.cgen.cc` without stopping the
-   Mac, and note the total time. That's the expected outage on the day.
+6. [x] **Time the dry run** — done 2026-11-25, with the Mac left running:
+
+   | Step                              | How it was timed                                                       | Time                      |
+   | --------------------------------- | ---------------------------------------------------------------------- | ------------------------- |
+   | 3. Stop the Mac app               | not run (one `launchctl` command)                                      | ~5 s                      |
+   | 4. Final snapshot + push + import | real run                                                               | 30 s                      |
+   | 5. Check the import               | every table's row count and max rowid, Mac copy vs Railway (83 tables) | 2 s, all matched          |
+   | 6. Railway to production + deploy | a sandbox redeploy until the site answered; variable edits not run     | 26 s + the variable edits |
+   | 7. Move the hostname              | Railway's verify + certificate for `flock-next.cgen.cc` (2026-11-25)   | ~40 s + the DNS edits     |
+
+   **Expected outage: about 10–15 minutes.** The scripted parts take about 1½ minutes; the rest
+   is hand work (Railway variables, `config.yml`, two Cloudflare DNS edits) and up to 5 minutes
+   for browsers' cached DNS for `flock.cgen.cc` to expire. The step 5 comparison script is in
+   "Checking the import" below; staging the variables early (Phase 4 step 6) cuts most of the
+   hand work.
+
+   **Found: the plan limits custom domains.** Railway refused a second custom domain on this
+   service ("You have reached the limit for custom domains per service on your plan"), and the
+   deploy metadata says the account is on `trial`, not Hobby. Before switch-over day: move the
+   account to Hobby, and either check that Hobby allows two custom domains per service or plan to
+   delete `flock-next.cgen.cc` right before adding `flock.cgen.cc` in step 7.
 
 ## Phase 4 — Switch-over day
 
@@ -245,8 +265,14 @@ anything due in the next 2 hours and move it if needed.
    Then run `scripts/push-rehearsal-copy.sh` once more, by hand, so the final copy lands in
    `/data/incoming/` and Railway imports it (still in sandbox mode).
 5. **Check the import** on `flock-next.cgen.cc`: people count, newest message in history, newest
-   RSVP and attendance entries match the Mac's last state.
-6. **Turn Railway into production.** In Railway variables: remove `CENTRAL_FLOCK_SANDBOX`; set and
+   RSVP and attendance entries match the Mac's last state. Faster and complete: compare every
+   table's row count and newest rowid (see "Checking the import" below); no differences means the
+   copy is whole.
+6. **Turn Railway into production.** To shorten the outage, stage everything except the sandbox
+   removal during step 4 with `railway variable set ... --skip-deploys` (sandbox still blocks every
+   send, so the bridge key is harmless before then); this step is then just deleting
+   `CENTRAL_FLOCK_SANDBOX`, which deploys on its own. Note `railway variable delete` ignores
+   `--skip-deploys`. In Railway variables: remove `CENTRAL_FLOCK_SANDBOX`; set and
    seal `CGEN_API_KEY` (the Mac's bridge key) and `ANTHROPIC_API_KEY`; generate a new
    `CENTRAL_FLOCK_INTERNAL_SECRET` (sealed); set `SENTRY_ENVIRONMENT=production`. Deploy. The log
    should **not** say `Sandbox: background jobs disabled`.
@@ -287,8 +313,40 @@ anything due in the next 2 hours and move it if needed.
 - [ ] Sentry shows events tagged `production` from Railway.
 - [ ] The home-screen app on iPhone and iPad opens and stays logged in (log in again if needed).
 - [ ] The next morning: `~/Library/Logs/central-flock-backup.log` shows `[backup-pull ...] Pulled
-    <today>` (the first launchd run of the pull script), the new dated iCloud folder's `.db` passes
+  <today>` (the first launchd run of the pull script), the new dated iCloud folder's `.db` passes
       `integrity_check`, and `/data/backups/<today>` exists on Railway (`railway ssh -- ls /data/backups`).
+
+## Checking the import
+
+Lists each table's row count and max rowid. Run it against the Mac's final copy and against
+Railway, then `diff` the two outputs; nothing printed means they match. Save as `tables.cjs`:
+
+```js
+const D = require(process.argv[3] || '/app/node_modules/better-sqlite3')
+const db = new D(process.argv[2], {readonly: true})
+const tables = db
+  .prepare(
+    "select name from sqlite_master where type='table' and name not like 'sqlite_%' " +
+      "and name not in ('__drizzle_migrations','route_visits') order by name",
+  )
+  .all()
+for (const {name} of tables) {
+  let r
+  try {
+    r = db.prepare(`select count(*) c, max(rowid) m from "${name}"`).get()
+  } catch {
+    r = db.prepare(`select count(*) c, '-' m from "${name}"`).get()
+  }
+  console.log(`${name}|${r.c}|${r.m}`)
+}
+```
+
+```bash
+node tables.cjs backups/central-flock.db.pre-railway-cutover "$PWD/node_modules/better-sqlite3" > mac.txt
+B64=$(base64 < tables.cjs | tr -d '\n')
+railway ssh --service central-flock -- sh -c "echo $B64 | base64 -d > /tmp/tables.cjs && node /tmp/tables.cjs /data/central-flock.db" | grep -v 'Using SSH' > railway.txt
+diff mac.txt railway.txt && echo "ALL TABLES MATCH"
+```
 
 ## Rollback
 

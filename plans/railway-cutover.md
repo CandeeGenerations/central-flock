@@ -1,10 +1,11 @@
 # Switching Central Flock from the Mac mini to Railway
 
 Status: **Phases 0–2 done (2026-11-24): Railway runs in sandbox at `flock-next.cgen.cc` with a
-nightly copy of the live data. Phases 3–4 not started.** This moves **today's
+nightly copy of the live data. Phase 3 under way (2026-11-25): bridge, webhooks, restore and the
+iCloud pull are proven; the parity checklist and the timed dry run are left. Phase 4 not started.** This moves **today's
 Express + Vite app** — the TanStack Start rewrite happens afterwards, on Railway (plan decision 18).
-`push-rehearsal-copy.sh` (Phase 2) is built and running nightly; the pull version of `backup-dbs.sh`
-(Phase 4) is still marked _(once built)_.
+`push-rehearsal-copy.sh` (Phase 2) runs nightly; `backup-dbs-pull.sh`, the iCloud backup for after
+the switch (Phase 4 step 9), is built and tested.
 
 After the switch the **Mac mini stays on**: it runs cgen-api, the tunnel for `api.cgen.cc`, and the
 iCloud backup pull. Only the `cc.cgen.central-flock` service is retired. Re-read this guide against
@@ -204,9 +205,17 @@ Then the rehearsals that prove the parts sandbox mode blocks:
        `/data/backups/2026-11-25` (15 MB DB, 16 MB uploads). A marker row was then added to the live
        DB, and the restore below brought back the snapshot: marker gone, 946 people, six upload
        folders, integrity `ok`. **22 seconds** from staging the files to the app running.
-5. **iCloud pull:** run the new pull version of `backup-dbs.sh` _(once built)_ from launchd (not a
-   terminal), confirm a dated folder appears with `central-flock.db` and `uploads.tar.gz`, and open
-   the `.db` with `sqlite3 ... "pragma integrity_check"`.
+5. [x] **iCloud pull** — built and tested 2026-11-25: `scripts/backup-dbs-pull.sh` waits up to 30
+       minutes for tonight's Railway snapshot (a night counts once both final files are in its folder,
+       since snapshots write `.tmp` files and rename them), downloads `central-flock.db` and
+       `uploads.tar.gz` with `railway volume files download`, checks the DB's integrity and the
+       tarball, then moves them into `<iCloud>/Backups/central-flock/<date>/` and keeps the newest 5.
+       It alerts the same n8n webhook as `backup-dbs.sh` when the snapshot is stale, missing or broken,
+       and keeps the existing backups. Tested into a scratch folder (`BACKUP_DEST=... WAIT_SECONDS=0`):
+       14 seconds, integrity `ok`, 946 people, pruning correct; with the CLI failing it alerted and
+       exited 1. **Not run from launchd yet:** running it for real now would put Railway's sandbox
+       copy over today's real iCloud backup. The same job already runs the Railway CLI (the nightly
+       push) and writes to iCloud, so the first night after the switch is the launchd check (Verify).
 6. **Time the dry run:** run Phase 4 steps 3–7 against `flock-next.cgen.cc` without stopping the
    Mac, and note the total time. That's the expected outage on the day.
 
@@ -257,9 +266,11 @@ anything due in the next 2 hours and move it if needed.
    launchctl bootout "gui/$(id -u)/cc.cgen.api"
    launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/cc.cgen.api.plist
    ```
-9. **Switch the iCloud backup to pull mode.** Replace `backup-dbs.sh` with the pull version
-   _(once built)_ and load the job again:
+9. **Switch the iCloud backup to pull mode.** Point the backup job at `backup-dbs-pull.sh` (it
+   pulls Railway's snapshot instead of copying the Mac's DB, so the rehearsal push stops with it)
+   and load the job again:
    ```bash
+   plutil -replace ProgramArguments -json '["/bin/bash","/Users/cgen01/repos/cgen/central-flock/scripts/backup-dbs-pull.sh"]' ~/Library/LaunchAgents/cc.cgen.central-flock-backup.plist
    launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/cc.cgen.central-flock-backup.plist
    ```
 
@@ -275,8 +286,9 @@ anything due in the next 2 hours and move it if needed.
 - [ ] Logs show all six schedulers started; the next scheduled send goes out on time.
 - [ ] Sentry shows events tagged `production` from Railway.
 - [ ] The home-screen app on iPhone and iPad opens and stays logged in (log in again if needed).
-- [ ] The next morning: a new dated iCloud folder exists and its `.db` passes `integrity_check`,
-      and `/data/backups/<today>` exists on Railway (`railway ssh -- ls /data/backups`).
+- [ ] The next morning: `~/Library/Logs/central-flock-backup.log` shows `[backup-pull ...] Pulled
+    <today>` (the first launchd run of the pull script), the new dated iCloud folder's `.db` passes
+      `integrity_check`, and `/data/backups/<today>` exists on Railway (`railway ssh -- ls /data/backups`).
 
 ## Rollback
 
@@ -293,7 +305,13 @@ Railway's newer data home:
    the `flock.cgen.cc` rule, recreate the tunnel DNS record, and restart the tunnel.
 5. Set cgen-api's `CENTRAL_FLOCK_BASE_URL` back to `http://localhost:5172` with the old secret and restart it.
 6. Start the Mac app: `launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/cc.cgen.central-flock.plist`.
-7. Put the old `backup-dbs.sh` back and reload the backup job.
+7. Point the backup job back at the Mac copy and reload it (the push line in `backup-dbs.sh` refuses
+   while Railway isn't in sandbox, so it's harmless):
+   ```bash
+   launchctl bootout "gui/$(id -u)/cc.cgen.central-flock-backup"
+   plutil -replace ProgramArguments -json '["/bin/sh","/Users/cgen01/repos/cgen/central-flock/scripts/backup-dbs.sh"]' ~/Library/LaunchAgents/cc.cgen.central-flock-backup.plist
+   launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/cc.cgen.central-flock-backup.plist
+   ```
 
 **If it's the first hour and nothing has changed on Railway yet:** skip steps 2–3 and go straight
 to 4–7. The Mac database is exactly as it was at the switch.

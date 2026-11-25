@@ -1,9 +1,10 @@
 # Switching Central Flock from the Mac mini to Railway
 
-Status: **Phase 0 done and deployed (2026-11-24); Phases 1–4 not started.** This moves **today's
+Status: **Phases 0–2 done (2026-11-24): Railway runs in sandbox at `flock-next.cgen.cc` with a
+nightly copy of the live data. Phases 3–4 not started.** This moves **today's
 Express + Vite app** — the TanStack Start rewrite happens afterwards, on Railway (plan decision 18).
-The two Mac scripts for Phases 2–4 (`push-rehearsal-copy.sh` and the pull version of
-`backup-dbs.sh`) are still marked _(once built)_.
+`push-rehearsal-copy.sh` (Phase 2) is built and running nightly; the pull version of `backup-dbs.sh`
+(Phase 4) is still marked _(once built)_.
 
 After the switch the **Mac mini stays on**: it runs cgen-api, the tunnel for `api.cgen.cc`, and the
 iCloud backup pull. Only the `cc.cgen.central-flock` service is retired. Re-read this guide against
@@ -146,30 +147,26 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
 ## Phase 2 — Nightly sandbox copy of the live data
 
 Each night, the Mac sends Railway a fresh copy of the live data. Railway only accepts it in sandbox mode.
+**Set up and first run done 2026-11-24.**
 
-1. On the Mac, install the Railway CLI and create a **project token** for `central-flock`
-   (`production`). Store it in the `cc.cgen.central-flock-backup` plist's environment, the same way
-   other secrets live in plists today.
-2. Add a `scripts/push-rehearsal-copy.sh` _(once built)_, run nightly after the existing backup:
-
-   ```bash
-   SRC=/Users/cgen01/repos/cgen/central-flock/central-flock.db
-   UP="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Backups/central-flock"
-   TMP=$(mktemp -d)
-   sqlite3 "$SRC" ".backup '$TMP/central-flock.db'"
-   sqlite3 "$TMP/central-flock.db" "pragma integrity_check" | grep -qx ok
-   tar -czf "$TMP/uploads.tar.gz" -C "$UP" events-story music-scans prayer-sheets scan-images schedule-logos special-music
-   railway volume files upload "$TMP/central-flock.db" /data/incoming/central-flock.db
-   railway volume files upload "$TMP/uploads.tar.gz" /data/incoming/uploads.tar.gz
-   railway redeploy --yes
-   rm -rf "$TMP"
-   ```
-
-   (Check the exact `railway` flags against the CLI version you install.)
-
-3. Run it once by hand. After the redeploy, check on `flock-next.cgen.cc` that the people count
-   matches the Mac (946 at the time of writing) and that a few uploaded images load.
-4. Leave it running nightly through Phases 3 and 4.
+1. **`scripts/push-rehearsal-copy.sh`** (`bash scripts/push-rehearsal-copy.sh` to run by hand):
+   - refuses unless Railway's `CENTRAL_FLOCK_SANDBOX` is `1`;
+   - takes a `sqlite3 .backup` copy of the live DB, checks its integrity, and packs the iCloud
+     upload folders;
+   - uploads both to `/data/incoming` with `railway volume files --volume central-flock-volume
+upload ... --overwrite`;
+   - redeploys, waits for the deploy and reports success or failure.
+     It uses the Railway CLI's saved login for this Mac user, so no project token is needed (set
+     `RAILWAY_TOKEN` to use one instead). If `railway login` ever lapses, the push refuses and says so.
+2. **Nightly:** the last step of `scripts/backup-dbs.sh` (the 03:00 `cc.cgen.central-flock-backup`
+   job) runs it, after the iCloud backup. A failure is logged to
+   `~/Library/Logs/central-flock-backup.log` and does not affect the backup.
+3. **First run (by hand, 22:12):** 14 MB DB with 946 people and 15 MB of uploads, uploaded and
+   imported in about 30 seconds. On Railway: 946 people, all six upload folders. That run showed
+   the import leaving `-wal`/`-shm` files in `/data/incoming`; fixed in `724c4a4`.
+4. **Still to check by eye:** sign in at `flock-next.cgen.cc` and confirm a few uploaded images load.
+5. Leave it running nightly through Phases 3 and 4. **Stop it at cut-over** (Phase 4 step 2) by
+   removing the last line of `backup-dbs.sh`.
 
 ## Phase 3 — Rehearse and prove parity
 

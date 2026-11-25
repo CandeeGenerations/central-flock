@@ -70,3 +70,8 @@ if [ "$FINAL_COUNT" -ge 10 ]; then
     https://workflows.cgen.cc/webhook/3a5d87df-b435-4ac8-831c-e729a3632af0 \
     || echo "Alert webhook failed (non-fatal)."
 fi
+
+# Pre-cut-over rehearsal (plans/railway-cutover.md, Phase 2): send Railway a
+# fresh copy of the live data. Non-fatal — the iCloud backup above is already
+# done. Remove this at cut-over (Phase 4 step 2), when Railway becomes production.
+/bin/bash "$SRC/scripts/push-rehearsal-copy.sh" || echo "Rehearsal push to Railway failed (non-fatal)."

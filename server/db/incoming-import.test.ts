@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 
-import {msUntilNextRun, writeSnapshot} from '../services/db-snapshot.js'
+import {KEEP_DAYS, datedSnapshots, msUntilNextRun, snapshotOverdue, writeSnapshot} from '../services/db-snapshot.js'
 import {importIncomingCopy} from './incoming-import.js'
 
 let dir: string
@@ -94,15 +94,53 @@ describe('writeSnapshot', () => {
     live.pragma('journal_mode = WAL')
     live.exec(`INSERT INTO marker VALUES ('written-in-wal')`)
     const out = path.join(dir, 'backups')
-    await writeSnapshot(live, out, uploadsDir)
+    const day = await writeSnapshot(live, out, uploadsDir, new Date(2026, 10, 24, 3))
     live.close()
 
+    expect(path.basename(day)).toBe('2026-11-24')
+    expect(fs.existsSync(path.join(day, 'central-flock.db'))).toBe(true)
     const copy = new Database(path.join(out, 'nightly.db'), {readonly: true})
     expect(copy.pragma('integrity_check', {simple: true})).toBe('ok')
     expect((copy.prepare('SELECT count(*) AS n FROM marker').get() as {n: number}).n).toBe(2)
     copy.close()
     const list = spawnSync('tar', ['-tzf', path.join(out, 'uploads.tar.gz')], {encoding: 'utf8'}).stdout
     expect(list).toContain('a.txt')
+  })
+
+  it(`keeps the newest ${KEEP_DAYS} nights and points nightly.db at the newest`, async () => {
+    const live = new Database(dbPath)
+    const out = path.join(dir, 'backups')
+    for (let d = 1; d <= 10; d++) {
+      live.exec(`INSERT INTO marker VALUES ('night-${d}')`)
+      await writeSnapshot(live, out, uploadsDir, new Date(2026, 10, d, 3))
+    }
+    live.close()
+
+    expect(datedSnapshots(out)).toEqual([
+      '2026-11-04',
+      '2026-11-05',
+      '2026-11-06',
+      '2026-11-07',
+      '2026-11-08',
+      '2026-11-09',
+      '2026-11-10',
+    ])
+    const latest = new Database(path.join(out, 'nightly.db'), {readonly: true})
+    expect((latest.prepare('SELECT count(*) AS n FROM marker').get() as {n: number}).n).toBe(11)
+    latest.close()
+  })
+})
+
+describe('snapshotOverdue', () => {
+  it('is overdue with no snapshots, or when the newest is older than yesterday', async () => {
+    const out = path.join(dir, 'backups')
+    const now = new Date(2026, 10, 24, 12)
+    expect(snapshotOverdue(out, now)).toBe(true)
+    const live = new Database(dbPath)
+    await writeSnapshot(live, out, uploadsDir, new Date(2026, 10, 23, 3))
+    expect(snapshotOverdue(out, now)).toBe(false)
+    expect(snapshotOverdue(out, new Date(2026, 10, 25, 12))).toBe(true)
+    live.close()
   })
 })
 

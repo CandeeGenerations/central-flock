@@ -80,6 +80,22 @@ describe('importIncomingCopy', () => {
     expect(fs.readdirSync(incomingDir)).toEqual([])
   })
 
+  it('leaves no -wal/-shm behind in incoming for a WAL-mode copy, even with stale ones there', () => {
+    const copy = path.join(incomingDir, 'central-flock.db')
+    const conn = new Database(copy)
+    conn.pragma('journal_mode = WAL')
+    conn.exec(`CREATE TABLE marker (label TEXT); INSERT INTO marker VALUES ('wal-copy')`)
+    conn.close()
+    fs.writeFileSync(`${copy}-wal`, 'stale from last night')
+    fs.writeFileSync(`${copy}-shm`, 'stale from last night')
+
+    expect(importIncomingCopy({dbPath, incomingDir, uploadsDir, sandbox: true, runMigrations: vi.fn()})).toBe(
+      'imported',
+    )
+    expect(readLabel(dbPath)).toBe('wal-copy')
+    expect(fs.readdirSync(incomingDir)).toEqual([])
+  })
+
   it('keeps the current database when the copy is corrupt', () => {
     fs.writeFileSync(path.join(incomingDir, 'central-flock.db'), 'not a database')
     expect(importIncomingCopy({dbPath, incomingDir, uploadsDir, sandbox: true, runMigrations: vi.fn()})).toBe('invalid')

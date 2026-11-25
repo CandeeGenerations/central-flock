@@ -63,6 +63,14 @@ export function importIncomingCopy(options: ImportOptions): ImportResult {
     return 'refused'
   }
 
+  // A WAL-mode copy grows -wal/-shm files the moment it is opened (the integrity check below does
+  // that), and they'd stay behind after the move. Left there, the next night's copy would arrive
+  // beside the previous night's files, which SQLite could treat as its own. Clear them each time.
+  const removeSidecars = () => {
+    for (const suffix of ['-wal', '-shm']) fs.rmSync(`${incomingDb}${suffix}`, {force: true})
+  }
+  removeSidecars()
+
   if (!integrityOk(incomingDb)) {
     console.error(`Incoming copy ${incomingDb} failed its integrity check; keeping the current database`)
     return 'invalid'
@@ -71,6 +79,7 @@ export function importIncomingCopy(options: ImportOptions): ImportResult {
   for (const suffix of ['', '-wal', '-shm']) fs.rmSync(`${dbPath}${suffix}`, {force: true})
   fs.mkdirSync(path.dirname(dbPath), {recursive: true})
   fs.renameSync(incomingDb, dbPath)
+  removeSidecars()
   runMigrations(dbPath)
 
   if (fs.existsSync(incomingUploads)) {

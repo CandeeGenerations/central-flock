@@ -88,8 +88,11 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
 - [x] **Send allow-list:** `SEND_ALLOWLIST` (comma-separated numbers) refuses anyone not listed,
       even with sandbox off.
 - [x] **`/webhooks/*` hardened:** constant-time secret compare, and 120 requests a minute.
-- [x] **Nightly snapshot:** when `SNAPSHOT_DIR` is set, the server writes `nightly.db` (via
-      `db.backup()`) and `uploads.tar.gz` there at 03:00 server time.
+- [x] **Nightly snapshot:** when `SNAPSHOT_DIR` is set, the server writes `<date>/central-flock.db`
+      (via `db.backup()`) and `<date>/uploads.tar.gz` there at 03:00 server time, keeps the newest
+      7 nights, and links `nightly.db` / `uploads.tar.gz` to the newest for the Mac's download. It
+      takes one at boot if the newest is older than yesterday. `pnpm snapshot:now` takes one on
+      demand. **These are the backups on Railway** — Hobby can't create Railway volume backups.
 - [x] **Boot-time import, sandbox only:** a copy at `<db dir>/incoming/central-flock.db` (or
       `INCOMING_DIR`), plus an optional `uploads.tar.gz`, is integrity-checked, swapped in, migrated
       and unpacked into `UPLOADS_DIR`. With sandbox off it refuses and logs loudly.
@@ -126,8 +129,9 @@ Decisions behind it: [ADR 0043](../docs/adr/0043-railway-hosting-with-mac-work-b
    | `CONNECTIONS_KEY`                                                                                    | same as the Mac (so saved Canva/Metricool connections decrypt) | same                                          |
    | `SEND_ALLOWLIST`                                                                                     | not set                                                        | not set (only during the Phase 3 bridge test) |
 
-5. Backups: on the volume's **Backups** tab, turn on daily, weekly and monthly. **Confirm the tab
-   exists on Hobby** — if it doesn't, stop and revisit decision 10.
+5. Backups: nothing to turn on. Railway's Hobby plan can view and restore volume backups but not
+   create them (checked 2026-11-24), so backups are our own nightly snapshots (7 nights on the
+   volume) plus the Mac's iCloud copy. See "Restoring from a snapshot" below.
 6. Custom domain `flock-next.cgen.cc`: add it in Railway, then create the CNAME (and verification
    TXT record) Railway shows in Cloudflare DNS. Leave `flock.cgen.cc` alone.
 7. **Leave PR environments off.** Railway's docs don't say whether a PR environment gets a copy of
@@ -192,8 +196,8 @@ Then the rehearsals that prove the parts sandbox mode blocks:
 3. **Webhooks:** from the Mac, call each `/webhooks/*` endpoint on `flock-next.cgen.cc` with the
    Railway secret (GET endpoints only, or POST against fake tokens), confirming the paths and the
    401 for a wrong secret.
-4. **Backups:** take a manual Railway backup, restore it, check the data, and note how long the
-   restore took.
+4. **Backups:** run `railway ssh -- pnpm snapshot:now`, then follow "Restoring from a snapshot"
+   with that folder, check the data came back, and note how long it took.
 5. **iCloud pull:** run the new pull version of `backup-dbs.sh` _(once built)_ from launchd (not a
    terminal), confirm a dated folder appears with `central-flock.db` and `uploads.tar.gz`, and open
    the `.db` with `sqlite3 ... "pragma integrity_check"`.
@@ -265,8 +269,8 @@ anything due in the next 2 hours and move it if needed.
 - [ ] Logs show all six schedulers started; the next scheduled send goes out on time.
 - [ ] Sentry shows events tagged `production` from Railway.
 - [ ] The home-screen app on iPhone and iPad opens and stays logged in (log in again if needed).
-- [ ] The next morning: a new dated iCloud folder exists and its `.db` passes `integrity_check`;
-      Railway's daily backup ran.
+- [ ] The next morning: a new dated iCloud folder exists and its `.db` passes `integrity_check`,
+      and `/data/backups/<today>` exists on Railway (`railway ssh -- ls /data/backups`).
 
 ## Rollback
 
@@ -274,9 +278,9 @@ anything due in the next 2 hours and move it if needed.
 Railway's newer data home:
 
 1. In Railway, set `CENTRAL_FLOCK_SANDBOX=1` and deploy, so it stops sending.
-2. Download the latest data: let the snapshot job write `/data/backups/nightly.db` (or trigger it),
-   then `railway volume files download /data/backups/nightly.db ./central-flock.db.from-railway`,
-   and the same for `uploads.tar.gz`.
+2. Download the latest data: `railway ssh -- pnpm snapshot:now` (works in sandbox mode too), then
+   `railway volume files download /data/backups/nightly.db ./central-flock.db.from-railway`, and the
+   same for `/data/backups/uploads.tar.gz`.
 3. Check it with `pragma integrity_check`, then replace the Mac's `central-flock.db` (remove any
    leftover `-wal`/`-shm`) and unpack the uploads into the iCloud `UPLOADS_DIR` subfolders.
 4. In Railway, remove the `flock.cgen.cc` custom domain. In `~/.cloudflared/config.yml`, uncomment
@@ -287,6 +291,24 @@ Railway's newer data home:
 
 **If it's the first hour and nothing has changed on Railway yet:** skip steps 2–3 and go straight
 to 4–7. The Mac database is exactly as it was at the switch.
+
+## Restoring from a snapshot
+
+Railway's Hobby plan can't create volume backups, so a restore uses our own snapshots and the
+sandbox-only import (Phase 0). Sandbox mode is on during the import, so nothing sends meanwhile.
+
+1. **Pick the night:** `railway ssh -- ls /data/backups` lists the dated folders (newest 7). Take a
+   fresh one of the current state first, in case you want to go back: `railway ssh -- pnpm snapshot:now`.
+2. **Stage it:**
+   ```bash
+   railway ssh -- sh -c 'mkdir -p /data/incoming && cp /data/backups/<date>/central-flock.db /data/backups/<date>/uploads.tar.gz /data/incoming/'
+   ```
+   From the iCloud copy instead (if the volume itself is lost): upload the dated folder's two files
+   with `railway volume files upload <file> /data/incoming/<file>`.
+3. **Import:** set `CENTRAL_FLOCK_SANDBOX=1` and deploy. The log should say
+   `Sandbox: imported the production copy`. Check the data in the app.
+4. **Back to live:** remove `CENTRAL_FLOCK_SANDBOX` and deploy. Anything scheduled while sandbox was
+   on goes out when the schedulers start.
 
 ## After the switch (from day 14)
 

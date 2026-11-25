@@ -52,9 +52,10 @@ every open tab: the service log showed 5,130 hot updates and 45 full reloads.
   sandbox check.
 - **`/webhooks/*` becomes internet-facing.** Today it's reachable only from the Mac. So the
   internal secret is rotated, compared in constant time and rate-limited.
-- **Backups happen twice:** Railway volume backups (daily, weekly, monthly), and a nightly
-  `db.backup()` snapshot that the Mac downloads into iCloud Drive, so a copy always lives outside
-  Railway.
+- **Backups are our own, twice:** the app's nightly `db.backup()` snapshot, with 7 dated nights kept
+  on the volume, and the Mac's nightly download of it into iCloud Drive, so a copy always lives
+  outside Railway. Railway's own volume backups can't be created on the Hobby plan (Pro can), so
+  there is no one-click restore or point-in-time recovery; a restore uses the sandbox-only import.
 - **What stops being true:** "production is the only DB", "the service runs `pnpm dev`" and
   "saved edits go live" in RUNBOOK.md, CLAUDE.md and the auto-memory notes. Those get rewritten at
   cut-over. The post-commit deploy hook is retired in favour of Railway's GitHub deploys.

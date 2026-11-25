@@ -412,10 +412,16 @@ What changes:
      after the Railway domain is live and verified, then retire the Mac's `cc.cgen.central-flock`
      launchd service.
 
-10. **Backups: Railway volume backups _and_ a nightly copy to iCloud Drive.** Revised the same day:
-    first Railway-only, then changed so a copy always lives outside Railway (a Railway account or
-    volume problem must not be able to lose the data).
-    - **Railway:** volume backups for quick restores (details checked below).
+10. **Backups: our own nightly snapshots on the volume _and_ a nightly copy to iCloud Drive.**
+    Revised twice on 2026-11-24: first Railway-only, then Railway backups plus iCloud so a copy
+    always lives outside Railway, then — once Railway showed that **Hobby can view and restore volume
+    backups but not create them** (Pro, $20/month, can) — our own snapshots instead of Railway's.
+    Chosen over upgrading to Pro and over adding object storage.
+    - **Railway:** the app's nightly `db.backup()` snapshot, 7 dated nights kept on the volume
+      (`server/services/db-snapshot.ts`). No one-click restore or point-in-time recovery; a restore
+      goes through the sandbox-only import ([railway-cutover.md](./railway-cutover.md) → "Restoring
+      from a snapshot"). The table below records what Railway's docs said before the plan limit
+      showed up; its "On Hobby?" row turned out wrong.
     - **iCloud:** `scripts/backup-dbs.sh` keeps its destination
       (`iCloud Drive/Backups/central-flock`, 5 dated folders) but can no longer `cp` the `.db` file;
       it downloads a nightly snapshot from the Railway volume instead (how, below). Each dated folder

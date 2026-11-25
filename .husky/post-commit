@@ -7,6 +7,14 @@ if [[ -n "${SKIP_DEPLOY:-}" ]]; then
   exit 0
 fi
 
+# After the switch to Railway (plans/railway-cutover.md, Phase 4) the Mac app's launchd file is
+# moved out of LaunchAgents, and Railway deploys from GitHub. Reloading the Mac app here would start
+# a second copy of the schedulers, so skip the Mac deploy entirely.
+if [[ ! -f "$HOME/Library/LaunchAgents/cc.cgen.central-flock.plist" ]]; then
+  echo "post-commit: the Mac app is retired (Railway deploys on push), skipping Mac deploy"
+  exit 0
+fi
+
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [[ "$BRANCH" != "main" ]]; then
   exit 0

@@ -64,20 +64,20 @@ export function titleText(line: Pick<StoryLineText, 'line1' | 'line2'>): string 
 
 export interface ReplaceTextOperation {
   type: 'replace_text'
-  element_id: string
+  locator_id: string
   text: string
 }
 
-// The perform-editing-operations payload that fills all five Story Lines.
+// The edit-design operations that fill all five Story Lines.
 export function buildOperations(lines: StoryLineFields[]): ReplaceTextOperation[] {
   if (lines.length !== STORY_LINE_COUNT) throw new Error(`An Events Story needs exactly ${STORY_LINE_COUNT} events`)
   return lines.flatMap((line, i) => {
     const l = STORY_LINE_LOCATORS[i]
     return [
-      {type: 'replace_text' as const, element_id: l.dayNumber, text: line.dayNumber.trim()},
-      {type: 'replace_text' as const, element_id: l.month, text: line.month.trim()},
-      {type: 'replace_text' as const, element_id: l.dayTimeLine, text: line.dayTimeLine.trim()},
-      {type: 'replace_text' as const, element_id: l.title, text: titleText(line)},
+      {type: 'replace_text' as const, locator_id: l.dayNumber, text: line.dayNumber.trim()},
+      {type: 'replace_text' as const, locator_id: l.month, text: line.month.trim()},
+      {type: 'replace_text' as const, locator_id: l.dayTimeLine, text: line.dayTimeLine.trim()},
+      {type: 'replace_text' as const, locator_id: l.title, text: titleText(line)},
     ]
   })
 }
@@ -95,9 +95,11 @@ export function altText(lines: StoryLineFields[]): string {
 
 const TWO_LINE_MIN_HEIGHT = 70 // one line ≈ 46px, two lines ≈ 100px
 
-interface RichTextEntry {
-  element_id?: string
-  containerElement?: {dimension?: {height?: number}}
+interface DesignElement {
+  locator_id?: string
+  height?: number
+  children?: DesignElement[]
+  elements?: DesignElement[]
 }
 
 export interface TitleBoxCheck {
@@ -105,14 +107,28 @@ export interface TitleBoxCheck {
   missing: number[] // Story Lines whose title element isn't in the design any more
 }
 
-// Reads start-editing-transaction's `richtexts`. A one-line title box would make its divider jump
+// Every element in read-design's `design_content`, groups flattened, by locator id.
+function elementHeights(read: unknown): Map<string, number | undefined> {
+  const out = new Map<string, number | undefined>()
+  const walk = (els: DesignElement[] | undefined) => {
+    for (const el of els ?? []) {
+      if (el?.locator_id) out.set(el.locator_id, el.height)
+      walk(el?.children)
+      walk(el?.elements)
+    }
+  }
+  const pages = (read as {design_content?: {pages?: DesignElement[]}})?.design_content?.pages ?? []
+  walk(pages)
+  return out
+}
+
+// Reads read-design's `design_content` (page 1). A one-line title box would make its divider jump
 // when we write two lines (see TITLE_PAD); a missing one means the template was redesigned.
-export function checkTitleBoxes(transaction: unknown): TitleBoxCheck {
-  const richtexts = ((transaction as {richtexts?: RichTextEntry[]})?.richtexts ?? []) as RichTextEntry[]
+export function checkTitleBoxes(read: unknown): TitleBoxCheck {
+  const heights = elementHeights(read)
   const out: TitleBoxCheck = {oneLine: [], missing: []}
   STORY_LINE_LOCATORS.forEach((l, i) => {
-    const entry = richtexts.find((r) => r.element_id === l.title)
-    const height = entry?.containerElement?.dimension?.height
+    const height = heights.get(l.title)
     if (typeof height !== 'number') out.missing.push(i + 1)
     else if (height < TWO_LINE_MIN_HEIGHT) out.oneLine.push(i + 1)
   })

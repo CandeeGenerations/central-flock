@@ -95,3 +95,41 @@ export function zonedIso(date: string, hour: number, minute = 0, timeZone = STOR
     .value.replace('GMT', '')
   return `${date}T${hh}:${mm}:00${offset || '+00:00'}`
 }
+
+// ---------- weeks (the first thing the New Story screen asks for) ----------
+
+export function mondayOf(date: string): string {
+  return addDays(date, -((weekdayOf(date) + 6) % 7))
+}
+
+// Mondays of the weeks a Story can still post in: this week through MAX_DAYS_AHEAD.
+export function storyWeeks(now: ZonedNow): string[] {
+  const last = addDays(now.date, MAX_DAYS_AHEAD)
+  const out: string[] = []
+  for (let m = mondayOf(now.date); m <= last; m = addDays(m, 7)) out.push(m)
+  return out
+}
+
+// The week the default rule (Decision 8) lands in, judged by the 10 am fallback — no Metricool call.
+export function suggestedWeek(now: ZonedNow): string {
+  return mondayOf(defaultPostDay(now, (_date, earliest) => fallbackHours(earliest).length > 0))
+}
+
+// Default post day inside a chosen week: the first Mon–Wed day with a good hour left, else the
+// first day with one, else the first day still open. Null when the week is past or out of range.
+export function defaultDayInWeek(
+  monday: string,
+  now: ZonedNow,
+  hasGoodHour: (date: string, earliest: number) => boolean,
+): string | null {
+  const last = addDays(now.date, MAX_DAYS_AHEAD)
+  const days: string[] = []
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(monday, i)
+    if (d >= now.date && d <= last) days.push(d)
+  }
+  if (days.length === 0) return null
+  const good = days.filter((d) => hasGoodHour(d, earliestMinute(d, now)))
+  const early = good.find((d) => weekdayOf(d) >= MONDAY && weekdayOf(d) < THURSDAY)
+  return early ?? good[0] ?? days[0]
+}

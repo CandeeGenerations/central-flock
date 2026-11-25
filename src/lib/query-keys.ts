@@ -34,6 +34,7 @@ export const queryKeys = {
   eventsStoryOpenRun: ['events-story', 'open'] as const,
   eventsStoryRun: (id: number) => ['events-story', 'run', id] as const,
   eventsStoryPrepare: ['events-story', 'prepare'] as const,
+  eventsStoryWeeks: ['events-story', 'weeks'] as const,
   eventsStoryDay: (date: string) => ['events-story', 'day', date] as const,
   nonMembers: (groupId: string | number, search?: string) => {
     if (search !== undefined) return ['nonMembers', String(groupId), search] as const

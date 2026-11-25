@@ -20,13 +20,18 @@ import {
 import {fetchBestTimes, scheduleStory} from './metricool.js'
 import {SPAN_LOOKBACK_DAYS, type StoryCandidate, pickEvents} from './pick-events.js'
 import {
+  type HourScores,
   MAX_DAYS_AHEAD,
   type RankedHour,
   type ZonedNow,
+  defaultDayInWeek,
   defaultPostDay,
   earliestMinute,
   fallbackHours,
+  mondayOf,
   rankHours,
+  storyWeeks,
+  suggestedWeek,
   zonedNow,
 } from './post-time.js'
 import {type StoryLineText, storyLineFor} from './story-lines.js'
@@ -68,6 +73,37 @@ export function loadCandidates(fromDate: string): Candidate[] {
   return pickEvents(rows, fromDate).map((c) => ({...c, ...storyLineFor(c.date, c.endDate, c.title)}))
 }
 
+// ---------- caches ----------
+// The New Story screen is reopened often (a refresh, an iPad waking up, another device), and each
+// open used to re-ask Canva and Metricool. Best times are historical averages and a working
+// Connection stays working, so both are kept in memory for a while. Failures are never cached.
+
+const BEST_TIMES_TTL_MS = 6 * 60 * 60_000
+const CONNECTION_TTL_MS = 30 * 60_000
+
+const bestTimesCache = new Map<string, {at: number; value: Promise<HourScores[]>}>()
+const connectionCache = new Map<'canva' | 'metricool', {at: number; value: Promise<ConnectionCheck>}>()
+
+function cachedBestTimes(date: string): Promise<HourScores[]> {
+  const hit = bestTimesCache.get(date)
+  if (hit && Date.now() - hit.at < BEST_TIMES_TTL_MS) return hit.value
+  const value = fetchBestTimes(date)
+  bestTimesCache.set(date, {at: Date.now(), value})
+  value.catch(() => bestTimesCache.delete(date))
+  return value
+}
+
+function cachedConnection(provider: 'canva' | 'metricool', fresh: boolean): Promise<ConnectionCheck> {
+  const hit = connectionCache.get(provider)
+  if (!fresh && hit && Date.now() - hit.at < CONNECTION_TTL_MS) return hit.value
+  const value = checkConnection(provider)
+  connectionCache.set(provider, {at: Date.now(), value})
+  void value.then((c) => {
+    if (!c.ok) connectionCache.delete(provider)
+  })
+  return value
+}
+
 // Ranked post hours for a day: Metricool's Facebook + Instagram scores, or 10 am if unavailable.
 export async function hoursFor(
   date: string,
@@ -75,7 +111,7 @@ export async function hoursFor(
 ): Promise<{hours: RankedHour[]; source: 'metricool' | 'fallback'}> {
   const earliest = earliestMinute(date, now)
   try {
-    const ranked = rankHours(await fetchBestTimes(date), earliest)
+    const ranked = rankHours(await cachedBestTimes(date), earliest)
     if (ranked.length > 0) return {hours: ranked, source: 'metricool'}
   } catch (error) {
     console.warn(`[events-story] best times for ${date} unavailable:`, error instanceof Error ? error.message : error)
@@ -107,11 +143,49 @@ export interface PrepareResult {
   scheduledThatWeek: RunRow[]
 }
 
+// Week picker: no Canva or Metricool calls, just the calendar and the scheduled Stories.
+export interface StoryWeek {
+  monday: string
+  sunday: string
+  scheduled: RunRow[]
+}
+
+export function listStoryWeeks(): {today: string; maxDate: string; suggested: string; weeks: StoryWeek[]} {
+  const now = zonedNow(new Date())
+  return {
+    today: now.date,
+    maxDate: addDays(now.date, MAX_DAYS_AHEAD),
+    suggested: suggestedWeek(now),
+    weeks: storyWeeks(now).map((monday) => ({
+      monday,
+      sunday: addDays(monday, 6),
+      scheduled: scheduledInWeekOf(monday),
+    })),
+  }
+}
+
+// Default post day within a chosen week. Only today can run out of good hours (any later day
+// has at least the 10 am fallback), so at most one best-times lookup.
+async function resolveDayInWeek(monday: string, now: ZonedNow): Promise<string> {
+  const todayHasHour = mondayOf(now.date) === monday ? (await hoursFor(now.date, now)).hours.length > 0 : true
+  const day = defaultDayInWeek(monday, now, (date) => date !== now.date || todayHasHour)
+  if (!day) throw new RunInputError('That week has already passed — pick another')
+  return day
+}
+
+export interface PrepareOptions {
+  // An exact post day (resuming a saved run), or a week (its Monday) to pick the day within.
+  date?: string
+  week?: string
+  // Re-check the Connections instead of trusting a recent check ("Check again").
+  fresh?: boolean
+}
+
 // Everything the New Story screen needs. Connections are checked first (Decision 5); when either
 // fails the rest is skipped and the picker stays locked.
-export async function prepareRun(date?: string): Promise<PrepareResult> {
+export async function prepareRun({date, week, fresh = false}: PrepareOptions = {}): Promise<PrepareResult> {
   const now = zonedNow(new Date())
-  const [canva, metricool] = await Promise.all([checkConnection('canva'), checkConnection('metricool')])
+  const [canva, metricool] = await Promise.all([cachedConnection('canva', fresh), cachedConnection('metricool', fresh)])
   const ready = canva.ok && metricool.ok
   const base = {
     connections: {canva, metricool},
@@ -123,7 +197,7 @@ export async function prepareRun(date?: string): Promise<PrepareResult> {
   if (!ready) {
     return {...base, postDate: now.date, hours: [], hoursSource: 'fallback', candidates: [], scheduledThatWeek: []}
   }
-  const postDate = date ?? (await resolveDefaultDay(now))
+  const postDate = date ?? (week ? await resolveDayInWeek(mondayOf(week), now) : await resolveDefaultDay(now))
   const {hours, source} = await hoursFor(postDate, now)
   return {
     ...base,
@@ -330,27 +404,33 @@ async function draftRun(id: number): Promise<void> {
     const lines = runLines(run)
     progress(id, 10, 'Opening the Canva design…')
     await withMcpClient('canva', async (client) => {
-      const started = toolJson(
+      const opened = toolJson(
         await client.callTool({
-          name: 'start-editing-transaction',
-          arguments: {design_id: DESIGN_ID, user_intent: 'Central Flock: draft the weekly Events Story'},
+          name: 'read-design',
+          arguments: {
+            design_id: DESIGN_ID,
+            open_transaction: true,
+            filter: {fields: ['design_content'], page_indices: [1]},
+            user_intent: 'Central Flock: draft the weekly Events Story',
+          },
         }),
       )
-      transactionId = findKey<string>(started, 'transaction_id')
+      transactionId = findKey<string>(opened, 'transaction_id')
       if (!transactionId) throw new Error('Canva did not return an editing transaction')
       update(id, {canvaTransactionId: transactionId})
 
-      const problem = describeTitleProblems(checkTitleBoxes(started))
+      const problem = describeTitleProblems(checkTitleBoxes(opened))
       if (problem) throw new Error(problem)
 
       progress(id, 35, 'Updating Story Lines…')
       toolJson(
         await client.callTool({
-          name: 'perform-editing-operations',
+          name: 'edit-design',
           arguments: {
             transaction_id: transactionId,
             page_index: 1,
             operations: buildOperations(lines),
+            finalize: 'keep_open',
             user_intent: 'Central Flock: fill the five Story Lines',
           },
         }),
@@ -359,8 +439,13 @@ async function draftRun(id: number): Promise<void> {
       progress(id, 70, 'Rendering preview…')
       const thumb = toolJson(
         await client.callTool({
-          name: 'get-design-thumbnail',
-          arguments: {transaction_id: transactionId, page_index: 1, user_intent: 'Central Flock: preview the draft'},
+          name: 'read-design',
+          arguments: {
+            design_id: DESIGN_ID,
+            transaction_id: transactionId,
+            filter: {fields: ['thumbnails'], thumbnail_pages: [1]},
+            user_intent: 'Central Flock: preview the draft',
+          },
         }),
       )
       const url = findKey<string>(thumb, 'url') ?? findKey<string>(thumb, 'thumbnail_url')
@@ -382,8 +467,12 @@ async function cancelTransaction(transactionId: string): Promise<void> {
   try {
     await withMcpClient('canva', (client) =>
       client.callTool({
-        name: 'cancel-editing-transaction',
-        arguments: {transaction_id: transactionId, user_intent: 'Central Flock: discard the Events Story draft'},
+        name: 'edit-design',
+        arguments: {
+          transaction_id: transactionId,
+          finalize: 'cancel',
+          user_intent: 'Central Flock: discard the Events Story draft',
+        },
       }),
     )
   } catch (error) {
@@ -520,9 +609,10 @@ async function scheduleRun(id: number, from: ScheduleStep): Promise<void> {
         await withMcpClient('canva', async (client) =>
           toolJson(
             await client.callTool({
-              name: 'commit-editing-transaction',
+              name: 'edit-design',
               arguments: {
                 transaction_id: run.canvaTransactionId,
+                finalize: 'commit',
                 user_intent: 'Central Flock: save the Events Story Tyler approved',
               },
             }),

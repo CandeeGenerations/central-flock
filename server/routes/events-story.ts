@@ -14,6 +14,7 @@ import {
   getRun,
   hoursFor,
   listPastRuns,
+  listStoryWeeks,
   loadCandidates,
   prepareRun,
   redraftRun,
@@ -42,12 +43,25 @@ function sendInputError(res: import('express').Response, error: unknown): boolea
   return false
 }
 
-// New Story screen: connection check, default post day/time, the 10 candidates, any open run.
+// New Story, step 1: the weeks a Story can post in (no Canva/Metricool calls).
+eventsStoryRouter.get('/weeks', (_req, res) => {
+  const {weeks, ...rest} = listStoryWeeks()
+  res.json({...rest, weeks: weeks.map((w) => ({...w, scheduled: w.scheduled.map(present)}))})
+})
+
+// New Story, step 2: connection check, default post day/time in the chosen week, the 10 candidates.
 eventsStoryRouter.get(
   '/prepare',
   asyncHandler(async (req, res) => {
-    const date = typeof req.query.date === 'string' && DATE_RE.test(req.query.date) ? req.query.date : undefined
-    res.json(await prepareRun(date))
+    const param = (name: string) =>
+      typeof req.query[name] === 'string' && DATE_RE.test(req.query[name] as string)
+        ? (req.query[name] as string)
+        : undefined
+    try {
+      res.json(await prepareRun({date: param('date'), week: param('week'), fresh: req.query.fresh === '1'}))
+    } catch (error) {
+      if (!sendInputError(res, error)) throw error
+    }
   }),
 )
 

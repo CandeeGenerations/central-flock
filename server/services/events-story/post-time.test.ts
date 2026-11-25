@@ -79,3 +79,44 @@ describe('time helpers', () => {
     expect(zonedIso('2027-06-07', 13, 30)).toBe('2027-06-07T13:30:00-04:00')
   })
 })
+
+describe('story weeks', async () => {
+  const {defaultDayInWeek, mondayOf, storyWeeks, suggestedWeek} = await import('./post-time.js')
+
+  it('finds the Monday of any day', () => {
+    expect(mondayOf('2026-11-23')).toBe('2026-11-23')
+    expect(mondayOf('2026-11-29')).toBe('2026-11-23')
+    expect(mondayOf('2026-11-30')).toBe('2026-11-30')
+  })
+
+  it('lists this week through 28 days ahead', () => {
+    expect(storyWeeks(at('2026-11-25', 8))).toEqual([
+      '2026-11-23',
+      '2026-11-30',
+      '2026-12-07',
+      '2026-12-14',
+      '2026-12-21',
+    ])
+  })
+
+  it('suggests this week Mon–Wed and next week after that', () => {
+    expect(suggestedWeek(at('2026-11-23', 8))).toBe('2026-11-23')
+    expect(suggestedWeek(at('2026-11-25', 15))).toBe('2026-11-30')
+    expect(suggestedWeek(at('2026-11-27', 8))).toBe('2026-11-30')
+  })
+
+  it('defaults to Monday of a future week', () => {
+    expect(defaultDayInWeek('2026-11-30', at('2026-11-25', 8), tenAm)).toBe('2026-11-30')
+  })
+
+  it('this week: today if an hour is left, else the next day', () => {
+    expect(defaultDayInWeek('2026-11-23', at('2026-11-24', 8), tenAm)).toBe('2026-11-24')
+    expect(defaultDayInWeek('2026-11-23', at('2026-11-24', 15), tenAm)).toBe('2026-11-25')
+    // Friday afternoon: no Mon–Wed left, so Saturday.
+    expect(defaultDayInWeek('2026-11-23', at('2026-11-27', 15), tenAm)).toBe('2026-11-28')
+  })
+
+  it('refuses a past week', () => {
+    expect(defaultDayInWeek('2026-11-16', at('2026-11-24', 8), always)).toBeNull()
+  })
+})

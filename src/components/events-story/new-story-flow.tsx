@@ -15,6 +15,7 @@ import {
   type StoryLineDraft,
   draftEventsStoryRun,
   fetchEventsStoryDay,
+  fetchEventsStoryWeeks,
   prepareEventsStory,
   saveEventsStoryRun,
   startConnection,
@@ -24,10 +25,19 @@ import {queryKeys} from '@/lib/query-keys'
 import {cn} from '@/lib/utils'
 import {useMutation, useQuery} from '@tanstack/react-query'
 import {AlertTriangle, CheckCircle2, XCircle} from 'lucide-react'
-import {useEffect, useMemo, useState} from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 import {toast} from 'sonner'
 
-import {formatDate, formatMinute, formatPostTime, minuteToTimeInput, timeInputToMinute} from './format'
+import {
+  addDaysIso,
+  formatDate,
+  formatMinute,
+  formatPostTime,
+  formatWeek,
+  minuteToTimeInput,
+  mondayOfIso,
+  timeInputToMinute,
+} from './format'
 
 const STORY_SIZE = 5
 
@@ -56,26 +66,157 @@ function PrepareProgress() {
 
 export function NewStoryFlow({
   run,
+  week,
+  onWeek,
   onDrafted,
   onCancel,
 }: {
   // The saved 'editing' Story Run being resumed, if any (e.g. after a refresh).
   run?: EventsStoryRun
+  // The chosen week's Monday, kept in the URL so a refresh lands back here.
+  week: string | null
+  onWeek: (week: string) => void
   onDrafted: (run: EventsStoryRun) => void
   onCancel: (runId: number | null) => void
 }) {
+  // Snapshot at mount: the open-run query refetches (window focus, after autosaves), and a newer
+  // copy of the same run must not reset the picker or re-ask Canva and Metricool.
+  const [initialRun] = useState(run)
   // The 'editing' run the picker autosaves into; created on the first save.
-  const [runId, setRunId] = useState<number | null>(run?.id ?? null)
+  const [runId, setRunId] = useState<number | null>(initialRun?.id ?? null)
+  const savedWeek = initialRun ? mondayOfIso(initialRun.postDate) : null
+  const [picking, setPicking] = useState(false)
+  const activeWeek = picking ? null : (week ?? savedWeek)
 
+  if (!activeWeek) {
+    return (
+      <WeekPicker
+        current={week ?? savedWeek}
+        onPick={(w) => {
+          setPicking(false)
+          onWeek(w)
+        }}
+        onCancel={() => onCancel(runId)}
+      />
+    )
+  }
+  return (
+    <WeekFlow
+      key={activeWeek}
+      week={activeWeek}
+      // Resuming keeps the saved day and lines only for the saved week.
+      resume={initialRun && savedWeek === activeWeek ? initialRun : undefined}
+      runId={runId}
+      onRunId={setRunId}
+      onChangeWeek={() => setPicking(true)}
+      onDrafted={onDrafted}
+      onCancel={() => onCancel(runId)}
+    />
+  )
+}
+
+// Step 1: pick the week. Only reads the calendar — no Canva or Metricool calls until a week is chosen.
+function WeekPicker({
+  current,
+  onPick,
+  onCancel,
+}: {
+  current: string | null
+  onPick: (week: string) => void
+  onCancel: () => void
+}) {
+  const weeks = useQuery({queryKey: queryKeys.eventsStoryWeeks, queryFn: fetchEventsStoryWeeks})
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Which week is this Story for?</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {weeks.isLoading && <p className="text-sm text-muted-foreground">Loading weeks…</p>}
+        {weeks.error && <p className="text-sm text-destructive">{weeks.error.message}</p>}
+        {weeks.data && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {weeks.data.weeks.map((w, i) => {
+              const label = i === 0 ? 'This week' : i === 1 ? 'Next week' : null
+              const chosen = current === w.monday
+              return (
+                <button
+                  key={w.monday}
+                  type="button"
+                  onClick={() => onPick(w.monday)}
+                  className={cn(
+                    'min-h-14 rounded-md border p-3 text-left transition-colors hover:bg-accent',
+                    chosen && 'border-primary bg-primary/5',
+                  )}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{formatWeek(w.monday)}</span>
+                    {label && <span className="text-xs text-muted-foreground">{label}</span>}
+                    {w.monday === weeks.data.suggested && (
+                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">Suggested</span>
+                    )}
+                  </div>
+                  {w.scheduled.length > 0 && (
+                    <p className="mt-1 flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                      Already scheduled: {w.scheduled.map((r) => formatPostTime(r.postDate, r.postMinute)).join(', ')}
+                    </p>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Step 2: connections, best times and candidates for the chosen week, then the picker.
+function WeekFlow({
+  week,
+  resume,
+  runId,
+  onRunId,
+  onChangeWeek,
+  onDrafted,
+  onCancel,
+}: {
+  week: string
+  resume?: EventsStoryRun
+  runId: number | null
+  onRunId: (id: number) => void
+  onChangeWeek: () => void
+  onDrafted: (run: EventsStoryRun) => void
+  onCancel: () => void
+}) {
+  // "Check again" / "Try again" re-check the Connections instead of using the server's recent check.
+  const fresh = useRef(false)
   const prepare = useQuery({
-    queryKey: [...queryKeys.eventsStoryPrepare, run?.postDate ?? 'default'],
-    queryFn: () => prepareEventsStory(run?.postDate),
-    staleTime: 0,
-    gcTime: 0,
+    queryKey: [...queryKeys.eventsStoryPrepare, week, resume?.postDate ?? 'default'],
+    queryFn: () => {
+      const opts = resume ? {date: resume.postDate} : {week}
+      const result = prepareEventsStory({...opts, fresh: fresh.current})
+      fresh.current = false
+      return result
+    },
+    // Fetched once per week; focus/remounts reuse it (the server caches the slow parts too).
+    staleTime: Infinity,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
     retry: false,
   })
+  const recheck = () => {
+    fresh.current = true
+    void prepare.refetch()
+  }
 
-  const [postDate, setPostDate] = useState<string | null>(run?.postDate ?? null)
+  const [postDate, setPostDate] = useState<string | null>(resume?.postDate ?? null)
   const effectiveDate = postDate ?? prepare.data?.postDate ?? null
   const overridden = Boolean(effectiveDate && effectiveDate !== prepare.data?.postDate)
 
@@ -83,6 +224,9 @@ export function NewStoryFlow({
     queryKey: queryKeys.eventsStoryDay(effectiveDate ?? ''),
     queryFn: () => fetchEventsStoryDay(effectiveDate!),
     enabled: Boolean(prepare.data?.ready && overridden && effectiveDate),
+    staleTime: Infinity,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
     retry: false,
   })
   const dayData: EventsStoryDay | undefined = overridden ? day.data : prepare.data
@@ -102,8 +246,11 @@ export function NewStoryFlow({
         <CardContent className="space-y-3 pt-6">
           <p className="text-sm text-destructive">{prepare.error?.message ?? "Couldn't start a new Story"}</p>
           <div className="flex gap-2">
-            <Button onClick={() => prepare.refetch()}>Try again</Button>
-            <Button variant="ghost" onClick={() => onCancel(runId)}>
+            <Button onClick={recheck}>Try again</Button>
+            <Button variant="outline" onClick={onChangeWeek}>
+              Change week
+            </Button>
+            <Button variant="ghost" onClick={onCancel}>
               Cancel
             </Button>
           </div>
@@ -112,27 +259,29 @@ export function NewStoryFlow({
     )
   }
   if (!prepare.data.ready) {
-    return <ConnectionsBlocker prep={prepare.data} onRetry={() => prepare.refetch()} onCancel={() => onCancel(runId)} />
+    return <ConnectionsBlocker prep={prepare.data} onRetry={recheck} onCancel={onCancel} />
   }
 
   // Resuming: keep the saved time only on the saved day; a new day starts at its best hour.
-  const savedMinute = run && run.postDate === effectiveDate ? run.postMinute : undefined
+  const savedMinute = resume && resume.postDate === effectiveDate ? resume.postMinute : undefined
 
   return (
     <StoryForm
       key={`${effectiveDate}:${dayData ? 'ready' : 'loading'}`}
       prep={prepare.data}
+      week={week}
+      onChangeWeek={onChangeWeek}
       day={dayData}
       dayLoading={overridden && day.isLoading}
       dayError={overridden ? day.error?.message : undefined}
       postDate={effectiveDate!}
       onPostDate={(d) => setPostDate(d)}
-      savedLines={run?.lines}
+      savedLines={resume?.lines}
       savedMinute={savedMinute}
       runId={runId}
-      onRunId={setRunId}
+      onRunId={onRunId}
       onDrafted={onDrafted}
-      onCancel={() => onCancel(runId)}
+      onCancel={onCancel}
     />
   )
 }
@@ -223,6 +372,8 @@ function ConnectionLine({
 
 function StoryForm({
   prep,
+  week,
+  onChangeWeek,
   day,
   dayLoading,
   dayError,
@@ -236,6 +387,8 @@ function StoryForm({
   onCancel,
 }: {
   prep: EventsStoryPrepare
+  week: string
+  onChangeWeek: () => void
   day: EventsStoryDay | undefined
   dayLoading: boolean
   dayError?: string
@@ -328,6 +481,10 @@ function StoryForm({
     chosen.length === STORY_SIZE &&
     postMinute !== null &&
     chosen.every((c) => lineFor(c).line1.trim())
+  // The picker stays inside the chosen week (and today → the 28-day limit).
+  const firstDay = week > prep.today ? week : prep.today
+  const weekEnd = addDaysIso(week, 6)
+  const lastDay = weekEnd < prep.maxDate ? weekEnd : prep.maxDate
   const pickerValue = postMinute !== null ? `${postDate}T${minuteToTimeInput(postMinute)}` : `${postDate}T10:00`
 
   return (
@@ -346,6 +503,12 @@ function StoryForm({
           </span>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Week of {formatWeek(week)}</span>
+            <Button variant="link" size="sm" className="h-auto p-0" onClick={onChangeWeek} disabled={draft.isPending}>
+              Change week
+            </Button>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="w-full max-w-xs">
               <DateTimePicker
@@ -353,8 +516,8 @@ function StoryForm({
                 onChange={(value) => {
                   if (!value) return
                   const [date, time] = value.split('T')
-                  if (date < prep.today || date > prep.maxDate) {
-                    toast.info(`Pick a day between today and ${formatDate(prep.maxDate)}`)
+                  if (date < firstDay || date > lastDay) {
+                    toast.info(`Pick a day between ${formatDate(firstDay)} and ${formatDate(lastDay)}`)
                     return
                   }
                   if (date !== postDate) onPostDate(date)
@@ -362,7 +525,7 @@ function StoryForm({
                 }}
               />
             </div>
-            {postDate !== prep.postDate && (
+            {postDate !== prep.postDate && mondayOfIso(prep.postDate) === week && (
               <Button variant="ghost" size="sm" onClick={() => onPostDate(prep.postDate)}>
                 Back to default ({formatDate(prep.postDate)})
               </Button>

@@ -32,3 +32,21 @@ export function timeInputToMinute(value: string): number | null {
   const m = value.match(/^(\d{2}):(\d{2})$/)
   return m ? Number(m[1]) * 60 + Number(m[2]) : null
 }
+
+export function addDaysIso(iso: string, days: number): string {
+  const [y, mo, d] = iso.split('-').map(Number)
+  return new Date(Date.UTC(y, mo - 1, d + days)).toISOString().slice(0, 10)
+}
+
+// Monday of the week holding `iso`.
+export function mondayOfIso(iso: string): string {
+  const [y, mo, d] = iso.split('-').map(Number)
+  const weekday = new Date(Date.UTC(y, mo - 1, d)).getUTCDay()
+  return addDaysIso(iso, -((weekday + 6) % 7))
+}
+
+// "Nov 30 – Dec 6"
+export function formatWeek(monday: string): string {
+  const short = {weekday: undefined, month: 'short', day: 'numeric'} as const
+  return `${formatDate(monday, short)} – ${formatDate(addDaysIso(monday, 6), short)}`
+}

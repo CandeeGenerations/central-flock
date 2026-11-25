@@ -17,6 +17,7 @@ import {queryKeys} from '@/lib/query-keys'
 import {keepPreviousData, useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {ExternalLink, Images, Plus} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
+import {useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
 
 const PAGE_SIZE = 10
@@ -25,7 +26,13 @@ const PAGE_SIZE = 10
 // Every stage lives on the server (the Story Run), so a refresh or another device resumes it.
 export function EventsStoryPage() {
   const queryClient = useQueryClient()
-  const [composing, setComposing] = useState(false)
+  // New Story state lives in the URL (?new=1&week=YYYY-MM-DD) so a refresh lands back on the same
+  // step; once the picker autosaves, the 'editing' run on the server carries it.
+  const [params, setParams] = useSearchParams()
+  const composing = params.get('new') === '1'
+  const week = params.get('week')
+  const setComposing = (on: boolean, nextWeek: string | null = null) =>
+    setParams(on ? {new: '1', ...(nextWeek ? {week: nextWeek} : {})} : {}, {replace: true})
   const [late, setLate] = useState<LateSuggestion | null | undefined>(undefined)
 
   // The open run; polled every second while the server is drafting or scheduling it.
@@ -74,7 +81,8 @@ export function EventsStoryPage() {
   })
 
   const busy = discard.isPending || redraft.isPending || retry.isPending || reopen.isPending || approve.isPending
-  const showFlow = Boolean(editing) || (composing && !current)
+  // Wait for the open run before mounting the flow: it snapshots the run it resumes on mount.
+  const showFlow = open.isSuccess && (Boolean(editing) || (composing && !current))
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -83,7 +91,7 @@ export function EventsStoryPage() {
           <Images className="h-6 w-6" />
           <h1 className="text-2xl font-bold">Events Story</h1>
         </div>
-        {!showFlow && !current && (
+        {open.isSuccess && !showFlow && !current && (
           <Button onClick={() => setComposing(true)}>
             <Plus className="mr-1 h-4 w-4" /> New Story
           </Button>
@@ -93,8 +101,12 @@ export function EventsStoryPage() {
       <div className="max-w-3xl space-y-4">
         {showFlow && (
           <NewStoryFlow
-            key={editing?.id ?? 'new'}
+            // One key for the whole flow: the run appearing after the first autosave (or refetching)
+            // must not remount it — that used to reset the picker and re-run /prepare.
+            key="flow"
             run={editing}
+            week={week}
+            onWeek={(w) => setComposing(true, w)}
             onCancel={(runId) => {
               setComposing(false)
               if (runId) discard.mutate(runId)

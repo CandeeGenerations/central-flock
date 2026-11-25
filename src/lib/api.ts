@@ -735,8 +735,31 @@ export interface EventsStoryPrepare extends EventsStoryDay {
   openRun: EventsStoryRun | null
 }
 
-export function prepareEventsStory(date?: string) {
-  return request<EventsStoryPrepare>(`/events-story/prepare${date ? `?date=${encodeURIComponent(date)}` : ''}`)
+export interface EventsStoryWeek {
+  monday: string
+  sunday: string
+  scheduled: EventsStoryRun[]
+}
+
+export interface EventsStoryWeeks {
+  today: string
+  maxDate: string
+  suggested: string
+  weeks: EventsStoryWeek[]
+}
+
+export function fetchEventsStoryWeeks() {
+  return request<EventsStoryWeeks>('/events-story/weeks')
+}
+
+// `date` resumes a saved post day; `week` (its Monday) lets the server pick the day in that week.
+export function prepareEventsStory(opts: {date?: string; week?: string; fresh?: boolean}) {
+  const params = new URLSearchParams()
+  if (opts.date) params.set('date', opts.date)
+  if (opts.week) params.set('week', opts.week)
+  if (opts.fresh) params.set('fresh', '1')
+  const qs = params.toString()
+  return request<EventsStoryPrepare>(`/events-story/prepare${qs ? `?${qs}` : ''}`)
 }
 
 export function fetchEventsStoryDay(date: string) {

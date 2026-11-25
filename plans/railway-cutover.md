@@ -183,20 +183,27 @@ Settings, command palette, Recents, login and logout, iPhone and iPad home-scree
 
 Then the rehearsals that prove the parts sandbox mode blocks:
 
-1. **Real send through the bridge from Railway, to yourself only.** The bridge itself is already
-   proven on the Mac; this checks the path through `https://api.cgen.cc`. Set `SEND_ALLOWLIST` to
-   your own number and `CGEN_API_KEY` (sealed), and remove `CENTRAL_FLOCK_SANDBOX` for this test only.
-   Before removing it, **pause the nightly push job and confirm no scheduled message, birthday or
-   fair-booth reminder is due in the next hour** — schedulers start when sandbox is off. Send one
-   text and one image to yourself. Then put `CENTRAL_FLOCK_SANDBOX=1` back, remove `SEND_ALLOWLIST`
-   and `CGEN_API_KEY`, redeploy, and resume the nightly push.
-2. **Contacts and calendar through the bridge:** in the same window, open the Contacts import
-   preview and the calendar page; both should show Mac data.
-3. **Webhooks:** from the Mac, call each `/webhooks/*` endpoint on `flock-next.cgen.cc` with the
-   Railway secret (GET endpoints only, or POST against fake tokens), confirming the paths and the
-   401 for a wrong secret.
-4. **Backups:** run `railway ssh -- pnpm snapshot:now`, then follow "Restoring from a snapshot"
-   with that folder, check the data came back, and note how long it took.
+1. [x] **Real send through the bridge from Railway** — done 2026-11-25. With nothing due in the
+       copy (no scheduled messages or fair-booth runs, no unfinished sermons, birthday digest at 07:00),
+       sandbox was removed with `CGEN_API_KEY` set and `SEND_ALLOWLIST=+14105088057` (Carissa). A
+       script run in the container (`railway ssh`, `npx tsx` on a `.mts` file importing
+       `server/lib/mac-bridge.ts`) sent one text and one image to Carissa through `https://api.cgen.cc`,
+       and both arrived (confirmed by Carissa). Afterwards `CENTRAL_FLOCK_SANDBOX=1` went back, both variables were removed, and the
+       redeploy logged `Sandbox: background jobs disabled`. Note: `railway variable delete` ignores
+       `--skip-deploys` silently, so drop that flag when deleting.
+2. [x] **Contacts and calendar through the bridge** — done in the same window: the boot-time
+       calendar sync pulled 131 events, and `fetchContacts()` returned 983 contacts.
+3. [x] **Webhooks** — done 2026-11-25. Railway's secret is sealed, so the calls ran inside the
+       container (`railway ssh`, reading `CENTRAL_FLOCK_INTERNAL_SECRET` from its env) against the
+       public `https://flock-next.cgen.cc/webhooks`. All 11 routes (sermons speaker-keys and POST,
+       nursery day, rsvp GET/POST, the four attendance routes, quotes POST) answered with the right
+       secret (200, or 400/404 for the fake bodies and tokens) and 401 with a wrong or missing one.
+       `/webhooks/nursery/day` was byte-for-byte the same as the Mac's. An unknown `/webhooks/*` path
+       with the right secret returns the app's HTML with 200 on both, so that's existing behaviour.
+4. [x] **Backups** — done 2026-11-25. `railway ssh -- pnpm snapshot:now` wrote
+       `/data/backups/2026-11-25` (15 MB DB, 16 MB uploads). A marker row was then added to the live
+       DB, and the restore below brought back the snapshot: marker gone, 946 people, six upload
+       folders, integrity `ok`. **22 seconds** from staging the files to the app running.
 5. **iCloud pull:** run the new pull version of `backup-dbs.sh` _(once built)_ from launchd (not a
    terminal), confirm a dated folder appears with `central-flock.db` and `uploads.tar.gz`, and open
    the `.db` with `sqlite3 ... "pragma integrity_check"`.
@@ -303,7 +310,8 @@ sandbox-only import (Phase 0). Sandbox mode is on during the import, so nothing 
    railway ssh -- sh -c 'mkdir -p /data/incoming && cp /data/backups/<date>/central-flock.db /data/backups/<date>/uploads.tar.gz /data/incoming/'
    ```
    From the iCloud copy instead (if the volume itself is lost): upload the dated folder's two files
-   with `railway volume files upload <file> /data/incoming/<file>`.
+   with `railway volume files --volume central-flock-volume upload <file> /incoming/<file> --overwrite`
+   (paths are relative to the volume, which is mounted at `/data`).
 3. **Import:** set `CENTRAL_FLOCK_SANDBOX=1` and deploy. The log should say
    `Sandbox: imported the production copy`. Check the data in the app.
 4. **Back to live:** remove `CENTRAL_FLOCK_SANDBOX` and deploy. Anything scheduled while sandbox was

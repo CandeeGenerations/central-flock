@@ -68,23 +68,47 @@ function RecipientsCard({
   onErrorClick: (info: ErrorInfo) => void
 }) {
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null)
+  const [failedOnly, setFailedOnly] = useState(false)
+  const failedCount = useMemo(() => recipients.filter((r) => r.status === 'failed').length, [recipients])
+  // Drop the filter once nothing has failed (e.g. after a resend succeeds) so the list isn't left empty
+  const showFailedOnly = failedOnly && failedCount > 0
 
   const filtered = useMemo(() => {
-    if (!debouncedSearch) return recipients
+    const byStatus = showFailedOnly ? recipients.filter((r) => r.status === 'failed') : recipients
+    if (!debouncedSearch) return byStatus
     const q = debouncedSearch.toLowerCase()
-    return recipients.filter((r) => formatFullName(r).toLowerCase().includes(q) || (r.phoneDisplay || '').includes(q))
-  }, [recipients, debouncedSearch])
+    return byStatus.filter((r) => formatFullName(r).toLowerCase().includes(q) || (r.phoneDisplay || '').includes(q))
+  }, [recipients, debouncedSearch, showFailedOnly])
 
   return (
     <Card size="sm">
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <CardTitle>Recipients</CardTitle>
-        <SearchInput
-          placeholder="Search recipients..."
-          value={search}
-          onChange={onSearchChange}
-          containerClassName="w-48"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {failedCount > 0 && (
+            <Button
+              variant={showFailedOnly ? 'destructive' : 'outline'}
+              size="sm"
+              aria-pressed={showFailedOnly}
+              onClick={() => {
+                setFailedOnly((v) => !v)
+                onPageChange(() => 1)
+              }}
+            >
+              <AlertCircle className="h-4 w-4 mr-1" />
+              Failed only
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {failedCount}
+              </Badge>
+            </Button>
+          )}
+          <SearchInput
+            placeholder="Search recipients..."
+            value={search}
+            onChange={onSearchChange}
+            containerClassName="w-48"
+          />
+        </div>
       </CardHeader>
       <div className="overflow-x-auto border-t">
         <Table>
@@ -128,7 +152,7 @@ function RecipientsCard({
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
-                  {recipients.length === 0 ? 'No recipients' : 'No recipients match your search.'}
+                  {recipients.length === 0 ? 'No recipients' : 'No recipients match your filters.'}
                 </TableCell>
               </TableRow>
             )}

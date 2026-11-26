@@ -1,0 +1,49 @@
+name: Preview Comment
+
+# Railway reports each PR environment deploy as a commit status whose description ends with the
+# preview's domain ("Success - central-flock-central-flock-pr-31.up.railway.app"). Post that
+# address on the PR, editing one comment rather than adding a new one per deploy.
+# `status` workflows run from the default branch, so changes here take effect once merged.
+
+on:
+  status: {}
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  comment:
+    if: >-
+      github.event.state == 'success' &&
+      github.event.context == 'central-flock - central-flock' &&
+      contains(github.event.description, '-pr-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post or update the preview link
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DESCRIPTION: ${{ github.event.description }}
+          SHA: ${{ github.event.sha }}
+          DEPLOY_URL: ${{ github.event.target_url }}
+        run: |
+          domain=$(printf '%s' "$DESCRIPTION" | grep -oE '[a-z0-9-]+-pr-[0-9]+[a-z0-9-]*\.up\.railway\.app' | head -1)
+          pr=$(printf '%s' "$domain" | grep -oE -- '-pr-[0-9]+' | grep -oE '[0-9]+')
+          if [ -z "$domain" ] || [ -z "$pr" ]; then
+            echo "No preview domain in: $DESCRIPTION"
+            exit 0
+          fi
+
+          marker='<!-- railway-preview -->'
+          body=$(printf '%s\n**Preview:** https://%s\n\nRunning commit `%s` in sandbox mode with fake data (no texts, AI or background jobs). [Railway deploy](%s)\n' \
+            "$marker" "$domain" "${SHA:0:7}" "$DEPLOY_URL")
+
+          existing=$(gh api "repos/$REPO/issues/$pr/comments" --paginate \
+            --jq "[.[] | select(.body | startswith(\"$marker\"))][0].id // empty")
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$existing" -f body="$body" > /dev/null
+            echo "Updated comment $existing on PR $pr"
+          else
+            gh pr comment "$pr" --repo "$REPO" --body "$body"
+          fi

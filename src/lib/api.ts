@@ -336,6 +336,10 @@ export function resumeMessage(id: number) {
   return request<{success: boolean; jobId: string}>(`/messages/${id}/resume`, {method: 'POST'})
 }
 
+export function resendFailedMessage(id: number) {
+  return request<{success: boolean; jobId: string; resent: number}>(`/messages/${id}/resend-failed`, {method: 'POST'})
+}
+
 export function duplicateMessage(id: number) {
   return request<Draft>(`/messages/${id}/duplicate`, {method: 'POST'})
 }

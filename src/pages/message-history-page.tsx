@@ -21,13 +21,14 @@ import {
   fetchDrafts,
   fetchMessages,
   fetchPeople,
+  resendFailedMessage,
 } from '@/lib/api'
 import type {Draft, Message, Person, TemplateVariable} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Copy, FileText, Pencil, Plus, Trash2} from 'lucide-react'
+import {AlertCircle, Copy, FileText, Pencil, Plus, RotateCcw, Trash2} from 'lucide-react'
 import {useEffect, useMemo, useState} from 'react'
 import {Link, useNavigate, useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -159,6 +160,12 @@ export function MessageHistoryPage() {
         )
         .sort((a, b) => (b.completedAt ?? b.createdAt).localeCompare(a.completedAt ?? a.createdAt)),
     [messages],
+  )
+  const [failedOnly, setFailedOnly] = useState(false)
+  const failedCount = useMemo(() => sentMessages?.filter((m) => m.failedCount > 0).length ?? 0, [sentMessages])
+  const visibleSentMessages = useMemo(
+    () => (failedOnly ? sentMessages?.filter((m) => m.failedCount > 0) : sentMessages),
+    [sentMessages, failedOnly],
   )
   const scheduledMessages = useMemo(
     () =>
@@ -292,6 +299,17 @@ export function MessageHistoryPage() {
     },
   })
 
+  const resendFailedMutation = useMutation({
+    mutationFn: (id: number) => resendFailedMessage(id),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({queryKey: queryKeys.messages()})
+      toast.success(`Resending to ${data.resent} failed recipient${data.resent === 1 ? '' : 's'}`)
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Failed to resend')
+    },
+  })
+
   const [saveTemplateMsg, setSaveTemplateMsg] = useState<Message | null>(null)
   const [templateName, setTemplateName] = useState('')
 
@@ -338,11 +356,12 @@ export function MessageHistoryPage() {
   const toggleSelect = useSetToggle(setSelectedIds)
 
   const toggleAll = () => {
-    if (!messages) return
-    if (selectedIds.size === messages.length) {
+    const visible = activeTab === 'scheduled' ? scheduledMessages : visibleSentMessages
+    if (!visible) return
+    if (selectedIds.size === visible.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(messages.map((m) => m.id)))
+      setSelectedIds(new Set(visible.map((m) => m.id)))
     }
   }
 
@@ -467,6 +486,25 @@ export function MessageHistoryPage() {
             }}
             containerClassName="sm:max-w-sm"
           />
+          {activeTab === 'sent' && (
+            <Button
+              variant={failedOnly ? 'destructive' : 'outline'}
+              size="sm"
+              className="mt-3"
+              onClick={() => {
+                setFailedOnly((v) => !v)
+                setSentPage(1)
+                setSelectedIds(new Set())
+              }}
+              aria-pressed={failedOnly}
+            >
+              <AlertCircle className="h-4 w-4 mr-1" />
+              Failed only
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {failedCount}
+              </Badge>
+            </Button>
+          )}
         </CardContent>
 
         {/* Tab toggle */}
@@ -549,7 +587,9 @@ export function MessageHistoryPage() {
                         <TableHead className="w-10">
                           <Checkbox
                             checked={
-                              sentMessages && sentMessages.length > 0 && selectedIds.size === sentMessages.length
+                              visibleSentMessages &&
+                              visibleSentMessages.length > 0 &&
+                              selectedIds.size === visibleSentMessages.length
                             }
                             onCheckedChange={toggleAll}
                           />
@@ -563,7 +603,7 @@ export function MessageHistoryPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sentMessages?.slice((sentPage - 1) * pageSize, sentPage * pageSize).map((msg) => (
+                      {visibleSentMessages?.slice((sentPage - 1) * pageSize, sentPage * pageSize).map((msg) => (
                         <TableRow
                           key={msg.id}
                           className="cursor-pointer hover:bg-muted/50"
@@ -605,6 +645,23 @@ export function MessageHistoryPage() {
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <div className="flex">
+                              {msg.failedCount > 0 && (msg.status === 'completed' || msg.status === 'cancelled') && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        disabled={resendFailedMutation.isPending}
+                                        onClick={() => resendFailedMutation.mutate(msg.id)}
+                                      >
+                                        <RotateCcw className="h-4 w-4 text-red-500" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Resend to {msg.failedCount} failed</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -633,7 +690,14 @@ export function MessageHistoryPage() {
                           </TableCell>
                         </TableRow>
                       ))}
-                      {sentMessages?.length === 0 && (
+                      {failedOnly && visibleSentMessages?.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No messages with failed sends.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!failedOnly && sentMessages?.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                             No messages sent yet.{' '}
@@ -650,7 +714,7 @@ export function MessageHistoryPage() {
                   <Pagination
                     page={sentPage}
                     pageSize={pageSize}
-                    total={sentMessages?.length || 0}
+                    total={visibleSentMessages?.length || 0}
                     onPageChange={setSentPage}
                     noun="messages"
                   />

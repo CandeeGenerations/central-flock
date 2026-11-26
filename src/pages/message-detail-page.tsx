@@ -10,13 +10,20 @@ import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
-import {cancelMessage, createTemplate, fetchMessage, resumeMessage, sendNowMessage} from '@/lib/api'
+import {
+  cancelMessage,
+  createTemplate,
+  fetchMessage,
+  resendFailedMessage,
+  resumeMessage,
+  sendNowMessage,
+} from '@/lib/api'
 import type {TemplateVariable} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertCircle, ArrowLeft, Copy, ExternalLink, FileText, Pencil, Play, XCircle} from 'lucide-react'
+import {AlertCircle, ArrowLeft, Copy, ExternalLink, FileText, Pencil, Play, RotateCcw, XCircle} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -207,7 +214,7 @@ export function MessageDetailPage() {
     enabled: !!id,
     refetchInterval: (query) => {
       const msg = query.state.data
-      return msg?.status === 'sending' || msg?.status === 'scheduled' ? 2000 : false
+      return msg?.status === 'sending' || msg?.status === 'pending' || msg?.status === 'scheduled' ? 2000 : false
     },
   })
 
@@ -242,6 +249,16 @@ export function MessageDetailPage() {
       queryClient.invalidateQueries({queryKey: queryKeys.messages()})
       toast.success('Message sending resumed')
     },
+  })
+
+  const resendFailedMutation = useMutation({
+    mutationFn: () => resendFailedMessage(Number(id)),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({queryKey: queryKeys.message(id!)})
+      queryClient.invalidateQueries({queryKey: queryKeys.messages()})
+      toast.success(`Resending to ${data.resent} failed recipient${data.resent === 1 ? '' : 's'}`)
+    },
+    onError: (err: Error) => toast.error(err.message),
   })
 
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
@@ -403,6 +420,17 @@ export function MessageDetailPage() {
           <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <CardTitle>Progress</CardTitle>
             <div className="flex flex-wrap gap-2">
+              {message.failedCount > 0 && (message.status === 'completed' || message.status === 'cancelled') && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => resendFailedMutation.mutate()}
+                  disabled={resendFailedMutation.isPending}
+                >
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Resend failed ({message.failedCount})
+                </Button>
+              )}
               {message.status === 'sending' && (
                 <>
                   <Button size="sm" onClick={() => resumeMutation.mutate()} disabled={resumeMutation.isPending}>

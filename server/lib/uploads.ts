@@ -1,6 +1,9 @@
 import path from 'node:path'
 import {fileURLToPath} from 'node:url'
 
+// Must run before UPLOADS_DIR is read below: a PR environment gets its own uploads folder.
+import './preview-env.js'
+
 const __here = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_DIR = path.join(__here, '..', '..', 'data')
 

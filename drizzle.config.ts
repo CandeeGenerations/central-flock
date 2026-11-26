@@ -1,5 +1,10 @@
 import {defineConfig} from 'drizzle-kit'
 
+// A PR environment migrates its own database, not production's (server/lib/preview-env.ts).
+import {applyPreviewEnvironment} from './server/lib/preview-env.ts'
+
+applyPreviewEnvironment()
+
 export default defineConfig({
   schema: './server/db/schema.ts',
   out: './server/db/migrations',

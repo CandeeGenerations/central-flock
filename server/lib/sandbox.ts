@@ -7,6 +7,10 @@
 // is covered automatically. A new kind of outbound call must add its own check. The Mac bridge
 // (lib/mac-bridge.ts) is the exception: it reports success for sends and returns empty reads, so
 // send flows still work in a copy.
+//
+// A Railway environment other than production (a PR environment) is always a sandbox, whatever
+// its variables say: see preview-env.ts.
+import {previewEnvironmentName} from './preview-env.js'
 
 export type OutboundKind = 'mac-bridge' | 'anthropic' | 'mcp' | 'webhook'
 
@@ -20,7 +24,7 @@ export class SandboxBlockedError extends Error {
 }
 
 export function isSandbox(): boolean {
-  return process.env.CENTRAL_FLOCK_SANDBOX === '1'
+  return process.env.CENTRAL_FLOCK_SANDBOX === '1' || previewEnvironmentName() !== null
 }
 
 export function assertOutboundAllowed(kind: OutboundKind, what: string): void {

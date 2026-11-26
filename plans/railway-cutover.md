@@ -424,9 +424,11 @@ sandbox-only import (Phase 0). Sandbox mode is on during the import, so nothing 
 - [ ] Remove the `flock-next.cgen.cc` domain from Railway and its DNS records.
 - [ ] Keep the old iCloud upload subfolders as the pre-migration snapshot; the live uploads are on
       Railway now.
-- [ ] Check what a PR environment gets for a volume (open a throwaway PR with PR environments on and
-      inspect `/data`). Only if it's empty — or if PR environments can be based on a separate
-      seeded environment — turn on PR environments and **Enable Bot PR Environments**.
+- [x] Check what a PR environment gets for a volume. **Empty** (checked 2026-11-26 on
+      `central-flock-pr-32`: only `lost+found` and the app's own `/data/preview`). PR environments
+      are on, based on production; every non-production environment is forced into sandbox mode on
+      fake data anyway (`server/lib/preview-env.ts`, RUNBOOK → PR preview environments). Bot PR
+      environments stay off. A preview gets a web address only if production has a Railway domain.
 - [ ] Update `RUNBOOK.md`, `CLAUDE.md` (no more "the service runs `pnpm dev`", "production is the
       only DB", post-commit deploy) and the auto-memory deployment notes.
 - [ ] Retire the Mac post-commit deploy hook (`.husky/post-commit`) in favour of Railway's GitHub deploys.

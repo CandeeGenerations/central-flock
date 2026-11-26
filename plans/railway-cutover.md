@@ -431,4 +431,5 @@ sandbox-only import (Phase 0). Sandbox mode is on during the import, so nothing 
       environments stay off. A preview gets a web address only if production has a Railway domain.
 - [ ] Update `RUNBOOK.md`, `CLAUDE.md` (no more "the service runs `pnpm dev`", "production is the
       only DB", post-commit deploy) and the auto-memory deployment notes.
-- [ ] Retire the Mac post-commit deploy hook (`.husky/post-commit`) in favour of Railway's GitHub deploys.
+- [x] Retire the Mac post-commit deploy hook (`.husky/post-commit`) in favour of Railway's GitHub deploys.
+      Done with `.husky/post-merge` too (it had no Mac guard, so every `git pull` on `main` still ran `deploy.sh`).

@@ -4,6 +4,24 @@ Operational procedures for the live Central Flock instance. There is **no dev or
 
 For deployment plumbing (launchd plists, env vars, cloudflared tunnel), see [memory/deployment.md](../../.claude/projects/-Users-cgen01-repos-cgen-central-flock/memory/deployment.md) (auto-memory, not in this repo).
 
+## PR preview environments (Railway)
+
+Railway can give each pull request its own environment (Project Settings → Environments → PR
+Environments). Railway copies production's **unsealed** variables into it, so the app doesn't
+rely on them: any Railway environment whose `RAILWAY_ENVIRONMENT_NAME` isn't `production` is
+forced into sandbox mode at start-up (`server/lib/preview-env.ts`). That means:
+
+- its own database and uploads under `/data/preview/`, seeded with fake people (555 numbers);
+  production's files are never opened, even if the volume was copied;
+- no texts, Claude calls, MCP, webhooks or background jobs; no snapshots; Sentry tags errors with
+  the environment's name;
+- no login, because the sealed `AUTH_PASSWORD_HASH`/`JWT_SECRET` aren't copied. It holds only fake
+  data, but don't paste anything real into it.
+
+A PR branch made before this guard landed (`feat/pr-preview-envs`) doesn't have it: merge or rebase
+it onto `main` before it gets a preview. Railway deletes the environment when the PR is merged or
+closed.
+
 ## Deploying
 
 `./scripts/deploy.sh` is the only sanctioned path. It performs, in order:

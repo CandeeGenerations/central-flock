@@ -18,7 +18,7 @@ forced into sandbox mode at start-up (`server/lib/preview-env.ts`). That means:
 - no login, because the sealed `AUTH_PASSWORD_HASH`/`JWT_SECRET` aren't copied. It holds only fake
   data, but don't paste anything real into it.
 
-A PR branch made before this guard landed (`feat/pr-preview-envs`) doesn't have it: merge or rebase
+A PR branch cut from `main` before this guard merged (PR 32) doesn't have it: merge or rebase
 it onto `main` before it gets a preview. Railway deletes the environment when the PR is merged or
 closed.
 

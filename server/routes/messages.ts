@@ -564,6 +564,53 @@ messagesRouter.post(
   }),
 )
 
+// POST /api/messages/:id/resend-failed - Put failed recipients back in the queue and send to them again
+messagesRouter.post(
+  '/:id/resend-failed',
+  asyncHandler(async (req, res) => {
+    const messageId = Number(req.params.id)
+    const message = db.select().from(schema.messages).where(eq(schema.messages.id, messageId)).get()
+
+    if (!message) {
+      res.status(404).json({error: 'Message not found'})
+      return
+    }
+    if (message.status !== 'completed' && message.status !== 'cancelled') {
+      res.status(400).json({error: 'Only finished messages can resend failed recipients'})
+      return
+    }
+    const existingJob = getJob(messageId)
+    if (existingJob && existingJob.status === 'processing') {
+      res.status(400).json({error: 'Message is already being processed'})
+      return
+    }
+
+    const failedFilter = sql`${schema.messageRecipients.messageId} = ${messageId} AND ${schema.messageRecipients.status} = 'failed'`
+    const failed = db.select({id: schema.messageRecipients.id}).from(schema.messageRecipients).where(failedFilter).all()
+    if (failed.length === 0) {
+      res.status(400).json({error: 'No failed recipients to resend'})
+      return
+    }
+
+    db.transaction((tx) => {
+      tx.update(schema.messageRecipients).set({status: 'pending', errorMessage: null}).where(failedFilter).run()
+      tx.update(schema.messages)
+        .set({
+          failedCount: sql`max(failed_count - ${failed.length}, 0)`,
+          status: 'pending',
+          completedAt: null,
+        })
+        .where(eq(schema.messages.id, messageId))
+        .run()
+    })
+
+    const job = createJob(messageId)
+    processSendJob(job)
+
+    res.json({success: true, jobId: job.id, resent: failed.length})
+  }),
+)
+
 // POST /api/messages/:id/duplicate - Duplicate a message as a new draft
 messagesRouter.post(
   '/:id/duplicate',

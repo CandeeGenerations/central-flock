@@ -10,13 +10,20 @@ import {InlineSpinner} from '@/components/ui/spinner'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {useDebouncedValue} from '@/hooks/use-debounced-value'
 import {usePersistedState} from '@/hooks/use-persisted-state'
-import {cancelMessage, createTemplate, fetchMessage, resumeMessage, sendNowMessage} from '@/lib/api'
+import {
+  cancelMessage,
+  createTemplate,
+  fetchMessage,
+  resendFailedMessage,
+  resumeMessage,
+  sendNowMessage,
+} from '@/lib/api'
 import type {TemplateVariable} from '@/lib/api'
 import {formatDateTime} from '@/lib/date'
 import {formatFullName} from '@/lib/format'
 import {queryKeys} from '@/lib/query-keys'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {AlertCircle, ArrowLeft, Copy, ExternalLink, FileText, Pencil, Play, XCircle} from 'lucide-react'
+import {AlertCircle, ArrowLeft, Copy, ExternalLink, FileText, Pencil, Play, RotateCcw, XCircle} from 'lucide-react'
 import {useMemo, useState} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {toast} from 'sonner'
@@ -61,23 +68,47 @@ function RecipientsCard({
   onErrorClick: (info: ErrorInfo) => void
 }) {
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null)
+  const [failedOnly, setFailedOnly] = useState(false)
+  const failedCount = useMemo(() => recipients.filter((r) => r.status === 'failed').length, [recipients])
+  // Drop the filter once nothing has failed (e.g. after a resend succeeds) so the list isn't left empty
+  const showFailedOnly = failedOnly && failedCount > 0
 
   const filtered = useMemo(() => {
-    if (!debouncedSearch) return recipients
+    const byStatus = showFailedOnly ? recipients.filter((r) => r.status === 'failed') : recipients
+    if (!debouncedSearch) return byStatus
     const q = debouncedSearch.toLowerCase()
-    return recipients.filter((r) => formatFullName(r).toLowerCase().includes(q) || (r.phoneDisplay || '').includes(q))
-  }, [recipients, debouncedSearch])
+    return byStatus.filter((r) => formatFullName(r).toLowerCase().includes(q) || (r.phoneDisplay || '').includes(q))
+  }, [recipients, debouncedSearch, showFailedOnly])
 
   return (
     <Card size="sm">
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <CardTitle>Recipients</CardTitle>
-        <SearchInput
-          placeholder="Search recipients..."
-          value={search}
-          onChange={onSearchChange}
-          containerClassName="w-48"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {failedCount > 0 && (
+            <Button
+              variant={showFailedOnly ? 'destructive' : 'outline'}
+              size="sm"
+              aria-pressed={showFailedOnly}
+              onClick={() => {
+                setFailedOnly((v) => !v)
+                onPageChange(() => 1)
+              }}
+            >
+              <AlertCircle className="h-4 w-4 mr-1" />
+              Failed only
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {failedCount}
+              </Badge>
+            </Button>
+          )}
+          <SearchInput
+            placeholder="Search recipients..."
+            value={search}
+            onChange={onSearchChange}
+            containerClassName="w-48"
+          />
+        </div>
       </CardHeader>
       <div className="overflow-x-auto border-t">
         <Table>
@@ -121,7 +152,7 @@ function RecipientsCard({
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
-                  {recipients.length === 0 ? 'No recipients' : 'No recipients match your search.'}
+                  {recipients.length === 0 ? 'No recipients' : 'No recipients match your filters.'}
                 </TableCell>
               </TableRow>
             )}
@@ -207,7 +238,7 @@ export function MessageDetailPage() {
     enabled: !!id,
     refetchInterval: (query) => {
       const msg = query.state.data
-      return msg?.status === 'sending' || msg?.status === 'scheduled' ? 2000 : false
+      return msg?.status === 'sending' || msg?.status === 'pending' || msg?.status === 'scheduled' ? 2000 : false
     },
   })
 
@@ -242,6 +273,16 @@ export function MessageDetailPage() {
       queryClient.invalidateQueries({queryKey: queryKeys.messages()})
       toast.success('Message sending resumed')
     },
+  })
+
+  const resendFailedMutation = useMutation({
+    mutationFn: () => resendFailedMessage(Number(id)),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({queryKey: queryKeys.message(id!)})
+      queryClient.invalidateQueries({queryKey: queryKeys.messages()})
+      toast.success(`Resending to ${data.resent} failed recipient${data.resent === 1 ? '' : 's'}`)
+    },
+    onError: (err: Error) => toast.error(err.message),
   })
 
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
@@ -403,6 +444,17 @@ export function MessageDetailPage() {
           <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <CardTitle>Progress</CardTitle>
             <div className="flex flex-wrap gap-2">
+              {message.failedCount > 0 && (message.status === 'completed' || message.status === 'cancelled') && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => resendFailedMutation.mutate()}
+                  disabled={resendFailedMutation.isPending}
+                >
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Resend failed ({message.failedCount})
+                </Button>
+              )}
               {message.status === 'sending' && (
                 <>
                   <Button size="sm" onClick={() => resumeMutation.mutate()} disabled={resumeMutation.isPending}>

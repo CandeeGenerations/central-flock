@@ -79,6 +79,7 @@
     "@commitlint/config-conventional": "^21.2.3",
     "@sentry/cli": "^3.8.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/intent": "0.5.6",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/better-sqlite3": "^9.6.0",
     "@types/cookie-parser": "^1.4.10",
@@ -103,5 +104,14 @@
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
   },
-  "packageManager": "pnpm@12.8.1+sha512.f64ba907507f5ceafe06c8d38e6052d0179444580ec1279ddd5bfc11cb48aa8a2644b66598e07e761da84872a9fc57d5f902b87fa49d024198d558612aabbe45"
+  "packageManager": "pnpm@12.8.1+sha512.f64ba907507f5ceafe06c8d38e6052d0179444580ec1279ddd5bfc11cb48aa8a2644b66598e07e761da84872a9fc57d5f902b87fa49d024198d558612aabbe45",
+  "intent": {
+    "skills": [
+      "@tanstack/react-query",
+      "@tanstack/react-router",
+      "@tanstack/router-core",
+      "@tanstack/react-start",
+      "@tanstack/start-client-core"
+    ]
+  }
 }

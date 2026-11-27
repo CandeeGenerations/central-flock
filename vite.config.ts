@@ -8,11 +8,13 @@ import {defineConfig} from 'vite'
 // Run as: SENTRY_RELEASE=$(git rev-parse --short HEAD) pnpm build
 const sentryEnabled = Boolean(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG)
 // On Railway nothing sets the release or environment for the build, so default them from the
-// deployed commit and the server's SENTRY_ENVIRONMENT (or the Railway environment's name).
+// deployed commit and the environment. A PR environment inherits production's SENTRY_ENVIRONMENT,
+// so its own Railway name wins, as on the server (server/lib/preview-env.ts).
 const sentryRelease = process.env.SENTRY_RELEASE ?? process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7)
 const webRelease = process.env.VITE_SENTRY_RELEASE ?? sentryRelease
-const webEnvironment =
-  process.env.VITE_SENTRY_ENVIRONMENT ?? process.env.SENTRY_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME
+const railwayEnvironment = process.env.RAILWAY_ENVIRONMENT_NAME
+const previewEnvironment = railwayEnvironment && railwayEnvironment !== 'production' ? railwayEnvironment : undefined
+const webEnvironment = process.env.VITE_SENTRY_ENVIRONMENT ?? previewEnvironment ?? process.env.SENTRY_ENVIRONMENT
 
 export default defineConfig({
   plugins: [

@@ -6,7 +6,9 @@ import * as Sentry from '@sentry/node'
 // perf spans automatically.
 const dsn = process.env.SENTRY_DSN_SERVER
 const environment = process.env.SENTRY_ENVIRONMENT ?? 'development'
-const release = process.env.SENTRY_RELEASE
+// The Mac deploy script set SENTRY_RELEASE; on Railway fall back to the deployed commit (short SHA,
+// the same form the Mac used), so events and source maps line up with a release.
+const release = process.env.SENTRY_RELEASE ?? process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7)
 
 const RSVP_TOKEN = /\/webhooks\/rsvp\/[^/?#]+/g
 

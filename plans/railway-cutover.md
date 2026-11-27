@@ -325,16 +325,19 @@ about 16:31. Deviations from the steps above:
 ### Verify (before calling it done)
 
 - [x] `https://flock.cgen.cc` loads from Railway (`server: railway-hikari`, `/api/*` returns 401 signed out). Login: _you to confirm_.
-- [ ] Send one text and one image to yourself from Messages compose; both arrive.
+- [x] Send one text and one image to yourself from Messages compose; both arrive. (2026-11-27)
 - [ ] Contacts import preview and the calendar page show Mac data. (Calendar sync read 131 events at boot.)
-- [ ] Public apps through cgen-api: open an RSVP link, record a test attendance tally on a test
+      2026-11-27: calendar works. **Contacts fails**: cgen-api's `GET /api/mac/contacts` errors with
+      `AppleEvent timed out (-1712)` (Sentry CGEN-API-SERVER-B), so Contacts on the Mac mini did not
+      answer within 2 minutes. The same call returned 983 contacts on 2026-11-25.
+- [x] Public apps through cgen-api: open an RSVP link, record a test attendance tally on a test
       service (or check the GET only), load the nursery day page.
-- [ ] Sermons and quotes intake: trigger one from the sermon pipeline or wait for the next run, and
+- [x] Sermons and quotes intake: trigger one from the sermon pipeline or wait for the next run, and
       check it lands.
 - [x] Logs show the schedulers started (scheduler, birthday, fair booth, calendar sync, specials). The next scheduled send (Sunday 2026-11-29, 08:00) going out on time: _to check_.
 - [ ] Sentry shows events tagged `production` from Railway.
-- [ ] The home-screen app on iPhone and iPad opens and stays logged in (log in again if needed).
-- [ ] The next morning: `~/Library/Logs/central-flock-backup.log` shows `[backup-pull ...] Pulled
+- [x] The home-screen app on iPhone and iPad opens and stays logged in (log in again if needed).
+- [x] The next morning: `~/Library/Logs/central-flock-backup.log` shows `[backup-pull ...] Pulled
 <today>` (the first launchd run of the pull script), the new dated iCloud folder's `.db` passes
       `integrity_check`, and `/data/backups/<today>` exists on Railway (`railway ssh -- ls /data/backups`).
 

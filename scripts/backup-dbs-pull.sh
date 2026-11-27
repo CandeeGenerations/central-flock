@@ -15,7 +15,8 @@
 #    so a night counts once both final files are in its folder.
 # 2. Downloads both files with the Railway CLI (no ssh needed).
 # 3. Checks the DB's integrity before it replaces anything in iCloud.
-# 4. Keeps the newest KEEP dated folders, like backup-dbs.sh.
+# 4. Keeps the newest KEEP dated folders, like backup-dbs.sh, without listing
+#    the iCloud folder (see the note at step 4).
 # Alerts n8n when the snapshot is stale, missing or broken.
 #
 # Uses the Railway CLI's saved login, as push-rehearsal-copy.sh does.
@@ -76,7 +77,9 @@ fi
 
 # --- 2. Download ------------------------------------------------------------
 mkdir -p "$DEST"
-TMP="$DEST/.tmp-$DAY"
+# Not a dot name: iCloud Drive marks dot-named items hidden while they sync, and
+# the flag stayed on the dated folder after the rename, hiding it in Finder.
+TMP="$DEST/$DAY.partial"
 rm -rf "$TMP"
 mkdir -p "$TMP"
 trap 'rm -rf "$TMP"' EXIT
@@ -103,14 +106,30 @@ trap - EXIT
 log "Pulled $DAY: $(du -h "$DEST/$DAY/central-flock.db" | cut -f1) DB ($PEOPLE people), $(du -h "$DEST/$DAY/uploads.tar.gz" | cut -f1) uploads"
 
 # --- 4. Keep the newest KEEP ------------------------------------------------
-# Absolute paths with find, not a relative glob: see the note in backup-dbs.sh.
-ALL=$(find "$DEST" -mindepth 1 -maxdepth 1 -type d -name '20*' | sort -r)
-printf '%s\n' "$ALL" | tail -n +$((KEEP + 1)) | while IFS= read -r OLD; do
+# Under launchd, macOS's iCloud Drive privacy rules let /bin/bash look up a
+# path and change folders this job created, but not list $DEST (find and globs
+# fail with "Operation not permitted") or change folders another app created.
+# So probe each dated name in the last WINDOW days instead of listing.
+WINDOW=60
+dated_folders() {
+  local i day
+  for ((i = 0; i <= WINDOW; i++)); do
+    day=$(date -j -v-"${i}"d -f %Y-%m-%d "$TODAY" +%Y-%m-%d)
+    [ -d "$DEST/$day" ] && echo "$DEST/$day"
+  done
+  return 0
+}
+
+ALL=$(dated_folders)
+PRUNE_FAILED=0
+while IFS= read -r OLD; do
   [ -n "$OLD" ] || continue
   log "Pruning old backup: $OLD"
-  rm -rf -- "$OLD"
-done
+  rm -rf -- "$OLD" || PRUNE_FAILED=1
+done < <(printf '%s\n' "$ALL" | tail -n +$((KEEP + 1)))
+[ "$PRUNE_FAILED" = 1 ] &&
+  alert backup_prune_failed "central-flock prune could not remove an old iCloud backup. Folders another app made must be deleted by hand in Finder."
 
-FINAL_COUNT=$(find "$DEST" -mindepth 1 -maxdepth 1 -type d -name '20*' | grep -c . || true)
+FINAL_COUNT=$(dated_folders | grep -c . || true)
 [ "$FINAL_COUNT" -ge 10 ] && alert backup_folder_count_exceeded "central-flock prune appears to be failing: $FINAL_COUNT dated backup folders found."
 log "Done. $FINAL_COUNT dated folder(s) kept."

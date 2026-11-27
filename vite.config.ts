@@ -7,6 +7,14 @@ import {defineConfig} from 'vite'
 // Source maps are uploaded to Sentry on build when SENTRY_AUTH_TOKEN is set.
 // Run as: SENTRY_RELEASE=$(git rev-parse --short HEAD) pnpm build
 const sentryEnabled = Boolean(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG)
+// On Railway nothing sets the release or environment for the build, so default them from the
+// deployed commit and the environment. A PR environment inherits production's SENTRY_ENVIRONMENT,
+// so its own Railway name wins, as on the server (server/lib/preview-env.ts).
+const sentryRelease = process.env.SENTRY_RELEASE ?? process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7)
+const webRelease = process.env.VITE_SENTRY_RELEASE ?? sentryRelease
+const railwayEnvironment = process.env.RAILWAY_ENVIRONMENT_NAME
+const previewEnvironment = railwayEnvironment && railwayEnvironment !== 'production' ? railwayEnvironment : undefined
+const webEnvironment = process.env.VITE_SENTRY_ENVIRONMENT ?? previewEnvironment ?? process.env.SENTRY_ENVIRONMENT
 
 export default defineConfig({
   plugins: [
@@ -17,7 +25,7 @@ export default defineConfig({
           org: process.env.SENTRY_ORG,
           project: process.env.SENTRY_PROJECT_WEB ?? 'central-flock-web',
           authToken: process.env.SENTRY_AUTH_TOKEN,
-          release: {name: process.env.SENTRY_RELEASE},
+          release: {name: sentryRelease},
           sourcemaps: {assets: './dist/**'},
           // The upload report is ~20 lines of debug-id tables on every deploy
           // and nobody reads it; failures still surface as build errors.
@@ -26,6 +34,10 @@ export default defineConfig({
         })
       : null,
   ],
+  define: {
+    ...(webRelease ? {'import.meta.env.VITE_SENTRY_RELEASE': JSON.stringify(webRelease)} : {}),
+    ...(webEnvironment ? {'import.meta.env.VITE_SENTRY_ENVIRONMENT': JSON.stringify(webEnvironment)} : {}),
+  },
   build: {
     // Emit source maps for Sentry; 'hidden' means they're produced but not referenced from the bundle.
     sourcemap: 'hidden',

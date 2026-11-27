@@ -1,12 +1,18 @@
 import * as Sentry from '@sentry/node'
 
+// First, so a Railway PR environment reports under its own name rather than the production
+// SENTRY_ENVIRONMENT it inherits (this file runs before anything else imports preview-env).
+import './preview-env.js'
+
 // Loaded via Node's --import preload flag (see package.json scripts and the
 // launchd plist's ProgramArguments) so Sentry.init runs before http/express
 // modules load. That's what lets Sentry's instrumentation hook them and emit
 // perf spans automatically.
 const dsn = process.env.SENTRY_DSN_SERVER
 const environment = process.env.SENTRY_ENVIRONMENT ?? 'development'
-const release = process.env.SENTRY_RELEASE
+// The Mac deploy script set SENTRY_RELEASE; on Railway fall back to the deployed commit (short SHA,
+// the same form the Mac used), so events and source maps line up with a release.
+const release = process.env.SENTRY_RELEASE ?? process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7)
 
 const RSVP_TOKEN = /\/webhooks\/rsvp\/[^/?#]+/g
 

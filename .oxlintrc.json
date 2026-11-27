@@ -11,5 +11,33 @@
     "react/immutability": "off",
     "react/purity": "off"
   },
-  "ignorePatterns": ["dist", "server/data", "server/db/migrations"]
+  "ignorePatterns": ["dist", "server/data", "server/db/migrations"],
+  "overrides": [
+    {
+      "files": ["server/**/*.ts"],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "fetch",
+            "message": "Outbound calls go through an approved client that checks sandbox mode. See docs/conventions/outbound-calls.md."
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "server/lib/mac-bridge.ts",
+        "server/services/notify-me.ts",
+        "server/routes/settings.ts",
+        "server/services/youtube-extract.ts",
+        "server/services/events-story/run.ts",
+        "server/**/*.test.ts",
+        "server/test/**"
+      ],
+      "rules": {
+        "no-restricted-globals": "off"
+      }
+    }
+  ]
 }

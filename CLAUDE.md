@@ -44,6 +44,11 @@ Schema is in `server/db/schema.ts` using Drizzle ORM. Tables: `people`, `groups`
 
 ## Key Patterns
 
+- Conventions live in `docs/conventions/` (index: `README.md`). A new default library or pattern gets a file there, a line here and a lint rule where possible.
+- Outbound calls: anything that leaves the app goes through an approved client that checks sandbox mode; no raw `fetch` in `server/` (lint-enforced) — see `docs/conventions/outbound-calls.md`.
+- Seed data: a new table or feature adds fake rows to `server/db/seed.ts` in the same change, 555-0100–0199 numbers only — see `docs/conventions/seed-data.md`.
+- Background jobs start only from the one start-up block in `server/index.ts`, after the sandbox check; production stays at 1 replica — see `docs/conventions/schedulers.md`.
+- Deploys: a merge to `main` deploys to Railway; PR environments are sandboxes on seed data — see `docs/conventions/deploy-and-staging.md`.
 - API client with typed helpers in `src/lib/api.ts`
 - Express routes in `server/routes/` (people, groups, messages, drafts, templates, global-variables, import, contacts)
 - Claude models are configured only in `server/lib/ai-models.ts`; changing it (or the SDK version) triggers `pnpm test:ai` in pre-commit — see RUNBOOK.md → Upgrading Claude models. All Claude calls go through `createMessage` in `server/lib/anthropic-client.ts`; a new AI feature should too, and should get a case in `server/test/ai-smoke.ai.test.ts`.
@@ -53,3 +58,15 @@ Schema is in `server/db/schema.ts` using Drizzle ORM. Tables: `people`, `groups`
 - CSV import via `/api/import` (preview + execute); CSV export via `/api/people/export` and `/api/groups/:id/export`
 - Command palette (Cmd+K): when adding/removing/renaming a route in `src/App.tsx` or a nav entry in `src/lib/nav-config.ts`, keep the palette in sync. Sidebar nav actions are derived from `navGroups` in `src/lib/search/actions.ts` (so sidebar routes update automatically); non-sidebar routes need an explicit entry there. New searchable entities get a provider in `src/lib/search/providers/` (registered in `providers/index.ts`); a new group also needs `GROUP_ORDER` + `PREFIX_TO_GROUP` in `src/components/command-palette.tsx`.
 - Usage frecency / Recents: route visits are logged (`route_visits` table) by the shell hook `use-route-visit-logger`; sections reorder Navigation and frecent entities feed the Recent group via `/api/usage/*`. When you add a new entity detail route (`/section/:id`), add a pretty-label entry for its section in `server/services/usage-entity-resolver.ts` — without one it still works but shows a generic "Section #id" label (a dev-only console warning flags the gap). If the entity can also appear in Recents, set `navPath` on its provider items so the Recent entry de-dupes against the provider result.
+
+<!-- intent-skills:start -->
+## Skill Loading
+
+TanStack packages ship agent skills through TanStack Intent (`@tanstack/intent`, sources allowed in `package.json` → `intent.skills`).
+Use the repository’s installed Intent. If it is unavailable, report the missing dependency instead of downloading a replacement.
+Before editing files for a substantial task:
+- Run `pnpm exec intent list` from the workspace root to see available local skills.
+- If a listed skill matches the task, run `pnpm exec intent load <package>#<skill>` before changing files.
+- Use the loaded `SKILL.md` guidance while making the change.
+- Multiple matches: prefer the most specific local skill for the package or concern you are changing; load additional skills only when the task spans multiple packages or concerns.
+<!-- intent-skills:end -->

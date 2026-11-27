@@ -1,7 +1,9 @@
 # TanStack Migration
 
-Status: **Decisions settled (2026-11-24); phased plan drafted below. Nothing built yet.** The
-numbered decisions further down are the record of why; the "Phased plan" section is what to do.
+Status: **Phase 1 done (2026-11-24). Phase 2: switched to Railway 2026-11-25, in its 14-day
+watch (contacts read still failing on the Mac). Phase 3 done 2026-11-27, ahead of Phase 2 finishing
+because it changes no runtime code. Phase 4 waits for Phase 2.** The numbered decisions further
+down are the record of why; the "Phased plan" section is what to do.
 
 Researched 2026-11-24. Maturity labels come from [tanstack.com/libraries](https://tanstack.com/libraries)
 on that date and move fast — recheck before starting each phase.
@@ -53,6 +55,13 @@ PR environments (once confirmed empty), add the `staging` environment (decision 
 RUNBOOK.md, CLAUDE.md and the auto-memory.
 
 ### Phase 3 — Conventions groundwork (before the rewrite starts)
+
+**Done 2026-11-27.** [`docs/conventions/`](../docs/conventions/README.md) has outbound calls, seed
+data, schedulers and deploy, each linked from CLAUDE.md. `.oxlintrc.json` bans raw `fetch` in
+`server/` outside the approved files. TanStack Intent 0.5.6 is a dev dependency with
+`intent.skills` limited to the TanStack packages, and CLAUDE.md has its skill-loading block.
+`@tanstack/react-query` ships no skills yet (checked 5.108.4); the Router and Start skills appear
+when Phase 4 installs those packages (`pnpm exec intent list` to check).
 
 - Create `docs/conventions/` with the files that already apply (outbound calls and sandbox, seed
   data, schedulers and the one-replica rule, deploy and staging) and link each from CLAUDE.md.

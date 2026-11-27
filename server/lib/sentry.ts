@@ -1,5 +1,9 @@
 import * as Sentry from '@sentry/node'
 
+// First, so a Railway PR environment reports under its own name rather than the production
+// SENTRY_ENVIRONMENT it inherits (this file runs before anything else imports preview-env).
+import './preview-env.js'
+
 // Loaded via Node's --import preload flag (see package.json scripts and the
 // launchd plist's ProgramArguments) so Sentry.init runs before http/express
 // modules load. That's what lets Sentry's instrumentation hook them and emit
